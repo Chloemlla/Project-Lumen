@@ -191,44 +191,44 @@ jobs:
       #   env:
       #     GITHUB_TOKEN: ${{ secrets.USER_PAT }}
 
-  build-web:
-    # if: false  # Disabled - Web build not needed
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_target == 'web' || github.event.inputs.build_target == 'all' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.USER_PAT }}
+  # build-web:
+  #   # if: false  # Disabled - Web build not needed
+  #   if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_target == 'web' || github.event.inputs.build_target == 'all' }}
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #       with:
+  #         token: ${{ secrets.USER_PAT }}
 
-      - uses: subosito/flutter-action@main
-        with:
-          flutter-version: "3.41.0"
-          channel: "stable"
-          cache: true
+  #     - uses: subosito/flutter-action@main
+  #       with:
+  #         flutter-version: "3.41.0"
+  #         channel: "stable"
+  #         cache: true
 
-      - name: Cache Flutter pub dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
+  #     - name: Cache Flutter pub dependencies
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: |
+  #           ~/.pub-cache
+  #         key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-pub-
 
-      - name: Install dependencies
-        run: flutter pub get
+  #     - name: Install dependencies
+  #       run: flutter pub get
 
-      - name: Run build.ps1 (version control)
-        run: pwsh scripts/build.ps1
+  #     - name: Run build.ps1 (version control)
+  #       run: pwsh scripts/build.ps1
 
-      - name: Build Web
-        run: flutter build web --release --dart-define-from-file=nexai_release.json
+  #     - name: Build Web
+  #       run: flutter build web --release --dart-define-from-file=nexai_release.json
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: project_lumen-Web
-          path: build/web/
-          retention-days: 30
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: project_lumen-Web
+  #         path: build/web/
+  #         retention-days: 30
 
   build-windows:
     if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_target == 'windows' || github.event.inputs.build_target == 'all' }}
