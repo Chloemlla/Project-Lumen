@@ -1,0 +1,62 @@
+name: Generate App Icons
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.USER_PAT }}
+
+      - name: Install ImageMagick
+        run: sudo apt-get install -y imagemagick
+
+      - name: Generate icon PNGs from SVG
+        run: |
+          # Generate main icon (1024x1024)
+          convert -size 1024x1024 xc:"#FFFFFF" \
+            -fill white -draw "roundrectangle 200,180 824,870 80,80" \
+            -fill "#FFFFFF" -draw "circle 400,450 400,510" \
+            -fill "#FFFFFF" -draw "circle 624,450 624,510" \
+            -fill "#FFFFFF" -draw "roundrectangle 380,600 644,700 40,40" \
+            -fill white -draw "line 512,180 512,100" \
+            -fill white -draw "circle 512,80 512,110" \
+            assets/icon.png
+
+          # Generate foreground (with padding for adaptive icon safe zone)
+          convert -size 1024x1024 xc:none \
+            -fill white -draw "roundrectangle 280,260 744,790 70,70" \
+            -fill "#FFFFFF" -draw "circle 420,470 420,520" \
+            -fill "#FFFFFF" -draw "circle 604,470 604,520" \
+            -fill "#FFFFFF" -draw "roundrectangle 400,610 624,690 30,30" \
+            -fill white -draw "line 512,260 512,190" \
+            -fill white -draw "circle 512,170 512,200" \
+            assets/icon_foreground.png
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
+      - name: Commit generated icons
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "ci: generate app launcher icons" || true
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.USER_PAT }}

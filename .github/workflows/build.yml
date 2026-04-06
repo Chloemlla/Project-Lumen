@@ -1,0 +1,285 @@
+name: Build project_lumen
+
+on:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: "Build target platform"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - windows
+          - android
+          - web
+          - all
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_target == 'android' || github.event.inputs.build_target == 'all' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.USER_PAT }}
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: "zulu"
+          java-version: "21"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.0"
+          channel: "stable"
+          cache: true
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            android/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache Flutter pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Clean stale pub git cache
+        run: rm -rf ~/.pub-cache/git/
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Write signing config
+        run: |
+          # Ensure gradle.properties has Unix line endings
+          if [ -f "android/gradle.properties" ]; then
+            sed -i 's/\r$//' android/gradle.properties
+            # Ensure file ends with newline
+            [ -n "$(tail -c1 android/gradle.properties)" ] && echo "" >> android/gradle.properties
+          fi
+
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "⚠️ Warning: KEYSTORE_BASE64 secret not set, using debug signing"
+            printf 'NEXAI_USE_DEBUG_SIGNING=true\n' >> android/gradle.properties
+          else
+            echo "✓ Decoding keystore from secret..."
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/project_lumen.jks || {
+              echo "❌ Error: Failed to decode KEYSTORE_BASE64, using debug signing"
+              printf 'NEXAI_USE_DEBUG_SIGNING=true\n' >> android/gradle.properties
+              exit 0
+            }
+            
+            if [ -f "${{ github.workspace }}/project_lumen.jks" ]; then
+              echo "✓ Keystore file created successfully"
+              printf 'NEXAI_STORE_FILE=${{ github.workspace }}/project_lumen.jks\n' >> android/gradle.properties
+              printf 'NEXAI_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}\n' >> android/gradle.properties
+              printf 'NEXAI_KEY_ALIAS=${{ secrets.KEY_ALIAS }}\n' >> android/gradle.properties
+              printf 'NEXAI_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}\n' >> android/gradle.properties
+              echo "✓ Release signing configured"
+            else
+              echo "❌ Error: Keystore file not created, using debug signing"
+              printf 'NEXAI_USE_DEBUG_SIGNING=true\n' >> android/gradle.properties
+            fi
+          fi
+
+          echo "=== gradle.properties content (masked) ==="
+          grep -v "PASSWORD\|ALIAS" android/gradle.properties || true
+          echo "Has NEXAI_STORE_FILE: $(grep -c 'NEXAI_STORE_FILE' android/gradle.properties)"
+
+      - name: Accept Android SDK licenses
+        run: yes | flutter doctor --android-licenses || true
+
+      - name: Run build.ps1 (version control)
+        run: pwsh scripts/build.ps1 -Arg android
+
+      - name: Build Android APK
+        run: |
+          flutter build apk --release --split-per-abi \
+            --obfuscate \
+            --split-debug-info=debug_symbols/android \
+            --dart-define-from-file=nexai_release.json \
+            --build-number=${{ env.VERSION_CODE }}
+
+      # - name: Build Android App Bundle
+      #   run: flutter build appbundle --release --dart-define-from-file=nexai_release.json --build-number=${{ env.VERSION_CODE }}
+
+      - name: Rename APK outputs for release
+        run: |
+          VERSION="${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          echo "Version: $VERSION"
+          echo "=== Original APK files ==="
+          ls -lh build/app/outputs/flutter-apk/
+
+          for file in build/app/outputs/flutter-apk/app-*-release.apk; do
+            if [ -f "$file" ]; then
+              abi=$(echo "$file" | sed -E 's|.*app-(.*)-release\.apk|\1|')
+              echo "Processing: $file -> NexAI_android_${VERSION}_${abi}.apk"
+              cp "$file" "build/app/outputs/flutter-apk/NexAI_android_${VERSION}_${abi}.apk"
+            fi
+          done
+
+          echo "=== Renamed APK files ==="
+          ls -lh build/app/outputs/flutter-apk/NexAI_android_*.apk
+
+      - name: Automatic release
+        if: success()
+        uses: softprops/action-gh-release@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          make_latest: true
+          generate_release_notes: true
+          tag_name: "v${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          prerelease: false
+          name: "project_lumen ${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          files: |
+            build/app/outputs/flutter-apk/NexAI_android_*.apk
+
+      # - name: Rename AAB output
+      #   run: |
+      #     VERSION="${{ env.version }}"
+      #     AAB_FILE="build/app/outputs/bundle/release/app-release.aab"
+      #     if [ -f "$AAB_FILE" ]; then
+      #       echo "Renaming AAB: $AAB_FILE -> NexAI_android_${VERSION}.aab"
+      #       cp "$AAB_FILE" "build/app/outputs/bundle/release/NexAI_android_${VERSION}.aab"
+      #     fi
+      #
+      #     echo "=== AAB files ==="
+      #     ls -lh build/app/outputs/bundle/release/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-symbols
+          path: debug_symbols/
+          retention-days: 90
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: project_lumen-Android-APK
+          path: build/app/outputs/flutter-apk/*.apk
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-outputs
+          path: build/app/outputs/
+
+      # - name: Commit generated files
+      #   run: |
+      #     git config user.name "github-actions[bot]"
+      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+      #     git add -A
+      #     git diff --cached --quiet || git commit -m "ci: generate android build files [skip ci]"
+      #     git push || true
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.USER_PAT }}
+
+  build-web:
+    # if: false  # Disabled - Web build not needed
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_target == 'web' || github.event.inputs.build_target == 'all' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.USER_PAT }}
+
+      - uses: subosito/flutter-action@main
+        with:
+          flutter-version: "3.41.0"
+          channel: "stable"
+          cache: true
+
+      - name: Cache Flutter pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run build.ps1 (version control)
+        run: pwsh scripts/build.ps1
+
+      - name: Build Web
+        run: flutter build web --release --dart-define-from-file=nexai_release.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: project_lumen-Web
+          path: build/web/
+          retention-days: 30
+
+  build-windows:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.build_target == 'windows' || github.event.inputs.build_target == 'all' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.USER_PAT }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.0"
+          channel: "stable"
+          cache: true
+
+      - name: Cache Flutter pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\Pub\Cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Recreate Windows directory
+        run: flutter create --platforms windows .
+
+      - name: Run build.ps1 (version control)
+        run: pwsh scripts/build.ps1
+
+      - name: Build Windows
+        run: |
+          flutter build windows --release `
+            --obfuscate `
+            --split-debug-info=debug_symbols\windows `
+            --dart-define-from-file=nexai_release.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-debug-symbols
+          path: debug_symbols\windows
+          retention-days: 90
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: project_lumen-Windows
+          path: build/windows/x64/runner/Release/
+          retention-days: 30

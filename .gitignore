@@ -111,6 +111,7 @@ coverage/
 
 # Symbols
 app.*.symbols
+scripts/keystore_base64.txt
 
 # Exceptions to above rules.
 !**/ios/**/default.mode1v3

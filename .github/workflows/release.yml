@@ -1,0 +1,314 @@
+name: Release project_lumen
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.USER_PAT }}
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: "zulu"
+          java-version: "21"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.0"
+          channel: "stable"
+          cache: true
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            android/.gradle
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache Flutter pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate app icons
+        run: |
+          sudo apt-get install -y imagemagick
+          convert -size 1024x1024 xc:"#FFFFFF" \
+            -fill white -draw "roundrectangle 200,180 824,870 80,80" \
+            -fill "#FFFFFF" -draw "circle 400,450 400,510" \
+            -fill "#FFFFFF" -draw "circle 624,450 624,510" \
+            -fill "#FFFFFF" -draw "roundrectangle 380,600 644,700 40,40" \
+            assets/icon.png
+          convert -size 1024x1024 xc:none \
+            -fill white -draw "roundrectangle 280,260 744,790 70,70" \
+            -fill "#FFFFFF" -draw "circle 420,470 420,520" \
+            -fill "#FFFFFF" -draw "circle 604,470 604,520" \
+            -fill "#FFFFFF" -draw "roundrectangle 400,610 624,690 30,30" \
+            assets/icon_foreground.png
+          dart run flutter_launcher_icons
+
+      - name: Write signing config
+        run: |
+          if [ -z "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "⚠️ Warning: KEYSTORE_BASE64 secret not set, using debug signing"
+            echo "NEXAI_USE_DEBUG_SIGNING=true" >> android/gradle.properties
+          else
+            echo "✓ Decoding keystore from secret..."
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/project_lumen.jks || {
+              echo "❌ Error: Failed to decode KEYSTORE_BASE64, using debug signing"
+              echo "NEXAI_USE_DEBUG_SIGNING=true" >> android/gradle.properties
+              exit 0
+            }
+            
+            if [ -f "${{ github.workspace }}/project_lumen.jks" ]; then
+              echo "✓ Keystore file created successfully"
+              echo "NEXAI_STORE_FILE=${{ github.workspace }}/project_lumen.jks" >> android/gradle.properties
+              echo "NEXAI_STORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> android/gradle.properties
+              echo "NEXAI_KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> android/gradle.properties
+              echo "NEXAI_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> android/gradle.properties
+              echo "✓ Release signing configured"
+            else
+              echo "❌ Error: Keystore file not created, using debug signing"
+              echo "NEXAI_USE_DEBUG_SIGNING=true" >> android/gradle.properties
+            fi
+          fi
+
+      - name: Accept Android SDK licenses
+        run: yes | flutter doctor --android-licenses || true
+
+      - name: Run build.ps1 (version control)
+        run: pwsh scripts/build.ps1 -Arg android
+
+      - name: Build Android APK
+        run: |
+          flutter build apk --release --split-per-abi \
+            --obfuscate \
+            --split-debug-info=debug_symbols/android \
+            --dart-define-from-file=nexai_release.json \
+            --build-number=${{ env.VERSION_CODE }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-symbols
+          path: debug_symbols/
+          retention-days: 90
+
+      - name: Rename APK outputs for release
+        run: |
+          VERSION="${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          for file in build/app/outputs/flutter-apk/app-*-release.apk; do
+            if [ -f "$file" ]; then
+              abi=$(echo "$file" | sed -E 's|.*app-(.*)-release\.apk|\1|')
+              cp "$file" "build/app/outputs/flutter-apk/NexAI_android_${VERSION}_${abi}.apk"
+            fi
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: project_lumen-Android-APK
+          path: build/app/outputs/flutter-apk/NexAI_android_*.apk
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-outputs
+          path: build/app/outputs/
+          retention-days: 7
+
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.USER_PAT }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.0"
+          channel: "stable"
+          cache: true
+
+      - name: Cache Flutter pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run build.ps1 (version control)
+        run: pwsh scripts/build.ps1
+
+      - name: Build Web
+        run: flutter build web --release --web-renderer canvaskit --dart-define-from-file=nexai_release.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: project_lumen-Web
+          path: build/web/
+          retention-days: 7
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.USER_PAT }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.0"
+          channel: "stable"
+          cache: true
+
+      - name: Cache Flutter pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\Pub\Cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Recreate Windows directory
+        run: flutter create --platforms windows .
+
+      - name: Run build.ps1 (version control)
+        run: pwsh scripts/build.ps1
+
+      - name: Build Windows
+        run: |
+          flutter build windows --release `
+            --obfuscate `
+            --split-debug-info=debug_symbols\windows `
+            --dart-define-from-file=nexai_release.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-debug-symbols
+          path: debug_symbols\windows
+          retention-days: 90
+
+      - name: Compress Windows Build
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath project_lumen-Windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: project_lumen-Windows
+          path: project_lumen-Windows.zip
+          retention-days: 7
+
+  release:
+    needs: [build-android, build-web, build-windows]
+    permissions: write-all
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: project_lumen-Android-APK
+          path: android-apk
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: project_lumen-Web
+          path: web-build
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: project_lumen-Windows
+          path: windows-build
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-outputs
+          path: android-outputs
+
+      - name: Package release assets
+        run: |
+          # Find all APK files with architecture suffix
+          mkdir -p release-assets
+          for apk in android-apk/NexAI_android_*.apk; do
+            if [ -f "$apk" ]; then
+              cp "$apk" release-assets/
+            fi
+          done
+
+          # Package web build
+          cd web-build && zip -r ../release-assets/project_lumen-Web-${{ github.ref_name }}.zip . && cd ..
+
+          # Package windows build
+          cp windows-build/project_lumen-Windows.zip release-assets/project_lumen-Windows-${{ github.ref_name }}.zip
+
+          # Package all android outputs for debugging
+          zip -r release-assets/android-outputs-${{ github.ref_name }}.zip android-outputs
+
+      - name: Generate release notes
+        run: |
+          echo "## project_lumen ${{ github.ref_name }}" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Downloads" >> RELEASE_NOTES.md
+          echo "- **Android APK** (multiple architectures available)" >> RELEASE_NOTES.md
+          echo "- **Web**: \`project_lumen-Web-${{ github.ref_name }}.zip\`" >> RELEASE_NOTES.md
+          echo "- **Windows**: \`project_lumen-Windows-${{ github.ref_name }}.zip\`" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### APK Architecture Guide" >> RELEASE_NOTES.md
+          echo "- \`arm64-v8a\`: Modern 64-bit ARM devices (recommended for most users)" >> RELEASE_NOTES.md
+          echo "- \`armeabi-v7a\`: Older 32-bit ARM devices" >> RELEASE_NOTES.md
+          echo "- \`x86_64\`: 64-bit x86 devices (emulators, some tablets)" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Features" >> RELEASE_NOTES.md
+          echo "- Auto-update detection via GitHub Releases" >> RELEASE_NOTES.md
+          echo "- Custom OpenAI-compatible API (base URL, key, models)" >> RELEASE_NOTES.md
+          echo "- LaTeX math & chemical formula rendering" >> RELEASE_NOTES.md
+          echo "- Material You dynamic color on Android" >> RELEASE_NOTES.md
+          echo "- Dark/Light/System theme support" >> RELEASE_NOTES.md
+          echo "- Notes with auto-save support" >> RELEASE_NOTES.md
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.USER_PAT }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: project_lumen ${{ github.ref_name }}
+          body_path: ./RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
+          files: |
+            release-assets/NexAI_android_*.apk
+            release-assets/project_lumen-Web-${{ github.ref_name }}.zip
+            release-assets/project_lumen-Windows-${{ github.ref_name }}.zip
+            release-assets/android-outputs-${{ github.ref_name }}.zip
