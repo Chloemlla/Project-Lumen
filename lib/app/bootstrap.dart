@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project_lumen/app/app.dart';
 import 'package:project_lumen/core/services/app_lifecycle_service.dart';
@@ -78,14 +78,139 @@ final tipTemplateRepositoryProvider = Provider<TipTemplateRepository>(
   (_) => throw UnimplementedError('TipTemplateRepository not initialized.'),
 );
 
-Future<void> bootstrap() async {
+void bootstrap() {
   WidgetsFlutterBinding.ensureInitialized();
+  runApp(const _BootstrapApp());
+}
 
+class _BootstrapApp extends StatefulWidget {
+  const _BootstrapApp();
+
+  @override
+  State<_BootstrapApp> createState() => _BootstrapAppState();
+}
+
+class _BootstrapAppState extends State<_BootstrapApp> {
+  late final Future<_BootstrapDependencies> _bootstrapFuture =
+      _loadDependencies();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_BootstrapDependencies>(
+      future: _bootstrapFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: _BootstrapStatusPage(
+              title: 'Project-Lumen',
+              message: '正在初始化应用...',
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: _BootstrapStatusPage(
+              title: '启动失败',
+              message: snapshot.error.toString(),
+            ),
+          );
+        }
+
+        final dependencies = snapshot.requireData;
+        return ProviderScope(
+          overrides: dependencies.overrides,
+          child: const ProjectLumenApp(),
+        );
+      },
+    );
+  }
+}
+
+class _BootstrapStatusPage extends StatelessWidget {
+  const _BootstrapStatusPage({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 20),
+              Text(title, style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: 10),
+              Text(message, textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BootstrapDependencies {
+  const _BootstrapDependencies({
+    required this.sharedPreferences,
+    required this.appPrefs,
+    required this.appDatabase,
+    required this.lifecycleService,
+    required this.notificationService,
+    required this.audioService,
+    required this.settingsRepository,
+    required this.reminderRepository,
+    required this.pomodoroRepository,
+    required this.statisticsRepository,
+    required this.tipTemplateRepository,
+  });
+
+  final SharedPreferences sharedPreferences;
+  final AppPrefs appPrefs;
+  final AppDatabase appDatabase;
+  final AppLifecycleService lifecycleService;
+  final AppNotificationService notificationService;
+  final AppAudioService audioService;
+  final SettingsRepository settingsRepository;
+  final ReminderRepository reminderRepository;
+  final PomodoroRepository pomodoroRepository;
+  final StatisticsRepository statisticsRepository;
+  final TipTemplateRepository tipTemplateRepository;
+
+  get overrides => [
+    sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+    appPrefsProvider.overrideWithValue(appPrefs),
+    appDatabaseProvider.overrideWithValue(appDatabase),
+    appLifecycleServiceProvider.overrideWithValue(lifecycleService),
+    notificationServiceProvider.overrideWithValue(notificationService),
+    audioServiceProvider.overrideWithValue(audioService),
+    settingsRepositoryProvider.overrideWithValue(settingsRepository),
+    reminderRepositoryProvider.overrideWithValue(reminderRepository),
+    pomodoroRepositoryProvider.overrideWithValue(pomodoroRepository),
+    statisticsRepositoryProvider.overrideWithValue(statisticsRepository),
+    tipTemplateRepositoryProvider.overrideWithValue(tipTemplateRepository),
+  ];
+}
+
+Future<_BootstrapDependencies> _loadDependencies() async {
   final sharedPreferences = await SharedPreferences.getInstance();
   final appPrefs = AppPrefs(sharedPreferences);
   final appDatabase = await AppDatabase.open();
-  final notificationService = LocalNotificationService();
-  await notificationService.initialize();
+  AppNotificationService notificationService = NoopNotificationService();
+  final localNotificationService = LocalNotificationService();
+  try {
+    await localNotificationService.initialize();
+    notificationService = localNotificationService;
+  } catch (_) {
+    notificationService = NoopNotificationService();
+  }
   final audioService = SilentAudioService();
   final lifecycleService = AppLifecycleService();
   lifecycleService.register();
@@ -118,22 +243,17 @@ Future<void> bootstrap() async {
   await pomodoroRepository.ensureInitialized();
   await tipTemplateRepository.seedBuiltIns();
 
-  runApp(
-    ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-        appPrefsProvider.overrideWithValue(appPrefs),
-        appDatabaseProvider.overrideWithValue(appDatabase),
-        appLifecycleServiceProvider.overrideWithValue(lifecycleService),
-        notificationServiceProvider.overrideWithValue(notificationService),
-        audioServiceProvider.overrideWithValue(audioService),
-        settingsRepositoryProvider.overrideWithValue(settingsRepository),
-        reminderRepositoryProvider.overrideWithValue(reminderRepository),
-        pomodoroRepositoryProvider.overrideWithValue(pomodoroRepository),
-        statisticsRepositoryProvider.overrideWithValue(statisticsRepository),
-        tipTemplateRepositoryProvider.overrideWithValue(tipTemplateRepository),
-      ],
-      child: const ProjectLumenApp(),
-    ),
+  return _BootstrapDependencies(
+    sharedPreferences: sharedPreferences,
+    appPrefs: appPrefs,
+    appDatabase: appDatabase,
+    lifecycleService: lifecycleService,
+    notificationService: notificationService,
+    audioService: audioService,
+    settingsRepository: settingsRepository,
+    reminderRepository: reminderRepository,
+    pomodoroRepository: pomodoroRepository,
+    statisticsRepository: statisticsRepository,
+    tipTemplateRepository: tipTemplateRepository,
   );
 }

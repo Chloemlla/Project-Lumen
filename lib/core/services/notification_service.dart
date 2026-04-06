@@ -27,6 +27,40 @@ abstract class AppNotificationService {
   Future<void> cancelPomodoroNotifications();
 }
 
+class NoopNotificationService implements AppNotificationService {
+  @override
+  Future<void> cancelPomodoroNotifications() async {}
+
+  @override
+  Future<void> cancelReminderNotifications() async {}
+
+  @override
+  Future<void> scheduleBreakFinished({required DateTime scheduledAt}) async {}
+
+  @override
+  Future<void> schedulePomodoroBreakEnd({
+    required DateTime scheduledAt,
+    required bool isLongBreak,
+    required int cycleIndex,
+  }) async {}
+
+  @override
+  Future<void> schedulePomodoroFocusEnd({
+    required DateTime scheduledAt,
+    required int cycleIndex,
+  }) async {}
+
+  @override
+  Future<void> scheduleReminderDue({required DateTime scheduledAt}) async {}
+
+  @override
+  Future<void> scheduleReminderPreAlert({
+    required DateTime scheduledAt,
+    required String title,
+    required String body,
+  }) async {}
+}
+
 class LocalNotificationService implements AppNotificationService {
   LocalNotificationService() : _plugin = FlutterLocalNotificationsPlugin();
 
