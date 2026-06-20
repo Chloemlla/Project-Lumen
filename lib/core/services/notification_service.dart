@@ -133,7 +133,7 @@ class LocalNotificationService implements AppNotificationService {
   Future<void> _cancelIds(Iterable<int> ids) async {
     for (final id in ids) {
       _timers.remove(id)?.cancel();
-      await _plugin.cancel(id);
+      await _plugin.cancel(id: id);
     }
   }
 
