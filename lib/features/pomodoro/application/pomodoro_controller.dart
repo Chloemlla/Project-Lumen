@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:project_lumen/app/bootstrap.dart';
 import 'package:project_lumen/core/enums/active_engine.dart';
@@ -17,7 +19,7 @@ final pomodoroControllerProvider =
         audioService: ref.watch(audioServiceProvider),
         clockService: ref.watch(clockServiceProvider),
       );
-      controller.hydrate();
+      unawaited(controller.hydrate());
       return controller;
     });
 
@@ -37,6 +39,7 @@ class PomodoroController extends StateNotifier<PomodoroRuntimeState> {
   final AppNotificationService _notificationService;
   final AppAudioService _audioService;
   final ClockService _clockService;
+  Timer? _phaseTimer;
 
   Future<void> hydrate() async {
     state = await _repository.getRuntimeState();
@@ -132,10 +135,12 @@ class PomodoroController extends StateNotifier<PomodoroRuntimeState> {
 
     if (saved.activeEngine != ActiveEngine.pomodoro ||
         saved.phase == PomodoroPhase.idle) {
+      _scheduleTimerForState(saved);
       return;
     }
 
     if (saved.phase == PomodoroPhase.awaitingFocusConfirm) {
+      _scheduleTimerForState(saved);
       return;
     }
 
@@ -177,6 +182,7 @@ class PomodoroController extends StateNotifier<PomodoroRuntimeState> {
         cycleIndex: saved.cycleIndex,
       );
     }
+    _scheduleTimerForState(saved);
   }
 
   Future<void> _enterFocusPhase({
@@ -336,5 +342,29 @@ class PomodoroController extends StateNotifier<PomodoroRuntimeState> {
     final stateToSave = nextState.copyWith(updatedAt: _clockService.now());
     await _repository.saveRuntimeState(stateToSave);
     state = stateToSave;
+    _scheduleTimerForState(stateToSave);
+  }
+
+  void _scheduleTimerForState(PomodoroRuntimeState source) {
+    _phaseTimer?.cancel();
+    _phaseTimer = null;
+
+    if (source.activeEngine != ActiveEngine.pomodoro ||
+        source.phase == PomodoroPhase.idle ||
+        source.phase == PomodoroPhase.awaitingFocusConfirm ||
+        source.phaseEndAt == null) {
+      return;
+    }
+
+    final delay = source.phaseEndAt!.difference(_clockService.now());
+    _phaseTimer = Timer(delay.isNegative ? Duration.zero : delay, () {
+      unawaited(handlePhaseEnd());
+    });
+  }
+
+  @override
+  void dispose() {
+    _phaseTimer?.cancel();
+    super.dispose();
   }
 }

@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:project_lumen/features/settings/application/settings_controller.dart';
 import 'package:project_lumen/features/settings/domain/models/app_settings.dart';
 import 'package:project_lumen/shared/widgets/app_card.dart';
 import 'package:project_lumen/shared/widgets/app_section_title.dart';
 import 'package:project_lumen/shared/widgets/app_switch_tile.dart';
 
 class NotificationSettingsSection extends StatelessWidget {
-  const NotificationSettingsSection({super.key, required this.settings});
+  const NotificationSettingsSection({
+    super.key,
+    required this.settings,
+    required this.controller,
+  });
 
   final AppSettings settings;
+  final SettingsController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -19,15 +25,17 @@ class NotificationSettingsSection extends StatelessWidget {
           AppSwitchTile(
             title: '预提醒通知',
             value: settings.preAlertEnabled,
-            onChanged: (_) {},
+            onChanged: (value) =>
+                controller.updateReminder(preAlertEnabled: value),
           ),
           AppSwitchTile(
             title: '到点自动开始休息',
             value: settings.timeoutAutoBreak,
-            onChanged: (_) {},
+            onChanged: (value) =>
+                controller.updateReminder(timeoutAutoBreak: value),
           ),
           Text(
-            '通知调度接口已预留，当前先走本地骨架实现。',
+            '关闭预提醒后，只保留正式休息提醒。',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

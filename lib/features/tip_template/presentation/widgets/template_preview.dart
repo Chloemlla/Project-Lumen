@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:project_lumen/features/tip_template/domain/models/tip_template.dart';
 
 class TemplatePreview extends StatelessWidget {
-  const TemplatePreview({super.key, required this.template});
+  const TemplatePreview({super.key, required this.template, this.onStartBreak});
 
   final TipTemplate template;
+  final VoidCallback? onStartBreak;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +41,7 @@ class TemplatePreview extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           FilledButton(
-            onPressed: () {},
+            onPressed: onStartBreak,
             style: FilledButton.styleFrom(backgroundColor: primaryColor),
             child: const Text('开始休息'),
           ),

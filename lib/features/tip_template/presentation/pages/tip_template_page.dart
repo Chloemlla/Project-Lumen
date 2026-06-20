@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:project_lumen/features/reminder/application/reminder_controller.dart';
 import 'package:project_lumen/features/settings/application/settings_controller.dart';
 import 'package:project_lumen/features/tip_template/application/tip_template_controller.dart';
 import 'package:project_lumen/features/tip_template/presentation/widgets/template_preview.dart';
@@ -44,6 +45,10 @@ class TipTemplatePage extends ConsumerWidget {
                     (item) => item.id == settings.activeTipTemplateId,
                     orElse: () => templates.first,
                   ),
+                  onStartBreak: () {
+                    ref.read(reminderControllerProvider.notifier).startBreak();
+                    context.go('/break');
+                  },
                 ),
               ],
             ),

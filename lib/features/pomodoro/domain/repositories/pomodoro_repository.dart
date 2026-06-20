@@ -107,6 +107,11 @@ class LocalPomodoroRepository implements PomodoroRepository {
       return;
     }
 
+    final statsEnabled = await _isStatsEnabled();
+    if (!statsEnabled) {
+      return;
+    }
+
     final effectiveAt = at ?? _clockService.now();
     await _dailyPomodoroStatsDao.addBreakSeconds(
       effectiveAt.isoDate,
@@ -118,6 +123,11 @@ class LocalPomodoroRepository implements PomodoroRepository {
   @override
   Future<void> addFocusDuration(Duration duration, {DateTime? at}) async {
     if (duration <= Duration.zero) {
+      return;
+    }
+
+    final statsEnabled = await _isStatsEnabled();
+    if (!statsEnabled) {
       return;
     }
 
@@ -133,6 +143,11 @@ class LocalPomodoroRepository implements PomodoroRepository {
 
   @override
   Future<void> incrementCompletedFocusSessions({DateTime? at}) async {
+    final statsEnabled = await _isStatsEnabled();
+    if (!statsEnabled) {
+      return;
+    }
+
     final effectiveAt = at ?? _clockService.now();
     await _dailyPomodoroStatsDao.addFocusProgress(
       effectiveAt.isoDate,
@@ -145,6 +160,11 @@ class LocalPomodoroRepository implements PomodoroRepository {
 
   @override
   Future<void> incrementCompletedTomatoCount({DateTime? at}) async {
+    final statsEnabled = await _isStatsEnabled();
+    if (!statsEnabled) {
+      return;
+    }
+
     final effectiveAt = at ?? _clockService.now();
     await _dailyPomodoroStatsDao.addFocusProgress(
       effectiveAt.isoDate,
@@ -157,6 +177,11 @@ class LocalPomodoroRepository implements PomodoroRepository {
 
   @override
   Future<void> incrementRestartCount({DateTime? at}) async {
+    final statsEnabled = await _isStatsEnabled();
+    if (!statsEnabled) {
+      return;
+    }
+
     final effectiveAt = at ?? _clockService.now();
     await _dailyPomodoroStatsDao.incrementRestart(
       effectiveAt.isoDate,
@@ -175,5 +200,12 @@ class LocalPomodoroRepository implements PomodoroRepository {
       'is_manually_paused': 0,
       'updated_at': now,
     };
+  }
+
+  Future<bool> _isStatsEnabled() async {
+    final row = await _appSettingsDao.fetch();
+    return row == null
+        ? AppSettings.defaults().statsEnabled
+        : AppSettings.fromMap(row).statsEnabled;
   }
 }

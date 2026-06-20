@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:project_lumen/app/bootstrap.dart';
 import 'package:project_lumen/core/enums/app_theme_mode.dart';
@@ -9,7 +11,7 @@ final settingsControllerProvider =
       final controller = SettingsController(
         ref.watch(settingsRepositoryProvider),
       );
-      controller.hydrate();
+      unawaited(controller.hydrate());
       return controller;
     });
 
@@ -28,6 +30,24 @@ class SettingsController extends StateNotifier<AppSettings> {
 
   Future<void> setLanguage(String languageCode) async {
     await _save(state.copyWith(languageCode: languageCode));
+  }
+
+  Future<void> updateGeneral({bool? statsEnabled}) async {
+    await _save(state.copyWith(statsEnabled: statsEnabled));
+  }
+
+  Future<void> updateAppearance({
+    bool? useAutoDarkWindow,
+    int? autoDarkStartMinute,
+    int? autoDarkEndMinute,
+  }) async {
+    await _save(
+      state.copyWith(
+        useAutoDarkWindow: useAutoDarkWindow,
+        autoDarkStartMinute: autoDarkStartMinute,
+        autoDarkEndMinute: autoDarkEndMinute,
+      ),
+    );
   }
 
   Future<void> updateReminder({
@@ -68,6 +88,22 @@ class SettingsController extends StateNotifier<AppSettings> {
         pomodoroShortBreakMinutes: shortBreakMinutes,
         pomodoroLongBreakMinutes: longBreakMinutes,
         pomodoroInteractiveMode: interactiveMode,
+      ),
+    );
+  }
+
+  Future<void> updateSound({
+    bool? soundEnabled,
+    bool? preAlertSoundEnabled,
+    bool? pomodoroWorkStartSoundEnabled,
+    bool? pomodoroWorkEndSoundEnabled,
+  }) async {
+    await _save(
+      state.copyWith(
+        soundEnabled: soundEnabled,
+        preAlertSoundEnabled: preAlertSoundEnabled,
+        pomodoroWorkStartSoundEnabled: pomodoroWorkStartSoundEnabled,
+        pomodoroWorkEndSoundEnabled: pomodoroWorkEndSoundEnabled,
       ),
     );
   }

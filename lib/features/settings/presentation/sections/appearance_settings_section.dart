@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_lumen/features/settings/application/settings_controller.dart';
 import 'package:project_lumen/features/settings/domain/models/app_settings.dart';
 import 'package:project_lumen/shared/widgets/app_card.dart';
 import 'package:project_lumen/shared/widgets/app_section_title.dart';
@@ -8,10 +9,12 @@ class AppearanceSettingsSection extends StatelessWidget {
   const AppearanceSettingsSection({
     super.key,
     required this.settings,
+    required this.controller,
     required this.onOpenTemplates,
   });
 
   final AppSettings settings;
+  final SettingsController controller;
   final VoidCallback onOpenTemplates;
 
   @override
@@ -30,8 +33,9 @@ class AppearanceSettingsSection extends StatelessWidget {
           AppSwitchTile(
             title: '自动深色模式',
             value: settings.useAutoDarkWindow,
-            onChanged: (_) {},
-            subtitle: 'v1 先保留入口，后续接时间段控制。',
+            onChanged: (value) =>
+                controller.updateAppearance(useAutoDarkWindow: value),
+            subtitle: '根据系统时间窗口自动切换深色外观。',
           ),
           const SizedBox(height: 8),
           Text('当前模板 ID: ${settings.activeTipTemplateId ?? 1}'),

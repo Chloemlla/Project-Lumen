@@ -5,6 +5,8 @@
 # IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
 # invoked from the command line by running `flutter analyze`.
 
+include: package:flutter_lints/flutter.yaml
+
 analyzer:
   exclude:
     - drafts/**
