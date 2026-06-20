@@ -1,16 +1,17 @@
 import 'dart:io' show Platform;
 
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart' deferred as sqflite_ffi;
 
 bool _databaseFactoryInitialized = false;
 
-void initializeDatabaseFactoryForPlatform() {
+Future<void> initializeDatabaseFactoryForPlatform() async {
   if (_databaseFactoryInitialized || !Platform.isWindows) {
     return;
   }
 
-  sqfliteFfiInit();
-  databaseFactory = databaseFactoryFfi;
+  await sqflite_ffi.loadLibrary();
+  sqflite_ffi.sqfliteFfiInit();
+  databaseFactory = sqflite_ffi.databaseFactoryFfi;
   _databaseFactoryInitialized = true;
 }

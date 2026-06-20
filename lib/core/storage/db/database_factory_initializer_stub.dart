@@ -1,1 +1,1 @@
-void initializeDatabaseFactoryForPlatform() {}
+Future<void> initializeDatabaseFactoryForPlatform() async {}

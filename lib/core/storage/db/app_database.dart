@@ -28,7 +28,7 @@ class AppDatabase {
   late final TipTemplatesDao tipTemplatesDao = TipTemplatesDao(database);
 
   static Future<AppDatabase> open() async {
-    initializeDatabaseFactoryForPlatform();
+    await initializeDatabaseFactoryForPlatform();
     final directory = await getApplicationDocumentsDirectory();
     final path = p.join(directory.path, AppConstants.databaseName);
     final db = await openDatabase(
