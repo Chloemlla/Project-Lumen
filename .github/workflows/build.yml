@@ -259,9 +259,6 @@ jobs:
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
 
-      - name: Recreate Windows directory
-        run: flutter create --platforms windows .
-
       - name: Run build.ps1 (version control)
         run: pwsh scripts/build.ps1
 

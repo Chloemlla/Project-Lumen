@@ -58,13 +58,13 @@ jobs:
             -fill "#FFFFFF" -draw "circle 400,450 400,510" \
             -fill "#FFFFFF" -draw "circle 624,450 624,510" \
             -fill "#FFFFFF" -draw "roundrectangle 380,600 644,700 40,40" \
-            assets/icon.png
+            assets/icon/icon.png
           convert -size 1024x1024 xc:none \
             -fill white -draw "roundrectangle 280,260 744,790 70,70" \
             -fill "#FFFFFF" -draw "circle 420,470 420,520" \
             -fill "#FFFFFF" -draw "circle 604,470 604,520" \
             -fill "#FFFFFF" -draw "roundrectangle 400,610 624,690 30,30" \
-            assets/icon_foreground.png
+            assets/icon/icon_foreground.png
           dart run flutter_launcher_icons
 
       - name: Write signing config
@@ -199,9 +199,6 @@ jobs:
 
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
-
-      - name: Recreate Windows directory
-        run: flutter create --platforms windows .
 
       - name: Run build.ps1 (version control)
         run: pwsh scripts/build.ps1

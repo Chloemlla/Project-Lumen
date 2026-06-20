@@ -13,13 +13,22 @@ if (signingPropertiesFile.exists()) {
     signingPropertiesFile.inputStream().use { signingProperties.load(it) }
 }
 
-val hasReleaseSigning = signingProperties.getProperty("NEXAI_USE_DEBUG_SIGNING") != "true" &&
+fun trimmedSigningProperty(name: String): String =
+    signingProperties.getProperty(name)?.trim().orEmpty()
+
+fun rawSigningProperty(name: String): String =
+    signingProperties.getProperty(name).orEmpty()
+
+val releaseStoreFile = trimmedSigningProperty("NEXAI_STORE_FILE")
+val releaseKeyAlias = trimmedSigningProperty("NEXAI_KEY_ALIAS")
+
+val hasReleaseSigning = trimmedSigningProperty("NEXAI_USE_DEBUG_SIGNING") != "true" &&
     listOf(
-        "NEXAI_STORE_FILE",
-        "NEXAI_STORE_PASSWORD",
-        "NEXAI_KEY_ALIAS",
-        "NEXAI_KEY_PASSWORD",
-    ).all { signingProperties.getProperty(it).isNullOrBlank().not() }
+        releaseStoreFile,
+        rawSigningProperty("NEXAI_STORE_PASSWORD"),
+        releaseKeyAlias,
+        rawSigningProperty("NEXAI_KEY_PASSWORD"),
+    ).all { it.isNotBlank() }
 
 android {
     namespace = "com.projectlumen.project_lumen"
@@ -39,10 +48,10 @@ android {
     signingConfigs {
         if (hasReleaseSigning) {
             create("release") {
-                storeFile = file(signingProperties.getProperty("NEXAI_STORE_FILE"))
-                storePassword = signingProperties.getProperty("NEXAI_STORE_PASSWORD")
-                keyAlias = signingProperties.getProperty("NEXAI_KEY_ALIAS")
-                keyPassword = signingProperties.getProperty("NEXAI_KEY_PASSWORD")
+                storeFile = file(releaseStoreFile)
+                storePassword = rawSigningProperty("NEXAI_STORE_PASSWORD")
+                keyAlias = releaseKeyAlias
+                keyPassword = rawSigningProperty("NEXAI_KEY_PASSWORD")
             }
         }
     }
