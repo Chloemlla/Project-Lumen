@@ -1,5 +1,5 @@
 name: project_lumen
-description: "Project-Lumen mobile v1 foundation built from the Flutter delivery guide."
+description: "Project-Lumen Flutter foundation for mobile and Windows desktop."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -37,6 +37,8 @@ dependencies:
   flutter_riverpod: ^3.3.1
   go_router: ^17.2.0
   sqflite: ^2.4.2
+  sqflite_common_ffi: ^2.3.0
+  sqlite3_flutter_libs: ^0.5.0
   path: ^1.9.1
   path_provider: ^2.1.5
   shared_preferences: ^2.5.5
@@ -57,10 +59,10 @@ flutter_launcher_icons:
   ios: false
   windows:
     generate: true
-    image_path: "assets/icon.png"
-  image_path: "assets/icon.png"
+    image_path: "assets/icon/icon.png"
+  image_path: "assets/icon/icon.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/icon_foreground.png"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

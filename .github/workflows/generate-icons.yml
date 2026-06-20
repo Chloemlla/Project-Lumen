@@ -27,7 +27,7 @@ jobs:
             -fill "#FFFFFF" -draw "roundrectangle 380,600 644,700 40,40" \
             -fill white -draw "line 512,180 512,100" \
             -fill white -draw "circle 512,80 512,110" \
-            assets/icon.png
+            assets/icon/icon.png
 
           # Generate foreground (with padding for adaptive icon safe zone)
           convert -size 1024x1024 xc:none \
@@ -37,7 +37,7 @@ jobs:
             -fill "#FFFFFF" -draw "roundrectangle 400,610 624,690 30,30" \
             -fill white -draw "line 512,260 512,190" \
             -fill white -draw "circle 512,170 512,200" \
-            assets/icon_foreground.png
+            assets/icon/icon_foreground.png
 
       - uses: subosito/flutter-action@v2
         with:
