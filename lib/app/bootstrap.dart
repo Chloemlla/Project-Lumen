@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project_lumen/app/app.dart';
@@ -79,8 +81,30 @@ final tipTemplateRepositoryProvider = Provider<TipTemplateRepository>(
 );
 
 void bootstrap() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const _BootstrapApp());
+  runZonedGuarded(
+    () {
+      WidgetsFlutterBinding.ensureInitialized();
+      ErrorWidget.builder = (details) => _BootstrapStatusPage(
+        title: '界面加载失败',
+        message: details.exceptionAsString(),
+        isLoading: false,
+      );
+      FlutterError.onError = FlutterError.presentError;
+      runApp(const _BootstrapApp());
+    },
+    (error, stackTrace) {
+      runApp(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: _BootstrapStatusPage(
+            title: '启动失败',
+            message: error.toString(),
+            isLoading: false,
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _BootstrapApp extends StatefulWidget {
@@ -92,7 +116,7 @@ class _BootstrapApp extends StatefulWidget {
 
 class _BootstrapAppState extends State<_BootstrapApp> {
   late final Future<_BootstrapDependencies> _bootstrapFuture =
-      _loadDependencies();
+      _loadDependencies().timeout(const Duration(seconds: 20));
 
   @override
   Widget build(BuildContext context) {
@@ -115,6 +139,7 @@ class _BootstrapAppState extends State<_BootstrapApp> {
             home: _BootstrapStatusPage(
               title: '启动失败',
               message: snapshot.error.toString(),
+              isLoading: false,
             ),
           );
         }
@@ -158,10 +183,15 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 }
 
 class _BootstrapStatusPage extends StatelessWidget {
-  const _BootstrapStatusPage({required this.title, required this.message});
+  const _BootstrapStatusPage({
+    required this.title,
+    required this.message,
+    this.isLoading = true,
+  });
 
   final String title;
   final String message;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -173,18 +203,16 @@ class _BootstrapStatusPage extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.asset(
-                  'assets/icon/icon.png',
-                  width: 88,
-                  height: 88,
-                  fit: BoxFit.cover,
-                ),
+              Icon(
+                Icons.visibility_rounded,
+                size: 72,
+                color: Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(height: 24),
-              const CircularProgressIndicator(),
-              const SizedBox(height: 20),
+              if (isLoading) ...[
+                const CircularProgressIndicator(),
+                const SizedBox(height: 20),
+              ],
               Text(title, style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 10),
               Text(message, textAlign: TextAlign.center),

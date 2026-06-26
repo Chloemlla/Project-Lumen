@@ -1,15 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart'
-    deferred as sqflite_ffi
-    hide
-        DatabaseFactoryLoggerDebugExt,
-        SqfliteDatabaseExecutorIterateExt,
-        SqfliteDatabaseExecutorExt,
-        SqfliteDatabaseExt,
-        SqfliteSqlCommandExecutorExt,
-        SqfliteDatabaseFactoryDebug;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart' deferred as sqflite_ffi;
 
 bool _databaseFactoryInitialized = false;
 

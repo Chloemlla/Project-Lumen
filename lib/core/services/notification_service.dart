@@ -68,6 +68,7 @@ class LocalNotificationService implements AppNotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin;
   final Map<int, Timer> _timers = <int, Timer>{};
+  bool _permissionsRequested = false;
 
   Future<void> initialize() async {
     const androidSettings = AndroidInitializationSettings(
@@ -80,6 +81,14 @@ class LocalNotificationService implements AppNotificationService {
     );
 
     await _plugin.initialize(settings: settings);
+  }
+
+  Future<void> _ensurePermissions() async {
+    if (_permissionsRequested) {
+      return;
+    }
+    _permissionsRequested = true;
+
     await _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -97,6 +106,8 @@ class LocalNotificationService implements AppNotificationService {
     required String title,
     required String body,
   }) async {
+    await _ensurePermissions();
+
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
         'project_lumen_default',
