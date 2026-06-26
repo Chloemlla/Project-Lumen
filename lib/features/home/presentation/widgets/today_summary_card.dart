@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:project_lumen/core/utils/duration_x.dart';
 import 'package:project_lumen/features/statistics/domain/models/statistics_summary.dart';
 import 'package:project_lumen/shared/widgets/app_card.dart';
+import 'package:project_lumen/shared/widgets/app_metric_tile.dart';
 
 class TodaySummaryCard extends StatelessWidget {
   const TodaySummaryCard({super.key, required this.summary});
@@ -36,35 +37,7 @@ class TodaySummaryCard extends StatelessWidget {
                     .map(
                       (item) => SizedBox(
                         width: itemWidth,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.$1,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  item.$2,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        child: AppMetricTile(label: item.$1, value: item.$2),
                       ),
                     )
                     .toList(growable: false),

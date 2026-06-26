@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:project_lumen/core/utils/duration_x.dart';
 import 'package:project_lumen/features/statistics/domain/models/statistics_summary.dart';
 import 'package:project_lumen/shared/widgets/app_card.dart';
+import 'package:project_lumen/shared/widgets/app_metric_tile.dart';
 
 class WeeklySummaryCards extends StatelessWidget {
   const WeeklySummaryCards({super.key, required this.summary});
@@ -36,17 +37,7 @@ class WeeklySummaryCards extends StatelessWidget {
                     .map(
                       (item) => SizedBox(
                         width: itemWidth,
-                        child: Chip(
-                          label: SizedBox(
-                            width: double.infinity,
-                            child: Text(
-                              '${item.$1} ${item.$2}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                        ),
+                        child: AppMetricTile(label: item.$1, value: item.$2),
                       ),
                     )
                     .toList(growable: false),
