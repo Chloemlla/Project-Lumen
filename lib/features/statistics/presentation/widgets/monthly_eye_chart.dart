@@ -46,7 +46,9 @@ class MonthlyEyeChart extends StatelessWidget {
                                     color: Theme.of(
                                       context,
                                     ).colorScheme.primary,
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(3),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),

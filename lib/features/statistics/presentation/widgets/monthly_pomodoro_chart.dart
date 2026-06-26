@@ -48,7 +48,9 @@ class MonthlyPomodoroChart extends StatelessWidget {
                                     color: Theme.of(
                                       context,
                                     ).colorScheme.secondary,
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(3),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),

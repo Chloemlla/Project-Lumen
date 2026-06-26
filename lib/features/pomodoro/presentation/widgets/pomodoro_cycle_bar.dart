@@ -7,23 +7,16 @@ class PomodoroCycleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: List.generate(
-        4,
-        (index) => Expanded(
-          child: Container(
-            height: 10,
-            margin: EdgeInsets.only(right: index == 3 ? 0 : 8),
-            decoration: BoxDecoration(
-              color: index < cycleIndex
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(
-                      context,
-                    ).colorScheme.primary.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-        ),
+    final progress = cycleIndex.clamp(0, 4) / 4;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: LinearProgressIndicator(
+        value: progress,
+        minHeight: 8,
+        backgroundColor: Theme.of(
+          context,
+        ).colorScheme.primary.withValues(alpha: 0.14),
       ),
     );
   }

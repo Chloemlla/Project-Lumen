@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppMetricTile extends StatelessWidget {
-  const AppMetricTile({
-    super.key,
-    required this.label,
-    required this.value,
-  });
+  const AppMetricTile({super.key, required this.label, required this.value});
 
   final String label;
   final String value;
@@ -16,9 +12,7 @@ class AppMetricTile extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(
-          left: BorderSide(color: colorScheme.primary, width: 3),
-        ),
+        border: Border(left: BorderSide(color: colorScheme.primary, width: 3)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
