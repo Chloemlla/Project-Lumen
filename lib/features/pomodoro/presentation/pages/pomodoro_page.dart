@@ -21,7 +21,7 @@ class PomodoroPage extends ConsumerWidget {
           const Duration(seconds: 1),
           (value) => value,
         ).asBroadcastStream(),
-        builder: (context, snapshot) {
+        builder: (context, _) {
           final now = DateTime.now();
           final remaining = state.phaseEndAt == null
               ? Duration.zero

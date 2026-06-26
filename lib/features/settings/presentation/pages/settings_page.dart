@@ -37,12 +37,16 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: 16),
           AppearanceSettingsSection(
             settings: settings,
+            controller: controller,
             onOpenTemplates: () => context.go('/templates'),
           ),
           const SizedBox(height: 16),
-          SoundSettingsSection(settings: settings),
+          SoundSettingsSection(settings: settings, controller: controller),
           const SizedBox(height: 16),
-          NotificationSettingsSection(settings: settings),
+          NotificationSettingsSection(
+            settings: settings,
+            controller: controller,
+          ),
         ],
       ),
     );

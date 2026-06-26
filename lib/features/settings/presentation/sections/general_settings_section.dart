@@ -55,8 +55,8 @@ class GeneralSettingsSection extends StatelessWidget {
           AppSwitchTile(
             title: '记录统计',
             value: settings.statsEnabled,
-            onChanged: (_) {},
-            subtitle: 'v1 中统计默认启用，后续可接持久化开关。',
+            onChanged: (value) => controller.updateGeneral(statsEnabled: value),
+            subtitle: '关闭后将暂停新的统计写入，历史数据仍会保留。',
           ),
         ],
       ),

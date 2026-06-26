@@ -211,7 +211,7 @@ Future<_BootstrapDependencies> _loadDependencies() async {
   } catch (_) {
     notificationService = NoopNotificationService();
   }
-  final audioService = SilentAudioService();
+  final audioService = SystemAudioService();
   final lifecycleService = AppLifecycleService();
   lifecycleService.register();
 

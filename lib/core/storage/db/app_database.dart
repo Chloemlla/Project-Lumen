@@ -3,6 +3,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'package:project_lumen/core/constants/app_constants.dart';
+import 'package:project_lumen/core/storage/db/database_factory_initializer.dart';
 import 'package:project_lumen/core/storage/db/daos/app_settings_dao.dart';
 import 'package:project_lumen/core/storage/db/daos/daily_eye_stats_dao.dart';
 import 'package:project_lumen/core/storage/db/daos/daily_pomodoro_stats_dao.dart';
@@ -27,6 +28,7 @@ class AppDatabase {
   late final TipTemplatesDao tipTemplatesDao = TipTemplatesDao(database);
 
   static Future<AppDatabase> open() async {
+    await initializeDatabaseFactoryForPlatform();
     final directory = await getApplicationDocumentsDirectory();
     final path = p.join(directory.path, AppConstants.databaseName);
     final db = await openDatabase(

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:project_lumen/core/enums/app_theme_mode.dart';
 import 'package:project_lumen/core/enums/reminder_action.dart';
 
@@ -136,18 +137,38 @@ class AppSettings {
   Duration get pomodoroLongBreakDuration =>
       Duration(minutes: pomodoroLongBreakMinutes);
 
+  ThemeMode get effectiveThemeMode {
+    if (!useAutoDarkWindow) {
+      return themeMode.themeMode;
+    }
+
+    final now = DateTime.now();
+    final currentMinute = now.hour * 60 + now.minute;
+    final inDarkWindow = autoDarkStartMinute <= autoDarkEndMinute
+        ? currentMinute >= autoDarkStartMinute &&
+              currentMinute < autoDarkEndMinute
+        : currentMinute >= autoDarkStartMinute ||
+              currentMinute < autoDarkEndMinute;
+    return inDarkWindow ? ThemeMode.dark : ThemeMode.light;
+  }
+
   AppSettings copyWith({
     String? languageCode,
     AppThemeMode? themeMode,
+    bool? useAutoDarkWindow,
+    int? autoDarkStartMinute,
+    int? autoDarkEndMinute,
     bool? reminderEnabled,
     int? warnIntervalMinutes,
     int? restDurationSeconds,
+    bool? statsEnabled,
     bool? preAlertEnabled,
     int? preAlertSeconds,
     ReminderAction? preAlertDefaultAction,
     String? preAlertTitle,
     String? preAlertSubtitle,
     String? preAlertMessage,
+    bool? preAlertSoundEnabled,
     bool? askBeforeBreak,
     bool? disableSkip,
     bool? timeoutAutoBreak,
@@ -165,13 +186,13 @@ class AppSettings {
       id: id,
       languageCode: languageCode ?? this.languageCode,
       themeMode: themeMode ?? this.themeMode,
-      useAutoDarkWindow: useAutoDarkWindow,
-      autoDarkStartMinute: autoDarkStartMinute,
-      autoDarkEndMinute: autoDarkEndMinute,
+      useAutoDarkWindow: useAutoDarkWindow ?? this.useAutoDarkWindow,
+      autoDarkStartMinute: autoDarkStartMinute ?? this.autoDarkStartMinute,
+      autoDarkEndMinute: autoDarkEndMinute ?? this.autoDarkEndMinute,
       reminderEnabled: reminderEnabled ?? this.reminderEnabled,
       warnIntervalMinutes: warnIntervalMinutes ?? this.warnIntervalMinutes,
       restDurationSeconds: restDurationSeconds ?? this.restDurationSeconds,
-      statsEnabled: statsEnabled,
+      statsEnabled: statsEnabled ?? this.statsEnabled,
       soundEnabled: soundEnabled ?? this.soundEnabled,
       restSoundPath: restSoundPath,
       preAlertEnabled: preAlertEnabled ?? this.preAlertEnabled,
@@ -182,7 +203,8 @@ class AppSettings {
       preAlertSubtitle: preAlertSubtitle ?? this.preAlertSubtitle,
       preAlertMessage: preAlertMessage ?? this.preAlertMessage,
       preAlertIconPath: preAlertIconPath,
-      preAlertSoundEnabled: preAlertSoundEnabled,
+      preAlertSoundEnabled:
+          preAlertSoundEnabled ?? this.preAlertSoundEnabled,
       askBeforeBreak: askBeforeBreak ?? this.askBeforeBreak,
       disableSkip: disableSkip ?? this.disableSkip,
       timeoutAutoBreak: timeoutAutoBreak ?? this.timeoutAutoBreak,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:project_lumen/app/bootstrap.dart';
 import 'package:project_lumen/features/tip_template/domain/models/tip_template.dart';
@@ -8,7 +10,7 @@ final tipTemplateControllerProvider =
       final controller = TipTemplateController(
         ref.watch(tipTemplateRepositoryProvider),
       );
-      controller.load();
+      unawaited(controller.load());
       return controller;
     });
 

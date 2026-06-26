@@ -1,0 +1,7 @@
+#ifndef RUNNER_RESOURCE_H_
+#define RUNNER_RESOURCE_H_
+
+#define IDS_APP_TITLE 101
+#define IDR_MAINFRAME 128
+
+#endif  // RUNNER_RESOURCE_H_

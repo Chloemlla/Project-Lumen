@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project_lumen/app/l10n/l10n.dart';
 import 'package:project_lumen/app/router/app_router.dart';
 import 'package:project_lumen/app/theme/app_theme.dart';
-import 'package:project_lumen/core/enums/app_theme_mode.dart';
 import 'package:project_lumen/features/settings/application/settings_controller.dart';
 
 class ProjectLumenApp extends ConsumerWidget {
@@ -14,13 +13,18 @@ class ProjectLumenApp extends ConsumerWidget {
     final settings = ref.watch(settingsControllerProvider);
     final router = ref.watch(appRouterProvider);
 
-    return MaterialApp.router(
-      title: AppL10n.of(settings.languageCode).appName,
-      debugShowCheckedModeBanner: false,
-      themeMode: settings.themeMode.themeMode,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      routerConfig: router,
+    return StreamBuilder<int>(
+      stream: Stream<int>.periodic(const Duration(minutes: 1)),
+      builder: (context, _) {
+        return MaterialApp.router(
+          title: AppL10n.of(settings.languageCode).appName,
+          debugShowCheckedModeBanner: false,
+          themeMode: settings.effectiveThemeMode,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          routerConfig: router,
+        );
+      },
     );
   }
 }

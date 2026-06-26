@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:project_lumen/app/bootstrap.dart';
 import 'package:project_lumen/core/enums/active_engine.dart';
@@ -17,7 +19,7 @@ final reminderControllerProvider =
         audioService: ref.watch(audioServiceProvider),
         clockService: ref.watch(clockServiceProvider),
       );
-      controller.hydrate();
+      unawaited(controller.hydrate());
       return controller;
     });
 
@@ -37,6 +39,10 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
   final AppNotificationService _notificationService;
   final AppAudioService _audioService;
   final ClockService _clockService;
+  Timer? _preAlertTimer;
+  Timer? _reminderTimer;
+  Timer? _breakTimer;
+  Timer? _resumeTimer;
 
   Future<void> hydrate() async {
     state = await _repository.getRuntimeState();
@@ -62,6 +68,7 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
 
     if (saved.activeEngine != ActiveEngine.reminder ||
         saved.phase == ReminderPhase.idle) {
+      _scheduleTimersForState(saved);
       return;
     }
 
@@ -69,6 +76,8 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
       final suspendedUntil = saved.suspendedUntil;
       if (suspendedUntil != null && !now.isBefore(suspendedUntil)) {
         await resume();
+      } else {
+        _scheduleTimersForState(saved);
       }
       return;
     }
@@ -92,6 +101,7 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
         await _notificationService.scheduleBreakFinished(
           scheduledAt: breakEndAt,
         );
+        _scheduleTimersForState(saved);
       }
       return;
     }
@@ -124,6 +134,7 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
     }
 
     await _rescheduleWorkingNotifications(settings: settings, source: saved);
+    _scheduleTimersForState(saved);
   }
 
   Future<void> handlePreAlertDue() async {
@@ -132,10 +143,12 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
       return;
     }
 
+    final settings = await _repository.getSettings();
     await _enterPreAlert(
       source: state,
       effectiveAt: _clockService.now(),
       incrementCounter: true,
+      playSound: settings.preAlertSoundEnabled,
     );
   }
 
@@ -150,11 +163,7 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
     );
   }
 
-  Future<void> startBreak({bool isAuto = false}) async {
-    if (isAuto) {
-      // Keep the entrypoint explicit for future notification-action handling.
-    }
-
+  Future<void> startBreak() async {
     final settings = await _repository.getSettings();
     final now = _clockService.now();
     await _enterResting(
@@ -176,7 +185,7 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
     final settings = await _repository.getSettings();
 
     if (settings.disableSkip || settings.timeoutAutoBreak) {
-      await startBreak(isAuto: true);
+      await startBreak();
       return;
     }
 
@@ -258,9 +267,14 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
     required ReminderRuntimeState source,
     required DateTime effectiveAt,
     required bool incrementCounter,
+    bool playSound = false,
   }) async {
     if (incrementCounter) {
       await _repository.incrementPreAlertCount(at: effectiveAt);
+    }
+
+    if (playSound) {
+      await _audioService.playPreAlert();
     }
 
     await _saveState(
@@ -484,5 +498,58 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
     final stateToSave = nextState.copyWith(updatedAt: _clockService.now());
     await _repository.saveRuntimeState(stateToSave);
     state = stateToSave;
+    _scheduleTimersForState(stateToSave);
+  }
+
+  void _scheduleTimersForState(ReminderRuntimeState source) {
+    _cancelTimers();
+
+    if (source.activeEngine != ActiveEngine.reminder) {
+      return;
+    }
+
+    if (source.phase == ReminderPhase.working &&
+        source.nextPreAlertAt != null) {
+      _preAlertTimer = _timerUntil(source.nextPreAlertAt!, handlePreAlertDue);
+    }
+
+    if ((source.phase == ReminderPhase.working ||
+            source.phase == ReminderPhase.preAlert) &&
+        source.nextReminderAt != null) {
+      _reminderTimer = _timerUntil(source.nextReminderAt!, handleReminderDue);
+    }
+
+    if (source.phase == ReminderPhase.resting && source.breakEndAt != null) {
+      _breakTimer = _timerUntil(source.breakEndAt!, completeBreak);
+    }
+
+    if (source.phase == ReminderPhase.paused &&
+        source.suspendedUntil != null) {
+      _resumeTimer = _timerUntil(source.suspendedUntil!, resume);
+    }
+  }
+
+  Timer _timerUntil(DateTime target, Future<void> Function() callback) {
+    final delay = target.difference(_clockService.now());
+    return Timer(delay.isNegative ? Duration.zero : delay, () {
+      unawaited(callback());
+    });
+  }
+
+  void _cancelTimers() {
+    _preAlertTimer?.cancel();
+    _reminderTimer?.cancel();
+    _breakTimer?.cancel();
+    _resumeTimer?.cancel();
+    _preAlertTimer = null;
+    _reminderTimer = null;
+    _breakTimer = null;
+    _resumeTimer = null;
+  }
+
+  @override
+  void dispose() {
+    _cancelTimers();
+    super.dispose();
   }
 }

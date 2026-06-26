@@ -112,6 +112,11 @@ class LocalReminderRepository implements ReminderRepository {
       return;
     }
 
+    final statsEnabled = await _isStatsEnabled();
+    if (!statsEnabled) {
+      return;
+    }
+
     final effectiveAt = at ?? _clockService.now();
     await _dailyEyeStatsDao.addWorkingSeconds(
       effectiveAt.isoDate,
@@ -126,6 +131,11 @@ class LocalReminderRepository implements ReminderRepository {
       return;
     }
 
+    final statsEnabled = await _isStatsEnabled();
+    if (!statsEnabled) {
+      return;
+    }
+
     final effectiveAt = at ?? _clockService.now();
     await _dailyEyeStatsDao.addRestSeconds(
       effectiveAt.isoDate,
@@ -136,6 +146,11 @@ class LocalReminderRepository implements ReminderRepository {
 
   @override
   Future<void> incrementCompletedBreakCount({DateTime? at}) async {
+    final statsEnabled = await _isStatsEnabled();
+    if (!statsEnabled) {
+      return;
+    }
+
     final effectiveAt = at ?? _clockService.now();
     await _dailyEyeStatsDao.incrementCompletedBreak(
       effectiveAt.isoDate,
@@ -145,6 +160,11 @@ class LocalReminderRepository implements ReminderRepository {
 
   @override
   Future<void> incrementPreAlertCount({DateTime? at}) async {
+    final statsEnabled = await _isStatsEnabled();
+    if (!statsEnabled) {
+      return;
+    }
+
     final effectiveAt = at ?? _clockService.now();
     await _dailyEyeStatsDao.incrementPreAlert(
       effectiveAt.isoDate,
@@ -154,6 +174,11 @@ class LocalReminderRepository implements ReminderRepository {
 
   @override
   Future<void> incrementSkipCount({DateTime? at}) async {
+    final statsEnabled = await _isStatsEnabled();
+    if (!statsEnabled) {
+      return;
+    }
+
     final effectiveAt = at ?? _clockService.now();
     await _dailyEyeStatsDao.incrementSkip(
       effectiveAt.isoDate,
@@ -172,5 +197,12 @@ class LocalReminderRepository implements ReminderRepository {
       'is_manually_paused': 0,
       'updated_at': now,
     };
+  }
+
+  Future<bool> _isStatsEnabled() async {
+    final row = await _appSettingsDao.fetch();
+    return row == null
+        ? AppSettings.defaults().statsEnabled
+        : AppSettings.fromMap(row).statsEnabled;
   }
 }

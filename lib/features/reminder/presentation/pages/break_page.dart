@@ -36,7 +36,7 @@ class BreakPage extends ConsumerWidget {
           const Duration(seconds: 1),
           (value) => value,
         ).asBroadcastStream(),
-        builder: (context, snapshot) {
+        builder: (context, _) {
           final now = DateTime.now();
           final remaining = reminderState.breakEndAt == null
               ? settings.restDuration

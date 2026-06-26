@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 abstract class AppNotificationService {
@@ -65,6 +67,7 @@ class LocalNotificationService implements AppNotificationService {
   LocalNotificationService() : _plugin = FlutterLocalNotificationsPlugin();
 
   final FlutterLocalNotificationsPlugin _plugin;
+  final Map<int, Timer> _timers = <int, Timer>{};
 
   Future<void> initialize() async {
     const androidSettings = AndroidInitializationSettings(
@@ -113,24 +116,42 @@ class LocalNotificationService implements AppNotificationService {
     );
   }
 
+  Future<void> _scheduleShow({
+    required int id,
+    required DateTime scheduledAt,
+    required String title,
+    required String body,
+  }) async {
+    _timers.remove(id)?.cancel();
+    final delay = scheduledAt.difference(DateTime.now());
+    _timers[id] = Timer(delay.isNegative ? Duration.zero : delay, () {
+      _timers.remove(id);
+      unawaited(_showNow(id: id, title: title, body: body));
+    });
+  }
+
+  Future<void> _cancelIds(Iterable<int> ids) async {
+    for (final id in ids) {
+      _timers.remove(id)?.cancel();
+      await _plugin.cancel(id: id);
+    }
+  }
+
   @override
   Future<void> cancelReminderNotifications() async {
-    await _plugin.cancel(id: 1001);
-    await _plugin.cancel(id: 1002);
-    await _plugin.cancel(id: 1003);
+    await _cancelIds(const [1001, 1002, 1003]);
   }
 
   @override
   Future<void> cancelPomodoroNotifications() async {
-    await _plugin.cancel(id: 2001);
-    await _plugin.cancel(id: 2002);
-    await _plugin.cancel(id: 2003);
+    await _cancelIds(const [2001, 2002, 2003]);
   }
 
   @override
   Future<void> scheduleBreakFinished({required DateTime scheduledAt}) async {
-    await _showNow(
+    await _scheduleShow(
       id: 1003,
+      scheduledAt: scheduledAt,
       title: '休息即将结束',
       body: 'Project-Lumen 已记录本次休息，返回继续工作。',
     );
@@ -142,8 +163,9 @@ class LocalNotificationService implements AppNotificationService {
     required bool isLongBreak,
     required int cycleIndex,
   }) async {
-    await _showNow(
+    await _scheduleShow(
       id: 2003,
+      scheduledAt: scheduledAt,
       title: isLongBreak ? '长休息结束' : '短休息结束',
       body: '第 $cycleIndex 轮已完成，可以进入下一轮专注。',
     );
@@ -154,8 +176,9 @@ class LocalNotificationService implements AppNotificationService {
     required DateTime scheduledAt,
     required int cycleIndex,
   }) async {
-    await _showNow(
+    await _scheduleShow(
       id: 2002,
+      scheduledAt: scheduledAt,
       title: '专注结束',
       body: '第 $cycleIndex 轮专注已结束，请切换到休息阶段。',
     );
@@ -163,7 +186,12 @@ class LocalNotificationService implements AppNotificationService {
 
   @override
   Future<void> scheduleReminderDue({required DateTime scheduledAt}) async {
-    await _showNow(id: 1002, title: '该休息了', body: 'Project-Lumen 检测到本轮用眼时间已到。');
+    await _scheduleShow(
+      id: 1002,
+      scheduledAt: scheduledAt,
+      title: '该休息了',
+      body: 'Project-Lumen 检测到本轮用眼时间已到。',
+    );
   }
 
   @override
@@ -172,6 +200,11 @@ class LocalNotificationService implements AppNotificationService {
     required String title,
     required String body,
   }) async {
-    await _showNow(id: 1001, title: title, body: body);
+    await _scheduleShow(
+      id: 1001,
+      scheduledAt: scheduledAt,
+      title: title,
+      body: body,
+    );
   }
 }

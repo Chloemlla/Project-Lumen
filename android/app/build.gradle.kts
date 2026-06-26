@@ -1,9 +1,34 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val signingProperties = Properties()
+val signingPropertiesFile = rootProject.file("gradle.properties")
+if (signingPropertiesFile.exists()) {
+    signingPropertiesFile.inputStream().use { signingProperties.load(it) }
+}
+
+fun trimmedSigningProperty(name: String): String =
+    signingProperties.getProperty(name)?.trim().orEmpty()
+
+fun rawSigningProperty(name: String): String =
+    signingProperties.getProperty(name).orEmpty()
+
+val releaseStoreFile = trimmedSigningProperty("NEXAI_STORE_FILE")
+val releaseKeyAlias = trimmedSigningProperty("NEXAI_KEY_ALIAS")
+
+val hasReleaseSigning = trimmedSigningProperty("NEXAI_USE_DEBUG_SIGNING") != "true" &&
+    listOf(
+        releaseStoreFile,
+        rawSigningProperty("NEXAI_STORE_PASSWORD"),
+        releaseKeyAlias,
+        rawSigningProperty("NEXAI_KEY_PASSWORD"),
+    ).all { it.isNotBlank() }
 
 android {
     namespace = "com.projectlumen.project_lumen"
@@ -20,8 +45,18 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = rawSigningProperty("NEXAI_STORE_PASSWORD")
+                keyAlias = releaseKeyAlias
+                keyPassword = rawSigningProperty("NEXAI_KEY_PASSWORD")
+            }
+        }
+    }
+
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.projectlumen.project_lumen"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -33,9 +68,11 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

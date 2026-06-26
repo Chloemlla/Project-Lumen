@@ -1,8 +1,23 @@
 # Project-Lumen
 
-Flutter mobile v1 foundation for reminder, break recovery, pomodoro, statistics, settings, and template management.
+Flutter app foundation for reminder, break recovery, pomodoro, statistics,
+settings, template management, and Windows desktop delivery.
 
-A new Flutter project.
+## Platform Support
+
+- Android and iOS mobile foundations.
+- Windows desktop runner committed under `windows/`.
+- Windows persistence uses `sqflite_common_ffi` with bundled sqlite libraries.
+- CI builds Windows directly from the committed runner instead of recreating it
+  during the workflow.
+
+## Windows Build
+
+```powershell
+flutter config --enable-windows-desktop
+flutter pub get
+flutter build windows --release
+```
 
 ## Getting Started
 
