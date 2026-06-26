@@ -5,8 +5,10 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart'
     deferred as sqflite_ffi
     hide
         DatabaseFactoryLoggerDebugExt,
+        SqfliteDatabaseExecutorIterateExt,
         SqfliteDatabaseExecutorExt,
         SqfliteDatabaseExt,
+        SqfliteSqlCommandExecutorExt,
         SqfliteDatabaseFactoryDebug;
 
 bool _databaseFactoryInitialized = false;
