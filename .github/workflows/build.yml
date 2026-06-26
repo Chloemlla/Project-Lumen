@@ -269,11 +269,109 @@ jobs:
             --split-debug-info=debug_symbols\windows `
             --dart-define-from-file=nexai_release.json
 
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $version = "${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          $appVersion = "${{ env.VERSION_NAME }}"
+          $releaseDir = (Resolve-Path "build\windows\x64\runner\Release").Path
+          $installerDir = "build\windows\installer"
+          $installerDirFull = (New-Item -ItemType Directory -Force -Path $installerDir).FullName
+          $outputBase = "Project-Lumen_windows_${version}_setup"
+          $exePath = Join-Path $releaseDir "project_lumen.exe"
+
+          if (-not (Test-Path $exePath)) {
+            throw "Windows executable not found: $exePath"
+          }
+
+          $issPath = Join-Path $installerDirFull "project_lumen.iss"
+          @"
+          #define MyAppName "Project-Lumen"
+          #define MyAppExeName "project_lumen.exe"
+          #define MyAppVersion "$appVersion"
+          #define MyBuildVersion "$version"
+          #define MyOutputBase "$outputBase"
+
+          [Setup]
+          AppId={{4F5D3C3B-20E9-4E52-8B1F-A2042D4D7F3E}
+          AppName={#MyAppName}
+          AppVersion={#MyAppVersion}
+          AppVerName={#MyAppName} {#MyBuildVersion}
+          AppPublisher=Project-Lumen
+          DefaultDirName={localappdata}\Programs\Project-Lumen
+          DefaultGroupName={#MyAppName}
+          DisableProgramGroupPage=yes
+          OutputDir=$installerDirFull
+          OutputBaseFilename={#MyOutputBase}
+          Compression=lzma2
+          SolidCompression=yes
+          WizardStyle=modern
+          PrivilegesRequired=lowest
+          UninstallDisplayIcon={app}\{#MyAppExeName}
+          ArchitecturesAllowed=x64compatible
+          ArchitecturesInstallIn64BitMode=x64compatible
+
+          [Languages]
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+
+          [Tasks]
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
+          [Files]
+          Source: "$releaseDir\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+          Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+          [Run]
+          Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+          "@ | Set-Content -Path $issPath -Encoding UTF8
+
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $iscc = "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path $iscc)) {
+            throw "ISCC.exe was not found after installing Inno Setup."
+          }
+
+          & $iscc $issPath
+          $installerPath = Join-Path $installerDirFull "$outputBase.exe"
+          if (-not (Test-Path $installerPath)) {
+            throw "Windows installer was not created: $installerPath"
+          }
+
+          "WINDOWS_INSTALLER=$installerPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows-debug-symbols
           path: debug_symbols\windows
           retention-days: 90
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: project_lumen-Windows-Installer
+          path: build/windows/installer/*.exe
+          retention-days: 30
+
+      - name: Automatic Windows installer release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          make_latest: true
+          generate_release_notes: true
+          tag_name: "v${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          prerelease: false
+          name: "project_lumen ${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          files: |
+            build/windows/installer/*.exe
 
       - uses: actions/upload-artifact@v4
         with:
