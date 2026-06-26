@@ -31,11 +31,17 @@ abstract final class AppTheme {
       snackBarTheme: const SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
       ),
+      filledButtonTheme: FilledButtonThemeData(style: _buttonStyle()),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: _buttonStyle()),
+      textButtonTheme: TextButtonThemeData(style: _buttonStyle()),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(minimumSize: const Size.square(48)),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
       ),
@@ -70,14 +76,33 @@ abstract final class AppTheme {
       snackBarTheme: const SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
       ),
+      filledButtonTheme: FilledButtonThemeData(style: _buttonStyle()),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: _buttonStyle()),
+      textButtonTheme: TextButtonThemeData(style: _buttonStyle()),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(minimumSize: const Size.square(48)),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: const Color(0xFF112B2A),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
       ),
+    );
+  }
+
+  static ButtonStyle _buttonStyle() {
+    return ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+      shape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      tapTargetSize: MaterialTapTargetSize.padded,
     );
   }
 }

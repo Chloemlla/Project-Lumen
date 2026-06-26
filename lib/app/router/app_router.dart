@@ -12,10 +12,12 @@ import 'package:project_lumen/features/tip_template/presentation/pages/tip_templ
 import 'package:project_lumen/features/tip_template/presentation/pages/tip_template_preview_page.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final initialLocation = ref.watch(appPrefsProvider).getLastRoute() ?? '/';
+  final savedLocation = ref.watch(appPrefsProvider).getLastRoute();
+  final initialLocation = _isKnownRoute(savedLocation) ? savedLocation! : '/';
 
   return GoRouter(
     initialLocation: initialLocation,
+    errorBuilder: (context, state) => const HomePage(),
     routes: [
       GoRoute(
         path: '/',
@@ -60,3 +62,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+bool _isKnownRoute(String? location) {
+  if (location == null || location.isEmpty) {
+    return false;
+  }
+
+  return location == '/' ||
+      location == '/break' ||
+      location == '/pomodoro' ||
+      location == '/statistics' ||
+      location == '/settings' ||
+      location == '/templates' ||
+      location == '/templates/preview' ||
+      location == '/about';
+}

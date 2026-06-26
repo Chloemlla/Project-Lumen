@@ -85,7 +85,7 @@ jobs:
               printf 'NEXAI_USE_DEBUG_SIGNING=true\n' >> android/gradle.properties
               exit 0
             }
-            
+
             if [ -f "${{ github.workspace }}/project_lumen.jks" ]; then
               echo "✓ Keystore file created successfully"
               printf 'NEXAI_STORE_FILE=${{ github.workspace }}/project_lumen.jks\n' >> android/gradle.properties
@@ -130,13 +130,13 @@ jobs:
           for file in build/app/outputs/flutter-apk/app-*-release.apk; do
             if [ -f "$file" ]; then
               abi=$(echo "$file" | sed -E 's|.*app-(.*)-release\.apk|\1|')
-              echo "Processing: $file -> NexAI_android_${VERSION}_${abi}.apk"
-              cp "$file" "build/app/outputs/flutter-apk/NexAI_android_${VERSION}_${abi}.apk"
+              echo "Processing: $file -> Project-Lumen_android_${VERSION}_${abi}.apk"
+              cp "$file" "build/app/outputs/flutter-apk/Project-Lumen_android_${VERSION}_${abi}.apk"
             fi
           done
 
           echo "=== Renamed APK files ==="
-          ls -lh build/app/outputs/flutter-apk/NexAI_android_*.apk
+          ls -lh build/app/outputs/flutter-apk/Project-Lumen_android_*.apk
 
       - name: Automatic release
         if: success()
@@ -150,15 +150,15 @@ jobs:
           prerelease: false
           name: "project_lumen ${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
           files: |
-            build/app/outputs/flutter-apk/NexAI_android_*.apk
+            build/app/outputs/flutter-apk/Project-Lumen_android_*.apk
 
       # - name: Rename AAB output
       #   run: |
       #     VERSION="${{ env.version }}"
       #     AAB_FILE="build/app/outputs/bundle/release/app-release.aab"
       #     if [ -f "$AAB_FILE" ]; then
-      #       echo "Renaming AAB: $AAB_FILE -> NexAI_android_${VERSION}.aab"
-      #       cp "$AAB_FILE" "build/app/outputs/bundle/release/NexAI_android_${VERSION}.aab"
+      #       echo "Renaming AAB: $AAB_FILE -> Project-Lumen_android_${VERSION}.aab"
+      #       cp "$AAB_FILE" "build/app/outputs/bundle/release/Project-Lumen_android_${VERSION}.aab"
       #     fi
       #
       #     echo "=== AAB files ==="

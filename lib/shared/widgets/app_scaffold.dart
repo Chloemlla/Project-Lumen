@@ -35,11 +35,33 @@ class AppScaffold extends StatelessWidget {
     final currentIndex = _currentIndex();
 
     return Scaffold(
-      appBar: AppBar(title: Text(title), actions: actions),
+      appBar: AppBar(
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        actions: actions,
+      ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: body,
+        top: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final horizontalPadding = constraints.maxWidth < 360 ? 12.0 : 16.0;
+            final maxBodyWidth = constraints.maxWidth >= 840 ? 760.0 : double.infinity;
+
+            return Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxBodyWidth),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    8,
+                    horizontalPadding,
+                    16,
+                  ),
+                  child: body,
+                ),
+              ),
+            );
+          },
         ),
       ),
       floatingActionButton: floatingActionButton,

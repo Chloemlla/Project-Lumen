@@ -138,12 +138,23 @@ class _BootstrapStatusPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF3F7F4),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  'assets/icon/icon.png',
+                  width: 88,
+                  height: 88,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 24),
               const CircularProgressIndicator(),
               const SizedBox(height: 20),
               Text(title, style: Theme.of(context).textTheme.headlineSmall),

@@ -6,13 +6,13 @@ abstract final class AppTypography {
       headlineLarge: TextStyle(
         fontSize: 32,
         fontWeight: FontWeight.w700,
-        letterSpacing: -0.8,
+        letterSpacing: 0,
         color: color,
       ),
       headlineMedium: TextStyle(
         fontSize: 24,
         fontWeight: FontWeight.w700,
-        letterSpacing: -0.4,
+        letterSpacing: 0,
         color: color,
       ),
       titleLarge: TextStyle(
