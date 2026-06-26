@@ -7,6 +7,7 @@ import 'package:project_lumen/core/enums/pomodoro_phase.dart';
 import 'package:project_lumen/core/services/audio_service.dart';
 import 'package:project_lumen/core/services/clock_service.dart';
 import 'package:project_lumen/core/services/notification_service.dart';
+import 'package:project_lumen/core/utils/unawaited_guarded.dart';
 import 'package:project_lumen/features/pomodoro/domain/models/pomodoro_runtime_state.dart';
 import 'package:project_lumen/features/pomodoro/domain/repositories/pomodoro_repository.dart';
 import 'package:project_lumen/features/settings/domain/models/app_settings.dart';
@@ -19,7 +20,10 @@ final pomodoroControllerProvider =
         audioService: ref.watch(audioServiceProvider),
         clockService: ref.watch(clockServiceProvider),
       );
-      unawaited(controller.hydrate());
+      unawaitedGuarded(
+        controller.hydrate(),
+        operation: 'PomodoroController.hydrate',
+      );
       return controller;
     });
 
@@ -358,7 +362,10 @@ class PomodoroController extends StateNotifier<PomodoroRuntimeState> {
 
     final delay = source.phaseEndAt!.difference(_clockService.now());
     _phaseTimer = Timer(delay.isNegative ? Duration.zero : delay, () {
-      unawaited(handlePhaseEnd());
+      unawaitedGuarded(
+        handlePhaseEnd(),
+        operation: 'PomodoroController.phaseTimer',
+      );
     });
   }
 

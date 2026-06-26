@@ -1,7 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:project_lumen/app/bootstrap.dart';
+import 'package:project_lumen/core/utils/unawaited_guarded.dart';
 import 'package:project_lumen/features/tip_template/domain/models/tip_template.dart';
 import 'package:project_lumen/features/tip_template/domain/repositories/tip_template_repository.dart';
 
@@ -10,7 +9,10 @@ final tipTemplateControllerProvider =
       final controller = TipTemplateController(
         ref.watch(tipTemplateRepositoryProvider),
       );
-      unawaited(controller.load());
+      unawaitedGuarded(
+        controller.load(),
+        operation: 'TipTemplateController.load',
+      );
       return controller;
     });
 

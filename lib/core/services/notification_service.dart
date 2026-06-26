@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:project_lumen/core/utils/unawaited_guarded.dart';
 
 abstract class AppNotificationService {
   Future<void> scheduleReminderPreAlert({
@@ -75,9 +76,16 @@ class LocalNotificationService implements AppNotificationService {
       '@mipmap/ic_launcher',
     );
     const darwinSettings = DarwinInitializationSettings();
+    const windowsSettings = WindowsInitializationSettings(
+      appName: 'Project-Lumen',
+      appUserModelId: 'Com.ProjectLumen.ProjectLumen',
+      guid: '0b8ff4f3-9f5d-4f64-9697-c47f3273a7d2',
+    );
     const settings = InitializationSettings(
       android: androidSettings,
       iOS: darwinSettings,
+      macOS: darwinSettings,
+      windows: windowsSettings,
     );
 
     await _plugin.initialize(settings: settings);
@@ -117,6 +125,8 @@ class LocalNotificationService implements AppNotificationService {
         priority: Priority.high,
       ),
       iOS: DarwinNotificationDetails(),
+      macOS: DarwinNotificationDetails(),
+      windows: WindowsNotificationDetails(),
     );
 
     await _plugin.show(
@@ -137,7 +147,10 @@ class LocalNotificationService implements AppNotificationService {
     final delay = scheduledAt.difference(DateTime.now());
     _timers[id] = Timer(delay.isNegative ? Duration.zero : delay, () {
       _timers.remove(id);
-      unawaited(_showNow(id: id, title: title, body: body));
+      unawaitedGuarded(
+        _showNow(id: id, title: title, body: body),
+        operation: 'LocalNotificationService.showNow',
+      );
     });
   }
 

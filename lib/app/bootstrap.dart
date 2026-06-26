@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:project_lumen/app/app.dart';
+import 'package:project_lumen/core/logging/app_logger.dart';
 import 'package:project_lumen/core/services/app_lifecycle_service.dart';
 import 'package:project_lumen/core/services/audio_service.dart';
 import 'package:project_lumen/core/services/background_sync_service.dart';
@@ -80,19 +83,43 @@ final tipTemplateRepositoryProvider = Provider<TipTemplateRepository>(
   (_) => throw UnimplementedError('TipTemplateRepository not initialized.'),
 );
 
+const _bootstrapTimeout = Duration(seconds: 60);
+
 void bootstrap() {
   runZonedGuarded(
     () {
       WidgetsFlutterBinding.ensureInitialized();
+      final zone = Zone.current;
+      appLogger.info('Flutter binding initialized');
       ErrorWidget.builder = (details) => _BootstrapStatusPage(
         title: '界面加载失败',
         message: details.exceptionAsString(),
         isLoading: false,
+        logLines: appLogger.recentLines,
+        logFilePath: appLogger.logFilePath,
       );
-      FlutterError.onError = FlutterError.presentError;
+      FlutterError.onError = (details) {
+        FlutterError.presentError(details);
+        appLogger.flutterError(details);
+        zone.handleUncaughtError(
+          details.exception,
+          details.stack ?? StackTrace.current,
+        );
+      };
+      PlatformDispatcher.instance.onError = (error, stackTrace) {
+        appLogger.error(
+          'Uncaught platform dispatcher error',
+          error,
+          stackTrace,
+        );
+        _runFatalApp(error, stackTrace);
+        return true;
+      };
+      appLogger.info('Bootstrap app runApp requested');
       runApp(const _BootstrapApp());
     },
     (error, stackTrace) {
+      appLogger.error('Uncaught zone error', error, stackTrace);
       runApp(
         MaterialApp(
           debugShowCheckedModeBanner: false,
@@ -100,11 +127,36 @@ void bootstrap() {
             title: '启动失败',
             message: error.toString(),
             isLoading: false,
+            logLines: appLogger.recentLines,
+            logFilePath: appLogger.logFilePath,
           ),
         ),
       );
     },
   );
+}
+
+void _runFatalApp(Object error, StackTrace stackTrace) {
+  try {
+    runApp(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: _BootstrapStatusPage(
+          title: 'Startup failed',
+          message: error.toString(),
+          isLoading: false,
+          logLines: appLogger.recentLines,
+          logFilePath: appLogger.logFilePath,
+        ),
+      ),
+    );
+  } catch (fatalPageError, fatalPageStackTrace) {
+    appLogger.error(
+      'Failed to render fatal error page',
+      fatalPageError,
+      fatalPageStackTrace,
+    );
+  }
 }
 
 class _BootstrapApp extends StatefulWidget {
@@ -116,7 +168,19 @@ class _BootstrapApp extends StatefulWidget {
 
 class _BootstrapAppState extends State<_BootstrapApp> {
   late final Future<_BootstrapDependencies> _bootstrapFuture =
-      _loadDependencies().timeout(const Duration(seconds: 20));
+      _loadDependencies().timeout(
+        _bootstrapTimeout,
+        onTimeout: () {
+          final error = TimeoutException(
+            'Application bootstrap timed out after '
+            '${_bootstrapTimeout.inSeconds} seconds.',
+          );
+          appLogger.error('Bootstrap timeout', error, StackTrace.current, {
+            'timeoutSeconds': _bootstrapTimeout.inSeconds,
+          });
+          throw error;
+        },
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +204,8 @@ class _BootstrapAppState extends State<_BootstrapApp> {
               title: '启动失败',
               message: snapshot.error.toString(),
               isLoading: false,
+              logLines: appLogger.recentLines,
+              logFilePath: appLogger.logFilePath,
             ),
           );
         }
@@ -187,36 +253,98 @@ class _BootstrapStatusPage extends StatelessWidget {
     required this.title,
     required this.message,
     this.isLoading = true,
+    this.logLines = const [],
+    this.logFilePath,
   });
 
   final String title;
   final String message;
   final bool isLoading;
+  final List<String> logLines;
+  final String? logFilePath;
 
   @override
   Widget build(BuildContext context) {
+    final copyText = [
+      'title: $title',
+      'message: $message',
+      if (logFilePath != null) 'logFilePath: $logFilePath',
+      ...logLines,
+    ].join('\n');
+    final visibleLogs = logLines.take(80).join('\n');
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7F4),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.visibility_rounded,
-                size: 72,
-                color: Theme.of(context).colorScheme.primary,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 900),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.visibility_rounded,
+                    size: 72,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(height: 24),
+                  if (isLoading) ...[
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 20),
+                  ],
+                  Text(title, style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 10),
+                  SelectableText(message, textAlign: TextAlign.center),
+                  if (!isLoading) ...[
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: copyText));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                '\u5df2\u590d\u5236\u5168\u90e8\u65e5\u5fd7',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.copy_all_rounded),
+                      label: const Text('\u5168\u90e8\u590d\u5236'),
+                    ),
+                  ],
+                  if (logFilePath != null) ...[
+                    const SizedBox(height: 16),
+                    SelectableText(
+                      'Log file: $logFilePath',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  if (visibleLogs.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: SelectableText(
+                        visibleLogs,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 24),
-              if (isLoading) ...[
-                const CircularProgressIndicator(),
-                const SizedBox(height: 20),
-              ],
-              Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 10),
-              Text(message, textAlign: TextAlign.center),
-            ],
+            ),
           ),
         ),
       ),
@@ -253,21 +381,40 @@ class _BootstrapDependencies {
 }
 
 Future<_BootstrapDependencies> _loadDependencies() async {
-  final sharedPreferences = await SharedPreferences.getInstance();
+  appLogger.info('Bootstrap dependencies loading started');
+  final sharedPreferences = await appLogger.trace(
+    'SharedPreferences.getInstance',
+    SharedPreferences.getInstance,
+  );
+  appLogger.info('AppPrefs creating');
   final appPrefs = AppPrefs(sharedPreferences);
-  final appDatabase = await AppDatabase.open();
+  final appDatabase = await appLogger.trace(
+    'AppDatabase.open',
+    AppDatabase.open,
+  );
   AppNotificationService notificationService = NoopNotificationService();
   final localNotificationService = LocalNotificationService();
   try {
-    await localNotificationService.initialize();
+    await appLogger.trace(
+      'LocalNotificationService.initialize',
+      localNotificationService.initialize,
+    );
     notificationService = localNotificationService;
-  } catch (_) {
+  } catch (error, stackTrace) {
+    appLogger.error(
+      'Notification service initialization failed; using noop service',
+      error,
+      stackTrace,
+    );
     notificationService = NoopNotificationService();
   }
+  appLogger.info('Audio service creating');
   final audioService = SystemAudioService();
+  appLogger.info('Lifecycle service registering');
   final lifecycleService = AppLifecycleService();
   lifecycleService.register();
 
+  appLogger.info('Repositories creating');
   final settingsRepository = LocalSettingsRepository(
     appDatabase.appSettingsDao,
   );
@@ -291,11 +438,24 @@ Future<_BootstrapDependencies> _loadDependencies() async {
     appDatabase.tipTemplatesDao,
   );
 
-  await settingsRepository.ensureInitialized();
-  await reminderRepository.ensureInitialized();
-  await pomodoroRepository.ensureInitialized();
-  await tipTemplateRepository.seedBuiltIns();
+  await appLogger.trace(
+    'SettingsRepository.ensureInitialized',
+    settingsRepository.ensureInitialized,
+  );
+  await appLogger.trace(
+    'ReminderRepository.ensureInitialized',
+    reminderRepository.ensureInitialized,
+  );
+  await appLogger.trace(
+    'PomodoroRepository.ensureInitialized',
+    pomodoroRepository.ensureInitialized,
+  );
+  await appLogger.trace(
+    'TipTemplateRepository.seedBuiltIns',
+    tipTemplateRepository.seedBuiltIns,
+  );
 
+  appLogger.info('Bootstrap dependencies loading completed');
   return _BootstrapDependencies(
     sharedPreferences: sharedPreferences,
     appPrefs: appPrefs,

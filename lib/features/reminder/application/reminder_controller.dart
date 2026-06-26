@@ -7,6 +7,7 @@ import 'package:project_lumen/core/enums/reminder_phase.dart';
 import 'package:project_lumen/core/services/audio_service.dart';
 import 'package:project_lumen/core/services/clock_service.dart';
 import 'package:project_lumen/core/services/notification_service.dart';
+import 'package:project_lumen/core/utils/unawaited_guarded.dart';
 import 'package:project_lumen/features/reminder/domain/models/reminder_runtime_state.dart';
 import 'package:project_lumen/features/reminder/domain/repositories/reminder_repository.dart';
 import 'package:project_lumen/features/settings/domain/models/app_settings.dart';
@@ -19,7 +20,10 @@ final reminderControllerProvider =
         audioService: ref.watch(audioServiceProvider),
         clockService: ref.watch(clockServiceProvider),
       );
-      unawaited(controller.hydrate());
+      unawaitedGuarded(
+        controller.hydrate(),
+        operation: 'ReminderController.hydrate',
+      );
       return controller;
     });
 
@@ -523,8 +527,7 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
       _breakTimer = _timerUntil(source.breakEndAt!, completeBreak);
     }
 
-    if (source.phase == ReminderPhase.paused &&
-        source.suspendedUntil != null) {
+    if (source.phase == ReminderPhase.paused && source.suspendedUntil != null) {
       _resumeTimer = _timerUntil(source.suspendedUntil!, resume);
     }
   }
@@ -532,7 +535,7 @@ class ReminderController extends StateNotifier<ReminderRuntimeState> {
   Timer _timerUntil(DateTime target, Future<void> Function() callback) {
     final delay = target.difference(_clockService.now());
     return Timer(delay.isNegative ? Duration.zero : delay, () {
-      unawaited(callback());
+      unawaitedGuarded(callback(), operation: 'ReminderController.timer');
     });
   }
 

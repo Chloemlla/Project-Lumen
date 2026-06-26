@@ -3,7 +3,7 @@ abstract final class DailyPomodoroStatsTable {
 
   static const createSql =
       '''
-    CREATE TABLE $tableName (
+    CREATE TABLE IF NOT EXISTS $tableName (
       stat_date TEXT PRIMARY KEY,
       completed_tomato_count INTEGER NOT NULL DEFAULT 0,
       restart_count INTEGER NOT NULL DEFAULT 0,

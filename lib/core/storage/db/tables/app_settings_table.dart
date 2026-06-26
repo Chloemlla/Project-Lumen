@@ -3,7 +3,7 @@ abstract final class AppSettingsTable {
 
   static const createSql =
       '''
-    CREATE TABLE $tableName (
+    CREATE TABLE IF NOT EXISTS $tableName (
       id INTEGER PRIMARY KEY,
       language_code TEXT NOT NULL,
       theme_mode TEXT NOT NULL,

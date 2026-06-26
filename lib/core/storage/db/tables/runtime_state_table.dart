@@ -3,7 +3,7 @@ abstract final class RuntimeStateTable {
 
   static const createSql =
       '''
-    CREATE TABLE $tableName (
+    CREATE TABLE IF NOT EXISTS $tableName (
       id INTEGER PRIMARY KEY,
       active_engine TEXT NOT NULL DEFAULT 'idle',
       reminder_phase TEXT NOT NULL DEFAULT 'idle',

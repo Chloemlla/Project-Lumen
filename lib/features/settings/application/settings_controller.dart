@@ -1,8 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:project_lumen/app/bootstrap.dart';
 import 'package:project_lumen/core/enums/app_theme_mode.dart';
+import 'package:project_lumen/core/utils/unawaited_guarded.dart';
 import 'package:project_lumen/features/settings/domain/models/app_settings.dart';
 import 'package:project_lumen/features/settings/domain/repositories/settings_repository.dart';
 
@@ -11,7 +10,10 @@ final settingsControllerProvider =
       final controller = SettingsController(
         ref.watch(settingsRepositoryProvider),
       );
-      unawaited(controller.hydrate());
+      unawaitedGuarded(
+        controller.hydrate(),
+        operation: 'SettingsController.hydrate',
+      );
       return controller;
     });
 

@@ -3,7 +3,7 @@ abstract final class TipTemplatesTable {
 
   static const createSql =
       '''
-    CREATE TABLE $tableName (
+    CREATE TABLE IF NOT EXISTS $tableName (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       is_builtin INTEGER NOT NULL DEFAULT 0,
