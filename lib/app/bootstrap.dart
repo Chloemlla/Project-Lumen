@@ -195,7 +195,7 @@ class _BootstrapDependencies {
   final StatisticsRepository statisticsRepository;
   final TipTemplateRepository tipTemplateRepository;
 
-  get overrides => [
+  List<Object> get overrides => [
     sharedPreferencesProvider.overrideWithValue(sharedPreferences),
     appPrefsProvider.overrideWithValue(appPrefs),
     appDatabaseProvider.overrideWithValue(appDatabase),

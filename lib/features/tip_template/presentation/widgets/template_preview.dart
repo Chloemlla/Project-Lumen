@@ -21,7 +21,7 @@ class TemplatePreview extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,12 +39,23 @@ class TemplatePreview extends StatelessWidget {
               context,
             ).textTheme.bodyLarge?.copyWith(color: Colors.white),
           ),
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: onStartBreak,
-            style: FilledButton.styleFrom(backgroundColor: primaryColor),
-            child: const Text('开始休息'),
-          ),
+          if (onStartBreak != null) ...[
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onStartBreak,
+                icon: const Icon(Icons.self_improvement_rounded),
+                label: const Text('开始休息'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: primaryColor.computeLuminance() > 0.5
+                      ? Colors.black
+                      : Colors.white,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

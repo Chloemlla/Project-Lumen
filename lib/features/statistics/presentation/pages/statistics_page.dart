@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:project_lumen/core/services/export_service.dart';
+import 'package:project_lumen/core/services/share_service.dart';
 import 'package:project_lumen/features/statistics/application/statistics_service.dart';
 import 'package:project_lumen/features/statistics/domain/models/statistics_summary.dart';
 import 'package:project_lumen/features/statistics/presentation/widgets/monthly_eye_chart.dart';
@@ -25,14 +26,22 @@ class StatisticsPage extends ConsumerWidget {
         IconButton(
           onPressed: eyeStats.value == null
               ? null
-              : () {
+              : () async {
                   final csv = const ExportService().buildEyeStatsCsv(
                     eyeStats.value!,
                   );
+                  await ShareService().shareText(
+                    csv,
+                    subject: 'Project-Lumen 用眼统计 CSV',
+                  );
+                  if (!context.mounted) {
+                    return;
+                  }
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('CSV 已生成，共 ${csv.length} 个字符')),
+                    const SnackBar(content: Text('CSV 已打开分享面板')),
                   );
                 },
+          tooltip: '导出 CSV',
           icon: const Icon(Icons.download_outlined),
         ),
       ],

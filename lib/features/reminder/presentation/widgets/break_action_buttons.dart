@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_lumen/shared/widgets/app_action_group.dart';
 
 class BreakActionButtons extends StatelessWidget {
   const BreakActionButtons({
@@ -17,18 +18,31 @@ class BreakActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isResting) {
-      return FilledButton(onPressed: onStartBreak, child: const Text('提前结束休息'));
+      return AppActionGroup(
+        alignment: WrapAlignment.center,
+        actions: [
+          AppAction(
+            label: '提前结束休息',
+            icon: Icons.check_circle_outline_rounded,
+            onPressed: onStartBreak,
+          ),
+        ],
+      );
     }
 
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+    return AppActionGroup(
       alignment: WrapAlignment.center,
-      children: [
-        FilledButton(onPressed: onStartBreak, child: const Text('开始休息')),
-        OutlinedButton(
+      actions: [
+        AppAction(
+          label: '开始休息',
+          icon: Icons.self_improvement_rounded,
+          onPressed: onStartBreak,
+        ),
+        AppAction(
+          label: '跳过本次',
+          icon: Icons.skip_next_rounded,
           onPressed: disableSkip ? null : onSkip,
-          child: const Text('跳过本次'),
+          style: AppActionStyle.outlined,
         ),
       ],
     );

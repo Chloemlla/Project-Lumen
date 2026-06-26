@@ -32,12 +32,11 @@ class HomePage extends ConsumerWidget {
         ),
       ],
       body: summaryValue.when(
-        data: (summary) =>
-            _HomeContent(
-              summary: summary,
-              reminderState: reminderState,
-              pomodoroState: pomodoroState,
-            ),
+        data: (summary) => _HomeContent(
+          summary: summary,
+          reminderState: reminderState,
+          pomodoroState: pomodoroState,
+        ),
         error: (_, _) => _HomeContent(
           summary: const StatisticsSummary.empty(),
           reminderState: reminderState,
@@ -119,73 +118,84 @@ class _HomeHeroPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.primary,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 360;
+        final logo = ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Image.asset(
+            'assets/icon/icon.png',
+            width: 72,
+            height: 72,
+            fit: BoxFit.cover,
+          ),
+        );
+        final content = Column(
+          crossAxisAlignment: isNarrow
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: Image.asset(
-                'assets/icon/icon.png',
-                width: 72,
-                height: 72,
-                fit: BoxFit.cover,
+            Text(
+              'Project-Lumen',
+              textAlign: isNarrow ? TextAlign.center : TextAlign.start,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: colorScheme.onPrimary,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Project-Lumen',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: colorScheme.onPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '护眼提醒与番茄专注',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onPrimary.withValues(alpha: 0.82),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      FilledButton.tonal(
-                        onPressed: onStartReminder,
-                        child: const Text('开始提醒'),
-                      ),
-                      OutlinedButton(
-                        onPressed: onStartPomodoro,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: colorScheme.onPrimary,
-                          side: BorderSide(
-                            color: colorScheme.onPrimary.withValues(
-                              alpha: 0.7,
-                            ),
-                          ),
-                        ),
-                        child: const Text('开始专注'),
-                      ),
-                    ],
-                  ),
-                ],
+            const SizedBox(height: 6),
+            Text(
+              '护眼提醒与番茄专注',
+              textAlign: isNarrow ? TextAlign.center : TextAlign.start,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onPrimary.withValues(alpha: 0.82),
               ),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              alignment: isNarrow ? WrapAlignment.center : WrapAlignment.start,
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                FilledButton.tonal(
+                  onPressed: onStartReminder,
+                  child: const Text('开始提醒'),
+                ),
+                OutlinedButton(
+                  onPressed: onStartPomodoro,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colorScheme.onPrimary,
+                    side: BorderSide(
+                      color: colorScheme.onPrimary.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  child: const Text('开始专注'),
+                ),
+              ],
             ),
           ],
-        ),
-      ),
+        );
+
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.primary,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: isNarrow
+                ? Column(children: [logo, const SizedBox(height: 16), content])
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      logo,
+                      const SizedBox(width: 16),
+                      Expanded(child: content),
+                    ],
+                  ),
+          ),
+        );
+      },
     );
   }
 }
