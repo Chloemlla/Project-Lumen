@@ -37,9 +37,9 @@ class StatisticsPage extends ConsumerWidget {
                   if (!context.mounted) {
                     return;
                   }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('CSV 已打开分享面板')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('CSV 已打开分享面板')));
                 },
           tooltip: '导出 CSV',
           icon: const Icon(Icons.download_outlined),

@@ -23,17 +23,35 @@ class WeeklySummaryCards extends StatelessWidget {
         children: [
           Text('本周概览', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: items
-                .map(
-                  (item) => Chip(
-                    label: Text('${item.$1} ${item.$2}'),
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                  ),
-                )
-                .toList(growable: false),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final itemWidth = constraints.maxWidth < 320
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - 12) / 2;
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: items
+                    .map(
+                      (item) => SizedBox(
+                        width: itemWidth,
+                        child: Chip(
+                          label: SizedBox(
+                            width: double.infinity,
+                            child: Text(
+                              '${item.$1} ${item.$2}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                        ),
+                      ),
+                    )
+                    .toList(growable: false),
+              );
+            },
           ),
         ],
       ),

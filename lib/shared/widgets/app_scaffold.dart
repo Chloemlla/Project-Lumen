@@ -44,7 +44,9 @@ class AppScaffold extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final horizontalPadding = constraints.maxWidth < 360 ? 12.0 : 16.0;
-            final maxBodyWidth = constraints.maxWidth >= 840 ? 760.0 : double.infinity;
+            final maxBodyWidth = constraints.maxWidth >= 840
+                ? 760.0
+                : double.infinity;
 
             return Align(
               alignment: Alignment.topCenter,

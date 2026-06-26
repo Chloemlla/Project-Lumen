@@ -61,7 +61,9 @@ class QuickActionsBar extends StatelessWidget {
         reminderAction,
         AppAction(
           label: pomodoroLabel,
-          icon: pomodoroIsIdle ? Icons.timer_outlined : Icons.open_in_new_rounded,
+          icon: pomodoroIsIdle
+              ? Icons.timer_outlined
+              : Icons.open_in_new_rounded,
           onPressed: onStartPomodoro,
         ),
         AppAction(

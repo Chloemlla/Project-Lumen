@@ -58,7 +58,9 @@ class PomodoroPage extends ConsumerWidget {
                                   .confirmFocusStart();
                               return;
                             }
-                            ref.read(pomodoroControllerProvider.notifier).start();
+                            ref
+                                .read(pomodoroControllerProvider.notifier)
+                                .start();
                           }
                         : null,
                   ),

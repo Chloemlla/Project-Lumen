@@ -9,6 +9,7 @@ class MonthlyPomodoroChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleStats = stats.take(14).toList(growable: false);
     final maxValue = stats.fold<int>(
       1,
       (max, item) =>
@@ -21,40 +22,51 @@ class MonthlyPomodoroChart extends StatelessWidget {
         children: [
           Text('月度番茄趋势', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 16),
-          SizedBox(
-            height: 180,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: stats
-                  .take(14)
-                  .map(
-                    (item) => Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 3),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Container(
-                              height:
-                                  120 * (item.completedTomatoCount / maxValue),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.secondary,
-                                borderRadius: BorderRadius.circular(99),
-                              ),
+          if (visibleStats.isEmpty)
+            Text('暂无月度番茄数据', style: Theme.of(context).textTheme.bodyMedium)
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: (visibleStats.length * 36).clamp(280, 560).toDouble(),
+                height: 180,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: visibleStats
+                      .map(
+                        (item) => Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Container(
+                                  height:
+                                      120 *
+                                      (item.completedTomatoCount / maxValue),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.secondary,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  item.statDate.length > 5
+                                      ? item.statDate.substring(5)
+                                      : item.statDate,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              item.statDate.substring(5),
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
+                      )
+                      .toList(growable: false),
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );

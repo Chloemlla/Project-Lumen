@@ -121,7 +121,35 @@ class _BootstrapAppState extends State<_BootstrapApp> {
 
         final dependencies = snapshot.requireData;
         return ProviderScope(
-          overrides: dependencies.overrides,
+          overrides: [
+            sharedPreferencesProvider.overrideWithValue(
+              dependencies.sharedPreferences,
+            ),
+            appPrefsProvider.overrideWithValue(dependencies.appPrefs),
+            appDatabaseProvider.overrideWithValue(dependencies.appDatabase),
+            appLifecycleServiceProvider.overrideWithValue(
+              dependencies.lifecycleService,
+            ),
+            notificationServiceProvider.overrideWithValue(
+              dependencies.notificationService,
+            ),
+            audioServiceProvider.overrideWithValue(dependencies.audioService),
+            settingsRepositoryProvider.overrideWithValue(
+              dependencies.settingsRepository,
+            ),
+            reminderRepositoryProvider.overrideWithValue(
+              dependencies.reminderRepository,
+            ),
+            pomodoroRepositoryProvider.overrideWithValue(
+              dependencies.pomodoroRepository,
+            ),
+            statisticsRepositoryProvider.overrideWithValue(
+              dependencies.statisticsRepository,
+            ),
+            tipTemplateRepositoryProvider.overrideWithValue(
+              dependencies.tipTemplateRepository,
+            ),
+          ],
           child: const ProjectLumenApp(),
         );
       },
@@ -194,20 +222,6 @@ class _BootstrapDependencies {
   final PomodoroRepository pomodoroRepository;
   final StatisticsRepository statisticsRepository;
   final TipTemplateRepository tipTemplateRepository;
-
-  List<Object> get overrides => [
-    sharedPreferencesProvider.overrideWithValue(sharedPreferences),
-    appPrefsProvider.overrideWithValue(appPrefs),
-    appDatabaseProvider.overrideWithValue(appDatabase),
-    appLifecycleServiceProvider.overrideWithValue(lifecycleService),
-    notificationServiceProvider.overrideWithValue(notificationService),
-    audioServiceProvider.overrideWithValue(audioService),
-    settingsRepositoryProvider.overrideWithValue(settingsRepository),
-    reminderRepositoryProvider.overrideWithValue(reminderRepository),
-    pomodoroRepositoryProvider.overrideWithValue(pomodoroRepository),
-    statisticsRepositoryProvider.overrideWithValue(statisticsRepository),
-    tipTemplateRepositoryProvider.overrideWithValue(tipTemplateRepository),
-  ];
 }
 
 Future<_BootstrapDependencies> _loadDependencies() async {

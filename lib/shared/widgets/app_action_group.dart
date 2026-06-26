@@ -61,40 +61,47 @@ class AppActionGroup extends StatelessWidget {
     final icon = action.icon == null ? null : Icon(action.icon);
 
     return switch (action.style) {
-      AppActionStyle.filled => icon == null
-          ? FilledButton(onPressed: action.onPressed, child: Text(action.label))
-          : FilledButton.icon(
-              onPressed: action.onPressed,
-              icon: icon,
-              label: Text(action.label),
-            ),
-      AppActionStyle.tonal => icon == null
-          ? FilledButton.tonal(
-              onPressed: action.onPressed,
-              child: Text(action.label),
-            )
-          : FilledButton.tonalIcon(
-              onPressed: action.onPressed,
-              icon: icon,
-              label: Text(action.label),
-            ),
-      AppActionStyle.outlined => icon == null
-          ? OutlinedButton(
-              onPressed: action.onPressed,
-              child: Text(action.label),
-            )
-          : OutlinedButton.icon(
-              onPressed: action.onPressed,
-              icon: icon,
-              label: Text(action.label),
-            ),
-      AppActionStyle.text => icon == null
-          ? TextButton(onPressed: action.onPressed, child: Text(action.label))
-          : TextButton.icon(
-              onPressed: action.onPressed,
-              icon: icon,
-              label: Text(action.label),
-            ),
+      AppActionStyle.filled =>
+        icon == null
+            ? FilledButton(
+                onPressed: action.onPressed,
+                child: Text(action.label),
+              )
+            : FilledButton.icon(
+                onPressed: action.onPressed,
+                icon: icon,
+                label: Text(action.label),
+              ),
+      AppActionStyle.tonal =>
+        icon == null
+            ? FilledButton.tonal(
+                onPressed: action.onPressed,
+                child: Text(action.label),
+              )
+            : FilledButton.tonalIcon(
+                onPressed: action.onPressed,
+                icon: icon,
+                label: Text(action.label),
+              ),
+      AppActionStyle.outlined =>
+        icon == null
+            ? OutlinedButton(
+                onPressed: action.onPressed,
+                child: Text(action.label),
+              )
+            : OutlinedButton.icon(
+                onPressed: action.onPressed,
+                icon: icon,
+                label: Text(action.label),
+              ),
+      AppActionStyle.text =>
+        icon == null
+            ? TextButton(onPressed: action.onPressed, child: Text(action.label))
+            : TextButton.icon(
+                onPressed: action.onPressed,
+                icon: icon,
+                label: Text(action.label),
+              ),
     };
   }
 }

@@ -27,8 +27,16 @@ class AppSliderTile extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: Text(title)),
-            Text(labelBuilder(value)),
+            Expanded(child: Text(title, overflow: TextOverflow.ellipsis)),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                labelBuilder(value),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+              ),
+            ),
           ],
         ),
         Slider(
