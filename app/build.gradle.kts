@@ -50,7 +50,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             if (projectLumenUseDebugSigning) {
                 signingConfig = signingConfigs.getByName("debug")
             } else if (projectLumenReleaseSigningConfigured) {
