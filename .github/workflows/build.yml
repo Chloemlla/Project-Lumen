@@ -29,7 +29,6 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.11.1"
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-cleanup: on-success
 
@@ -74,10 +73,10 @@ jobs:
           fi
 
       - name: Check project
-        run: gradle test lint assembleDebug --no-daemon
+        run: ./gradlew test lint assembleDebug --no-daemon
 
       - name: Build release APK
-        run: gradle assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Prepare release assets
         run: |

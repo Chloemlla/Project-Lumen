@@ -116,23 +116,27 @@ class NotificationService(private val context: Context) {
             priority = NotificationCompat.PRIORITY_DEFAULT,
             includeBreakActions = false,
         )
-        NotificationManagerCompat.from(context).notify(
-            NotificationIds.POMODORO + 1001,
-            NotificationCompat.Builder(context, NotificationChannels.STATUS)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                .setContentTitle(context.getString(R.string.about_update_status))
-                .setContentText("$apkName")
-                .setContentIntent(
-                    PendingIntent.getActivity(
-                        context,
-                        NotificationIds.POMODORO + 1001,
-                        Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)),
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                    ),
-                )
-                .setAutoCancel(true)
-                .build(),
-        )
+        try {
+            NotificationManagerCompat.from(context).notify(
+                NotificationIds.POMODORO + 1001,
+                NotificationCompat.Builder(context, NotificationChannels.STATUS)
+                    .setSmallIcon(R.drawable.ic_launcher_foreground)
+                    .setContentTitle(context.getString(R.string.about_update_status))
+                    .setContentText("$apkName")
+                    .setContentIntent(
+                        PendingIntent.getActivity(
+                            context,
+                            NotificationIds.POMODORO + 1001,
+                            Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)),
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                        ),
+                    )
+                    .setAutoCancel(true)
+                    .build(),
+            )
+        } catch (_: SecurityException) {
+            return
+        }
     }
 
     fun buildOngoingStatusNotification(state: RuntimeStateEntity? = null): Notification {
