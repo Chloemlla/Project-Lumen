@@ -24,7 +24,7 @@ import com.projectlumen.app.core.database.entities.TipTemplateEntity
         TipTemplateEntity::class,
     ],
     version = 1,
-    exportSchema = true,
+    exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun appSettingsDao(): AppSettingsDao
