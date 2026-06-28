@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -32,7 +33,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.using
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -834,9 +834,11 @@ private fun TimerCard(label: String, seconds: Long, progress: Float, fallbackTex
                 AnimatedContent(
                     targetState = if (seconds > 0) compactTime(seconds) else fallbackText,
                     transitionSpec = {
-                        (fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 2 }) togetherWith
-                            (fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 2 }) using
-                            SizeTransform(clip = false)
+                        ContentTransform(
+                            targetContentEnter = fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 2 },
+                            initialContentExit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 2 },
+                            sizeTransform = SizeTransform(clip = false),
+                        )
                     },
                     label = "timerText",
                 ) { text ->
