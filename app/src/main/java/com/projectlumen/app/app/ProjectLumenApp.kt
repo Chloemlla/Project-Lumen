@@ -1,26 +1,36 @@
 package com.projectlumen.app.app
 
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Spa
+import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,11 +53,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
@@ -57,8 +69,8 @@ import androidx.navigation.compose.rememberNavController
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
-import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.enums.PomodoroPhase
@@ -72,12 +84,15 @@ private enum class Destination(
     val route: String,
     @StringRes val labelRes: Int,
     val icon: ImageVector,
+    val showInBottomNav: Boolean = true,
 ) {
     HOME("home", R.string.nav_home, Icons.Outlined.Home),
     BREAK("break", R.string.nav_break, Icons.Outlined.Spa),
     POMODORO("pomodoro", R.string.nav_pomodoro, Icons.Outlined.LocalCafe),
     STATS("stats", R.string.nav_stats, Icons.Outlined.BarChart),
     SETTINGS("settings", R.string.nav_settings, Icons.Outlined.Settings),
+    TEMPLATES("templates", R.string.nav_templates, Icons.Outlined.Style, false),
+    ABOUT("about", R.string.nav_about, Icons.Outlined.Info, false),
 }
 
 @Composable
@@ -107,7 +122,7 @@ fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
                 },
                 bottomBar = {
                     NavigationBar {
-                        Destination.entries.forEach { destination ->
+                        Destination.entries.filter { it.showInBottomNav }.forEach { destination ->
                             val selected = backStackEntry?.destination?.hierarchy?.any {
                                 it.route == destination.route
                             } == true
@@ -115,9 +130,7 @@ fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
                                 selected = selected,
                                 onClick = {
                                     navController.navigate(destination.route) {
-                                        popUpTo(navController.graph.startDestinationId) {
-                                            saveState = true
-                                        }
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
                                         launchSingleTop = true
                                         restoreState = true
                                     }
@@ -134,21 +147,20 @@ fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
                     startDestination = Destination.HOME.route,
                     modifier = Modifier.padding(padding),
                 ) {
-                    composable(Destination.HOME.route) {
-                        HomeScreen(uiState = uiState, viewModel = viewModel)
-                    }
-                    composable(Destination.BREAK.route) {
-                        BreakScreen(uiState = uiState, viewModel = viewModel)
-                    }
-                    composable(Destination.POMODORO.route) {
-                        PomodoroScreen(uiState = uiState, viewModel = viewModel)
-                    }
-                    composable(Destination.STATS.route) {
-                        StatisticsScreen(uiState = uiState)
-                    }
+                    composable(Destination.HOME.route) { HomeScreen(uiState, viewModel) }
+                    composable(Destination.BREAK.route) { BreakScreen(uiState, viewModel) }
+                    composable(Destination.POMODORO.route) { PomodoroScreen(uiState, viewModel) }
+                    composable(Destination.STATS.route) { StatisticsScreen(uiState, viewModel) }
                     composable(Destination.SETTINGS.route) {
-                        SettingsScreen(uiState = uiState, viewModel = viewModel)
+                        SettingsScreen(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            openTemplates = { navController.navigate(Destination.TEMPLATES.route) },
+                            openAbout = { navController.navigate(Destination.ABOUT.route) },
+                        )
                     }
+                    composable(Destination.TEMPLATES.route) { TemplatesScreen(uiState, viewModel) }
+                    composable(Destination.ABOUT.route) { AboutScreen() }
                 }
             }
         }
@@ -164,33 +176,16 @@ private fun LumenTopBar(title: String) {
 @Composable
 private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
     LumenPage {
-        Text(
-            text = stringResource(R.string.home_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = stringResource(R.string.home_subtitle),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text(stringResource(R.string.home_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.home_subtitle), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         StateCard(uiState.runtime, uiState.nowMillis)
         TodayStatsCard(uiState.eyeStats.firstOrNull())
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Button(
-                    modifier = Modifier.weight(1f),
-                    onClick = viewModel::startReminder,
-                ) {
+            Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(modifier = Modifier.weight(1f), onClick = viewModel::startReminder) {
                     Text(stringResource(R.string.start_reminder))
                 }
-                OutlinedButton(
-                    modifier = Modifier.weight(1f),
-                    onClick = viewModel::pauseReminder,
-                ) {
+                OutlinedButton(modifier = Modifier.weight(1f), onClick = viewModel::pauseReminder) {
                     Text(stringResource(R.string.pause))
                 }
             }
@@ -200,35 +195,27 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
 
 @Composable
 private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
-    val phase = uiState.runtime.reminderPhase
-    val isResting = phase == ReminderPhase.RESTING.name
-    val remaining = remainingSeconds(uiState.runtime.breakEndAt, uiState.nowMillis)
+    val runtime = uiState.runtime
+    val isResting = runtime.reminderPhase == ReminderPhase.RESTING.name
     LumenPage(horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
+        TemplatePreviewCard(activeTemplate(uiState))
+        Text(stringResource(R.string.break_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         Text(
-            text = stringResource(R.string.break_title),
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = stringResource(if (isResting) R.string.break_message else R.string.break_waiting_message),
+            stringResource(if (isResting) R.string.break_message else R.string.break_waiting_message),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         TimerCard(
             label = stringResource(if (isResting) R.string.remaining else R.string.current_state),
-            seconds = if (isResting) remaining else 0,
-            progress = if (isResting) progress(uiState.runtime.breakStartedAt, uiState.runtime.breakEndAt, uiState.nowMillis) else 0f,
-            fallbackText = statusLabel(uiState.runtime),
+            seconds = if (isResting) remainingSeconds(runtime.breakEndAt, uiState.nowMillis) else 0,
+            progress = if (isResting) progress(runtime.breakStartedAt, runtime.breakEndAt, uiState.nowMillis) else 0f,
+            fallbackText = statusLabel(runtime),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = viewModel::startBreak) {
-                Text(stringResource(R.string.start_break))
-            }
+            Button(onClick = viewModel::startBreak) { Text(stringResource(R.string.start_break)) }
             if (!uiState.settings.disableSkip) {
-                OutlinedButton(onClick = viewModel::skipBreak) {
-                    Text(stringResource(R.string.skip_break))
-                }
+                OutlinedButton(onClick = viewModel::skipBreak) { Text(stringResource(R.string.skip_break)) }
             }
         }
     }
@@ -237,16 +224,11 @@ private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
 @Composable
 private fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
     val runtime = uiState.runtime
-    val phase = runtime.pomodoroPhase
-    val running = runtime.activeEngine == ActiveEngine.POMODORO.name && phase != PomodoroPhase.IDLE.name
+    val running = runtime.activeEngine == ActiveEngine.POMODORO.name && runtime.pomodoroPhase != PomodoroPhase.IDLE.name
     LumenPage(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(stringResource(R.string.pomodoro_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         Text(
-            text = stringResource(R.string.pomodoro_title),
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = stringResource(R.string.pomodoro_cycle, runtime.pomodoroCycleIndex.coerceIn(1, 4)),
+            stringResource(R.string.pomodoro_cycle, runtime.pomodoroCycleIndex.coerceIn(1, 4)),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -257,10 +239,7 @@ private fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumen
             fallbackText = stringResource(R.string.status_ready),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                enabled = uiState.settings.pomodoroEnabled,
-                onClick = viewModel::startPomodoro,
-            ) {
+            Button(enabled = uiState.settings.pomodoroEnabled, onClick = viewModel::startPomodoro) {
                 Text(stringResource(R.string.start_pomodoro))
             }
             OutlinedButton(onClick = viewModel::stopPomodoro) {
@@ -271,39 +250,38 @@ private fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumen
 }
 
 @Composable
-private fun StatisticsScreen(uiState: ProjectLumenUiState) {
+private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
     val eye = uiState.eyeStats.firstOrNull()
     val pomodoro = uiState.pomodoroStats.firstOrNull()
     LumenPage {
-        Text(
-            text = stringResource(R.string.statistics_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
+        Text(stringResource(R.string.statistics_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         TodayStatsCard(eye)
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricRow(R.string.completed_tomatoes, (pomodoro?.completedTomatoCount ?: 0).toString())
                 MetricRow(R.string.focus_sessions, (pomodoro?.completedFocusSessions ?: 0).toString())
                 MetricRow(R.string.rest_time, minutesLabel(((pomodoro?.totalBreakSeconds ?: 0L) / 60L).toInt()))
             }
         }
+        Button(onClick = viewModel::shareStatistics) {
+            Text(stringResource(R.string.export_csv))
+        }
     }
 }
 
 @Composable
-private fun SettingsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
+private fun SettingsScreen(
+    uiState: ProjectLumenUiState,
+    viewModel: ProjectLumenViewModel,
+    openTemplates: () -> Unit,
+    openAbout: () -> Unit,
+) {
     val settings = uiState.settings
+    val context = LocalContext.current
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     LumenPage {
-        Text(
-            text = stringResource(R.string.settings_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        SettingsSection(titleRes = R.string.section_general) {
+        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        SettingsSection(R.string.section_general) {
             Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 LanguageChip(R.string.language_system, LocaleController.SYSTEM, settings, viewModel)
@@ -316,27 +294,49 @@ private fun SettingsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumen
                 ThemeChip(R.string.theme_light, AppThemeMode.LIGHT, settings, viewModel)
                 ThemeChip(R.string.theme_dark, AppThemeMode.DARK, settings, viewModel)
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = openTemplates) { Text(stringResource(R.string.nav_templates)) }
+                OutlinedButton(onClick = openAbout) { Text(stringResource(R.string.nav_about)) }
+            }
         }
-        SettingsSection(titleRes = R.string.section_reminder) {
+        SettingsSection(R.string.section_notifications) {
+            SwitchRow(R.string.enable_notifications, settings.notificationEnabled) {
+                viewModel.updateSettings { current -> current.copy(notificationEnabled = it) }
+            }
+            Button(onClick = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    openAppNotificationSettings(context)
+                }
+            }) {
+                Text(stringResource(R.string.notification_permission))
+            }
+        }
+        SettingsSection(R.string.section_sound) {
+            SwitchRow(R.string.enable_sound, settings.soundEnabled) {
+                viewModel.updateSettings { current -> current.copy(soundEnabled = it) }
+            }
+        }
+        SettingsSection(R.string.section_appearance) {
+            uiState.templates.forEach { template ->
+                FilterChip(
+                    selected = settings.activeTipTemplateId == template.id,
+                    onClick = { viewModel.selectTemplate(template.id) },
+                    label = { Text(templateDisplayName(template)) },
+                )
+            }
+        }
+        SettingsSection(R.string.section_reminder) {
             SwitchRow(R.string.enable_reminder, settings.reminderEnabled) {
                 viewModel.updateSettings { current -> current.copy(reminderEnabled = it) }
             }
-            NumberSlider(
-                labelRes = R.string.warn_interval,
-                value = settings.warnIntervalMinutes,
-                range = 5f..120f,
-                steps = 22,
-                valueLabel = stringResource(R.string.minutes_value, settings.warnIntervalMinutes),
-            ) {
+            NumberSlider(R.string.warn_interval, settings.warnIntervalMinutes, 5f..120f, 22, stringResource(R.string.minutes_value, settings.warnIntervalMinutes)) {
                 viewModel.updateSettings { current -> current.copy(warnIntervalMinutes = it) }
             }
-            NumberSlider(
-                labelRes = R.string.rest_duration,
-                value = settings.restDurationSeconds,
-                range = 10f..300f,
-                steps = 28,
-                valueLabel = stringResource(R.string.seconds_value, settings.restDurationSeconds),
-            ) {
+            NumberSlider(R.string.rest_duration, settings.restDurationSeconds, 10f..300f, 28, stringResource(R.string.seconds_value, settings.restDurationSeconds)) {
                 viewModel.updateSettings { current -> current.copy(restDurationSeconds = it) }
             }
             SwitchRow(R.string.ask_before_break, settings.askBeforeBreak) {
@@ -346,21 +346,15 @@ private fun SettingsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumen
                 viewModel.updateSettings { current -> current.copy(disableSkip = it) }
             }
         }
-        SettingsSection(titleRes = R.string.section_pre_alert) {
+        SettingsSection(R.string.section_pre_alert) {
             SwitchRow(R.string.enable_pre_alert, settings.preAlertEnabled) {
                 viewModel.updateSettings { current -> current.copy(preAlertEnabled = it) }
             }
-            NumberSlider(
-                labelRes = R.string.pre_alert_seconds,
-                value = settings.preAlertSeconds,
-                range = 10f..300f,
-                steps = 28,
-                valueLabel = stringResource(R.string.seconds_value, settings.preAlertSeconds),
-            ) {
+            NumberSlider(R.string.pre_alert_seconds, settings.preAlertSeconds, 10f..300f, 28, stringResource(R.string.seconds_value, settings.preAlertSeconds)) {
                 viewModel.updateSettings { current -> current.copy(preAlertSeconds = it) }
             }
         }
-        SettingsSection(titleRes = R.string.section_pomodoro) {
+        SettingsSection(R.string.section_pomodoro) {
             SwitchRow(R.string.enable_pomodoro, settings.pomodoroEnabled) {
                 viewModel.updateSettings { current -> current.copy(pomodoroEnabled = it) }
             }
@@ -378,12 +372,54 @@ private fun SettingsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumen
 }
 
 @Composable
+private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
+    LumenPage {
+        Text(stringResource(R.string.templates_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        TemplatePreviewCard(activeTemplate(uiState))
+        uiState.templates.forEach { template ->
+            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ColorSwatch(template.backgroundValue)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(templateDisplayName(template), style = MaterialTheme.typography.titleMedium)
+                            Text(template.subtitleText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    FilterChip(
+                        selected = template.id == uiState.settings.activeTipTemplateId,
+                        onClick = { viewModel.selectTemplate(template.id) },
+                        label = { Text(stringResource(R.string.active_template)) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutScreen() {
+    LumenPage {
+        Text(stringResource(R.string.about_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.about_version), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.about_body), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
 private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             MetricRow(R.string.current_state, statusLabel(runtime))
             MetricRow(
                 R.string.next_reminder,
@@ -396,10 +432,7 @@ private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
 @Composable
 private fun TodayStatsCard(stat: DailyEyeStatsEntity?) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.today_summary), style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SmallMetric(R.string.working_time, stringResource(R.string.hours_short, ((stat?.workingSeconds ?: 0L) / 3600.0)))
@@ -416,32 +449,34 @@ private fun TodayStatsCard(stat: DailyEyeStatsEntity?) {
 @Composable
 private fun TimerCard(label: String, seconds: Long, progress: Float, fallbackText: String) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
+        Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(label, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = if (seconds > 0) compactTime(seconds) else fallbackText,
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Text(if (seconds > 0) compactTime(seconds) else fallbackText, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold)
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
         }
     }
 }
 
 @Composable
-private fun SettingsSection(@StringRes titleRes: Int, content: @Composable ColumnScope.() -> Unit) {
+private fun TemplatePreviewCard(template: TipTemplateEntity?) {
+    val background = parseColor(template?.backgroundValue, MaterialTheme.colorScheme.primaryContainer)
+    val primary = parseColor(template?.primaryColor, MaterialTheme.colorScheme.primary)
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            ColorSwatch(background)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(templateDisplayName(template), style = MaterialTheme.typography.titleMedium, color = primary)
+                Text(template?.subtitleText ?: stringResource(R.string.break_message), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsSection(@StringRes titleRes: Int, content: @Composable Column.() -> Unit) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(titleRes), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             content()
         }
@@ -450,11 +485,7 @@ private fun SettingsSection(@StringRes titleRes: Int, content: @Composable Colum
 
 @Composable
 private fun SwitchRow(@StringRes labelRes: Int, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
@@ -470,10 +501,7 @@ private fun NumberSlider(
     onValueChange: (Int) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge)
             Text(valueLabel, color = MaterialTheme.colorScheme.primary)
         }
@@ -487,12 +515,7 @@ private fun NumberSlider(
 }
 
 @Composable
-private fun LanguageChip(
-    @StringRes labelRes: Int,
-    code: String,
-    settings: AppSettingsEntity,
-    viewModel: ProjectLumenViewModel,
-) {
+private fun LanguageChip(@StringRes labelRes: Int, code: String, settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
     FilterChip(
         selected = settings.languageCode == code,
         onClick = { viewModel.updateSettings { it.copy(languageCode = code) } },
@@ -501,12 +524,7 @@ private fun LanguageChip(
 }
 
 @Composable
-private fun ThemeChip(
-    @StringRes labelRes: Int,
-    mode: AppThemeMode,
-    settings: AppSettingsEntity,
-    viewModel: ProjectLumenViewModel,
-) {
+private fun ThemeChip(@StringRes labelRes: Int, mode: AppThemeMode, settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
     FilterChip(
         selected = settings.themeMode == mode.name,
         onClick = { viewModel.setThemeMode(mode) },
@@ -515,7 +533,7 @@ private fun ThemeChip(
 }
 
 @Composable
-private fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
+private fun SmallMetric(@StringRes labelRes: Int, value: String) {
     ElevatedCard(modifier = Modifier.weight(1f)) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(stringResource(labelRes), style = MaterialTheme.typography.labelLarge)
@@ -531,21 +549,29 @@ private fun MetricRow(@StringRes labelRes: Int, value: String) {
 
 @Composable
 private fun MetricRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyLarge)
         Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 
 @Composable
-private fun LumenPage(
-    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
-    content: @Composable ColumnScope.() -> Unit,
-) {
+private fun ColorSwatch(hex: String) {
+    ColorSwatch(parseColor(hex, MaterialTheme.colorScheme.primaryContainer))
+}
+
+@Composable
+private fun ColorSwatch(color: Color) {
+    Box(
+        modifier = Modifier
+            .width(44.dp)
+            .height(44.dp)
+            .background(color),
+    )
+}
+
+@Composable
+private fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Start, content: @Composable Column.() -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -583,15 +609,25 @@ private fun statusLabel(runtime: RuntimeStateEntity): String {
 @Composable
 private fun compactTime(totalSeconds: Long): String {
     val safeSeconds = max(0L, totalSeconds)
-    return stringResource(
-        R.string.minutes_compact,
-        (safeSeconds / 60L).toInt(),
-        (safeSeconds % 60L).toInt(),
-    )
+    return stringResource(R.string.minutes_compact, (safeSeconds / 60L).toInt(), (safeSeconds % 60L).toInt())
 }
 
 @Composable
 private fun minutesLabel(minutes: Int): String = stringResource(R.string.minutes_short, minutes)
+
+@Composable
+private fun templateDisplayName(template: TipTemplateEntity?): String {
+    return when (template?.id) {
+        1L -> stringResource(R.string.template_calm_teal)
+        2L -> stringResource(R.string.template_soft_sunrise)
+        3L -> stringResource(R.string.template_focus_indigo)
+        else -> template?.name ?: stringResource(R.string.template_calm_teal)
+    }
+}
+
+private fun activeTemplate(uiState: ProjectLumenUiState): TipTemplateEntity? {
+    return uiState.templates.firstOrNull { it.id == uiState.settings.activeTipTemplateId } ?: uiState.templates.firstOrNull()
+}
 
 private fun remainingSeconds(endAt: Long, nowMillis: Long): Long {
     if (endAt <= 0L) return 0L
@@ -603,4 +639,14 @@ private fun progress(startAt: Long, endAt: Long, nowMillis: Long): Float {
     val elapsed = (nowMillis - startAt).coerceAtLeast(0L).toFloat()
     val duration = (endAt - startAt).toFloat()
     return (elapsed / duration).coerceIn(0f, 1f)
+}
+
+private fun parseColor(hex: String?, fallback: Color): Color {
+    return runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(fallback)
+}
+
+private fun openAppNotificationSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    context.startActivity(intent)
 }

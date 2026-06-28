@@ -99,7 +99,7 @@ class NotificationService(private val context: Context) {
             NotificationIds.BREAK_DONE to AlarmReceiver.ACTION_BREAK_DONE,
             NotificationIds.POMODORO to AlarmReceiver.ACTION_POMODORO,
         ).forEach { (id, action) ->
-            manager.cancel(pendingIntent(id, action, PendingIntent.FLAG_NO_CREATE))
+            existingPendingIntent(id, action)?.let(manager::cancel)
         }
     }
 
@@ -120,6 +120,16 @@ class NotificationService(private val context: Context) {
             id,
             intent,
             flags or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun existingPendingIntent(id: Int, action: String): PendingIntent? {
+        val intent = Intent(context, AlarmReceiver::class.java).setAction(action)
+        return PendingIntent.getBroadcast(
+            context,
+            id,
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 
