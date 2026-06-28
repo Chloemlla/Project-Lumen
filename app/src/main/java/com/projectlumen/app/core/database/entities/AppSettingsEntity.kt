@@ -29,5 +29,10 @@ data class AppSettingsEntity(
     val pomodoroShortBreakMinutes: Int = 5,
     val pomodoroLongBreakMinutes: Int = 15,
     val pomodoroInteractiveMode: Boolean = false,
+    val activeTipTemplateId: Long = 1L,
+    val useAutoDarkWindow: Boolean = false,
+    val autoDarkStartMinute: Int = 1080,
+    val autoDarkEndMinute: Int = 360,
+    val notificationEnabled: Boolean = true,
     val updatedAt: Long = System.currentTimeMillis(),
 )

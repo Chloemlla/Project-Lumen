@@ -8,10 +8,12 @@ import com.projectlumen.app.core.database.daos.AppSettingsDao
 import com.projectlumen.app.core.database.daos.DailyEyeStatsDao
 import com.projectlumen.app.core.database.daos.DailyPomodoroStatsDao
 import com.projectlumen.app.core.database.daos.RuntimeStateDao
+import com.projectlumen.app.core.database.daos.TipTemplatesDao
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.database.entities.TipTemplateEntity
 
 @Database(
     entities = [
@@ -19,6 +21,7 @@ import com.projectlumen.app.core.database.entities.RuntimeStateEntity
         RuntimeStateEntity::class,
         DailyEyeStatsEntity::class,
         DailyPomodoroStatsEntity::class,
+        TipTemplateEntity::class,
     ],
     version = 1,
     exportSchema = true,
@@ -28,6 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun runtimeStateDao(): RuntimeStateDao
     abstract fun dailyEyeStatsDao(): DailyEyeStatsDao
     abstract fun dailyPomodoroStatsDao(): DailyPomodoroStatsDao
+    abstract fun tipTemplatesDao(): TipTemplatesDao
 
     companion object {
         fun create(context: Context): AppDatabase {
