@@ -18,5 +18,5 @@ interface TipTemplatesDao {
     suspend fun count(): Int
 
     @Upsert
-    suspend fun upsert(template: TipTemplateEntity): Long
+    suspend fun upsert(template: TipTemplateEntity)
 }

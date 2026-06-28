@@ -106,7 +106,9 @@ class NotificationService(private val context: Context) {
     private fun schedule(id: Int, triggerAtMillis: Long, action: String) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val pendingIntent = pendingIntent(id, action, PendingIntent.FLAG_UPDATE_CURRENT)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && alarmManager.canScheduleExactAlarms()) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+        } else if (alarmManager.canScheduleExactAlarms()) {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
         } else {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
