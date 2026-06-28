@@ -7,10 +7,14 @@ import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
+import com.projectlumen.app.core.services.AudioService
+import com.projectlumen.app.core.services.ExportService
+import com.projectlumen.app.core.services.NotificationService
 import com.projectlumen.app.core.time.coerceElapsedSecondsSince
 import com.projectlumen.app.core.time.todayKey
 import kotlinx.coroutines.delay
@@ -23,28 +27,36 @@ import kotlin.math.max
 
 class ProjectLumenViewModel(
     private val database: AppDatabase,
+    private val notifications: NotificationService,
+    private val audio: AudioService,
+    private val export: ExportService,
 ) : ViewModel() {
     private val settingsDao = database.appSettingsDao()
     private val runtimeDao = database.runtimeStateDao()
     private val eyeStatsDao = database.dailyEyeStatsDao()
     private val pomodoroStatsDao = database.dailyPomodoroStatsDao()
+    private val tipTemplatesDao = database.tipTemplatesDao()
     private val now = MutableStateFlow(System.currentTimeMillis())
 
-    val uiState = combine(
+    private val dataState = combine(
         settingsDao.observe(),
         runtimeDao.observe(),
         eyeStatsDao.observeAll(),
         pomodoroStatsDao.observeAll(),
-        now,
-    ) { settings, runtime, eyeStats, pomodoroStats, nowMillis ->
+        tipTemplatesDao.observeAll(),
+    ) { settings, runtime, eyeStats, pomodoroStats, templates ->
         ProjectLumenUiState(
             settings = settings ?: AppSettingsEntity(),
             runtime = runtime ?: RuntimeStateEntity(),
             eyeStats = eyeStats,
             pomodoroStats = pomodoroStats,
-            nowMillis = nowMillis,
+            templates = templates,
             isReady = settings != null && runtime != null,
         )
+    }
+
+    val uiState = combine(dataState, now) { state, nowMillis ->
+        state.copy(nowMillis = nowMillis)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -55,6 +67,7 @@ class ProjectLumenViewModel(
         viewModelScope.launch {
             if (settingsDao.get() == null) settingsDao.upsert(AppSettingsEntity())
             if (runtimeDao.get() == null) runtimeDao.upsert(RuntimeStateEntity())
+            seedTemplates()
             restoreFromClock()
         }
         viewModelScope.launch {
@@ -71,13 +84,18 @@ class ProjectLumenViewModel(
         viewModelScope.launch {
             val settings = settingsDao.get() ?: AppSettingsEntity()
             val nowMillis = System.currentTimeMillis()
-            runtimeDao.upsert(newWorkingState(settings, nowMillis))
+            val state = newWorkingState(settings, nowMillis)
+            runtimeDao.upsert(state)
+            if (settings.notificationEnabled) {
+                notifications.scheduleReminder(state.nextPreAlertAt, state.nextReminderAt)
+            }
         }
     }
 
     fun pauseReminder() {
         viewModelScope.launch {
             val state = runtimeDao.get() ?: RuntimeStateEntity()
+            notifications.cancelAllScheduled()
             runtimeDao.upsert(
                 state.copy(
                     reminderPhase = ReminderPhase.PAUSED.name,
@@ -92,6 +110,7 @@ class ProjectLumenViewModel(
     fun stopAll() {
         viewModelScope.launch {
             runtimeDao.upsert(RuntimeStateEntity(updatedAt = System.currentTimeMillis()))
+            notifications.cancelAllScheduled()
         }
     }
 
@@ -101,15 +120,15 @@ class ProjectLumenViewModel(
             val state = runtimeDao.get() ?: RuntimeStateEntity()
             val nowMillis = System.currentTimeMillis()
             addWorkingSeconds(nowMillis.coerceElapsedSecondsSince(state.reminderStartedAt), nowMillis)
-            runtimeDao.upsert(
-                state.copy(
+            val nextState = state.copy(
                     activeEngine = ActiveEngine.REMINDER.name,
                     reminderPhase = ReminderPhase.RESTING.name,
                     breakStartedAt = nowMillis,
                     breakEndAt = nowMillis + settings.restDurationSeconds * 1000L,
                     updatedAt = nowMillis,
-                ),
             )
+            runtimeDao.upsert(nextState)
+            if (settings.notificationEnabled) notifications.scheduleBreakDone(nextState.breakEndAt)
         }
     }
 
@@ -120,7 +139,9 @@ class ProjectLumenViewModel(
             val nowMillis = System.currentTimeMillis()
             addWorkingSeconds(nowMillis.coerceElapsedSecondsSince(state.reminderStartedAt), nowMillis)
             incrementEyeStats(nowMillis) { it.copy(skipCount = it.skipCount + 1) }
-            runtimeDao.upsert(newWorkingState(settings, nowMillis))
+            val nextState = newWorkingState(settings, nowMillis)
+            runtimeDao.upsert(nextState)
+            if (settings.notificationEnabled) notifications.scheduleReminder(nextState.nextPreAlertAt, nextState.nextReminderAt)
         }
     }
 
@@ -138,6 +159,7 @@ class ProjectLumenViewModel(
                     updatedAt = nowMillis,
                 ),
             )
+            audio.playReminderTone(settings.soundEnabled)
         }
     }
 
@@ -157,6 +179,15 @@ class ProjectLumenViewModel(
             val current = settingsDao.get() ?: AppSettingsEntity()
             settingsDao.upsert(transform(current).copy(id = 1, updatedAt = System.currentTimeMillis()))
         }
+    }
+
+    fun selectTemplate(templateId: Long) {
+        updateSettings { it.copy(activeTipTemplateId = templateId) }
+    }
+
+    fun shareStatistics() {
+        val state = uiState.value
+        export.shareCsv(state.eyeStats, state.pomodoroStats)
     }
 
     private suspend fun restoreFromClock() {
@@ -192,14 +223,14 @@ class ProjectLumenViewModel(
                             ),
                         )
                     } else {
-                        runtimeDao.upsert(
-                            state.copy(
+                        val nextState = state.copy(
                                 reminderPhase = ReminderPhase.RESTING.name,
                                 breakStartedAt = nowMillis,
                                 breakEndAt = nowMillis + settings.restDurationSeconds * 1000L,
                                 updatedAt = nowMillis,
-                            ),
                         )
+                        runtimeDao.upsert(nextState)
+                        if (settings.notificationEnabled) notifications.scheduleBreakDone(nextState.breakEndAt)
                     }
                 }
             }
@@ -220,7 +251,10 @@ class ProjectLumenViewModel(
                 if (nowMillis >= state.breakEndAt) {
                     addRestSeconds(nowMillis.coerceElapsedSecondsSince(state.breakStartedAt), nowMillis)
                     incrementEyeStats(nowMillis) { it.copy(completedBreakCount = it.completedBreakCount + 1) }
-                    runtimeDao.upsert(newWorkingState(settings, nowMillis))
+                    audio.playReminderTone(settings.soundEnabled)
+                    val nextState = newWorkingState(settings, nowMillis)
+                    runtimeDao.upsert(nextState)
+                    if (settings.notificationEnabled) notifications.scheduleReminder(nextState.nextPreAlertAt, nextState.nextReminderAt)
                 }
             }
         }
@@ -252,6 +286,7 @@ class ProjectLumenViewModel(
                         updatedAt = nowMillis,
                     ),
                 )
+                audio.playReminderTone(settings.soundEnabled)
             }
 
             PomodoroPhase.SHORT_BREAK.name,
@@ -271,8 +306,43 @@ class ProjectLumenViewModel(
                         updatedAt = nowMillis,
                     ),
                 )
+                audio.playReminderTone(settings.soundEnabled)
             }
         }
+    }
+
+    private suspend fun seedTemplates() {
+        if (tipTemplatesDao.count() > 0) return
+        val nowMillis = System.currentTimeMillis()
+        listOf(
+            TipTemplateEntity(
+                id = 1L,
+                name = "Calm teal",
+                backgroundValue = "#D4F2F0",
+                primaryColor = "#246B73",
+                sortOrder = 0,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            ),
+            TipTemplateEntity(
+                id = 2L,
+                name = "Soft sunrise",
+                backgroundValue = "#FFE0D4",
+                primaryColor = "#B9503E",
+                sortOrder = 1,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            ),
+            TipTemplateEntity(
+                id = 3L,
+                name = "Focus indigo",
+                backgroundValue = "#E0E3FF",
+                primaryColor = "#575EA8",
+                sortOrder = 2,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            ),
+        ).forEach { tipTemplatesDao.upsert(it) }
     }
 
     private fun newWorkingState(settings: AppSettingsEntity, nowMillis: Long): RuntimeStateEntity {

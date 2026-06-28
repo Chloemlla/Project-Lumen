@@ -4,8 +4,10 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -434,7 +436,7 @@ private fun TimerCard(label: String, seconds: Long, progress: Float, fallbackTex
 }
 
 @Composable
-private fun SettingsSection(@StringRes titleRes: Int, content: @Composable Column.() -> Unit) {
+private fun SettingsSection(@StringRes titleRes: Int, content: @Composable ColumnScope.() -> Unit) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -513,7 +515,7 @@ private fun ThemeChip(
 }
 
 @Composable
-private fun SmallMetric(@StringRes labelRes: Int, value: String) {
+private fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
     ElevatedCard(modifier = Modifier.weight(1f)) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(stringResource(labelRes), style = MaterialTheme.typography.labelLarge)
@@ -542,7 +544,7 @@ private fun MetricRow(label: String, value: String) {
 @Composable
 private fun LumenPage(
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
-    content: @Composable Column.() -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(

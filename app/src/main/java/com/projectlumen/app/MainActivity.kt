@@ -20,7 +20,12 @@ class MainActivity : ComponentActivity() {
                 factory = object : ViewModelProvider.Factory {
                     @Suppress("UNCHECKED_CAST")
                     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                        return ProjectLumenViewModel(app.database) as T
+                        return ProjectLumenViewModel(
+                            database = app.database,
+                            notifications = app.notifications,
+                            audio = app.audio,
+                            export = app.export,
+                        ) as T
                     }
                 },
             )
