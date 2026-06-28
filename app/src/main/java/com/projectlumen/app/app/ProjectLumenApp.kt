@@ -883,7 +883,6 @@ private fun LinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String)
     }
 }
 
-@Composable
 private fun rememberAppVersionLabel(context: Context): String {
     val versionName = runCatching {
         @Suppress("DEPRECATION")
