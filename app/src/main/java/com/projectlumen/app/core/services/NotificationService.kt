@@ -6,6 +6,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -161,23 +162,25 @@ class NotificationService(private val context: Context) {
     }
 
     private fun pendingIntent(id: Int, action: String, flags: Int): PendingIntent {
-        val intent = Intent(context, AlarmReceiver::class.java).setAction(action)
         return PendingIntent.getBroadcast(
             context,
             id,
-            intent,
+            alarmIntent(action),
             flags or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 
     private fun existingPendingIntent(id: Int, action: String): PendingIntent? {
-        val intent = Intent(context, AlarmReceiver::class.java).setAction(action)
         return PendingIntent.getBroadcast(
             context,
             id,
-            intent,
+            alarmIntent(action),
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
+
+    private fun alarmIntent(action: String): Intent {
+        return explicitReceiverIntent(action, AlarmReceiver::class.java)
     }
 
     private fun show(
@@ -221,9 +224,15 @@ class NotificationService(private val context: Context) {
         return PendingIntent.getActivity(
             context,
             id,
-            Intent(context, MainActivity::class.java),
+            openAppIntent(),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
+
+    private fun openAppIntent(): Intent {
+        return Intent()
+            .setComponent(ComponentName(context.packageName, MainActivity::class.java.name))
+            .setPackage(context.packageName)
     }
 
     private fun ongoingStatusText(state: RuntimeStateEntity?): Pair<String, String> {
@@ -258,12 +267,21 @@ class NotificationService(private val context: Context) {
     }
 
     private fun actionPendingIntent(id: Int, action: String): PendingIntent {
-        val intent = Intent(context, ReminderActionReceiver::class.java).setAction(action)
         return PendingIntent.getBroadcast(
             context,
             id,
-            intent,
+            reminderActionIntent(action),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
+
+    private fun reminderActionIntent(action: String): Intent {
+        return explicitReceiverIntent(action, ReminderActionReceiver::class.java)
+    }
+
+    private fun explicitReceiverIntent(action: String, receiverClass: Class<*>): Intent {
+        return Intent(action)
+            .setComponent(ComponentName(context.packageName, receiverClass.name))
+            .setPackage(context.packageName)
     }
 }
