@@ -32,6 +32,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.using
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -585,7 +586,12 @@ private fun SettingsScreen(
 @Composable
 private fun TrendCard(uiState: ProjectLumenUiState) {
     val recent = uiState.eyeStats.take(7).reversed()
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.weekly_trend)
             if (recent.isEmpty()) {
@@ -593,13 +599,26 @@ private fun TrendCard(uiState: ProjectLumenUiState) {
             } else {
                 val maxSeconds = recent.maxOf { max(it.workingSeconds, 1L) }
                 recent.forEach { stat ->
+                    val targetWidth = (stat.workingSeconds.toFloat() / maxSeconds.toFloat()).coerceIn(0.05f, 1f)
+                    val animatedWidth by animateFloatAsState(
+                        targetValue = targetWidth,
+                        animationSpec = tween(durationMillis = 520),
+                        label = "trendBarWidth",
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stat.statDate.takeLast(5), style = MaterialTheme.typography.labelMedium)
-                        Box(modifier = Modifier.weight(1f)) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(10.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth((stat.workingSeconds.toFloat() / maxSeconds.toFloat()).coerceIn(0.05f, 1f))
+                                    .fillMaxWidth(animatedWidth)
                                     .height(10.dp)
+                                    .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.primary),
                             )
                         }
@@ -621,13 +640,24 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
             SystemBackgroundPicker(activeTemplate, viewModel)
         }
         uiState.templates.forEach { template ->
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Row(
+            val selected = template.id == uiState.settings.activeTipTemplateId
+            val borderColor by animateColorAsState(
+                targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                animationSpec = tween(180),
+                label = "templateBorderColor",
+            )
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, borderColor, LumenCardShape)
+                    .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+                shape = LumenCardShape,
+            ) {
+                Column(
                     modifier = Modifier.padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         TemplateColorSwatch(template)
                         Spacer(Modifier.width(12.dp))
                         Column {
@@ -636,11 +666,15 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                         }
                     }
                     FilterChip(
-                        selected = template.id == uiState.settings.activeTipTemplateId,
+                        selected = selected,
                         onClick = { viewModel.selectTemplate(template.id) },
                         label = { Text(stringResource(R.string.active_template)) },
                         leadingIcon = {
-                            if (template.id == uiState.settings.activeTipTemplateId) {
+                            AnimatedVisibility(
+                                visible = selected,
+                                enter = scaleIn(tween(120)) + fadeIn(tween(120)),
+                                exit = scaleOut(tween(90)) + fadeOut(tween(90)),
+                            ) {
                                 Icon(Icons.Outlined.CheckCircle, contentDescription = null)
                             }
                         },
@@ -653,7 +687,7 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
 
 @Composable
 private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Style, R.string.system_background_color)
             LumenFlowRow {
@@ -673,8 +707,6 @@ private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: Proje
                     )
                 }
             }
-    }
-}
         }
     }
 }
@@ -694,10 +726,24 @@ private fun AboutScreen() {
 
 @Composable
 private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.NotificationsActive, R.string.current_state)
-            Text(statusLabel(runtime), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            AnimatedContent(
+                targetState = statusLabel(runtime),
+                transitionSpec = {
+                    (fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 3 }) togetherWith
+                        (fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 3 })
+                },
+                label = "runtimeStatus",
+            ) { status ->
+                Text(status, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
             MetricRow(
                 R.string.next_reminder,
                 if (runtime.nextReminderAt > 0) compactTime(remainingSeconds(runtime.nextReminderAt, nowMillis)) else stringResource(R.string.not_set),
@@ -708,7 +754,12 @@ private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
 
 @Composable
 private fun TodayStatsCard(stat: DailyEyeStatsEntity?) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.today_summary)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -725,11 +776,62 @@ private fun TodayStatsCard(stat: DailyEyeStatsEntity?) {
 
 @Composable
 private fun TimerCard(label: String, seconds: Long, progress: Float, fallbackText: String) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 650),
+        label = "timerProgress",
+    )
+    val running = seconds > 0
+    val pulse = if (running) {
+        val transition = rememberInfiniteTransition(label = "timerPulse")
+        transition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.035f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1400),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "timerPulseScale",
+        ).value
+    } else {
+        1f
+    }
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+    ) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(label, style = MaterialTheme.typography.titleMedium)
-            Text(if (seconds > 0) compactTime(seconds) else fallbackText, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold)
-            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            Box(
+                modifier = Modifier
+                    .size(220.dp)
+                    .graphicsLayer {
+                        scaleX = pulse
+                        scaleY = pulse
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.fillMaxSize(),
+                    strokeWidth = 10.dp,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
+                AnimatedContent(
+                    targetState = if (seconds > 0) compactTime(seconds) else fallbackText,
+                    transitionSpec = {
+                        (fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 2 }) togetherWith
+                            (fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 2 }) using
+                            SizeTransform(clip = false)
+                    },
+                    label = "timerText",
+                ) { text ->
+                    Text(text, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+            LinearProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxWidth())
         }
     }
 }
@@ -738,15 +840,20 @@ private fun TimerCard(label: String, seconds: Long, progress: Float, fallbackTex
 private fun TemplatePreviewCard(template: TipTemplateEntity?) {
     val background = templateBackgroundColor(template)
     val primary = templatePrimaryColor(template)
+    val animatedBackground by animateColorAsState(background, tween(220), label = "templateBackground")
+    val animatedPrimary by animateColorAsState(primary, tween(220), label = "templatePrimary")
     ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors(containerColor = background),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+        colors = CardDefaults.elevatedCardColors(containerColor = animatedBackground),
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            ColorSwatch(background)
+            ColorSwatch(animatedBackground)
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(templateDisplayName(template), style = MaterialTheme.typography.titleMedium, color = primary)
+                Text(templateDisplayName(template), style = MaterialTheme.typography.titleMedium, color = animatedPrimary)
                 Text(templateSubtitle(template), style = MaterialTheme.typography.bodyMedium)
             }
         }
@@ -782,7 +889,12 @@ private fun SectionHeader(icon: ImageVector, @StringRes titleRes: Int) {
 
 @Composable
 private fun SettingsSection(@StringRes titleRes: Int, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(icon, titleRes)
             content()
@@ -801,7 +913,9 @@ private fun NotificationRequirementCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(LumenCardShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -845,7 +959,13 @@ private fun rememberNotificationPermissionGate(): ((() -> Unit) -> Unit) {
 
 @Composable
 private fun SwitchRow(@StringRes labelRes: Int, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         LabelWithIcon(icon, labelRes)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
@@ -864,7 +984,16 @@ private fun NumberSlider(
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             LabelWithIcon(icon, labelRes)
-            Text(valueLabel, color = MaterialTheme.colorScheme.primary)
+            AnimatedContent(
+                targetState = valueLabel,
+                transitionSpec = {
+                    (fadeIn(tween(140)) + slideInVertically(tween(140)) { it / 2 }) togetherWith
+                        (fadeOut(tween(100)) + slideOutVertically(tween(100)) { -it / 2 })
+                },
+                label = "sliderValue",
+            ) { text ->
+                Text(text, color = MaterialTheme.colorScheme.primary)
+            }
         }
         Slider(
             value = value.toFloat().coerceIn(range.start, range.endInclusive),
@@ -881,6 +1010,16 @@ private fun LabelWithIcon(icon: ImageVector, @StringRes labelRes: Int) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge)
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LumenFlowRow(content: @Composable () -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        content = { content() },
+    )
 }
 
 @Composable
@@ -903,12 +1042,26 @@ private fun ThemeChip(@StringRes labelRes: Int, mode: AppThemeMode, settings: Ap
 
 @Composable
 private fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
-    ElevatedCard(modifier = Modifier.weight(1f)) {
-        Column(modifier = Modifier.padding(12.dp)) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .padding(12.dp),
+    ) {
             Text(stringResource(labelRes), style = MaterialTheme.typography.labelLarge)
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            AnimatedContent(
+                targetState = value,
+                transitionSpec = {
+                    (fadeIn(tween(150)) + slideInVertically(tween(150)) { it / 2 }) togetherWith
+                        (fadeOut(tween(100)) + slideOutVertically(tween(100)) { -it / 2 })
+                },
+                label = "metricValue",
+            ) { metricValue ->
+                Text(metricValue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            }
         }
-    }
 }
 
 @Composable
@@ -920,17 +1073,27 @@ private fun MetricRow(@StringRes labelRes: Int, value: String) {
 private fun MetricRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyLarge)
-        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        AnimatedContent(
+            targetState = value,
+            transitionSpec = {
+                (fadeIn(tween(140)) + slideInVertically(tween(140)) { it / 2 }) togetherWith
+                    (fadeOut(tween(100)) + slideOutVertically(tween(100)) { -it / 2 })
+            },
+            label = "metricRowValue",
+        ) { metricValue ->
+            Text(metricValue, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
 @Composable
 private fun ColorSwatch(color: Color, size: Dp = 44.dp) {
+    val animatedColor by animateColorAsState(color, tween(180), label = "colorSwatch")
     Box(
         modifier = Modifier
-            .width(size)
-            .height(size)
-            .background(color),
+            .size(size)
+            .clip(RoundedCornerShape(6.dp))
+            .background(animatedColor),
     )
 }
 
@@ -941,11 +1104,16 @@ private fun TemplateColorSwatch(template: TipTemplateEntity) {
 
 @Composable
 private fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Start, content: @Composable ColumnScope.() -> Unit) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
                 .padding(PaddingValues(16.dp)),
             horizontalAlignment = horizontalAlignment,
             verticalArrangement = Arrangement.spacedBy(16.dp),

@@ -6,7 +6,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -230,8 +229,7 @@ class NotificationService(private val context: Context) {
     }
 
     private fun openAppIntent(): Intent {
-        return Intent()
-            .setComponent(ComponentName(context.packageName, MainActivity::class.java.name))
+        return Intent(context, MainActivity::class.java)
             .setPackage(context.packageName)
     }
 
@@ -280,8 +278,8 @@ class NotificationService(private val context: Context) {
     }
 
     private fun explicitReceiverIntent(action: String, receiverClass: Class<*>): Intent {
-        return Intent(action)
-            .setComponent(ComponentName(context.packageName, receiverClass.name))
+        return Intent(context, receiverClass)
+            .setAction(action)
             .setPackage(context.packageName)
     }
 }
