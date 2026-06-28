@@ -11,11 +11,35 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -26,8 +50,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
@@ -50,6 +77,7 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -73,8 +101,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -128,6 +158,8 @@ private enum class SystemBackgroundColor(
     SURFACE_CONTAINER("surfaceContainer", R.string.system_color_surface, "primary"),
 }
 
+private val LumenCardShape = RoundedCornerShape(8.dp)
+
 @Composable
 fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -169,8 +201,35 @@ fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
                                         restoreState = true
                                     }
                                 },
-                                icon = { Icon(destination.icon, contentDescription = null) },
-                                label = { Text(stringResource(destination.labelRes)) },
+                                icon = {
+                                    val scale by animateFloatAsState(
+                                        targetValue = if (selected) 1.12f else 1f,
+                                        animationSpec = spring(stiffness = 600f, dampingRatio = 0.72f),
+                                        label = "bottomNavIconScale",
+                                    )
+                                    Icon(
+                                        destination.icon,
+                                        contentDescription = null,
+                                        modifier = Modifier.graphicsLayer {
+                                            scaleX = scale
+                                            scaleY = scale
+                                        },
+                                    )
+                                },
+                                label = {
+                                    AnimatedContent(
+                                        targetState = selected,
+                                        transitionSpec = {
+                                            fadeIn(tween(120)) togetherWith fadeOut(tween(90))
+                                        },
+                                        label = "bottomNavLabel",
+                                    ) { isSelected ->
+                                        Text(
+                                            text = stringResource(destination.labelRes),
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                        )
+                                    }
+                                },
                             )
                         }
                     }
@@ -180,6 +239,18 @@ fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
                     navController = navController,
                     startDestination = Destination.HOME.route,
                     modifier = Modifier.padding(padding),
+                    enterTransition = {
+                        fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 10 }
+                    },
+                    exitTransition = {
+                        fadeOut(tween(160)) + slideOutHorizontally(tween(160)) { -it / 12 }
+                    },
+                    popEnterTransition = {
+                        fadeIn(tween(220)) + slideInHorizontally(tween(220)) { -it / 10 }
+                    },
+                    popExitTransition = {
+                        fadeOut(tween(160)) + slideOutHorizontally(tween(160)) { it / 12 }
+                    },
                 ) {
                     composable(Destination.HOME.route) { HomeScreen(uiState, viewModel) }
                     composable(Destination.BREAK.route) { BreakScreen(uiState, viewModel) }
@@ -377,18 +448,18 @@ private fun SettingsScreen(
     LumenPage {
         SettingsSection(R.string.section_general, Icons.Outlined.Settings) {
             Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LumenFlowRow {
                 LanguageChip(R.string.language_system, LocaleController.SYSTEM, settings, viewModel)
                 LanguageChip(R.string.language_zh, LocaleController.CHINESE, settings, viewModel)
                 LanguageChip(R.string.language_en, LocaleController.ENGLISH, settings, viewModel)
             }
             Text(stringResource(R.string.theme), style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LumenFlowRow {
                 ThemeChip(R.string.theme_system, AppThemeMode.SYSTEM, settings, viewModel)
                 ThemeChip(R.string.theme_light, AppThemeMode.LIGHT, settings, viewModel)
                 ThemeChip(R.string.theme_dark, AppThemeMode.DARK, settings, viewModel)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            LumenFlowRow {
                 OutlinedButton(onClick = openTemplates) { ButtonLabel(Icons.Outlined.Style, R.string.nav_templates) }
                 OutlinedButton(onClick = openAbout) { ButtonLabel(Icons.Outlined.Info, R.string.nav_about) }
             }
@@ -404,7 +475,11 @@ private fun SettingsScreen(
                     viewModel.setNotificationsEnabled(false)
                 }
             }
-            if (settings.notificationEnabled && notificationPermissionNeeded) {
+            AnimatedVisibility(
+                visible = settings.notificationEnabled && notificationPermissionNeeded,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+            ) {
                 NotificationRequirementCard(
                     titleRes = R.string.notification_permission_needed,
                     messageRes = R.string.notification_permission_needed_message,
@@ -413,7 +488,11 @@ private fun SettingsScreen(
                     onClick = { runWithNotificationPermission { viewModel.setNotificationsEnabled(true) } },
                 )
             }
-            if (settings.notificationEnabled && exactAlarmSettingsNeeded) {
+            AnimatedVisibility(
+                visible = settings.notificationEnabled && exactAlarmSettingsNeeded,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+            ) {
                 NotificationRequirementCard(
                     titleRes = R.string.exact_alarm_permission_needed,
                     messageRes = R.string.exact_alarm_permission_needed_message,
@@ -441,16 +520,24 @@ private fun SettingsScreen(
             }
         }
         SettingsSection(R.string.section_appearance, Icons.Outlined.Style) {
-            uiState.templates.forEach { template ->
-                val selected = settings.activeTipTemplateId == template.id
-                FilterChip(
-                    selected = selected,
-                    onClick = { viewModel.selectTemplate(template.id) },
-                    label = { Text(templateDisplayName(template)) },
-                    leadingIcon = {
-                        if (selected) Icon(Icons.Outlined.CheckCircle, contentDescription = null)
-                    },
-                )
+            LumenFlowRow {
+                uiState.templates.forEach { template ->
+                    val selected = settings.activeTipTemplateId == template.id
+                    FilterChip(
+                        selected = selected,
+                        onClick = { viewModel.selectTemplate(template.id) },
+                        label = { Text(templateDisplayName(template)) },
+                        leadingIcon = {
+                            AnimatedVisibility(
+                                visible = selected,
+                                enter = scaleIn(tween(120)) + fadeIn(tween(120)),
+                                exit = scaleOut(tween(90)) + fadeOut(tween(90)),
+                            ) {
+                                Icon(Icons.Outlined.CheckCircle, contentDescription = null)
+                            }
+                        },
+                    )
+                }
             }
         }
         SettingsSection(R.string.section_reminder, Icons.Outlined.Spa) {
@@ -569,27 +656,25 @@ private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: Proje
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Style, R.string.system_background_color)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SystemBackgroundColor.entries.chunked(2).forEach { rowOptions ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        rowOptions.forEach { option ->
-                            FilterChip(
-                                selected = template.backgroundType == TemplateBackgroundType.SYSTEM.name &&
-                                    template.backgroundValue == option.key,
-                                onClick = {
-                                    viewModel.updateTemplateSystemBackground(
-                                        template = template,
-                                        backgroundValue = option.key,
-                                        primaryColor = option.primaryKey,
-                                    )
-                                },
-                                label = { Text(stringResource(option.labelRes)) },
-                                leadingIcon = { ColorSwatch(systemThemeColor(option.key), size = 18.dp) },
+            LumenFlowRow {
+                SystemBackgroundColor.entries.forEach { option ->
+                    FilterChip(
+                        selected = template.backgroundType == TemplateBackgroundType.SYSTEM.name &&
+                            template.backgroundValue == option.key,
+                        onClick = {
+                            viewModel.updateTemplateSystemBackground(
+                                template = template,
+                                backgroundValue = option.key,
+                                primaryColor = option.primaryKey,
                             )
-                        }
-                    }
+                        },
+                        label = { Text(stringResource(option.labelRes)) },
+                        leadingIcon = { ColorSwatch(systemThemeColor(option.key), size = 18.dp) },
+                    )
                 }
             }
+    }
+}
         }
     }
 }
