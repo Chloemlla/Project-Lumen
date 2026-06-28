@@ -126,10 +126,14 @@ class NotificationService(private val context: Context) {
 
     fun showOngoingStatus(state: RuntimeStateEntity) {
         if (!canPostNotifications()) return
-        NotificationManagerCompat.from(context).notify(
-            NotificationIds.FOREGROUND_TIMER,
-            buildOngoingStatusNotification(state),
-        )
+        try {
+            NotificationManagerCompat.from(context).notify(
+                NotificationIds.FOREGROUND_TIMER,
+                buildOngoingStatusNotification(state),
+            )
+        } catch (_: SecurityException) {
+            return
+        }
     }
 
     fun cancelOngoingStatus() {
