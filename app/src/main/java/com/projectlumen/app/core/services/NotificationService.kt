@@ -107,6 +107,7 @@ class NotificationService(private val context: Context) {
     }
 
     fun showUpdateAvailable(tagName: String, apkName: String, apkUrl: String) {
+        if (!canPostNotifications()) return
         show(
             id = NotificationIds.POMODORO + 1000,
             channel = NotificationChannels.STATUS,
