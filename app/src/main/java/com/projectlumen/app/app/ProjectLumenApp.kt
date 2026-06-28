@@ -1,9 +1,11 @@
 package com.projectlumen.app.app
 
 import android.Manifest
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,12 +31,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalCafe
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -55,7 +64,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -194,6 +205,18 @@ private fun LumenTopBar(title: String) {
 
 @Composable
 private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
+    val runtime = uiState.runtime
+    val reminderActive = runtime.activeEngine == ActiveEngine.REMINDER.name &&
+        runtime.reminderPhase != ReminderPhase.IDLE.name
+    val reminderPaused = reminderActive && runtime.reminderPhase == ReminderPhase.PAUSED.name
+    val canStartReminder = uiState.settings.reminderEnabled && !reminderActive
+    val canPauseReminder = reminderActive && !reminderPaused
+    val canResumeReminder = uiState.settings.reminderEnabled && reminderPaused
+    val runWithNotificationPermission = rememberNotificationPermissionGate()
+    fun runReminderAction(action: () -> Unit) {
+        if (uiState.settings.notificationEnabled) runWithNotificationPermission(action) else action()
+    }
+
     LumenPage {
         Text(stringResource(R.string.home_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text(stringResource(R.string.home_subtitle), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -201,20 +224,36 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
         TodayStatsCard(uiState.eyeStats.firstOrNull())
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(modifier = Modifier.weight(1f), onClick = viewModel::startReminder) {
-                    Text(stringResource(R.string.start_reminder))
+                Button(
+                    modifier = Modifier.weight(1f),
+                    enabled = canStartReminder,
+                    onClick = { runReminderAction(viewModel::startReminder) },
+                ) {
+                    ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_reminder)
                 }
-                OutlinedButton(modifier = Modifier.weight(1f), onClick = viewModel::pauseReminder) {
-                    Text(stringResource(R.string.pause))
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = canPauseReminder,
+                    onClick = viewModel::pauseReminder,
+                ) {
+                    ButtonLabel(Icons.Outlined.Pause, R.string.pause)
                 }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(modifier = Modifier.weight(1f), onClick = viewModel::pauseForOneHour) {
+            OutlinedButton(
+                modifier = Modifier.weight(1f),
+                enabled = canPauseReminder,
+                onClick = viewModel::pauseForOneHour,
+            ) {
                 Text(stringResource(R.string.silent_until))
             }
-            OutlinedButton(modifier = Modifier.weight(1f), onClick = viewModel::resumeReminder) {
-                Text(stringResource(R.string.resume_now))
+            OutlinedButton(
+                modifier = Modifier.weight(1f),
+                enabled = canResumeReminder,
+                onClick = { runReminderAction(viewModel::resumeReminder) },
+            ) {
+                ButtonLabel(Icons.Outlined.Refresh, R.string.resume_now)
             }
         }
     }
@@ -224,6 +263,12 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
 private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
     val runtime = uiState.runtime
     val isResting = runtime.reminderPhase == ReminderPhase.RESTING.name
+    val canSkip = runtime.activeEngine == ActiveEngine.REMINDER.name &&
+        runtime.reminderPhase in setOf(
+            ReminderPhase.PRE_ALERT.name,
+            ReminderPhase.AWAITING_ACTION.name,
+            ReminderPhase.RESTING.name,
+        )
     LumenPage(horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(16.dp))
         TemplatePreviewCard(activeTemplate(uiState))
@@ -240,9 +285,13 @@ private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
             fallbackText = statusLabel(runtime),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = viewModel::startBreak) { Text(stringResource(R.string.start_break)) }
+            Button(enabled = uiState.settings.reminderEnabled && !isResting, onClick = viewModel::startBreak) {
+                ButtonLabel(Icons.Outlined.Spa, R.string.start_break)
+            }
             if (!uiState.settings.disableSkip) {
-                OutlinedButton(onClick = viewModel::skipBreak) { Text(stringResource(R.string.skip_break)) }
+                OutlinedButton(enabled = canSkip, onClick = viewModel::skipBreak) {
+                    Text(stringResource(R.string.skip_break))
+                }
             }
         }
     }
@@ -252,6 +301,10 @@ private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
 private fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
     val runtime = uiState.runtime
     val running = runtime.activeEngine == ActiveEngine.POMODORO.name && runtime.pomodoroPhase != PomodoroPhase.IDLE.name
+    val runWithNotificationPermission = rememberNotificationPermissionGate()
+    fun runPomodoroAction(action: () -> Unit) {
+        if (uiState.settings.notificationEnabled) runWithNotificationPermission(action) else action()
+    }
     LumenPage(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(stringResource(R.string.pomodoro_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         Text(
@@ -266,11 +319,14 @@ private fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumen
             fallbackText = stringResource(R.string.status_ready),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(enabled = uiState.settings.pomodoroEnabled, onClick = viewModel::startPomodoro) {
-                Text(stringResource(R.string.start_pomodoro))
+            Button(
+                enabled = uiState.settings.pomodoroEnabled && !running,
+                onClick = { runPomodoroAction(viewModel::startPomodoro) },
+            ) {
+                ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_pomodoro)
             }
-            OutlinedButton(onClick = viewModel::stopPomodoro) {
-                Text(stringResource(R.string.stop_pomodoro))
+            OutlinedButton(enabled = running, onClick = viewModel::stopPomodoro) {
+                ButtonLabel(Icons.Outlined.Stop, R.string.stop_pomodoro)
             }
         }
     }
@@ -280,6 +336,11 @@ private fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumen
 private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
     val eye = uiState.eyeStats.firstOrNull()
     val pomodoro = uiState.pomodoroStats.firstOrNull()
+    val hasExportableStats = uiState.eyeStats.any {
+        it.workingSeconds > 0L || it.restSeconds > 0L || it.skipCount > 0 || it.completedBreakCount > 0
+    } || uiState.pomodoroStats.any {
+        it.completedTomatoCount > 0 || it.completedFocusSessions > 0 || it.totalBreakSeconds > 0L || it.totalFocusSeconds > 0L
+    }
     LumenPage {
         Text(stringResource(R.string.statistics_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         TodayStatsCard(eye)
@@ -291,8 +352,8 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                 MetricRow(R.string.rest_time, minutesLabel(((pomodoro?.totalBreakSeconds ?: 0L) / 60L).toInt()))
             }
         }
-        Button(onClick = viewModel::shareStatistics) {
-            Text(stringResource(R.string.export_csv))
+        Button(enabled = hasExportableStats, onClick = viewModel::shareStatistics) {
+            ButtonLabel(Icons.Outlined.FileDownload, R.string.export_csv)
         }
     }
 }
@@ -306,7 +367,9 @@ private fun SettingsScreen(
 ) {
     val settings = uiState.settings
     val context = LocalContext.current
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val runWithNotificationPermission = rememberNotificationPermissionGate()
+    val notificationPermissionNeeded = needsNotificationPermission(context)
+    val exactAlarmSettingsNeeded = needsExactAlarmSettings(context)
     LumenPage {
         Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         SettingsSection(R.string.section_general) {
@@ -331,19 +394,42 @@ private fun SettingsScreen(
             }
         }
         SettingsSection(R.string.section_notifications) {
-            SwitchRow(R.string.enable_notifications, settings.notificationEnabled) {
-                viewModel.updateSettings { current -> current.copy(notificationEnabled = it) }
+            SwitchRow(R.string.enable_notifications, settings.notificationEnabled) { enabled ->
+                if (enabled) {
+                    runWithNotificationPermission { viewModel.setNotificationsEnabled(true) }
+                } else {
+                    viewModel.setNotificationsEnabled(false)
+                }
+            }
+            if (settings.notificationEnabled && notificationPermissionNeeded) {
+                NotificationRequirementCard(
+                    titleRes = R.string.notification_permission_needed,
+                    messageRes = R.string.notification_permission_needed_message,
+                    actionLabelRes = R.string.allow_notifications,
+                    icon = Icons.Outlined.NotificationsActive,
+                    onClick = { runWithNotificationPermission { viewModel.setNotificationsEnabled(true) } },
+                )
+            }
+            if (settings.notificationEnabled && exactAlarmSettingsNeeded) {
+                NotificationRequirementCard(
+                    titleRes = R.string.exact_alarm_permission_needed,
+                    messageRes = R.string.exact_alarm_permission_needed_message,
+                    actionLabelRes = R.string.open_system_settings,
+                    icon = Icons.Outlined.OpenInNew,
+                    onClick = { openExactAlarmSettings(context) },
+                )
             }
             Button(onClick = {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                if (notificationPermissionNeeded) {
+                    runWithNotificationPermission { viewModel.setNotificationsEnabled(true) }
                 } else {
                     openAppNotificationSettings(context)
                 }
             }) {
-                Text(stringResource(R.string.notification_permission))
+                ButtonLabel(
+                    if (notificationPermissionNeeded) Icons.Outlined.NotificationsActive else Icons.Outlined.OpenInNew,
+                    if (notificationPermissionNeeded) R.string.allow_notifications else R.string.notification_system_settings,
+                )
             }
         }
         SettingsSection(R.string.section_sound) {
@@ -362,7 +448,7 @@ private fun SettingsScreen(
         }
         SettingsSection(R.string.section_reminder) {
             SwitchRow(R.string.enable_reminder, settings.reminderEnabled) {
-                viewModel.updateSettings { current -> current.copy(reminderEnabled = it) }
+                viewModel.setReminderEnabled(it)
             }
             NumberSlider(R.string.warn_interval, settings.warnIntervalMinutes, 5f..120f, 22, stringResource(R.string.minutes_value, settings.warnIntervalMinutes)) {
                 viewModel.updateSettings { current -> current.copy(warnIntervalMinutes = it) }
@@ -387,7 +473,7 @@ private fun SettingsScreen(
         }
         SettingsSection(R.string.section_pomodoro) {
             SwitchRow(R.string.enable_pomodoro, settings.pomodoroEnabled) {
-                viewModel.updateSettings { current -> current.copy(pomodoroEnabled = it) }
+                viewModel.setPomodoroEnabled(it)
             }
             NumberSlider(R.string.pomodoro_work, settings.pomodoroWorkMinutes, 5f..60f, 10, minutesLabel(settings.pomodoroWorkMinutes)) {
                 viewModel.updateSettings { current -> current.copy(pomodoroWorkMinutes = it) }
@@ -576,6 +662,59 @@ private fun SettingsSection(@StringRes titleRes: Int, content: @Composable Colum
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(titleRes), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             content()
+        }
+    }
+}
+
+@Composable
+private fun NotificationRequirementCard(
+    @StringRes titleRes: Int,
+    @StringRes messageRes: Int,
+    @StringRes actionLabelRes: Int,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(titleRes), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(messageRes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        OutlinedButton(onClick = onClick) {
+            Text(stringResource(actionLabelRes))
+        }
+    }
+}
+
+@Composable
+private fun ButtonLabel(icon: ImageVector, @StringRes labelRes: Int) {
+    Icon(icon, contentDescription = null)
+    Spacer(Modifier.width(8.dp))
+    Text(stringResource(labelRes))
+}
+
+@Composable
+private fun rememberNotificationPermissionGate(): ((() -> Unit) -> Unit) {
+    val context = LocalContext.current
+    var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val action = pendingAction
+        pendingAction = null
+        if (granted) action?.invoke()
+    }
+    return { action ->
+        if (needsNotificationPermission(context)) {
+            pendingAction = action
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            action()
         }
     }
 }
@@ -792,4 +931,26 @@ private fun openAppNotificationSettings(context: Context) {
     val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
         .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
     context.startActivity(intent)
+}
+
+private fun needsNotificationPermission(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
+    return ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+        PackageManager.PERMISSION_GRANTED
+}
+
+private fun needsExactAlarmSettings(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+    val alarmManager = context.getSystemService(AlarmManager::class.java)
+    return !alarmManager.canScheduleExactAlarms()
+}
+
+private fun openExactAlarmSettings(context: Context) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    val intent = Intent(
+        Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+        Uri.parse("package:${context.packageName}"),
+    )
+    runCatching { context.startActivity(intent) }
+        .onFailure { openAppNotificationSettings(context) }
 }

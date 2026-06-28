@@ -92,11 +92,19 @@
     <string name="minutes_compact">%1$02d:%2$02d</string>
     <string name="channel_reminder">用眼提醒</string>
     <string name="channel_pomodoro">番茄钟</string>
+    <string name="channel_status">运行状态</string>
     <string name="pre_alert_notification_title">即将休息</string>
     <string name="pre_alert_notification_message">准备让眼睛休息一下。</string>
     <string name="break_done_title">休息完成</string>
     <string name="break_done_message">可以回到工作状态。</string>
     <string name="pomodoro_notification_message">当前番茄钟阶段已变化。</string>
+    <string name="notification_action_stop">停止</string>
+    <string name="notification_system_settings">系统通知设置</string>
+    <string name="allow_notifications">允许通知</string>
+    <string name="notification_permission_needed">需要通知权限</string>
+    <string name="notification_permission_needed_message">允许系统通知后，提醒才能在应用外显示。</string>
+    <string name="exact_alarm_permission_needed">提升计时准确性</string>
+    <string name="exact_alarm_permission_needed_message">如果未允许精确闹钟，Android 可能延迟提醒。</string>
     <string name="export_subject">Project Lumen 统计</string>
     <string name="export_share">分享统计</string>
     <string name="template_calm_teal">清爽青绿</string>
@@ -114,5 +122,9 @@
     <string name="system_color_surface">表面色</string>
     <string name="ongoing_timer_title">Project Lumen 正在运行</string>
     <string name="ongoing_timer_message">提醒计时已启用。</string>
+    <string name="ongoing_status_working">用眼休息提醒已启用。</string>
+    <string name="ongoing_status_resting">休息计时正在进行。</string>
+    <string name="ongoing_status_paused">提醒计时已暂停。</string>
+    <string name="ongoing_status_pomodoro">番茄钟计时正在进行。</string>
     <string name="weekly_trend">近期趋势</string>
 </resources>

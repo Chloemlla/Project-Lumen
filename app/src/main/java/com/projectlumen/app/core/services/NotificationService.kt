@@ -2,6 +2,7 @@ package com.projectlumen.app.core.services
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -15,6 +16,10 @@ import androidx.core.content.ContextCompat
 import com.projectlumen.app.MainActivity
 import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
+import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.enums.ActiveEngine
+import com.projectlumen.app.core.enums.PomodoroPhase
+import com.projectlumen.app.core.enums.ReminderPhase
 
 class NotificationService(private val context: Context) {
     fun ensureChannels() {
@@ -31,6 +36,11 @@ class NotificationService(private val context: Context) {
                     NotificationChannels.POMODORO,
                     context.getString(R.string.channel_pomodoro),
                     NotificationManager.IMPORTANCE_DEFAULT,
+                ),
+                NotificationChannel(
+                    NotificationChannels.STATUS,
+                    context.getString(R.string.channel_status),
+                    NotificationManager.IMPORTANCE_LOW,
                 ),
             ),
         )
@@ -95,6 +105,37 @@ class NotificationService(private val context: Context) {
         )
     }
 
+    fun buildOngoingStatusNotification(state: RuntimeStateEntity? = null): Notification {
+        val (title, message) = ongoingStatusText(state)
+        return NotificationCompat.Builder(context, NotificationChannels.STATUS)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setContentIntent(openAppPendingIntent(NotificationIds.FOREGROUND_TIMER))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .addAction(
+                R.drawable.ic_launcher_foreground,
+                context.getString(R.string.notification_action_stop),
+                actionPendingIntent(NotificationIds.STOP_TIMER_ACTION, ReminderActionReceiver.ACTION_STOP_ALL),
+            )
+            .build()
+    }
+
+    fun showOngoingStatus(state: RuntimeStateEntity) {
+        if (!canPostNotifications()) return
+        NotificationManagerCompat.from(context).notify(
+            NotificationIds.FOREGROUND_TIMER,
+            buildOngoingStatusNotification(state),
+        )
+    }
+
+    fun cancelOngoingStatus() {
+        NotificationManagerCompat.from(context).cancel(NotificationIds.FOREGROUND_TIMER)
+    }
+
     fun cancelAllScheduled() {
         val manager = context.getSystemService(AlarmManager::class.java)
         listOf(
@@ -147,22 +188,12 @@ class NotificationService(private val context: Context) {
         priority: Int,
         includeBreakActions: Boolean,
     ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-                PackageManager.PERMISSION_GRANTED
-            if (!granted) return
-        }
-        val openIntent = PendingIntent.getActivity(
-            context,
-            id,
-            Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+        if (!canPostNotifications()) return
         val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(message)
-            .setContentIntent(openIntent)
+            .setContentIntent(openAppPendingIntent(id))
             .setAutoCancel(true)
             .setPriority(priority)
         if (includeBreakActions) {
@@ -178,6 +209,52 @@ class NotificationService(private val context: Context) {
             )
         }
         NotificationManagerCompat.from(context).notify(id, builder.build())
+    }
+
+    private fun canPostNotifications(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun openAppPendingIntent(id: Int): PendingIntent {
+        return PendingIntent.getActivity(
+            context,
+            id,
+            Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun ongoingStatusText(state: RuntimeStateEntity?): Pair<String, String> {
+        if (state == null) {
+            return context.getString(R.string.ongoing_timer_title) to
+                context.getString(R.string.ongoing_timer_message)
+        }
+        return when (state.activeEngine) {
+            ActiveEngine.REMINDER.name -> when (state.reminderPhase) {
+                ReminderPhase.WORKING.name,
+                ReminderPhase.PRE_ALERT.name,
+                ReminderPhase.AWAITING_ACTION.name -> context.getString(R.string.ongoing_timer_title) to
+                    context.getString(R.string.ongoing_status_working)
+                ReminderPhase.RESTING.name -> context.getString(R.string.break_title) to
+                    context.getString(R.string.ongoing_status_resting)
+                ReminderPhase.PAUSED.name -> context.getString(R.string.ongoing_timer_title) to
+                    context.getString(R.string.ongoing_status_paused)
+                else -> context.getString(R.string.ongoing_timer_title) to
+                    context.getString(R.string.ongoing_timer_message)
+            }
+            ActiveEngine.POMODORO.name -> when (state.pomodoroPhase) {
+                PomodoroPhase.FOCUS.name,
+                PomodoroPhase.SHORT_BREAK.name,
+                PomodoroPhase.LONG_BREAK.name -> context.getString(R.string.pomodoro_title) to
+                    context.getString(R.string.ongoing_status_pomodoro)
+                else -> context.getString(R.string.ongoing_timer_title) to
+                    context.getString(R.string.ongoing_timer_message)
+            }
+            else -> context.getString(R.string.ongoing_timer_title) to
+                context.getString(R.string.ongoing_timer_message)
+        }
     }
 
     private fun actionPendingIntent(id: Int, action: String): PendingIntent {

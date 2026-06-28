@@ -26,11 +26,13 @@ class BootReceiver : BroadcastReceiver() {
                         ReminderPhase.AWAITING_ACTION.name -> {
                             app.notifications.scheduleReminder(runtime.nextPreAlertAt, runtime.nextReminderAt)
                             app.startTimerService()
+                            app.notifications.showOngoingStatus(runtime)
                         }
 
                         ReminderPhase.RESTING.name -> {
                             app.notifications.scheduleBreakDone(runtime.breakEndAt)
                             app.startTimerService()
+                            app.notifications.showOngoingStatus(runtime)
                         }
                     }
                 }

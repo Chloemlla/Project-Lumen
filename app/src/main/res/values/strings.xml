@@ -92,11 +92,19 @@
     <string name="minutes_compact">%1$02d:%2$02d</string>
     <string name="channel_reminder">Eye reminders</string>
     <string name="channel_pomodoro">Pomodoro</string>
+    <string name="channel_status">Running status</string>
     <string name="pre_alert_notification_title">Break soon</string>
     <string name="pre_alert_notification_message">Prepare to rest your eyes.</string>
     <string name="break_done_title">Break complete</string>
     <string name="break_done_message">You can return to work.</string>
     <string name="pomodoro_notification_message">The current pomodoro phase changed.</string>
+    <string name="notification_action_stop">Stop</string>
+    <string name="notification_system_settings">System notification settings</string>
+    <string name="allow_notifications">Allow notifications</string>
+    <string name="notification_permission_needed">Notifications need permission</string>
+    <string name="notification_permission_needed_message">Allow system notifications so reminders can appear outside the app.</string>
+    <string name="exact_alarm_permission_needed">Improve timing accuracy</string>
+    <string name="exact_alarm_permission_needed_message">Android may delay reminders unless exact alarms are allowed in system settings.</string>
     <string name="export_subject">Project Lumen statistics</string>
     <string name="export_share">Share statistics</string>
     <string name="template_calm_teal">Calm teal</string>
@@ -114,5 +122,9 @@
     <string name="system_color_surface">Surface</string>
     <string name="ongoing_timer_title">Project Lumen is running</string>
     <string name="ongoing_timer_message">Reminder timing is active.</string>
+    <string name="ongoing_status_working">Eye break reminders are active.</string>
+    <string name="ongoing_status_resting">Rest timer is active.</string>
+    <string name="ongoing_status_paused">Reminder timing is paused.</string>
+    <string name="ongoing_status_pomodoro">Pomodoro timing is active.</string>
     <string name="weekly_trend">Recent trend</string>
 </resources>

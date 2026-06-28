@@ -6,4 +6,5 @@ object NotificationIds {
     const val BREAK_DUE = 1002
     const val BREAK_DONE = 1003
     const val POMODORO = 2001
+    const val STOP_TIMER_ACTION = 9010
 }

@@ -36,7 +36,10 @@ class ReminderActionReceiver : BroadcastReceiver() {
                                 updatedAt = now,
                             )
                             db.runtimeStateDao().upsert(next)
-                            if (settings.notificationEnabled) app.notifications.scheduleBreakDone(next.breakEndAt)
+                            if (settings.notificationEnabled) {
+                                app.notifications.scheduleBreakDone(next.breakEndAt)
+                                app.notifications.showOngoingStatus(next)
+                            }
                         }
                     }
 
@@ -59,13 +62,17 @@ class ReminderActionReceiver : BroadcastReceiver() {
                                 updatedAt = now,
                             )
                             db.runtimeStateDao().upsert(next)
-                            if (settings.notificationEnabled) app.notifications.scheduleReminder(next.nextPreAlertAt, next.nextReminderAt)
+                            if (settings.notificationEnabled) {
+                                app.notifications.scheduleReminder(next.nextPreAlertAt, next.nextReminderAt)
+                                app.notifications.showOngoingStatus(next)
+                            }
                         }
                     }
 
                     ACTION_STOP_ALL -> {
                         db.runtimeStateDao().upsert(RuntimeStateEntity(updatedAt = now))
                         app.notifications.cancelAllScheduled()
+                        app.notifications.cancelOngoingStatus()
                         context.stopService(Intent(context, TimerForegroundService::class.java))
                     }
                 }
