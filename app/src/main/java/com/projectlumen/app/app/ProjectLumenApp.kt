@@ -301,7 +301,12 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
         )
         StateCard(uiState.runtime, uiState.nowMillis)
         TodayStatsCard(uiState.eyeStats.firstOrNull())
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        ElevatedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            shape = LumenCardShape,
+        ) {
             Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     modifier = Modifier.weight(1f),
@@ -420,7 +425,12 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
     LumenPage {
         TodayStatsCard(eye)
         TrendCard(uiState)
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        ElevatedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            shape = LumenCardShape,
+        ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionHeader(Icons.Outlined.LocalCafe, R.string.section_pomodoro)
                 MetricRow(R.string.completed_tomatoes, (pomodoro?.completedTomatoCount ?: 0).toString())
@@ -714,7 +724,12 @@ private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: Proje
 @Composable
 private fun AboutScreen() {
     LumenPage {
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        ElevatedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            shape = LumenCardShape,
+        ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SectionHeader(Icons.Outlined.Info, R.string.app_name)
                 Text(stringResource(R.string.about_version), style = MaterialTheme.typography.titleMedium)
