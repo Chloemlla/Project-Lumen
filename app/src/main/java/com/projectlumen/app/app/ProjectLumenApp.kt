@@ -157,14 +157,6 @@ private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chlo
 private const val PROJECT_LUMEN_APK_MIME = "application/vnd.android.package-archive"
 private val crashDetailsTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
-data class UpdateInfo(
-    val tagName: String,
-    val releaseName: String,
-    val body: String,
-    val apkName: String,
-    val apkUrl: String,
-)
-
 private enum class Destination(
     val route: String,
     @StringRes val labelRes: Int,
@@ -319,9 +311,9 @@ private fun LumenTopBar(title: String) {
 private fun CrashReportScreen(report: CrashReport) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-    val formattedTime = remember(report.crashedAtMillis) {
-        Instant.ofEpochMilli(report.crashedAtMillis).atZone(ZoneId.systemDefault()).format(crashDetailsTimeFormatter)
-    }
+    val formattedTime = Instant.ofEpochMilli(report.crashedAtMillis)
+        .atZone(ZoneId.systemDefault())
+        .format(crashDetailsTimeFormatter)
     LumenPage {
         PageIntro(
             icon = Icons.Outlined.Code,

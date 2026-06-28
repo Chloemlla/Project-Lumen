@@ -64,3 +64,14 @@ data class CrashReport(
         }
     }
 }
+
+fun crashReportFromJson(json: org.json.JSONObject): CrashReport {
+    return CrashReport(
+        crashedAtMillis = json.getLong("crashedAtMillis"),
+        crashedAtText = json.getString("crashedAtText"),
+        exceptionType = json.getString("exceptionType"),
+        rootCause = json.getString("rootCause"),
+        systemInfo = json.getString("systemInfo"),
+        stackTrace = json.getString("stackTrace"),
+    )
+}

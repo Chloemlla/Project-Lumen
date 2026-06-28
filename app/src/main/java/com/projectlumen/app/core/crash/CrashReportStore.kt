@@ -13,7 +13,7 @@ class CrashReportStore(context: Context) {
 
     fun load(): CrashReport? {
         if (!file.exists()) return null
-        return runCatching { CrashReport.fromJson(JSONObject(file.readText())) }.getOrNull()
+        return runCatching { crashReportFromJson(JSONObject(file.readText())) }.getOrNull()
     }
 
     fun clear() {
