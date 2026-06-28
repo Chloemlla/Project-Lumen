@@ -28,6 +28,35 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
+      - name: Write signing config
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          KEY_ALIAS="$(printf '%s' "$KEY_ALIAS" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+
+          if [ -f "gradle.properties" ]; then
+            sed -i 's/\r$//' gradle.properties
+            [ -n "$(tail -c 1 gradle.properties)" ] && echo "" >> gradle.properties
+          fi
+
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "Release signing secrets are incomplete; building an unsigned release APK."
+          else
+            printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "${{ github.workspace }}/project_lumen.jks" || {
+              echo "Failed to decode KEYSTORE_BASE64; building an unsigned release APK."
+              exit 0
+            }
+
+            printf 'PROJECT_LUMEN_STORE_FILE=%s\n' "${{ github.workspace }}/project_lumen.jks" >> gradle.properties
+            printf 'PROJECT_LUMEN_STORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD" >> gradle.properties
+            printf 'PROJECT_LUMEN_KEY_ALIAS=%s\n' "$KEY_ALIAS" >> gradle.properties
+            printf 'PROJECT_LUMEN_KEY_PASSWORD=%s\n' "$KEY_PASSWORD" >> gradle.properties
+            echo "Release signing configured."
+          fi
+
       - name: Build release APK
         run: gradle assembleRelease --no-daemon
 
@@ -35,7 +64,18 @@ jobs:
         run: |
           mkdir -p release-assets
           VERSION="${GITHUB_REF_NAME:-manual}"
-          cp app/build/outputs/apk/release/app-release-unsigned.apk "release-assets/Project-Lumen_android_${VERSION}_unsigned.apk"
+          APK_FILE="app/build/outputs/apk/release/app-release.apk"
+          APK_SUFFIX="signed"
+          if [ ! -f "$APK_FILE" ]; then
+            APK_FILE="app/build/outputs/apk/release/app-release-unsigned.apk"
+            APK_SUFFIX="unsigned"
+          fi
+          if [ ! -f "$APK_FILE" ]; then
+            echo "Release APK was not found."
+            ls -lh app/build/outputs/apk/release/
+            exit 1
+          fi
+          cp "$APK_FILE" "release-assets/Project-Lumen_android_${VERSION}_${APK_SUFFIX}.apk"
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4

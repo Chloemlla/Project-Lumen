@@ -47,6 +47,8 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          KEY_ALIAS="$(printf '%s' "$KEY_ALIAS" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+
           if [ -f "gradle.properties" ]; then
             sed -i 's/\r$//' gradle.properties
             [ -n "$(tail -c 1 gradle.properties)" ] && echo "" >> gradle.properties
@@ -56,7 +58,7 @@ jobs:
             echo "Release signing secrets are incomplete; using debug signing for the release APK."
             printf 'PROJECT_LUMEN_USE_DEBUG_SIGNING=true\n' >> gradle.properties
           else
-            echo "$KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/project_lumen.jks" || {
+            printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "${{ github.workspace }}/project_lumen.jks" || {
               echo "Failed to decode KEYSTORE_BASE64; using debug signing for the release APK."
               printf 'PROJECT_LUMEN_USE_DEBUG_SIGNING=true\n' >> gradle.properties
               exit 0
