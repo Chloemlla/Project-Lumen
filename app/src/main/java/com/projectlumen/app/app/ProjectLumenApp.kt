@@ -797,20 +797,17 @@ private fun TimerCard(label: String, seconds: Long, progress: Float, fallbackTex
         label = "timerProgress",
     )
     val running = seconds > 0
-    val pulse = if (running) {
-        val transition = rememberInfiniteTransition(label = "timerPulse")
-        transition.animateFloat(
-            initialValue = 1f,
-            targetValue = 1.035f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 1400),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "timerPulseScale",
-        ).value
-    } else {
-        1f
-    }
+    val transition = rememberInfiniteTransition(label = "timerPulse")
+    val pulseScale by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.035f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1400),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "timerPulseScale",
+    )
+    val pulse = if (running) pulseScale else 1f
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
