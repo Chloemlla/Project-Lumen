@@ -191,11 +191,9 @@ fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
         .getOrDefault(AppThemeMode.SYSTEM)
     val baseContext = LocalContext.current
     LaunchedEffect(uiState.settings.languageCode) {
-        LocaleController.apply(baseContext, uiState.settings.languageCode)
+        LocaleController.apply(uiState.settings.languageCode)
     }
-    val localizedContext = remember(baseContext, uiState.settings.languageCode) {
-        LocaleController.wrap(baseContext, uiState.settings.languageCode)
-    }
+    val localizedContext = baseContext
 
     CompositionLocalProvider(LocalContext provides localizedContext) {
         ProjectLumenTheme(themeMode = themeMode) {
