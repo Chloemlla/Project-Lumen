@@ -2,6 +2,7 @@
 
 import android.app.Application
 import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.services.AudioService
@@ -34,7 +35,8 @@ class ProjectLumenApplication : Application() {
     private fun checkStartupUpdate() {
         Thread {
             val update = runCatching { fetchLatestReleaseAsset() }.getOrNull() ?: return@Thread
-            if (update.tagName.isNotBlank() && update.tagName != BuildConfig.GIT_SHA_SHORT) {
+            val currentVersion = currentVersionName()
+            if (update.tagName.isNotBlank() && compareVersions(update.tagName, currentVersion) > 0) {
                 notifications.showUpdateAvailable(update.tagName, update.apkName, update.apkUrl)
             }
         }.start()
@@ -95,6 +97,34 @@ class ProjectLumenApplication : Application() {
             }
         }
         return objects
+    }
+
+    private fun currentVersionName(): String {
+        return try {
+            @Suppress("DEPRECATION")
+            packageManager.getPackageInfo(packageName, 0).versionName ?: BuildConfig.VERSION_NAME
+        } catch (_: PackageManager.NameNotFoundException) {
+            BuildConfig.VERSION_NAME
+        }
+    }
+
+    private fun compareVersions(left: String, right: String): Int {
+        val leftParts = normalizeVersion(left)
+        val rightParts = normalizeVersion(right)
+        val size = maxOf(leftParts.size, rightParts.size)
+        for (i in 0 until size) {
+            val l = leftParts.getOrElse(i) { 0 }
+            val r = rightParts.getOrElse(i) { 0 }
+            if (l != r) return l.compareTo(r)
+        }
+        return 0
+    }
+
+    private fun normalizeVersion(version: String): List<Int> {
+        val cleaned = version.trim().removePrefix("v").removePrefix("V")
+        return cleaned.split('.', '-', '_')
+            .mapNotNull { part -> part.toIntOrNull() }
+            .ifEmpty { listOf(0) }
     }
 
     private data class ReleaseAssetInfo(val tagName: String, val apkName: String, val apkUrl: String)
