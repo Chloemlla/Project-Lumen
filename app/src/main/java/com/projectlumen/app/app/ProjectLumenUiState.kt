@@ -5,6 +5,7 @@ import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
+import com.projectlumen.app.core.crash.CrashReport
 
 data class ProjectLumenUiState(
     val settings: AppSettingsEntity = AppSettingsEntity(),
@@ -14,4 +15,5 @@ data class ProjectLumenUiState(
     val templates: List<TipTemplateEntity> = emptyList(),
     val nowMillis: Long = System.currentTimeMillis(),
     val isReady: Boolean = false,
+    val crashReport: CrashReport? = null,
 )

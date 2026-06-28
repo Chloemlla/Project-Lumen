@@ -31,7 +31,10 @@ class MainActivity : ComponentActivity() {
                     }
                 },
             )
-            ProjectLumenApp(viewModel = viewModel)
+            ProjectLumenApp(
+                viewModel = viewModel,
+                crashReport = app.crashReports.load(),
+            )
         }
     }
 }

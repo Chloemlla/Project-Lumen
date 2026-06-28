@@ -56,6 +56,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -109,11 +110,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -126,6 +129,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.projectlumen.app.R
+import com.projectlumen.app.core.crash.CrashReport
+import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
@@ -140,6 +145,9 @@ import com.projectlumen.app.ui.theme.ProjectLumenTheme
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -147,6 +155,7 @@ private const val PROJECT_LUMEN_REPO_URL = "https://github.com/Chloemlla/Project
 private const val PROJECT_LUMEN_RELEASES_URL = "https://github.com/Chloemlla/Project-Lumen/releases/latest"
 private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases/latest"
 private const val PROJECT_LUMEN_APK_MIME = "application/vnd.android.package-archive"
+private val crashDetailsTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
 data class UpdateInfo(
     val tagName: String,
@@ -185,7 +194,10 @@ private enum class SystemBackgroundColor(
 private val LumenCardShape = RoundedCornerShape(8.dp)
 
 @Composable
-fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
+fun ProjectLumenApp(
+    viewModel: ProjectLumenViewModel,
+    crashReport: CrashReport?,
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val themeMode = runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }
         .getOrDefault(AppThemeMode.SYSTEM)
@@ -197,6 +209,10 @@ fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
 
     CompositionLocalProvider(LocalContext provides localizedContext) {
         ProjectLumenTheme(themeMode = themeMode) {
+            if (crashReport != null) {
+                CrashReportScreen(report = crashReport)
+                return@ProjectLumenTheme
+            }
             val navController = rememberNavController()
             val backStackEntry by navController.currentBackStackEntryAsState()
             Scaffold(
@@ -297,6 +313,44 @@ fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
 @Composable
 private fun LumenTopBar(title: String) {
     TopAppBar(title = { Text(title, fontWeight = FontWeight.SemiBold) })
+}
+
+@Composable
+private fun CrashReportScreen(report: CrashReport) {
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    val formattedTime = remember(report.crashedAtMillis) {
+        Instant.ofEpochMilli(report.crashedAtMillis).atZone(ZoneId.systemDefault()).format(crashDetailsTimeFormatter)
+    }
+    LumenPage {
+        PageIntro(
+            icon = Icons.Outlined.Code,
+            titleRes = R.string.app_name,
+            message = "应用检测到崩溃，报告已保留。",
+        )
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = LumenCardShape,
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetricRow("时间", formattedTime)
+                MetricRow("根因", report.rootCause)
+                MetricRow("异常类型", report.exceptionType)
+                Text("系统信息", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(report.systemInfo, style = MaterialTheme.typography.bodyMedium)
+                Text("完整堆栈", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(report.stackTrace, style = MaterialTheme.typography.bodySmall)
+                Button(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(report.toClipboardText()))
+                        (context.applicationContext as? ProjectLumenApplication)?.crashReports?.clear()
+                    },
+                ) {
+                    Text("复制报告")
+                }
+            }
+        }
+    }
 }
 
 @Composable
