@@ -151,7 +151,7 @@ class NotificationService(private val context: Context) {
 
     private fun schedule(id: Int, triggerAtMillis: Long, action: String) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        val pendingIntent = pendingIntent(id, action, PendingIntent.FLAG_UPDATE_CURRENT)
+        val pendingIntent = scheduledPendingIntent(id, action)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
         } else if (alarmManager.canScheduleExactAlarms()) {
@@ -161,12 +161,12 @@ class NotificationService(private val context: Context) {
         }
     }
 
-    private fun pendingIntent(id: Int, action: String, flags: Int): PendingIntent {
+    private fun scheduledPendingIntent(id: Int, action: String): PendingIntent {
         return PendingIntent.getBroadcast(
             context,
             id,
             alarmIntent(action),
-            flags or PendingIntent.FLAG_IMMUTABLE,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
 
