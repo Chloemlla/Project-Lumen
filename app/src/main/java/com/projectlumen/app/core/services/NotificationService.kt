@@ -214,7 +214,11 @@ class NotificationService(private val context: Context) {
                 actionPendingIntent(NotificationIds.BREAK_DUE + 11, ReminderActionReceiver.ACTION_SKIP_BREAK),
             )
         }
-        NotificationManagerCompat.from(context).notify(id, builder.build())
+        try {
+            NotificationManagerCompat.from(context).notify(id, builder.build())
+        } catch (_: SecurityException) {
+            return
+        }
     }
 
     private fun canPostNotifications(): Boolean {

@@ -58,6 +58,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.FileDownload
@@ -65,7 +67,6 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.NotificationsActive
-import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
@@ -75,7 +76,6 @@ import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Stop
-import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -508,7 +508,7 @@ private fun SettingsScreen(
                     titleRes = R.string.exact_alarm_permission_needed,
                     messageRes = R.string.exact_alarm_permission_needed_message,
                     actionLabelRes = R.string.open_system_settings,
-                    icon = Icons.Outlined.OpenInNew,
+                    icon = Icons.AutoMirrored.Outlined.OpenInNew,
                     onClick = { openExactAlarmSettings(context) },
                 )
             }
@@ -520,13 +520,13 @@ private fun SettingsScreen(
                 }
             }) {
                 ButtonLabel(
-                    if (notificationPermissionNeeded) Icons.Outlined.NotificationsActive else Icons.Outlined.OpenInNew,
+                    if (notificationPermissionNeeded) Icons.Outlined.NotificationsActive else Icons.AutoMirrored.Outlined.OpenInNew,
                     if (notificationPermissionNeeded) R.string.allow_notifications else R.string.notification_system_settings,
                 )
             }
         }
-        SettingsSection(R.string.section_sound, Icons.Outlined.VolumeUp) {
-            SwitchRow(R.string.enable_sound, Icons.Outlined.VolumeUp, settings.soundEnabled) {
+        SettingsSection(R.string.section_sound, Icons.AutoMirrored.Outlined.VolumeUp) {
+            SwitchRow(R.string.enable_sound, Icons.AutoMirrored.Outlined.VolumeUp, settings.soundEnabled) {
                 viewModel.updateSettings { current -> current.copy(soundEnabled = it) }
             }
         }
