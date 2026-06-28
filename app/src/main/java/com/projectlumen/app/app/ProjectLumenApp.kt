@@ -392,12 +392,12 @@ private fun SettingsScreen(
                 OutlinedButton(onClick = openTemplates) { ButtonLabel(Icons.Outlined.Style, R.string.nav_templates) }
                 OutlinedButton(onClick = openAbout) { ButtonLabel(Icons.Outlined.Info, R.string.nav_about) }
             }
-            SwitchRow(R.string.auto_dark_window, settings.useAutoDarkWindow) {
+            SwitchRow(R.string.auto_dark_window, Icons.Outlined.Style, settings.useAutoDarkWindow) {
                 viewModel.updateSettings { current -> current.copy(useAutoDarkWindow = it) }
             }
         }
         SettingsSection(R.string.section_notifications, Icons.Outlined.NotificationsActive) {
-            SwitchRow(R.string.enable_notifications, settings.notificationEnabled) { enabled ->
+            SwitchRow(R.string.enable_notifications, Icons.Outlined.NotificationsActive, settings.notificationEnabled) { enabled ->
                 if (enabled) {
                     runWithNotificationPermission { viewModel.setNotificationsEnabled(true) }
                 } else {
@@ -436,7 +436,7 @@ private fun SettingsScreen(
             }
         }
         SettingsSection(R.string.section_sound, Icons.Outlined.VolumeUp) {
-            SwitchRow(R.string.enable_sound, settings.soundEnabled) {
+            SwitchRow(R.string.enable_sound, Icons.Outlined.VolumeUp, settings.soundEnabled) {
                 viewModel.updateSettings { current -> current.copy(soundEnabled = it) }
             }
         }
@@ -454,41 +454,41 @@ private fun SettingsScreen(
             }
         }
         SettingsSection(R.string.section_reminder, Icons.Outlined.Spa) {
-            SwitchRow(R.string.enable_reminder, settings.reminderEnabled) {
+            SwitchRow(R.string.enable_reminder, Icons.Outlined.Spa, settings.reminderEnabled) {
                 viewModel.setReminderEnabled(it)
             }
-            NumberSlider(R.string.warn_interval, settings.warnIntervalMinutes, 5f..120f, 22, stringResource(R.string.minutes_value, settings.warnIntervalMinutes)) {
+            NumberSlider(R.string.warn_interval, Icons.Outlined.Schedule, settings.warnIntervalMinutes, 5f..120f, 22, stringResource(R.string.minutes_value, settings.warnIntervalMinutes)) {
                 viewModel.updateSettings { current -> current.copy(warnIntervalMinutes = it) }
             }
-            NumberSlider(R.string.rest_duration, settings.restDurationSeconds, 10f..300f, 28, stringResource(R.string.seconds_value, settings.restDurationSeconds)) {
+            NumberSlider(R.string.rest_duration, Icons.Outlined.Spa, settings.restDurationSeconds, 10f..300f, 28, stringResource(R.string.seconds_value, settings.restDurationSeconds)) {
                 viewModel.updateSettings { current -> current.copy(restDurationSeconds = it) }
             }
-            SwitchRow(R.string.ask_before_break, settings.askBeforeBreak) {
+            SwitchRow(R.string.ask_before_break, Icons.Outlined.NotificationsActive, settings.askBeforeBreak) {
                 viewModel.updateSettings { current -> current.copy(askBeforeBreak = it) }
             }
-            SwitchRow(R.string.disable_skip, settings.disableSkip) {
+            SwitchRow(R.string.disable_skip, Icons.Outlined.SkipNext, settings.disableSkip) {
                 viewModel.updateSettings { current -> current.copy(disableSkip = it) }
             }
         }
         SettingsSection(R.string.section_pre_alert, Icons.Outlined.Schedule) {
-            SwitchRow(R.string.enable_pre_alert, settings.preAlertEnabled) {
+            SwitchRow(R.string.enable_pre_alert, Icons.Outlined.Schedule, settings.preAlertEnabled) {
                 viewModel.updateSettings { current -> current.copy(preAlertEnabled = it) }
             }
-            NumberSlider(R.string.pre_alert_seconds, settings.preAlertSeconds, 10f..300f, 28, stringResource(R.string.seconds_value, settings.preAlertSeconds)) {
+            NumberSlider(R.string.pre_alert_seconds, Icons.Outlined.Schedule, settings.preAlertSeconds, 10f..300f, 28, stringResource(R.string.seconds_value, settings.preAlertSeconds)) {
                 viewModel.updateSettings { current -> current.copy(preAlertSeconds = it) }
             }
         }
         SettingsSection(R.string.section_pomodoro, Icons.Outlined.LocalCafe) {
-            SwitchRow(R.string.enable_pomodoro, settings.pomodoroEnabled) {
+            SwitchRow(R.string.enable_pomodoro, Icons.Outlined.LocalCafe, settings.pomodoroEnabled) {
                 viewModel.setPomodoroEnabled(it)
             }
-            NumberSlider(R.string.pomodoro_work, settings.pomodoroWorkMinutes, 5f..60f, 10, minutesLabel(settings.pomodoroWorkMinutes)) {
+            NumberSlider(R.string.pomodoro_work, Icons.Outlined.LocalCafe, settings.pomodoroWorkMinutes, 5f..60f, 10, minutesLabel(settings.pomodoroWorkMinutes)) {
                 viewModel.updateSettings { current -> current.copy(pomodoroWorkMinutes = it) }
             }
-            NumberSlider(R.string.pomodoro_short_break, settings.pomodoroShortBreakMinutes, 3f..20f, 16, minutesLabel(settings.pomodoroShortBreakMinutes)) {
+            NumberSlider(R.string.pomodoro_short_break, Icons.Outlined.Spa, settings.pomodoroShortBreakMinutes, 3f..20f, 16, minutesLabel(settings.pomodoroShortBreakMinutes)) {
                 viewModel.updateSettings { current -> current.copy(pomodoroShortBreakMinutes = it) }
             }
-            NumberSlider(R.string.pomodoro_long_break, settings.pomodoroLongBreakMinutes, 5f..45f, 39, minutesLabel(settings.pomodoroLongBreakMinutes)) {
+            NumberSlider(R.string.pomodoro_long_break, Icons.Outlined.Spa, settings.pomodoroLongBreakMinutes, 5f..45f, 39, minutesLabel(settings.pomodoroLongBreakMinutes)) {
                 viewModel.updateSettings { current -> current.copy(pomodoroLongBreakMinutes = it) }
             }
         }
@@ -540,7 +540,7 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                         TemplateColorSwatch(template)
                         Spacer(Modifier.width(12.dp))
                         Column {
@@ -759,9 +759,9 @@ private fun rememberNotificationPermissionGate(): ((() -> Unit) -> Unit) {
 }
 
 @Composable
-private fun SwitchRow(@StringRes labelRes: Int, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun SwitchRow(@StringRes labelRes: Int, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge)
+        LabelWithIcon(icon, labelRes)
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
@@ -769,6 +769,7 @@ private fun SwitchRow(@StringRes labelRes: Int, checked: Boolean, onCheckedChang
 @Composable
 private fun NumberSlider(
     @StringRes labelRes: Int,
+    icon: ImageVector,
     value: Int,
     range: ClosedFloatingPointRange<Float>,
     steps: Int,
@@ -777,7 +778,7 @@ private fun NumberSlider(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge)
+            LabelWithIcon(icon, labelRes)
             Text(valueLabel, color = MaterialTheme.colorScheme.primary)
         }
         Slider(
@@ -786,6 +787,14 @@ private fun NumberSlider(
             steps = steps,
             onValueChange = { onValueChange(it.roundToInt()) },
         )
+    }
+}
+
+@Composable
+private fun LabelWithIcon(icon: ImageVector, @StringRes labelRes: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge)
     }
 }
 
