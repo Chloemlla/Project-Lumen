@@ -1,4 +1,4 @@
-package com.projectlumen.app.core.i18n
+﻿package com.projectlumen.app.core.i18n
 
 import android.app.LocaleManager
 import android.content.Context
@@ -18,17 +18,20 @@ object LocaleController {
             localeManager.applicationLocales = if (languageCode == SYSTEM) {
                 LocaleList.getEmptyLocaleList()
             } else {
-                LocaleList.forLanguageTags(languageCode)
+                localeListFor(languageCode)
             }
         }
     }
 
     fun wrap(base: Context, languageCode: String): Context {
         if (languageCode == SYSTEM) return base
-        val locale = Locale.forLanguageTag(languageCode)
-        Locale.setDefault(locale)
         val configuration = Configuration(base.resources.configuration)
-        configuration.setLocales(LocaleList(locale))
+        configuration.setLocales(localeListFor(languageCode))
         return base.createConfigurationContext(configuration)
+    }
+
+    private fun localeListFor(languageCode: String): LocaleList {
+        val locale = Locale.forLanguageTag(languageCode)
+        return LocaleList(locale)
     }
 }
