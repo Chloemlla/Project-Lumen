@@ -102,9 +102,16 @@
     <string name="template_calm_teal">清爽青绿</string>
     <string name="template_soft_sunrise">柔和日出</string>
     <string name="template_focus_indigo">专注靛蓝</string>
+    <string name="template_system_colors">系统配色</string>
     <string name="template_calm_teal_subtitle">适合日常用眼休息的安静界面。</string>
     <string name="template_soft_sunrise_subtitle">适合较长暂停的温暖视觉风格。</string>
     <string name="template_focus_indigo_subtitle">适合番茄钟循环的专注休息风格。</string>
+    <string name="template_system_colors_subtitle">使用 Android 系统配色作为休息背景。</string>
+    <string name="system_background_color">系统背景色</string>
+    <string name="system_color_primary">主色</string>
+    <string name="system_color_secondary">辅色</string>
+    <string name="system_color_tertiary">强调色</string>
+    <string name="system_color_surface">表面色</string>
     <string name="ongoing_timer_title">Project Lumen 正在运行</string>
     <string name="ongoing_timer_message">提醒计时已启用。</string>
     <string name="weekly_trend">近期趋势</string>

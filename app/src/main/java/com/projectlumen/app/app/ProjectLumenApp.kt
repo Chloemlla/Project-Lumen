@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -99,7 +100,7 @@ private enum class Destination(
     ABOUT("about", R.string.nav_about, Icons.Outlined.Info, false),
 }
 
-enum class SystemBackgroundColor(
+private enum class SystemBackgroundColor(
     val key: String,
     @StringRes val labelRes: Int,
     val primaryKey: String,
@@ -483,7 +484,7 @@ private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: Proje
                                     )
                                 },
                                 label = { Text(stringResource(option.labelRes)) },
-                                leadingIcon = { ColorSwatch(systemThemeColor(option.key)) },
+                                leadingIcon = { ColorSwatch(systemThemeColor(option.key), size = 18.dp) },
                             )
                         }
                     }
@@ -650,11 +651,11 @@ private fun MetricRow(label: String, value: String) {
 }
 
 @Composable
-private fun ColorSwatch(color: Color) {
+private fun ColorSwatch(color: Color, size: Dp = 44.dp) {
     Box(
         modifier = Modifier
-            .width(44.dp)
-            .height(44.dp)
+            .width(size)
+            .height(size)
             .background(color),
     )
 }

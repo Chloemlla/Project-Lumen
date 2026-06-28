@@ -102,9 +102,16 @@
     <string name="template_calm_teal">Calm teal</string>
     <string name="template_soft_sunrise">Soft sunrise</string>
     <string name="template_focus_indigo">Focus indigo</string>
+    <string name="template_system_colors">System colors</string>
     <string name="template_calm_teal_subtitle">A quiet rest screen for regular eye breaks.</string>
     <string name="template_soft_sunrise_subtitle">A warm visual tone for longer pauses.</string>
     <string name="template_focus_indigo_subtitle">A focused rest style for pomodoro cycles.</string>
+    <string name="template_system_colors_subtitle">Use Android system colors as the break background.</string>
+    <string name="system_background_color">System background color</string>
+    <string name="system_color_primary">Primary</string>
+    <string name="system_color_secondary">Secondary</string>
+    <string name="system_color_tertiary">Tertiary</string>
+    <string name="system_color_surface">Surface</string>
     <string name="ongoing_timer_title">Project Lumen is running</string>
     <string name="ongoing_timer_message">Reminder timing is active.</string>
     <string name="weekly_trend">Recent trend</string>
