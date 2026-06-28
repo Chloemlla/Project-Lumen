@@ -13,8 +13,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -569,7 +571,7 @@ private fun TemplatePreviewCard(template: TipTemplateEntity?) {
 }
 
 @Composable
-private fun SettingsSection(@StringRes titleRes: Int, content: @Composable Column.() -> Unit) {
+private fun SettingsSection(@StringRes titleRes: Int, content: @Composable ColumnScope.() -> Unit) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(titleRes), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -628,7 +630,7 @@ private fun ThemeChip(@StringRes labelRes: Int, mode: AppThemeMode, settings: Ap
 }
 
 @Composable
-private fun SmallMetric(@StringRes labelRes: Int, value: String) {
+private fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
     ElevatedCard(modifier = Modifier.weight(1f)) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(stringResource(labelRes), style = MaterialTheme.typography.labelLarge)
@@ -666,7 +668,7 @@ private fun TemplateColorSwatch(template: TipTemplateEntity) {
 }
 
 @Composable
-private fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Start, content: @Composable Column.() -> Unit) {
+private fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Start, content: @Composable ColumnScope.() -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
