@@ -1,5 +1,0 @@
-enum ReminderAction {
-  startBreak,
-  skipBreak,
-}
-
