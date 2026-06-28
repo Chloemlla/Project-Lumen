@@ -164,9 +164,8 @@ private val LumenCardShape = RoundedCornerShape(8.dp)
 @Composable
 fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val themeMode = remember(uiState.settings.themeMode) {
-        runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }.getOrDefault(AppThemeMode.SYSTEM)
-    }
+    val themeMode = runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }
+        .getOrDefault(AppThemeMode.SYSTEM)
     val baseContext = LocalContext.current
     LaunchedEffect(uiState.settings.languageCode) {
         LocaleController.apply(baseContext, uiState.settings.languageCode)
@@ -1042,8 +1041,12 @@ private fun LumenFlowRow(content: @Composable () -> Unit) {
 @Composable
 private fun LanguageChip(@StringRes labelRes: Int, code: String, settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
     FilterChip(
-        selected = settings.languageCode == code,
-        onClick = { viewModel.updateSettings { it.copy(languageCode = code) } },
+        selected = LocaleController.normalize(settings.languageCode) == LocaleController.normalize(code),
+        onClick = {
+            viewModel.updateSettings {
+                it.copy(languageCode = LocaleController.normalize(code))
+            }
+        },
         label = { Text(stringResource(labelRes)) },
     )
 }
