@@ -1,5 +1,6 @@
 ﻿package com.projectlumen.app.core.i18n
 
+import android.content.Context
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import java.util.Locale

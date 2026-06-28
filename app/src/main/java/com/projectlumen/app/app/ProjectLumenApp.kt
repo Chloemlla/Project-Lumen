@@ -1,4 +1,4 @@
-package com.projectlumen.app.app
+﻿package com.projectlumen.app.app
 
 import android.Manifest
 import android.app.AlarmManager
@@ -876,7 +876,8 @@ private fun UpdateDownloadButton(apkName: String, apkUrl: String) {
 
 @Composable
 private fun LinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String) {
-    OutlinedButton(onClick = { openUrl(LocalContext.current, url) }) {
+    val context = LocalContext.current
+    OutlinedButton(onClick = { openUrl(context, url) }) {
         Icon(icon, contentDescription = null)
         Spacer(Modifier.width(8.dp))
         Text(stringResource(labelRes))
@@ -1512,3 +1513,5 @@ private fun openExactAlarmSettings(context: Context) {
     runCatching { context.startActivity(intent) }
         .onFailure { openAppNotificationSettings(context) }
 }
+
+
