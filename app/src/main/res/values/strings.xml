@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Project Lumen</string>
     <string name="nav_home">Home</string>
@@ -47,8 +47,18 @@
     <string name="template_preview">Preview</string>
     <string name="active_template">Active template</string>
     <string name="about_title">About</string>
-    <string name="about_version">Native Android Kotlin V1</string>
+    <string name="about_version">Version</string>
+    <string name="about_version_hint">Built from the current commit SHA.</string>
     <string name="about_body">Project Lumen helps schedule eye breaks, pomodoro focus sessions, and local usage statistics.</string>
+    <string name="about_links">Open source</string>
+    <string name="about_source_code">Source code</string>
+    <string name="about_latest_release">Latest release</string>
+    <string name="about_check_updates">Check for updates</string>
+    <string name="about_download_update">Download update</string>
+    <string name="about_update_status">Update status</string>
+    <string name="about_update_checking">Checking GitHub releases...</string>
+    <string name="about_update_found">Latest release: %1$s</string>
+    <string name="about_update_unavailable">No update data available right now.</string>
     <string name="section_general">General</string>
     <string name="section_reminder">Reminder</string>
     <string name="section_pre_alert">Pre-alert</string>

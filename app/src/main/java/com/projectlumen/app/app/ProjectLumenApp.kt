@@ -2,8 +2,11 @@ package com.projectlumen.app.app
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -62,6 +65,8 @@ import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CloudDownload
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
@@ -76,6 +81,7 @@ import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -112,6 +118,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.getSystemService
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
@@ -130,8 +137,24 @@ import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import kotlin.math.max
 import kotlin.math.roundToInt
+
+private const val PROJECT_LUMEN_REPO_URL = "https://github.com/Chloemlla/Project-Lumen"
+private const val PROJECT_LUMEN_RELEASES_URL = "https://github.com/Chloemlla/Project-Lumen/releases/latest"
+private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases/latest"
+private const val PROJECT_LUMEN_APK_MIME = "application/vnd.android.package-archive"
+
+data class UpdateInfo(
+    val tagName: String,
+    val releaseName: String,
+    val body: String,
+    val apkName: String,
+    val apkUrl: String,
+)
 
 private enum class Destination(
     val route: String,
@@ -725,20 +748,105 @@ private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: Proje
 
 @Composable
 private fun AboutScreen() {
+    val context = LocalContext.current
+    val versionLabel = rememberAppVersionLabel(context)
+    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    var updateError by remember { mutableStateOf<String?>(null) }
+    var checkingUpdate by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        val result = runCatching { fetchLatestUpdateInfo() }
+        updateInfo = result.getOrNull()
+        updateError = result.exceptionOrNull()?.message
+        checkingUpdate = false
+    }
+
     LumenPage {
-        ElevatedCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-            shape = LumenCardShape,
-        ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionHeader(Icons.Outlined.Info, R.string.app_name)
-                Text(stringResource(R.string.about_version), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.about_body), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        AboutHeroCard(versionLabel = versionLabel)
+        AboutLinksCard()
+        AboutUpdateCard(updateInfo = updateInfo, checkingUpdate = checkingUpdate, updateError = updateError)
+    }
+}
+
+@Composable
+private fun AboutHeroCard(versionLabel: String) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SectionHeader(Icons.Outlined.Info, R.string.app_name)
+            Text(stringResource(R.string.about_version), style = MaterialTheme.typography.titleMedium)
+            Text(versionLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.about_body),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AboutLinksCard() {
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeader(Icons.Outlined.Code, R.string.about_links)
+            LinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL)
+            LinkButton(Icons.Outlined.CloudDownload, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL)
+        }
+    }
+}
+
+@Composable
+private fun AboutUpdateCard(updateInfo: UpdateInfo?, checkingUpdate: Boolean, updateError: String?) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeader(Icons.Outlined.Sync, R.string.about_update_status)
+            when {
+                checkingUpdate -> Text(stringResource(R.string.about_update_checking), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                updateInfo != null -> {
+                    Text(stringResource(R.string.about_update_found, updateInfo.tagName), fontWeight = FontWeight.SemiBold)
+                    Text(updateInfo.releaseName, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(updateInfo.body, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    UpdateDownloadButton(updateInfo.apkName, updateInfo.apkUrl)
+                }
+                updateError != null -> Text(updateError, color = MaterialTheme.colorScheme.error)
+                else -> Text(stringResource(R.string.about_update_unavailable), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
+}
+
+@Composable
+private fun UpdateDownloadButton(apkName: String, apkUrl: String) {
+    val context = LocalContext.current
+    OutlinedButton(onClick = { downloadUpdateApk(context, apkName, apkUrl) }) {
+        Icon(Icons.Outlined.FileDownload, contentDescription = null)
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.about_download_update))
+    }
+}
+
+@Composable
+private fun LinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String) {
+    OutlinedButton(onClick = { openUrl(LocalContext.current, url) }) {
+        Icon(icon, contentDescription = null)
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(labelRes))
+    }
+}
+
+@Composable
+private fun rememberAppVersionLabel(context: Context): String {
+    val versionName = remember(context) {
+        @Suppress("DEPRECATION")
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
+    }
+    val sha = BuildConfig.GIT_SHA_SHORT.takeIf { it.isNotBlank() } ?: "unknown"
+    return "$versionName ($sha)"
 }
 
 @Composable
@@ -1247,6 +1355,91 @@ private fun systemThemeColor(key: String?): Color {
 private fun parseColor(hex: String?, fallback: Color): Color {
     return runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(fallback)
 }
+
+private fun openUrl(context: Context, url: String) {
+    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+}
+
+private fun fetchLatestUpdateInfo(): UpdateInfo? {
+    val connection = (URL(PROJECT_LUMEN_RELEASE_API).openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 6000
+        readTimeout = 6000
+        setRequestProperty("Accept", "application/vnd.github+json")
+        setRequestProperty("User-Agent", "Project-Lumen")
+    }
+    return connection.use { response ->
+        if (response.responseCode !in 200..299) return null
+        val body = response.inputStream.bufferedReader().use { it.readText() }
+        val tagName = body.extractJsonString("tag_name") ?: return null
+        val releaseName = body.extractJsonString("name") ?: tagName
+        val releaseBody = body.extractJsonString("body") ?: ""
+        val assets = body.extractArrayObjects("assets")
+        val apkAssets = assets.filter { it.extractJsonString("name")?.endsWith(".apk", ignoreCase = true) == true }
+        if (apkAssets.size != 1) return null
+        val apk = apkAssets.single()
+        UpdateInfo(
+            tagName = tagName,
+            releaseName = releaseName,
+            body = releaseBody,
+            apkName = apk.extractJsonString("name") ?: return null,
+            apkUrl = apk.extractJsonString("browser_download_url") ?: return null,
+        )
+    }
+}
+
+private fun downloadUpdateApk(context: Context, apkName: String, apkUrl: String) {
+    val fileName = apkName.takeIf { it.endsWith(".apk", ignoreCase = true) } ?: "$apkName.apk"
+    val request = DownloadManager.Request(Uri.parse(apkUrl))
+        .setTitle(fileName)
+        .setDescription(context.getString(R.string.about_download_update))
+        .setMimeType(PROJECT_LUMEN_APK_MIME)
+        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        .setDestinationInExternalFilesDir(context, android.os.Environment.DIRECTORY_DOWNLOADS, fileName)
+    val manager = context.getSystemService<DownloadManager>() ?: return
+    manager.enqueue(request)
+}
+
+private fun String.extractJsonString(key: String): String? {
+    val regex = Regex("\"$key\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"")
+    return regex.find(this)?.groupValues?.getOrNull(1)?.replace("\\\"", "\"")?.replace("\\\\", "\\")
+}
+
+private fun String.extractArrayObjects(key: String): List<String> {
+    val marker = "\"$key\":"
+    val start = indexOf(marker)
+    if (start < 0) return emptyList()
+    val arrayStart = indexOf('[', start)
+    if (arrayStart < 0) return emptyList()
+    var depth = 0
+    var currentStart = -1
+    val objects = mutableListOf<String>()
+    for (i in arrayStart until length) {
+        when (this[i]) {
+            '{' -> {
+                if (depth == 0) currentStart = i
+                depth++
+            }
+            '}' -> {
+                depth--
+                if (depth == 0 && currentStart >= 0) {
+                    objects += substring(currentStart, i + 1)
+                    currentStart = -1
+                }
+            }
+            ']' -> if (depth == 0) break
+        }
+    }
+    return objects
+}
+
+private data class UpdateInfo(
+    val tagName: String,
+    val releaseName: String,
+    val body: String,
+    val apkName: String,
+    val apkUrl: String,
+)
 
 private fun openAppNotificationSettings(context: Context) {
     val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)

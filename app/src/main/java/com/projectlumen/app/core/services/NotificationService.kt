@@ -105,6 +105,34 @@ class NotificationService(private val context: Context) {
         )
     }
 
+    fun showUpdateAvailable(tagName: String, apkName: String, apkUrl: String) {
+        show(
+            id = NotificationIds.POMODORO + 1000,
+            channel = NotificationChannels.STATUS,
+            title = context.getString(R.string.about_update_status),
+            message = context.getString(R.string.about_update_found, tagName),
+            priority = NotificationCompat.PRIORITY_DEFAULT,
+            includeBreakActions = false,
+        )
+        NotificationManagerCompat.from(context).notify(
+            NotificationIds.POMODORO + 1001,
+            NotificationCompat.Builder(context, NotificationChannels.STATUS)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentTitle(context.getString(R.string.about_update_status))
+                .setContentText("$apkName")
+                .setContentIntent(
+                    PendingIntent.getActivity(
+                        context,
+                        NotificationIds.POMODORO + 1001,
+                        Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    ),
+                )
+                .setAutoCancel(true)
+                .build(),
+        )
+    }
+
     fun buildOngoingStatusNotification(state: RuntimeStateEntity? = null): Notification {
         val (title, message) = ongoingStatusText(state)
         return NotificationCompat.Builder(context, NotificationChannels.STATUS)

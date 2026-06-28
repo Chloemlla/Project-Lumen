@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -23,6 +23,11 @@ android {
     compileSdk = 36
 
     defaultConfig {
+        val gitShaShort = providers.exec {
+            commandLine("git", "rev-parse", "--short=8", "HEAD")
+        }.standardOutput.asText.get().trim().ifBlank { "unknown" }
+        buildConfigField("String", "GIT_SHA_SHORT", "\"$gitShaShort\"")
+
         applicationId = "com.projectlumen.app"
         minSdk = 26
         targetSdk = 36
