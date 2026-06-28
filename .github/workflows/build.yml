@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   android:
@@ -31,8 +31,64 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
+      - name: Read app version
+        run: |
+          VERSION_NAME=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)
+          VERSION_CODE=$(sed -n 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1)
+          SHORT_HASH="${GITHUB_SHA::7}"
+          echo "VERSION_NAME=${VERSION_NAME:-0.0.0}" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=${VERSION_CODE:-0}" >> "$GITHUB_ENV"
+          echo "SHORT_HASH=$SHORT_HASH" >> "$GITHUB_ENV"
+
+      - name: Write signing config
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -f "gradle.properties" ]; then
+            sed -i 's/\r$//' gradle.properties
+            [ -n "$(tail -c 1 gradle.properties)" ] && echo "" >> gradle.properties
+          fi
+
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "Release signing secrets are incomplete; using debug signing for the release APK."
+            printf 'PROJECT_LUMEN_USE_DEBUG_SIGNING=true\n' >> gradle.properties
+          else
+            echo "$KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/project_lumen.jks" || {
+              echo "Failed to decode KEYSTORE_BASE64; using debug signing for the release APK."
+              printf 'PROJECT_LUMEN_USE_DEBUG_SIGNING=true\n' >> gradle.properties
+              exit 0
+            }
+
+            printf 'PROJECT_LUMEN_STORE_FILE=%s\n' "${{ github.workspace }}/project_lumen.jks" >> gradle.properties
+            printf 'PROJECT_LUMEN_STORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD" >> gradle.properties
+            printf 'PROJECT_LUMEN_KEY_ALIAS=%s\n' "$KEY_ALIAS" >> gradle.properties
+            printf 'PROJECT_LUMEN_KEY_PASSWORD=%s\n' "$KEY_PASSWORD" >> gradle.properties
+            echo "Release signing configured."
+          fi
+
       - name: Check project
         run: gradle test lint assembleDebug --no-daemon
+
+      - name: Build release APK
+        run: gradle assembleRelease --no-daemon
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          VERSION="${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          APK_FILE="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$APK_FILE" ]; then
+            APK_FILE="app/build/outputs/apk/release/app-release-unsigned.apk"
+          fi
+          if [ ! -f "$APK_FILE" ]; then
+            echo "Release APK was not found."
+            ls -lh app/build/outputs/apk/release/
+            exit 1
+          fi
+          cp "$APK_FILE" "release-assets/Project-Lumen_android_${VERSION}.apk"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -40,3 +96,23 @@ jobs:
           name: project-lumen-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           retention-days: 14
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-lumen-release-apk
+          path: release-assets/*.apk
+          retention-days: 30
+
+      - name: Automatic release
+        if: success() && github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          make_latest: true
+          generate_release_notes: true
+          tag_name: "v${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          prerelease: false
+          name: "Project-Lumen ${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          files: release-assets/*.apk

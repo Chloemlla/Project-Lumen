@@ -5,6 +5,19 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val projectLumenUseDebugSigning =
+    providers.gradleProperty("PROJECT_LUMEN_USE_DEBUG_SIGNING").orNull.toBoolean()
+val projectLumenStoreFile = providers.gradleProperty("PROJECT_LUMEN_STORE_FILE").orNull
+val projectLumenStorePassword = providers.gradleProperty("PROJECT_LUMEN_STORE_PASSWORD").orNull
+val projectLumenKeyAlias = providers.gradleProperty("PROJECT_LUMEN_KEY_ALIAS").orNull
+val projectLumenKeyPassword = providers.gradleProperty("PROJECT_LUMEN_KEY_PASSWORD").orNull
+val projectLumenReleaseSigningConfigured = listOf(
+    projectLumenStoreFile,
+    projectLumenStorePassword,
+    projectLumenKeyAlias,
+    projectLumenKeyPassword,
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.projectlumen.app"
     compileSdk = 36
@@ -19,9 +32,25 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (projectLumenReleaseSigningConfigured) {
+                storeFile = file(projectLumenStoreFile!!)
+                storePassword = projectLumenStorePassword
+                keyAlias = projectLumenKeyAlias
+                keyPassword = projectLumenKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (projectLumenUseDebugSigning) {
+                signingConfig = signingConfigs.getByName("debug")
+            } else if (projectLumenReleaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
