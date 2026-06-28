@@ -105,7 +105,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -141,6 +140,7 @@ import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
+import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
 import java.io.File
 import java.net.HttpURLConnection
@@ -885,12 +885,11 @@ private fun LinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String)
 
 @Composable
 private fun rememberAppVersionLabel(context: Context): String {
-    val versionName = remember(context) {
+    val versionName = runCatching {
         @Suppress("DEPRECATION")
         context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
-    }
-    val sha = BuildConfig.GIT_SHA_SHORT.takeIf { it.isNotBlank() } ?: "unknown"
-    return "$versionName ($sha)"
+    }.getOrDefault("0.0.0")
+    return versionName
 }
 
 @Composable
@@ -1412,9 +1411,9 @@ private fun fetchLatestUpdateInfo(): UpdateInfo? {
         setRequestProperty("Accept", "application/vnd.github+json")
         setRequestProperty("User-Agent", "Project-Lumen")
     }
-    return connection.use { response ->
-        if (response.responseCode !in 200..299) return null
-        val body = response.inputStream.bufferedReader().use { it.readText() }
+    try {
+        if (connection.responseCode !in 200..299) return null
+        val body = connection.inputStream.bufferedReader().use { it.readText() }
         val tagName = body.extractJsonString("tag_name") ?: return null
         val releaseName = body.extractJsonString("name") ?: tagName
         val releaseBody = body.extractJsonString("body") ?: ""
@@ -1422,13 +1421,15 @@ private fun fetchLatestUpdateInfo(): UpdateInfo? {
         val apkAssets = assets.filter { it.extractJsonString("name")?.endsWith(".apk", ignoreCase = true) == true }
         if (apkAssets.size != 1) return null
         val apk = apkAssets.single()
-        UpdateInfo(
+        return UpdateInfo(
             tagName = tagName,
             releaseName = releaseName,
             body = releaseBody,
             apkName = apk.extractJsonString("name") ?: return null,
             apkUrl = apk.extractJsonString("browser_download_url") ?: return null,
         )
+    } finally {
+        connection.disconnect()
     }
 }
 
