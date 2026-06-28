@@ -60,7 +60,7 @@ jobs:
           build-mode: ${{ matrix.build-mode }}
 
       - name: Initialize CodeQL
-        if: matrix.build-mode != 'autobuild'
+        if: matrix.build-mode != 'manual'
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
