@@ -76,6 +76,9 @@
     <string name="enable_sound">Enable sound</string>
     <string name="notification_permission">Notification permission</string>
     <string name="open_system_settings">Open system settings</string>
+    <string name="auto_dark_window">Scheduled dark theme</string>
+    <string name="silent_until">Pause for one hour</string>
+    <string name="resume_now">Resume now</string>
     <string name="export_csv">Export CSV</string>
     <string name="share_stats">Share stats</string>
     <string name="pomodoro_work">Focus length</string>
@@ -99,4 +102,10 @@
     <string name="template_calm_teal">Calm teal</string>
     <string name="template_soft_sunrise">Soft sunrise</string>
     <string name="template_focus_indigo">Focus indigo</string>
+    <string name="template_calm_teal_subtitle">A quiet rest screen for regular eye breaks.</string>
+    <string name="template_soft_sunrise_subtitle">A warm visual tone for longer pauses.</string>
+    <string name="template_focus_indigo_subtitle">A focused rest style for pomodoro cycles.</string>
+    <string name="ongoing_timer_title">Project Lumen is running</string>
+    <string name="ongoing_timer_message">Reminder timing is active.</string>
+    <string name="weekly_trend">Recent trend</string>
 </resources>

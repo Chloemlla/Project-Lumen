@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -75,6 +78,7 @@ import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
+import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
 import kotlin.math.max
@@ -93,6 +97,17 @@ private enum class Destination(
     SETTINGS("settings", R.string.nav_settings, Icons.Outlined.Settings),
     TEMPLATES("templates", R.string.nav_templates, Icons.Outlined.Style, false),
     ABOUT("about", R.string.nav_about, Icons.Outlined.Info, false),
+}
+
+enum class SystemBackgroundColor(
+    val key: String,
+    @StringRes val labelRes: Int,
+    val primaryKey: String,
+) {
+    PRIMARY_CONTAINER("primaryContainer", R.string.system_color_primary, "primary"),
+    SECONDARY_CONTAINER("secondaryContainer", R.string.system_color_secondary, "secondary"),
+    TERTIARY_CONTAINER("tertiaryContainer", R.string.system_color_tertiary, "tertiary"),
+    SURFACE_CONTAINER("surfaceContainer", R.string.system_color_surface, "primary"),
 }
 
 @Composable
@@ -114,6 +129,7 @@ fun ProjectLumenApp(viewModel: ProjectLumenViewModel) {
             val navController = rememberNavController()
             val backStackEntry by navController.currentBackStackEntryAsState()
             Scaffold(
+                contentWindowInsets = WindowInsets.safeDrawing,
                 topBar = {
                     val current = Destination.entries.firstOrNull {
                         it.route == backStackEntry?.destination?.route
@@ -190,6 +206,14 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
                 }
             }
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(modifier = Modifier.weight(1f), onClick = viewModel::pauseForOneHour) {
+                Text(stringResource(R.string.silent_until))
+            }
+            OutlinedButton(modifier = Modifier.weight(1f), onClick = viewModel::resumeReminder) {
+                Text(stringResource(R.string.resume_now))
+            }
+        }
     }
 }
 
@@ -256,6 +280,7 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
     LumenPage {
         Text(stringResource(R.string.statistics_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         TodayStatsCard(eye)
+        TrendCard(uiState)
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricRow(R.string.completed_tomatoes, (pomodoro?.completedTomatoCount ?: 0).toString())
@@ -297,6 +322,9 @@ private fun SettingsScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(onClick = openTemplates) { Text(stringResource(R.string.nav_templates)) }
                 OutlinedButton(onClick = openAbout) { Text(stringResource(R.string.nav_about)) }
+            }
+            SwitchRow(R.string.auto_dark_window, settings.useAutoDarkWindow) {
+                viewModel.updateSettings { current -> current.copy(useAutoDarkWindow = it) }
             }
         }
         SettingsSection(R.string.section_notifications) {
@@ -372,10 +400,43 @@ private fun SettingsScreen(
 }
 
 @Composable
+private fun TrendCard(uiState: ProjectLumenUiState) {
+    val recent = uiState.eyeStats.take(7).reversed()
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.weekly_trend), style = MaterialTheme.typography.titleMedium)
+            if (recent.isEmpty()) {
+                Text(stringResource(R.string.not_set), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                val maxSeconds = recent.maxOf { max(it.workingSeconds, 1L) }
+                recent.forEach { stat ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stat.statDate.takeLast(5), style = MaterialTheme.typography.labelMedium)
+                        Box(modifier = Modifier.weight(1f)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth((stat.workingSeconds.toFloat() / maxSeconds.toFloat()).coerceIn(0.05f, 1f))
+                                    .height(10.dp)
+                                    .background(MaterialTheme.colorScheme.primary),
+                            )
+                        }
+                        Text(minutesLabel((stat.workingSeconds / 60L).toInt()), style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
+    val activeTemplate = activeTemplate(uiState)
     LumenPage {
         Text(stringResource(R.string.templates_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        TemplatePreviewCard(activeTemplate(uiState))
+        TemplatePreviewCard(activeTemplate)
+        if (activeTemplate != null) {
+            SystemBackgroundPicker(activeTemplate, viewModel)
+        }
         uiState.templates.forEach { template ->
             ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                 Row(
@@ -384,11 +445,11 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        ColorSwatch(template.backgroundValue)
+                        TemplateColorSwatch(template)
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text(templateDisplayName(template), style = MaterialTheme.typography.titleMedium)
-                            Text(template.subtitleText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(templateSubtitle(template), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     FilterChip(
@@ -396,6 +457,36 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                         onClick = { viewModel.selectTemplate(template.id) },
                         label = { Text(stringResource(R.string.active_template)) },
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.system_background_color), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SystemBackgroundColor.entries.chunked(2).forEach { rowOptions ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowOptions.forEach { option ->
+                            FilterChip(
+                                selected = template.backgroundType == TemplateBackgroundType.SYSTEM.name &&
+                                    template.backgroundValue == option.key,
+                                onClick = {
+                                    viewModel.updateTemplateSystemBackground(
+                                        template = template,
+                                        backgroundValue = option.key,
+                                        primaryColor = option.primaryKey,
+                                    )
+                                },
+                                label = { Text(stringResource(option.labelRes)) },
+                                leadingIcon = { ColorSwatch(systemThemeColor(option.key)) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -459,15 +550,18 @@ private fun TimerCard(label: String, seconds: Long, progress: Float, fallbackTex
 
 @Composable
 private fun TemplatePreviewCard(template: TipTemplateEntity?) {
-    val background = parseColor(template?.backgroundValue, MaterialTheme.colorScheme.primaryContainer)
-    val primary = parseColor(template?.primaryColor, MaterialTheme.colorScheme.primary)
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    val background = templateBackgroundColor(template)
+    val primary = templatePrimaryColor(template)
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(containerColor = background),
+    ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             ColorSwatch(background)
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(templateDisplayName(template), style = MaterialTheme.typography.titleMedium, color = primary)
-                Text(template?.subtitleText ?: stringResource(R.string.break_message), style = MaterialTheme.typography.bodyMedium)
+                Text(templateSubtitle(template), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -556,11 +650,6 @@ private fun MetricRow(label: String, value: String) {
 }
 
 @Composable
-private fun ColorSwatch(hex: String) {
-    ColorSwatch(parseColor(hex, MaterialTheme.colorScheme.primaryContainer))
-}
-
-@Composable
 private fun ColorSwatch(color: Color) {
     Box(
         modifier = Modifier
@@ -568,6 +657,11 @@ private fun ColorSwatch(color: Color) {
             .height(44.dp)
             .background(color),
     )
+}
+
+@Composable
+private fun TemplateColorSwatch(template: TipTemplateEntity) {
+    ColorSwatch(templateBackgroundColor(template))
 }
 
 @Composable
@@ -621,7 +715,19 @@ private fun templateDisplayName(template: TipTemplateEntity?): String {
         1L -> stringResource(R.string.template_calm_teal)
         2L -> stringResource(R.string.template_soft_sunrise)
         3L -> stringResource(R.string.template_focus_indigo)
+        4L -> stringResource(R.string.template_system_colors)
         else -> template?.name ?: stringResource(R.string.template_calm_teal)
+    }
+}
+
+@Composable
+private fun templateSubtitle(template: TipTemplateEntity?): String {
+    return when (template?.id) {
+        1L -> stringResource(R.string.template_calm_teal_subtitle)
+        2L -> stringResource(R.string.template_soft_sunrise_subtitle)
+        3L -> stringResource(R.string.template_focus_indigo_subtitle)
+        4L -> stringResource(R.string.template_system_colors_subtitle)
+        else -> template?.subtitleText ?: stringResource(R.string.break_message)
     }
 }
 
@@ -639,6 +745,40 @@ private fun progress(startAt: Long, endAt: Long, nowMillis: Long): Float {
     val elapsed = (nowMillis - startAt).coerceAtLeast(0L).toFloat()
     val duration = (endAt - startAt).toFloat()
     return (elapsed / duration).coerceIn(0f, 1f)
+}
+
+@Composable
+private fun templateBackgroundColor(template: TipTemplateEntity?): Color {
+    return if (template?.backgroundType == TemplateBackgroundType.SYSTEM.name) {
+        systemThemeColor(template.backgroundValue)
+    } else {
+        parseColor(template?.backgroundValue, MaterialTheme.colorScheme.primaryContainer)
+    }
+}
+
+@Composable
+private fun templatePrimaryColor(template: TipTemplateEntity?): Color {
+    return if (template?.backgroundType == TemplateBackgroundType.SYSTEM.name) {
+        systemThemeColor(template.primaryColor)
+    } else {
+        parseColor(template?.primaryColor, MaterialTheme.colorScheme.primary)
+    }
+}
+
+@Composable
+private fun systemThemeColor(key: String?): Color {
+    val colors = MaterialTheme.colorScheme
+    return when (key) {
+        "primary" -> colors.primary
+        "secondary" -> colors.secondary
+        "tertiary" -> colors.tertiary
+        "primaryContainer" -> colors.primaryContainer
+        "secondaryContainer" -> colors.secondaryContainer
+        "tertiaryContainer" -> colors.tertiaryContainer
+        "surfaceContainer" -> colors.surfaceContainer
+        "surfaceVariant" -> colors.surfaceVariant
+        else -> colors.primaryContainer
+    }
 }
 
 private fun parseColor(hex: String?, fallback: Color): Color {

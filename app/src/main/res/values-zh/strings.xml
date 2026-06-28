@@ -76,6 +76,9 @@
     <string name="enable_sound">启用声音</string>
     <string name="notification_permission">通知权限</string>
     <string name="open_system_settings">打开系统设置</string>
+    <string name="auto_dark_window">定时深色主题</string>
+    <string name="silent_until">暂停一小时</string>
+    <string name="resume_now">立即恢复</string>
     <string name="export_csv">导出 CSV</string>
     <string name="share_stats">分享统计</string>
     <string name="pomodoro_work">专注时长</string>
@@ -99,4 +102,10 @@
     <string name="template_calm_teal">清爽青绿</string>
     <string name="template_soft_sunrise">柔和日出</string>
     <string name="template_focus_indigo">专注靛蓝</string>
+    <string name="template_calm_teal_subtitle">适合日常用眼休息的安静界面。</string>
+    <string name="template_soft_sunrise_subtitle">适合较长暂停的温暖视觉风格。</string>
+    <string name="template_focus_indigo_subtitle">适合番茄钟循环的专注休息风格。</string>
+    <string name="ongoing_timer_title">Project Lumen 正在运行</string>
+    <string name="ongoing_timer_message">提醒计时已启用。</string>
+    <string name="weekly_trend">近期趋势</string>
 </resources>

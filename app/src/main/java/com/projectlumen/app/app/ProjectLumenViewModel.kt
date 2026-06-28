@@ -12,6 +12,7 @@ import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
+import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
@@ -30,6 +31,8 @@ class ProjectLumenViewModel(
     private val notifications: NotificationService,
     private val audio: AudioService,
     private val export: ExportService,
+    private val startTimerService: () -> Unit,
+    private val stopTimerService: () -> Unit,
 ) : ViewModel() {
     private val settingsDao = database.appSettingsDao()
     private val runtimeDao = database.runtimeStateDao()
@@ -86,6 +89,7 @@ class ProjectLumenViewModel(
             val nowMillis = System.currentTimeMillis()
             val state = newWorkingState(settings, nowMillis)
             runtimeDao.upsert(state)
+            startTimerService()
             if (settings.notificationEnabled) {
                 notifications.scheduleReminder(state.nextPreAlertAt, state.nextReminderAt)
             }
@@ -96,6 +100,7 @@ class ProjectLumenViewModel(
         viewModelScope.launch {
             val state = runtimeDao.get() ?: RuntimeStateEntity()
             notifications.cancelAllScheduled()
+            stopTimerService()
             runtimeDao.upsert(
                 state.copy(
                     reminderPhase = ReminderPhase.PAUSED.name,
@@ -107,10 +112,41 @@ class ProjectLumenViewModel(
         }
     }
 
+    fun pauseForOneHour() {
+        viewModelScope.launch {
+            val state = runtimeDao.get() ?: RuntimeStateEntity()
+            val nowMillis = System.currentTimeMillis()
+            notifications.cancelAllScheduled()
+            runtimeDao.upsert(
+                state.copy(
+                    reminderPhase = ReminderPhase.PAUSED.name,
+                    isManuallyPaused = false,
+                    pausedAt = nowMillis,
+                    suspendedUntil = nowMillis + 60 * 60_000L,
+                    updatedAt = nowMillis,
+                ),
+            )
+        }
+    }
+
+    fun resumeReminder() {
+        viewModelScope.launch {
+            val settings = settingsDao.get() ?: AppSettingsEntity()
+            val nowMillis = System.currentTimeMillis()
+            val state = newWorkingState(settings, nowMillis)
+            runtimeDao.upsert(state)
+            startTimerService()
+            if (settings.notificationEnabled) {
+                notifications.scheduleReminder(state.nextPreAlertAt, state.nextReminderAt)
+            }
+        }
+    }
+
     fun stopAll() {
         viewModelScope.launch {
             runtimeDao.upsert(RuntimeStateEntity(updatedAt = System.currentTimeMillis()))
             notifications.cancelAllScheduled()
+            stopTimerService()
         }
     }
 
@@ -159,6 +195,7 @@ class ProjectLumenViewModel(
                     updatedAt = nowMillis,
                 ),
             )
+            startTimerService()
             audio.playReminderTone(settings.soundEnabled)
         }
     }
@@ -171,6 +208,7 @@ class ProjectLumenViewModel(
                 incrementPomodoroStats(nowMillis) { it.copy(restartCount = it.restartCount + 1) }
             }
             runtimeDao.upsert(RuntimeStateEntity(updatedAt = nowMillis))
+            stopTimerService()
         }
     }
 
@@ -183,6 +221,19 @@ class ProjectLumenViewModel(
 
     fun selectTemplate(templateId: Long) {
         updateSettings { it.copy(activeTipTemplateId = templateId) }
+    }
+
+    fun updateTemplateSystemBackground(template: TipTemplateEntity, backgroundValue: String, primaryColor: String) {
+        viewModelScope.launch {
+            tipTemplatesDao.upsert(
+                template.copy(
+                    backgroundType = TemplateBackgroundType.SYSTEM.name,
+                    backgroundValue = backgroundValue,
+                    primaryColor = primaryColor,
+                    updatedAt = System.currentTimeMillis(),
+                ),
+            )
+        }
     }
 
     fun shareStatistics() {
@@ -209,6 +260,14 @@ class ProjectLumenViewModel(
         nowMillis: Long,
     ) {
         when (state.reminderPhase) {
+            ReminderPhase.PAUSED.name -> {
+                if (!state.isManuallyPaused && state.suspendedUntil > 0L && nowMillis >= state.suspendedUntil) {
+                    val nextState = newWorkingState(settings, nowMillis)
+                    runtimeDao.upsert(nextState)
+                    if (settings.notificationEnabled) notifications.scheduleReminder(nextState.nextPreAlertAt, nextState.nextReminderAt)
+                }
+            }
+
             ReminderPhase.WORKING.name -> {
                 if (settings.preAlertEnabled && nowMillis >= state.nextPreAlertAt && nowMillis < state.nextReminderAt) {
                     incrementEyeStats(nowMillis) { it.copy(preAlertCount = it.preAlertCount + 1) }
@@ -312,37 +371,52 @@ class ProjectLumenViewModel(
     }
 
     private suspend fun seedTemplates() {
-        if (tipTemplatesDao.count() > 0) return
         val nowMillis = System.currentTimeMillis()
-        listOf(
-            TipTemplateEntity(
-                id = 1L,
-                name = "Calm teal",
-                backgroundValue = "#D4F2F0",
-                primaryColor = "#246B73",
-                sortOrder = 0,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 2L,
-                name = "Soft sunrise",
-                backgroundValue = "#FFE0D4",
-                primaryColor = "#B9503E",
-                sortOrder = 1,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 3L,
-                name = "Focus indigo",
-                backgroundValue = "#E0E3FF",
-                primaryColor = "#575EA8",
-                sortOrder = 2,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-        ).forEach { tipTemplatesDao.upsert(it) }
+        if (tipTemplatesDao.count() == 0) {
+            listOf(
+                TipTemplateEntity(
+                    id = 1L,
+                    name = "Calm teal",
+                    backgroundValue = "#D4F2F0",
+                    primaryColor = "#246B73",
+                    sortOrder = 0,
+                    createdAt = nowMillis,
+                    updatedAt = nowMillis,
+                ),
+                TipTemplateEntity(
+                    id = 2L,
+                    name = "Soft sunrise",
+                    backgroundValue = "#FFE0D4",
+                    primaryColor = "#B9503E",
+                    sortOrder = 1,
+                    createdAt = nowMillis,
+                    updatedAt = nowMillis,
+                ),
+                TipTemplateEntity(
+                    id = 3L,
+                    name = "Focus indigo",
+                    backgroundValue = "#E0E3FF",
+                    primaryColor = "#575EA8",
+                    sortOrder = 2,
+                    createdAt = nowMillis,
+                    updatedAt = nowMillis,
+                ),
+            ).forEach { tipTemplatesDao.upsert(it) }
+        }
+        if (tipTemplatesDao.get(4L) == null) {
+            tipTemplatesDao.upsert(
+                TipTemplateEntity(
+                    id = 4L,
+                    name = "System colors",
+                    backgroundType = TemplateBackgroundType.SYSTEM.name,
+                    backgroundValue = SystemBackgroundColor.PRIMARY_CONTAINER.key,
+                    primaryColor = SystemBackgroundColor.PRIMARY.key,
+                    sortOrder = 3,
+                    createdAt = nowMillis,
+                    updatedAt = nowMillis,
+                ),
+            )
+        }
     }
 
     private fun newWorkingState(settings: AppSettingsEntity, nowMillis: Long): RuntimeStateEntity {

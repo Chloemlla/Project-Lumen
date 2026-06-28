@@ -25,6 +25,8 @@ class MainActivity : ComponentActivity() {
                             notifications = app.notifications,
                             audio = app.audio,
                             export = app.export,
+                            startTimerService = app::startTimerService,
+                            stopTimerService = app::stopTimerService,
                         ) as T
                     }
                 },

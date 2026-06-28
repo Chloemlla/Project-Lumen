@@ -58,6 +58,7 @@ class NotificationService(private val context: Context) {
             title = context.getString(R.string.break_title),
             message = context.getString(R.string.break_waiting_message),
             priority = NotificationCompat.PRIORITY_HIGH,
+            includeBreakActions = true,
         )
     }
 
@@ -68,6 +69,7 @@ class NotificationService(private val context: Context) {
             title = context.getString(R.string.pre_alert_notification_title),
             message = context.getString(R.string.pre_alert_notification_message),
             priority = NotificationCompat.PRIORITY_DEFAULT,
+            includeBreakActions = false,
         )
     }
 
@@ -78,6 +80,7 @@ class NotificationService(private val context: Context) {
             title = context.getString(R.string.break_done_title),
             message = context.getString(R.string.break_done_message),
             priority = NotificationCompat.PRIORITY_DEFAULT,
+            includeBreakActions = false,
         )
     }
 
@@ -88,6 +91,7 @@ class NotificationService(private val context: Context) {
             title = title,
             message = message,
             priority = NotificationCompat.PRIORITY_DEFAULT,
+            includeBreakActions = false,
         )
     }
 
@@ -135,7 +139,14 @@ class NotificationService(private val context: Context) {
         )
     }
 
-    private fun show(id: Int, channel: String, title: String, message: String, priority: Int) {
+    private fun show(
+        id: Int,
+        channel: String,
+        title: String,
+        message: String,
+        priority: Int,
+        includeBreakActions: Boolean,
+    ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
                 PackageManager.PERMISSION_GRANTED
@@ -147,14 +158,35 @@ class NotificationService(private val context: Context) {
             Intent(context, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = NotificationCompat.Builder(context, channel)
+        val builder = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(message)
             .setContentIntent(openIntent)
             .setAutoCancel(true)
             .setPriority(priority)
-            .build()
-        NotificationManagerCompat.from(context).notify(id, notification)
+        if (includeBreakActions) {
+            builder.addAction(
+                R.drawable.ic_launcher_foreground,
+                context.getString(R.string.start_break),
+                actionPendingIntent(NotificationIds.BREAK_DUE + 10, ReminderActionReceiver.ACTION_START_BREAK),
+            )
+            builder.addAction(
+                R.drawable.ic_launcher_foreground,
+                context.getString(R.string.skip_break),
+                actionPendingIntent(NotificationIds.BREAK_DUE + 11, ReminderActionReceiver.ACTION_SKIP_BREAK),
+            )
+        }
+        NotificationManagerCompat.from(context).notify(id, builder.build())
+    }
+
+    private fun actionPendingIntent(id: Int, action: String): PendingIntent {
+        val intent = Intent(context, ReminderActionReceiver::class.java).setAction(action)
+        return PendingIntent.getBroadcast(
+            context,
+            id,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 }

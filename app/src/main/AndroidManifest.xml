@@ -3,6 +3,9 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".ProjectLumenApplication"
@@ -16,6 +19,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:resizeableActivity="true"
             android:theme="@style/Theme.ProjectLumen">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -27,6 +31,27 @@
         <receiver
             android:name=".core.services.AlarmReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".core.services.ReminderActionReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".core.services.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".core.services.TimerForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps eye-break and Pomodoro timer sessions active while the app is backgrounded." />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"
