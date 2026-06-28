@@ -1,0 +1,15 @@
+package com.projectlumen.app.app
+
+import com.projectlumen.app.core.database.entities.AppSettingsEntity
+import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
+import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
+import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+
+data class ProjectLumenUiState(
+    val settings: AppSettingsEntity = AppSettingsEntity(),
+    val runtime: RuntimeStateEntity = RuntimeStateEntity(),
+    val eyeStats: List<DailyEyeStatsEntity> = emptyList(),
+    val pomodoroStats: List<DailyPomodoroStatsEntity> = emptyList(),
+    val nowMillis: Long = System.currentTimeMillis(),
+    val isReady: Boolean = false,
+)
