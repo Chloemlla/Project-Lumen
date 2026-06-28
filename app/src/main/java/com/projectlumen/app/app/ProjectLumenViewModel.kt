@@ -348,7 +348,7 @@ class ProjectLumenViewModel(
                     if (settings.notificationEnabled) notifications.showOngoingStatus(nextState)
                 } else if (nowMillis >= state.nextReminderAt) {
                     addWorkingSeconds(nowMillis.coerceElapsedSecondsSince(state.reminderStartedAt), nowMillis)
-                    if (settings.askBeforeBreak && !settings.disableSkip) {
+                    if (settings.askBeforeBreak) {
                         val nextState = state.copy(
                             reminderPhase = ReminderPhase.AWAITING_ACTION.name,
                             updatedAt = nowMillis,

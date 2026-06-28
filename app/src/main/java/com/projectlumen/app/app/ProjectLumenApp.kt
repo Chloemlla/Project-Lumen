@@ -346,6 +346,7 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
 @Composable
 private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
     val runtime = uiState.runtime
+    val template = activeTemplate(uiState)
     val isResting = runtime.reminderPhase == ReminderPhase.RESTING.name
     val canSkip = runtime.activeEngine == ActiveEngine.REMINDER.name &&
         runtime.reminderPhase in setOf(
@@ -355,7 +356,7 @@ private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
         )
     LumenPage(horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(16.dp))
-        TemplatePreviewCard(activeTemplate(uiState))
+        TemplatePreviewCard(template)
         PageIntro(
             icon = Icons.Outlined.Spa,
             titleRes = R.string.break_title,
@@ -452,11 +453,13 @@ private fun SettingsScreen(
     openAbout: () -> Unit,
 ) {
     val settings = uiState.settings
+    val template = activeTemplate(uiState)
     val context = LocalContext.current
     val runWithNotificationPermission = rememberNotificationPermissionGate()
     val notificationPermissionNeeded = needsNotificationPermission(context)
     val exactAlarmSettingsNeeded = needsExactAlarmSettings(context)
     LumenPage {
+        TemplatePreviewCard(template)
         SettingsSection(R.string.section_general, Icons.Outlined.Settings) {
             Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall)
             LumenFlowRow {
