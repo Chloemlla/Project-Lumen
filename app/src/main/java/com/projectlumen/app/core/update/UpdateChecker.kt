@@ -1,0 +1,156 @@
+package com.projectlumen.app.core.update
+
+import android.os.Build
+import org.json.JSONObject
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.time.Instant
+import kotlin.math.max
+
+class UpdateChecker(
+    private val apiUrl: String = PROJECT_LUMEN_RELEASE_API,
+) {
+    fun checkForUpdate(currentBuild: BuildMetadata = BuildMetadata.current()): UpdateCandidate? {
+        val latest = fetchLatestRelease() ?: return null
+        val versionComparison = compareReleaseVersion(latest.tagName, currentBuild.versionName)
+        val publishTimeNewer = latest.publishedAtUtcMillis > currentBuild.buildTimeUtcMillis + PUBLISH_TIME_TOLERANCE_MILLIS
+
+        val shouldUpdate = versionComparison > 0 || publishTimeNewer
+        if (!shouldUpdate) return null
+
+        return UpdateCandidate(
+            currentBuild = currentBuild,
+            release = latest,
+            matchedAsset = selectBestAsset(latest.assets),
+            matchReason = if (versionComparison > 0) UpdateMatchReason.SEMANTIC_VERSION else UpdateMatchReason.PUBLISHED_AT,
+        )
+    }
+
+    private fun fetchLatestRelease(): ReleaseInfo? {
+        val connection = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = REQUEST_TIMEOUT_MILLIS
+            readTimeout = REQUEST_TIMEOUT_MILLIS
+            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+            setRequestProperty("User-Agent", USER_AGENT)
+        }
+        try {
+            if (connection.responseCode !in 200..299) {
+                throw IOException("GitHub release request failed with HTTP ${connection.responseCode}")
+            }
+            val payload = connection.inputStream.bufferedReader().use { it.readText() }
+            val json = JSONObject(payload)
+            return ReleaseInfo(
+                tagName = json.optString("tag_name").orEmpty(),
+                releaseName = json.optString("name").ifBlank { json.optString("tag_name").orEmpty() },
+                body = json.optString("body"),
+                htmlUrl = json.optString("html_url").orEmpty(),
+                publishedAtUtcMillis = parseInstant(json.optString("published_at"))
+                    ?: throw IOException("Release published_at is missing or invalid"),
+                assets = json.optJSONArray("assets")
+                    ?.let { array ->
+                        buildList {
+                            for (index in 0 until array.length()) {
+                                val asset = array.optJSONObject(index) ?: continue
+                                val name = asset.optString("name").orEmpty()
+                                val downloadUrl = asset.optString("browser_download_url").orEmpty()
+                                if (name.isBlank() || downloadUrl.isBlank()) continue
+                                add(
+                                    ReleaseAsset(
+                                        name = name,
+                                        downloadUrl = downloadUrl,
+                                        contentType = asset.optString("content_type").takeIf { it.isNotBlank() },
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    .orEmpty(),
+            )
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun compareReleaseVersion(remoteTagName: String, localVersionName: String): Int {
+        val remote = normalizeVersion(remoteTagName) ?: return 0
+        val local = normalizeVersion(localVersionName) ?: return 0
+        return remote.compareTo(local)
+    }
+
+    private fun normalizeVersion(value: String): SemanticVersion? {
+        val cleaned = value.trim()
+            .removePrefix("v")
+            .substringBefore('-')
+            .substringBefore('+')
+        val parts = cleaned.split('.')
+            .mapNotNull { it.toIntOrNull() }
+        if (parts.isEmpty()) return null
+        return SemanticVersion(
+            major = parts.getOrNull(0) ?: 0,
+            minor = parts.getOrNull(1) ?: 0,
+            patch = parts.getOrNull(2) ?: 0,
+        )
+    }
+
+    private fun selectBestAsset(assets: List<ReleaseAsset>): ReleaseAsset? {
+        val apkAssets = assets.filter { it.name.endsWith(".apk", ignoreCase = true) }
+        if (apkAssets.isEmpty()) return null
+
+        val preferredAbis = Build.SUPPORTED_ABIS.map { normalizeAbiToken(it) }
+        val scored = apkAssets.mapNotNull { asset ->
+            val normalizedName = normalizeName(asset.name)
+            val abiScore = preferredAbis.indexOfFirst { abi ->
+                abi.isNotBlank() && normalizedName.contains(abi)
+            }
+            val fallbackScore = when {
+                normalizedName.contains("universal") -> 10_000
+                normalizedName.contains("all") -> 10_001
+                else -> 20_000
+            }
+            if (abiScore >= 0) {
+                asset to abiScore
+            } else {
+                asset to fallbackScore
+            }
+        }
+        return scored.minWithOrNull(compareBy<Pair<ReleaseAsset, Int>> { it.second }.thenBy { it.first.name.length })?.first
+    }
+
+    private fun normalizeName(value: String): String {
+        return value.lowercase()
+            .replace('-', '_')
+            .replace('.', '_')
+            .replace(' ', '_')
+    }
+
+    private fun normalizeAbiToken(value: String): String {
+        return value.lowercase()
+            .replace('-', '_')
+            .replace('.', '_')
+    }
+
+    private fun parseInstant(value: String): Long? {
+        if (value.isBlank()) return null
+        return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
+    }
+
+    private data class SemanticVersion(
+        val major: Int,
+        val minor: Int,
+        val patch: Int,
+    ) : Comparable<SemanticVersion> {
+        override fun compareTo(other: SemanticVersion): Int {
+            return compareValuesBy(this, other, SemanticVersion::major, SemanticVersion::minor, SemanticVersion::patch)
+        }
+    }
+
+    private companion object {
+        private const val REQUEST_TIMEOUT_MILLIS = 6_000
+        private const val PUBLISH_TIME_TOLERANCE_MILLIS = 90_000L
+        private const val USER_AGENT = "Project-Lumen"
+        private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases/latest"
+    }
+}

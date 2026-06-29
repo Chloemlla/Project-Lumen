@@ -573,4 +573,11 @@ class ProjectLumenViewModel(
             settingsDao.upsert(current.copy(themeMode = mode.name, updatedAt = System.currentTimeMillis()))
         }
     }
+
+    fun setAutoUpdateCheckEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = settingsDao.get() ?: AppSettingsEntity()
+            settingsDao.upsert(current.copy(autoUpdateCheckEnabled = enabled, updatedAt = System.currentTimeMillis()))
+        }
+    }
 }

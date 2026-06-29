@@ -22,19 +22,37 @@ android {
     namespace = "com.projectlumen.app"
     compileSdk = 36
 
+    val projectLumenVersionName = providers.environmentVariable("PROJECT_LUMEN_VERSION_NAME")
+        .orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: "1.0.0"
+    val projectLumenVersionCode = providers.environmentVariable("PROJECT_LUMEN_VERSION_CODE")
+        .orNull
+        ?.toIntOrNull()
+        ?: 1
+    val projectLumenBuildTimeUtcMillis = providers.environmentVariable("PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS")
+        .orNull
+        ?.toLongOrNull()
+        ?: System.currentTimeMillis()
+    val projectLumenCommitHash = providers.environmentVariable("PROJECT_LUMEN_COMMIT_HASH")
+        .orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: providers.exec { commandLine("git", "rev-parse", "HEAD") }.standardOutput.asText.get().trim().ifBlank { "unknown" }
+    val projectLumenShortHash = providers.environmentVariable("PROJECT_LUMEN_SHORT_HASH")
+        .orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: providers.exec { commandLine("git", "rev-parse", "--short=8", "HEAD") }.standardOutput.asText.get().trim().ifBlank { "unknown" }
+
     defaultConfig {
-        val gitShaShort = providers.exec {
-            commandLine("git", "rev-parse", "--short=8", "HEAD")
-        }.standardOutput.asText.get().trim().ifBlank { "unknown" }
-        buildConfigField("String", "GIT_SHA_SHORT", "\"$gitShaShort\"")
-        val buildTimeMillis = System.currentTimeMillis()
-        buildConfigField("long", "BUILD_TIME", "${buildTimeMillis}L")
+        buildConfigField("long", "BUILD_TIME_UTC_MILLIS", "${projectLumenBuildTimeUtcMillis}L")
+        buildConfigField("String", "COMMIT_HASH", "\"$projectLumenCommitHash\"")
+        buildConfigField("String", "SHORT_HASH", "\"$projectLumenShortHash\"")
 
         applicationId = "com.projectlumen.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = projectLumenVersionCode
+        versionName = projectLumenVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

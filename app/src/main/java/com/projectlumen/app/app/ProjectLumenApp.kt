@@ -2,7 +2,6 @@
 
 import android.Manifest
 import android.app.AlarmManager
-import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -66,7 +65,6 @@ import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Home
@@ -86,6 +84,7 @@ import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -105,8 +104,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -141,23 +142,28 @@ import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
-import com.projectlumen.app.BuildConfig
+import com.projectlumen.app.core.update.BuildMetadata
+import com.projectlumen.app.core.update.ReleaseAsset
+import com.projectlumen.app.core.update.ReleaseInfo
+import com.projectlumen.app.core.update.UpdateCandidate
+import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
-import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.time.Instant
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val PROJECT_LUMEN_REPO_URL = "https://github.com/Chloemlla/Project-Lumen"
 private const val PROJECT_LUMEN_RELEASES_URL = "https://github.com/Chloemlla/Project-Lumen/releases/latest"
-private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases"
-private const val PROJECT_LUMEN_APK_MIME = "application/vnd.android.package-archive"
-private const val PREFERRED_AGGREGATED_ASSET_NAME = "Project-Lumen_android_aggregated.apk"
+private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases/latest"
+private const val PROJECT_LUMEN_RELEASES_BASE_URL = "https://github.com/Chloemlla/Project-Lumen/releases"
 private val crashDetailsTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+private val updateDialogTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
 private enum class Destination(
     val route: String,
@@ -196,8 +202,42 @@ fun ProjectLumenApp(
     val themeMode = runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }
         .getOrDefault(AppThemeMode.SYSTEM)
     val baseContext = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val updateChecker = remember { UpdateChecker(PROJECT_LUMEN_RELEASE_API) }
+    var checkingUpdate by remember { mutableStateOf(false) }
+    var manualUpdateError by remember { mutableStateOf<String?>(null) }
+    var updateCandidate by remember { mutableStateOf<UpdateCandidate?>(null) }
+    var updateDialogVisible by remember { mutableStateOf(false) }
+    var autoCheckStarted by rememberSaveable { mutableStateOf(false) }
+
+    fun triggerUpdateCheck(manual: Boolean) {
+        coroutineScope.launch {
+            checkingUpdate = true
+            if (manual) manualUpdateError = null
+            val result = withContext(Dispatchers.IO) {
+                runCatching { updateChecker.checkForUpdate() }
+            }
+            checkingUpdate = false
+            result.onSuccess { candidate ->
+                updateCandidate = candidate
+                updateDialogVisible = candidate != null
+                if (!manual) autoCheckStarted = true
+            }.onFailure { throwable ->
+                if (manual) {
+                    manualUpdateError = throwable.message ?: "Update check failed."
+                }
+                if (!manual) autoCheckStarted = true
+            }
+        }
+    }
+
     LaunchedEffect(uiState.settings.languageCode) {
         LocaleController.apply(uiState.settings.languageCode)
+    }
+    LaunchedEffect(uiState.isReady, uiState.settings.autoUpdateCheckEnabled, autoCheckStarted) {
+        if (uiState.isReady && uiState.settings.autoUpdateCheckEnabled && !autoCheckStarted && !checkingUpdate) {
+            triggerUpdateCheck(manual = false)
+        }
     }
     val localizedContext = baseContext
 
@@ -291,6 +331,9 @@ fun ProjectLumenApp(
                         SettingsScreen(
                             uiState = uiState,
                             viewModel = viewModel,
+                            checkingUpdate = checkingUpdate,
+                            updateError = manualUpdateError,
+                            onManualUpdateCheck = { triggerUpdateCheck(manual = true) },
                             openTemplates = { navController.navigate(Destination.TEMPLATES.route) },
                             openAbout = { navController.navigate(Destination.ABOUT.route) },
                         )
@@ -298,6 +341,24 @@ fun ProjectLumenApp(
                     composable(Destination.TEMPLATES.route) { TemplatesScreen(uiState, viewModel) }
                     composable(Destination.ABOUT.route) { AboutScreen() }
                 }
+            }
+            if (updateDialogVisible && updateCandidate != null) {
+                UpdateDialog(
+                    candidate = updateCandidate!!,
+                    onDismiss = { updateDialogVisible = false },
+                )
+            }
+            if (manualUpdateError != null) {
+                AlertDialog(
+                    onDismissRequest = { manualUpdateError = null },
+                    title = { Text(stringResource(R.string.about_update_failed_title)) },
+                    text = { Text(manualUpdateError.orEmpty()) },
+                    confirmButton = {
+                        OutlinedButton(onClick = { manualUpdateError = null }) {
+                            Text(stringResource(android.R.string.ok))
+                        }
+                    },
+                )
             }
         }
     }
@@ -517,6 +578,9 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
 private fun SettingsScreen(
     uiState: ProjectLumenUiState,
     viewModel: ProjectLumenViewModel,
+    checkingUpdate: Boolean,
+    updateError: String?,
+    onManualUpdateCheck: () -> Unit,
     openTemplates: () -> Unit,
     openAbout: () -> Unit,
 ) {
@@ -547,6 +611,17 @@ private fun SettingsScreen(
             }
             SwitchRow(R.string.auto_dark_window, Icons.Outlined.Style, settings.useAutoDarkWindow) {
                 viewModel.updateSettings { current -> current.copy(useAutoDarkWindow = it) }
+            }
+            SwitchRow(R.string.auto_update_check, Icons.Outlined.Sync, settings.autoUpdateCheckEnabled) {
+                viewModel.setAutoUpdateCheckEnabled(it)
+            }
+        }
+        SettingsSection(R.string.about_update_status, Icons.Outlined.Sync) {
+            if (checkingUpdate) {
+                Text(stringResource(R.string.about_update_checking), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            OutlinedButton(onClick = onManualUpdateCheck, enabled = !checkingUpdate) {
+                ButtonLabel(Icons.Outlined.Sync, R.string.about_check_updates)
             }
         }
         SettingsSection(R.string.section_notifications, Icons.Outlined.NotificationsActive) {
@@ -794,23 +869,11 @@ private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: Proje
 
 @Composable
 private fun AboutScreen() {
-    val context = LocalContext.current
-    val versionLabel = rememberAppVersionLabel(context)
-    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
-    var updateError by remember { mutableStateOf<String?>(null) }
-    var checkingUpdate by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        val result = runCatching { fetchLatestUpdateInfo() }
-        updateInfo = result.getOrNull()
-        updateError = result.exceptionOrNull()?.message
-        checkingUpdate = false
-    }
+    val versionLabel = rememberBuildVersionLabel()
 
     LumenPage {
         AboutHeroCard(versionLabel = versionLabel)
         AboutLinksCard()
-        AboutUpdateCard(updateInfo = updateInfo, checkingUpdate = checkingUpdate, updateError = updateError)
     }
 }
 
@@ -841,38 +904,30 @@ private fun AboutLinksCard() {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
             LinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL)
-    LinkButton(Icons.Outlined.CloudDownload, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL)
+            LinkButton(Icons.Outlined.Code, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL)
         }
     }
 }
 
 @Composable
-private fun AboutUpdateCard(updateInfo: UpdateInfo?, checkingUpdate: Boolean, updateError: String?) {
+private fun AboutUpdateCard(
+    checkingUpdate: Boolean,
+    manualCheckError: String?,
+    onManualCheck: () -> Unit,
+) {
     ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Sync, R.string.about_update_status)
-            when {
-                checkingUpdate -> Text(stringResource(R.string.about_update_checking), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                updateInfo != null -> {
-                    Text(stringResource(R.string.about_update_found, updateInfo.tagName), fontWeight = FontWeight.SemiBold)
-                    Text(updateInfo.releaseName, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(updateInfo.body, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    UpdateDownloadButton(updateInfo.apkName, updateInfo.apkUrl)
-                }
-                updateError != null -> Text(updateError, color = MaterialTheme.colorScheme.error)
-                else -> Text(stringResource(R.string.about_update_unavailable), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (checkingUpdate) {
+                Text(stringResource(R.string.about_update_checking), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            manualCheckError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+            OutlinedButton(onClick = onManualCheck, enabled = !checkingUpdate) {
+                ButtonLabel(Icons.Outlined.Sync, R.string.about_check_updates)
             }
         }
-    }
-}
-
-@Composable
-private fun UpdateDownloadButton(apkName: String, apkUrl: String) {
-    val context = LocalContext.current
-    OutlinedButton(onClick = { downloadUpdateApk(context, apkName, apkUrl) }) {
-        Icon(Icons.Outlined.FileDownload, contentDescription = null)
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.about_download_update))
     }
 }
 
@@ -886,12 +941,47 @@ private fun LinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String)
     }
 }
 
-private fun rememberAppVersionLabel(context: Context): String {
-    val versionName = runCatching {
-        @Suppress("DEPRECATION")
-        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.0.0"
-    }.getOrDefault("0.0.0")
-    return versionName
+@Composable
+private fun UpdateDialog(candidate: UpdateCandidate, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val release = candidate.release
+    val targetAsset = candidate.matchedAsset ?: chooseFallbackAsset(release.assets)
+    val current = candidate.currentBuild
+    val publishTime = Instant.ofEpochMilli(release.publishedAtUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
+    val buildTime = Instant.ofEpochMilli(current.buildTimeUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
+    val primaryActionLabel = if (targetAsset != null) R.string.about_download_update else R.string.about_open_release
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(release.tagName) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.about_update_found, release.tagName))
+                Text(stringResource(R.string.about_update_current_version, current.versionName, current.shortHash))
+                Text(stringResource(R.string.about_update_build_time, buildTime))
+                Text(stringResource(R.string.about_update_publish_time, publishTime))
+                if (candidate.isTimeFallback) {
+                    Text(stringResource(R.string.about_update_time_fallback), color = MaterialTheme.colorScheme.primary)
+                }
+                if (release.body.isNotBlank()) {
+                    Text(release.body)
+                }
+                Text(stringResource(R.string.about_update_release_notes, release.releaseName))
+            }
+        },
+        confirmButton = {
+            OutlinedButton(onClick = {
+                if (targetAsset != null) {
+                    openUrl(context, targetAsset.downloadUrl)
+                } else {
+                    openUrl(context, release.htmlUrl.ifBlank { PROJECT_LUMEN_RELEASES_BASE_URL })
+                }
+            }) {
+                ButtonLabel(Icons.Outlined.FileDownload, primaryActionLabel)
+            }
+        },
+        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
+    )
 }
 
 @Composable
@@ -1401,131 +1491,17 @@ private fun openUrl(context: Context, url: String) {
     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
-private fun fetchLatestUpdateInfo(): UpdateInfo? {
-    val connection = (URL(PROJECT_LUMEN_RELEASE_API).openConnection() as HttpURLConnection).apply {
-        requestMethod = "GET"
-        connectTimeout = 6000
-        readTimeout = 6000
-        setRequestProperty("Accept", "application/vnd.github+json")
-        setRequestProperty("User-Agent", "Project-Lumen")
-    }
-    try {
-        if (connection.responseCode !in 200..299) return null
-        val body = connection.inputStream.bufferedReader().use { it.readText() }
-        val latest = body.extractFirstArrayObject() ?: return null
-        val tagName = latest.extractJsonString("tag_name") ?: return null
-        val releaseName = latest.extractJsonString("name") ?: tagName
-        val releaseBody = latest.extractJsonString("body") ?: ""
-        val createdAt = latest.extractJsonString("created_at") ?: return null
-        val createdAtMillis = runCatching { Instant.parse(createdAt).toEpochMilli() }.getOrNull() ?: return null
-        val assets = latest.extractArrayObjects("assets")
-        val apk = selectPreferredAsset(assets) ?: return null
-        return UpdateInfo(
-            tagName = tagName,
-            releaseName = releaseName,
-            body = releaseBody,
-            createdAtMillis = createdAtMillis,
-            apkName = apk.name,
-            apkUrl = apk.url,
-        )
-    } finally {
-        connection.disconnect()
-    }
+@Composable
+private fun rememberBuildVersionLabel(): String {
+    val metadata = remember { BuildMetadata.current() }
+    return "${metadata.versionName} (${metadata.shortHash})"
 }
 
-private fun downloadUpdateApk(context: Context, apkName: String, apkUrl: String) {
-    val fileName = apkName.takeIf { it.endsWith(".apk", ignoreCase = true) } ?: "$apkName.apk"
-    val request = DownloadManager.Request(Uri.parse(apkUrl))
-        .setTitle(fileName)
-        .setDescription(context.getString(R.string.about_download_update))
-        .setMimeType(PROJECT_LUMEN_APK_MIME)
-        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-        .setDestinationInExternalFilesDir(context, android.os.Environment.DIRECTORY_DOWNLOADS, fileName)
-    val manager = context.getSystemService<DownloadManager>() ?: return
-    manager.enqueue(request)
+private fun chooseFallbackAsset(assets: List<ReleaseAsset>): ReleaseAsset? {
+    return assets.firstOrNull { it.name.contains("universal", ignoreCase = true) }
+        ?: assets.firstOrNull { it.name.contains("all", ignoreCase = true) }
+        ?: assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
 }
-
-private fun String.extractJsonString(key: String): String? {
-    val regex = Regex("\"$key\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"")
-    return regex.find(this)?.groupValues?.getOrNull(1)?.replace("\\\"", "\"")?.replace("\\\\", "\\")
-}
-
-private fun String.extractArrayObjects(key: String): List<String> {
-    val marker = "\"$key\":"
-    val start = indexOf(marker)
-    if (start < 0) return emptyList()
-    val arrayStart = indexOf('[', start)
-    if (arrayStart < 0) return emptyList()
-    var depth = 0
-    var currentStart = -1
-    val objects = mutableListOf<String>()
-    for (i in arrayStart until length) {
-        when (this[i]) {
-            '{' -> {
-                if (depth == 0) currentStart = i
-                depth++
-            }
-            '}' -> {
-                depth--
-                if (depth == 0 && currentStart >= 0) {
-                    objects += substring(currentStart, i + 1)
-                    currentStart = -1
-                }
-            }
-            ']' -> if (depth == 0) break
-        }
-    }
-    return objects
-}
-
-private fun String.extractFirstArrayObject(): String? {
-    val start = indexOf('[')
-    if (start < 0) return null
-    var depth = 0
-    var currentStart = -1
-    for (i in start until length) {
-        when (this[i]) {
-            '{' -> {
-                if (depth == 0) currentStart = i
-                depth++
-            }
-            '}' -> {
-                depth--
-                if (depth == 0 && currentStart >= 0) {
-                    return substring(currentStart, i + 1)
-                }
-            }
-        }
-    }
-    return null
-}
-
-private fun selectPreferredAsset(assets: List<String>): UpdateAsset? {
-    val parsed = assets.mapNotNull { asset ->
-        val name = asset.extractJsonString("name") ?: return@mapNotNull null
-        val url = asset.extractJsonString("browser_download_url") ?: return@mapNotNull null
-        UpdateAsset(name, url)
-    }
-    return parsed.firstOrNull { it.name.equals(PREFERRED_AGGREGATED_ASSET_NAME, ignoreCase = true) }
-        ?: parsed.firstOrNull { it.name.endsWith("_universal.apk", ignoreCase = true) }
-        ?: parsed.firstOrNull { it.name.contains("universal", ignoreCase = true) }
-        ?: parsed.firstOrNull { it.name.contains("android", ignoreCase = true) && it.name.endsWith(".apk", ignoreCase = true) }
-        ?: parsed.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
-}
-
-private data class UpdateInfo(
-    val tagName: String,
-    val releaseName: String,
-    val body: String,
-    val createdAtMillis: Long,
-    val apkName: String,
-    val apkUrl: String,
-)
-
-private data class UpdateAsset(
-    val name: String,
-    val url: String,
-)
 
 private fun openAppNotificationSettings(context: Context) {
     val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)

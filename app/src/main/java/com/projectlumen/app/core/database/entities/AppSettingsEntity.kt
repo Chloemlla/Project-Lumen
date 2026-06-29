@@ -34,5 +34,6 @@ data class AppSettingsEntity(
     val autoDarkStartMinute: Int = 1080,
     val autoDarkEndMinute: Int = 360,
     val notificationEnabled: Boolean = true,
+    val autoUpdateCheckEnabled: Boolean = true,
     val updatedAt: Long = System.currentTimeMillis(),
 )

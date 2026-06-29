@@ -37,10 +37,14 @@ jobs:
         run: |
           VERSION_NAME=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)
           VERSION_CODE=$(sed -n 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1)
-          SHORT_HASH="${GITHUB_SHA::7}"
-          echo "VERSION_NAME=${VERSION_NAME:-0.0.0}" >> "$GITHUB_ENV"
-          echo "VERSION_CODE=${VERSION_CODE:-0}" >> "$GITHUB_ENV"
-          echo "SHORT_HASH=$SHORT_HASH" >> "$GITHUB_ENV"
+          BUILD_TIME_UTC_MILLIS=$(date -u +%s%3N)
+          COMMIT_HASH="${GITHUB_SHA}"
+          SHORT_HASH="${GITHUB_SHA::8}"
+          echo "PROJECT_LUMEN_VERSION_NAME=${VERSION_NAME:-0.0.0}" >> "$GITHUB_ENV"
+          echo "PROJECT_LUMEN_VERSION_CODE=${VERSION_CODE:-0}" >> "$GITHUB_ENV"
+          echo "PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS=$BUILD_TIME_UTC_MILLIS" >> "$GITHUB_ENV"
+          echo "PROJECT_LUMEN_COMMIT_HASH=$COMMIT_HASH" >> "$GITHUB_ENV"
+          echo "PROJECT_LUMEN_SHORT_HASH=$SHORT_HASH" >> "$GITHUB_ENV"
 
       - name: Write signing config
         env:
@@ -74,12 +78,18 @@ jobs:
           fi
 
       - name: Build release APK
+        env:
+          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
+          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
+          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
+          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
+          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
         run: gradle assembleRelease --no-daemon
 
       - name: Prepare release assets
         run: |
           mkdir -p release-assets
-          VERSION="${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          VERSION="${{ env.PROJECT_LUMEN_VERSION_NAME }}-${{ env.PROJECT_LUMEN_SHORT_HASH }}"
           APK_DIR="app/build/outputs/apk/release"
           AGGREGATED_APK="$(find "$APK_DIR" -maxdepth 1 -type f \( -name "app-universal-release.apk" -o -name "app-release.apk" -o -name "app-release-unsigned.apk" \) | head -n 1)"
 
@@ -113,7 +123,7 @@ jobs:
           draft: false
           make_latest: true
           generate_release_notes: true
-          tag_name: "v${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          tag_name: "v${{ env.PROJECT_LUMEN_VERSION_NAME }}-${{ env.PROJECT_LUMEN_SHORT_HASH }}"
           prerelease: false
-          name: "Project-Lumen ${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
+          name: "Project-Lumen ${{ env.PROJECT_LUMEN_VERSION_NAME }}-${{ env.PROJECT_LUMEN_SHORT_HASH }}"
           files: release-assets/*.apk

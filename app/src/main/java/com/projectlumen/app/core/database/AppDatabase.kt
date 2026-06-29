@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.projectlumen.app.core.database.daos.AppSettingsDao
 import com.projectlumen.app.core.database.daos.DailyEyeStatsDao
 import com.projectlumen.app.core.database.daos.DailyPomodoroStatsDao
@@ -23,7 +25,7 @@ import com.projectlumen.app.core.database.entities.TipTemplateEntity
         DailyPomodoroStatsEntity::class,
         TipTemplateEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,12 +36,19 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun tipTemplatesDao(): TipTemplatesDao
 
     companion object {
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE app_settings ADD COLUMN autoUpdateCheckEnabled INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun create(context: Context): AppDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "project_lumen_mobile.db",
             )
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
         }
