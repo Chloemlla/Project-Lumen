@@ -65,6 +65,8 @@
     <string name="about_update_publish_time">发布时间：%1$s</string>
     <string name="about_update_release_notes">发布说明：%1$s</string>
     <string name="about_update_time_fallback">该版本通过发布时间判定为更新，即使版本号看起来更低也应优先升级。</string>
+    <string name="about_update_downloading">正在下载更新...</string>
+    <string name="about_update_downloading_progress">正在下载更新... %1$d%%</string>
     <string name="about_update_failed_title">检查更新失败</string>
     <string name="about_external_link_prompt_title">打开外部链接？</string>
     <string name="about_external_link_prompt_message">这将打开浏览器并跳转到外部网站。</string>

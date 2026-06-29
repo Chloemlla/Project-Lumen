@@ -86,7 +86,7 @@ class UpdateChecker(
 
     private fun isExactVersionMatch(remoteTagName: String, localVersion: VersionDescriptor): Boolean {
         val remote = parseVersionDescriptor(remoteTagName) ?: return false
-        return remote.semanticVersion == local.semanticVersion &&
+        return remote.semanticVersion == localVersion.semanticVersion &&
             remote.shortHash.isNotBlank() &&
             localVersion.shortHash.isNotBlank() &&
             remote.shortHash.equals(localVersion.shortHash, ignoreCase = true)

@@ -209,6 +209,8 @@ fun ProjectLumenApp(
     val updateInstaller = remember { UpdateInstaller(baseContext) }
     var checkingUpdate by remember { mutableStateOf(false) }
     var downloadingUpdate by remember { mutableStateOf(false) }
+    var downloadProgressBytes by remember { mutableStateOf(0L) }
+    var downloadProgressTotalBytes by remember { mutableStateOf<Long?>(null) }
     var manualUpdateError by remember { mutableStateOf<String?>(null) }
     var downloadError by remember { mutableStateOf<String?>(null) }
     var updateCandidate by remember { mutableStateOf<UpdateCandidate?>(null) }
@@ -251,11 +253,20 @@ fun ProjectLumenApp(
     fun triggerUpdateDownload(asset: ReleaseAsset) {
         coroutineScope.launch {
             downloadingUpdate = true
+            downloadProgressBytes = 0L
+            downloadProgressTotalBytes = null
             downloadError = null
             val result = withContext(Dispatchers.IO) {
-                runCatching { updateInstaller.downloadApk(asset) }
+                runCatching {
+                    updateInstaller.downloadApk(asset) { downloadedBytes, totalBytes ->
+                        downloadProgressBytes = downloadedBytes
+                        downloadProgressTotalBytes = totalBytes
+                    }
+                }
             }
             downloadingUpdate = false
+            downloadProgressBytes = 0L
+            downloadProgressTotalBytes = null
             result.onSuccess { file ->
                 startInstallIfAllowed(file)
             }.onFailure { throwable ->
@@ -379,6 +390,8 @@ fun ProjectLumenApp(
                 UpdateDialog(
                     candidate = updateCandidate!!,
                     downloadingUpdate = downloadingUpdate,
+                    downloadProgressBytes = downloadProgressBytes,
+                    downloadProgressTotalBytes = downloadProgressTotalBytes,
                     onDismiss = { updateDialogVisible = false },
                     onDownloadUpdate = { asset -> triggerUpdateDownload(asset) },
                 )
@@ -1042,6 +1055,8 @@ private fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: In
 private fun UpdateDialog(
     candidate: UpdateCandidate,
     downloadingUpdate: Boolean,
+    downloadProgressBytes: Long,
+    downloadProgressTotalBytes: Long?,
     onDismiss: () -> Unit,
     onDownloadUpdate: (ReleaseAsset) -> Unit,
 ) {
@@ -1068,6 +1083,21 @@ private fun UpdateDialog(
                 }
                 if (release.body.isNotBlank()) {
                     Text(release.body)
+                }
+                if (downloadingUpdate) {
+                    val progress = downloadProgressTotalBytes?.takeIf { it > 0 }?.let {
+                        downloadProgressBytes.toFloat() / it.toFloat()
+                    }
+                    LinearProgressIndicator(
+                        progress = { progress ?: 0f },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        text = downloadProgressTotalBytes?.takeIf { it > 0 }?.let {
+                            val percent = ((downloadProgressBytes * 100) / it).coerceIn(0, 100)
+                            stringResource(R.string.about_update_downloading_progress, percent)
+                        } ?: stringResource(R.string.about_update_downloading),
+                    )
                 }
                 Text(stringResource(R.string.about_update_release_notes, release.releaseName))
             }

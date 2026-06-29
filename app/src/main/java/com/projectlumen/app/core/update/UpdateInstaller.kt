@@ -14,7 +14,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 class UpdateInstaller(private val context: Context) {
-    suspend fun downloadApk(asset: ReleaseAsset): File = withContext(Dispatchers.IO) {
+    suspend fun downloadApk(
+        asset: ReleaseAsset,
+        onProgress: ((downloadedBytes: Long, totalBytes: Long?) -> Unit)? = null,
+    ): File = withContext(Dispatchers.IO) {
         val targetFile = File(context.cacheDir, buildCacheFileName(asset.name))
         val connection = (URL(asset.downloadUrl).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
@@ -27,9 +30,18 @@ class UpdateInstaller(private val context: Context) {
             if (connection.responseCode !in 200..299) {
                 throw IOException("APK download failed with HTTP ${connection.responseCode}")
             }
-            connection.inputStream.use { input ->
+            val totalBytes = connection.contentLengthLong.takeIf { it > 0 }
+            connection.inputStream.buffered().use { input ->
                 targetFile.outputStream().use { output ->
-                    input.copyTo(output)
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var downloadedBytes = 0L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        downloadedBytes += read
+                        onProgress?.invoke(downloadedBytes, totalBytes)
+                    }
                 }
             }
             targetFile
