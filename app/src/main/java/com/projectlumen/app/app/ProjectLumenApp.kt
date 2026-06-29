@@ -972,6 +972,7 @@ private fun UpdateDialog(candidate: UpdateCandidate, onDismiss: () -> Unit) {
     val buildTime = Instant.ofEpochMilli(current.buildTimeUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
     val primaryActionLabel = if (targetAsset != null) R.string.about_download_update else R.string.about_open_release
     var pendingDownloadUrl by remember { mutableStateOf<String?>(null) }
+    var pendingReleaseUrl by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -996,7 +997,7 @@ private fun UpdateDialog(candidate: UpdateCandidate, onDismiss: () -> Unit) {
                 if (targetAsset != null) {
                     pendingDownloadUrl = targetAsset.downloadUrl
                 } else {
-                    openUrl(context, release.htmlUrl.ifBlank { PROJECT_LUMEN_RELEASES_BASE_URL })
+                    pendingReleaseUrl = release.htmlUrl.ifBlank { PROJECT_LUMEN_RELEASES_BASE_URL }
                 }
             }) {
                 ButtonLabel(Icons.Outlined.FileDownload, primaryActionLabel)
@@ -1019,6 +1020,26 @@ private fun UpdateDialog(candidate: UpdateCandidate, onDismiss: () -> Unit) {
             },
             dismissButton = {
                 OutlinedButton(onClick = { pendingDownloadUrl = null }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
+    pendingReleaseUrl?.let { url ->
+        AlertDialog(
+            onDismissRequest = { pendingReleaseUrl = null },
+            title = { Text(stringResource(R.string.about_external_link_prompt_title)) },
+            text = { Text(stringResource(R.string.about_external_link_prompt_message)) },
+            confirmButton = {
+                OutlinedButton(onClick = {
+                    pendingReleaseUrl = null
+                    openUrl(context, url)
+                }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { pendingReleaseUrl = null }) {
                     Text(stringResource(android.R.string.cancel))
                 }
             },
@@ -1542,7 +1563,6 @@ private fun rememberBuildVersionLabel(): String {
 private fun chooseFallbackAsset(assets: List<ReleaseAsset>): ReleaseAsset? {
     return assets.firstOrNull { it.name.contains("universal", ignoreCase = true) }
         ?: assets.firstOrNull { it.name.contains("all", ignoreCase = true) }
-        ?: assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
 }
 
 private fun openAppNotificationSettings(context: Context) {

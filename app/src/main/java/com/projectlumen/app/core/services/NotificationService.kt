@@ -105,7 +105,7 @@ class NotificationService(private val context: Context) {
         )
     }
 
-    fun showUpdateAvailable(tagName: String, releaseName: String, body: String) {
+    fun showUpdateAvailable(tagName: String, releaseName: String) {
         if (!canPostNotifications()) return
         val updateIntent = Intent(context, MainActivity::class.java).setPackage(context.packageName)
         show(
