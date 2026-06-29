@@ -108,6 +108,9 @@ class NotificationService(private val context: Context) {
 
     fun showUpdateAvailable(tagName: String, apkName: String, apkUrl: String) {
         if (!canPostNotifications()) return
+        val updateIntent = Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)).apply {
+            setPackage(context.packageName)
+        }
         show(
             id = NotificationIds.POMODORO + 1000,
             channel = NotificationChannels.STATUS,
@@ -123,14 +126,12 @@ class NotificationService(private val context: Context) {
                     .setSmallIcon(R.drawable.ic_launcher_foreground)
                     .setContentTitle(context.getString(R.string.about_update_status))
                     .setContentText("$apkName")
-                    .setContentIntent(
-                        PendingIntent.getActivity(
-                            context,
-                            NotificationIds.POMODORO + 1001,
-                            Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)),
-                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                        ),
-                    )
+                    .setContentIntent(PendingIntent.getActivity(
+                        context,
+                        NotificationIds.POMODORO + 1001,
+                        updateIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    ))
                     .setAutoCancel(true)
                     .build(),
             )
@@ -324,4 +325,5 @@ class NotificationService(private val context: Context) {
             .setAction(action)
             .setPackage(context.packageName)
     }
+
 }
