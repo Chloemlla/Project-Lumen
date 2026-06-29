@@ -1,4 +1,4 @@
-﻿package com.projectlumen.app.app
+package com.projectlumen.app.app
 
 import android.Manifest
 import android.app.AlarmManager
@@ -207,7 +207,8 @@ private enum class SystemBackgroundColor(
 }
 
 private val LumenCardShape = RoundedCornerShape(8.dp)
-private val LumenCardElevation = CardDefaults.cardElevation(
+@Composable
+private fun LumenCardElevation() = CardDefaults.cardElevation(
     defaultElevation = 0.dp,
     pressedElevation = 0.dp,
     focusedElevation = 0.dp,
@@ -455,7 +456,7 @@ private fun CrashReportScreen(report: CrashReport) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = LumenCardShape,
-            elevation = LumenCardElevation,
+            elevation = LumenCardElevation(),
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricRow("时间", formattedTime)
@@ -505,7 +506,7 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
             shape = LumenCardShape,
-            elevation = LumenCardElevation,
+            elevation = LumenCardElevation(),
         ) {
             Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
@@ -817,7 +818,7 @@ private fun TrendCard(uiState: ProjectLumenUiState) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        elevation = LumenCardElevation,
+        elevation = LumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.weekly_trend)
@@ -879,7 +880,7 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                     .border(1.dp, borderColor, LumenCardShape)
                     .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
                 shape = LumenCardShape,
-                elevation = LumenCardElevation,
+                elevation = LumenCardElevation(),
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -915,7 +916,7 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
 
 @Composable
 private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Style, R.string.system_background_color)
             LumenFlowRow {
@@ -956,7 +957,7 @@ private fun AboutHeroCard(versionLabel: String) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        elevation = LumenCardElevation,
+        elevation = LumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(Icons.Outlined.Info, R.string.app_name)
@@ -972,7 +973,7 @@ private fun AboutHeroCard(versionLabel: String) {
 
 @Composable
 private fun AboutLinksCard() {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL)
@@ -987,7 +988,7 @@ private fun AboutUpdateCard(
     manualCheckError: String?,
     onManualCheck: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Sync, R.string.about_update_status)
             if (checkingUpdate) {
@@ -1047,6 +1048,7 @@ private fun UpdateDialog(
     updateInstaller: UpdateInstaller,
 ) {
     val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<ProjectLumenViewModel>()
+    val context = LocalContext.current
     var pendingReleaseUrl by remember { mutableStateOf<String?>(null) }
     val showReleaseInfo: @Composable (ReleaseInfo, BuildMetadata, UpdateCandidate?) -> Unit = { release, current, candidate ->
         val publishTime = Instant.ofEpochMilli(release.publishedAtUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
@@ -1221,7 +1223,7 @@ private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        elevation = LumenCardElevation,
+        elevation = LumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.NotificationsActive, R.string.current_state)
@@ -1285,7 +1287,7 @@ private fun TodayStatsCard(stat: DailyEyeStatsEntity?) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        elevation = LumenCardElevation,
+        elevation = LumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.today_summary)
@@ -1374,7 +1376,7 @@ private fun TemplatePreviewCard(template: TipTemplateEntity?) {
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
         colors = CardDefaults.cardColors(containerColor = animatedBackground),
-        elevation = LumenCardElevation,
+        elevation = LumenCardElevation(),
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             ColorSwatch(animatedBackground)
@@ -1421,7 +1423,7 @@ private fun SettingsSection(@StringRes titleRes: Int, icon: ImageVector, content
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        elevation = LumenCardElevation,
+        elevation = LumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(icon, titleRes)
