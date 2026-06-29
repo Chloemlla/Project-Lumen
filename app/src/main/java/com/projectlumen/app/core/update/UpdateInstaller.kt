@@ -2,6 +2,7 @@ package com.projectlumen.app.core.update
 
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -19,7 +20,7 @@ class UpdateInstaller(private val context: Context) {
         onProgress: ((downloadedBytes: Long, totalBytes: Long?) -> Unit)? = null,
     ): File = withContext(Dispatchers.IO) {
         val targetFile = File(context.cacheDir, buildCacheFileName(asset.name))
-        val connection = (URL(asset.downloadUrl).openConnection() as HttpURLConnection).apply {
+        val connection = openHttpConnection(asset.downloadUrl).apply {
             requestMethod = "GET"
             connectTimeout = REQUEST_TIMEOUT_MILLIS
             readTimeout = REQUEST_TIMEOUT_MILLIS
@@ -78,6 +79,13 @@ class UpdateInstaller(private val context: Context) {
     private fun buildCacheFileName(assetName: String): String {
         val baseName = assetName.substringAfterLast('/').ifBlank { "project_lumen_update.apk" }
         return baseName.replace(UNSAFE_FILE_CHARS, "_")
+    }
+
+    private fun openHttpConnection(url: String): HttpURLConnection {
+        val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+        val network = connectivityManager?.activeNetwork
+            ?: return URL(url).openConnection() as HttpURLConnection
+        return network.openConnection(URL(url)) as HttpURLConnection
     }
 
     private companion object {

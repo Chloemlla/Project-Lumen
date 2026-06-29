@@ -205,7 +205,7 @@ fun ProjectLumenApp(
         .getOrDefault(AppThemeMode.SYSTEM)
     val baseContext = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val updateChecker = remember { UpdateChecker(PROJECT_LUMEN_RELEASE_API) }
+    val updateChecker = remember(baseContext) { UpdateChecker(baseContext, PROJECT_LUMEN_RELEASE_API) }
     val updateInstaller = remember { UpdateInstaller(baseContext) }
     var checkingUpdate by remember { mutableStateOf(false) }
     var downloadingUpdate by remember { mutableStateOf(false) }

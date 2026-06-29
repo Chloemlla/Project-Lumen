@@ -1,5 +1,7 @@
 package com.projectlumen.app.core.update
 
+import android.content.Context
+import android.net.ConnectivityManager
 import android.os.Build
 import org.json.JSONObject
 import java.io.IOException
@@ -9,6 +11,7 @@ import java.time.Instant
 import kotlin.math.max
 
 class UpdateChecker(
+    private val context: Context,
     private val apiUrl: String = PROJECT_LUMEN_RELEASE_API,
 ) {
     fun checkForUpdate(currentBuild: BuildMetadata = BuildMetadata.current()): UpdateCandidate? {
@@ -33,7 +36,7 @@ class UpdateChecker(
     }
 
     private fun fetchLatestRelease(): ReleaseInfo? {
-        val connection = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
+        val connection = openHttpConnection(apiUrl).apply {
             requestMethod = "GET"
             connectTimeout = REQUEST_TIMEOUT_MILLIS
             readTimeout = REQUEST_TIMEOUT_MILLIS
@@ -77,6 +80,13 @@ class UpdateChecker(
         } finally {
             connection.disconnect()
         }
+    }
+
+    private fun openHttpConnection(url: String): HttpURLConnection {
+        val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+        val network = connectivityManager?.activeNetwork
+            ?: return URL(url).openConnection() as HttpURLConnection
+        return network.openConnection(URL(url)) as HttpURLConnection
     }
 
     private fun compareReleaseVersion(remoteTagName: String, localVersion: VersionDescriptor): Int {
