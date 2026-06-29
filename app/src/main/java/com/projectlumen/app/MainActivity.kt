@@ -27,6 +27,9 @@ class MainActivity : ComponentActivity() {
                             export = app.export,
                             startTimerService = app::startTimerService,
                             stopTimerService = app::stopTimerService,
+                            scheduleProximityMonitoring = app::scheduleProximityMonitoring,
+                            cancelProximityMonitoring = app::cancelProximityMonitoring,
+                            calibrateProximityMonitoring = app::calibrateProximityMonitoring,
                         ) as T
                     }
                 },

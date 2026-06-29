@@ -2,7 +2,7 @@
 <resources>
     <style name="Theme.ProjectLumen" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:navigationBarColor">#FAFAFA</item>
-        <item name="android:statusBarColor">#FAFAFA</item>
+        <item name="android:navigationBarColor">#F8FAF7</item>
+        <item name="android:statusBarColor">#F8FAF7</item>
     </style>
 </resources>

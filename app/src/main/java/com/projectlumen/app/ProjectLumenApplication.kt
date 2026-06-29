@@ -10,6 +10,7 @@ import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
 import com.projectlumen.app.core.services.TimerForegroundService
+import com.projectlumen.app.core.proximity.ProximityDetectionWorker
 
 class ProjectLumenApplication : Application() {
     val database: AppDatabase by lazy { AppDatabase.create(this) }
@@ -34,5 +35,17 @@ class ProjectLumenApplication : Application() {
 
     fun stopTimerService() {
         stopService(Intent(this, TimerForegroundService::class.java))
+    }
+
+    fun scheduleProximityMonitoring() {
+        ProximityDetectionWorker.enqueueNext(this)
+    }
+
+    fun cancelProximityMonitoring() {
+        ProximityDetectionWorker.cancel(this)
+    }
+
+    fun calibrateProximityMonitoring() {
+        ProximityDetectionWorker.enqueueCalibration(this)
     }
 }

@@ -14,6 +14,7 @@ data class TipTemplateEntity(
     val primaryColor: String = "#246B73",
     val titleText: String = "Time to rest",
     val subtitleText: String = "Look away from the screen and relax your eyes.",
+    val imagePath: String = "",
     val showSkipButton: Boolean = true,
     val layoutJson: String = "{}",
     val sortOrder: Int = 0,

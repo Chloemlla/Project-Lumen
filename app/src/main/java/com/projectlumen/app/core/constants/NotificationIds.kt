@@ -7,4 +7,6 @@ object NotificationIds {
     const val BREAK_DONE = 1003
     const val POMODORO = 2001
     const val STOP_TIMER_ACTION = 9010
+    const val PROXIMITY_FOREGROUND = 9101
+    const val PROXIMITY_WARNING = 9102
 }

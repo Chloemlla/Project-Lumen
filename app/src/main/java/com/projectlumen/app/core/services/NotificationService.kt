@@ -42,6 +42,11 @@ class NotificationService(private val context: Context) {
                     context.getString(R.string.channel_status),
                     NotificationManager.IMPORTANCE_LOW,
                 ),
+                NotificationChannel(
+                    NotificationChannels.PROXIMITY,
+                    context.getString(R.string.channel_proximity),
+                    NotificationManager.IMPORTANCE_HIGH,
+                ),
             ),
         )
     }
@@ -156,6 +161,31 @@ class NotificationService(private val context: Context) {
             .build()
     }
 
+    fun buildProximityForegroundNotification(): Notification {
+        return NotificationCompat.Builder(context, NotificationChannels.PROXIMITY)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(context.getString(R.string.proximity_check_running_title))
+            .setContentText(context.getString(R.string.proximity_check_running_message))
+            .setContentIntent(openAppPendingIntent(NotificationIds.PROXIMITY_FOREGROUND))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+    fun showProximityWarning(ratioPercent: Int) {
+        show(
+            id = NotificationIds.PROXIMITY_WARNING,
+            channel = NotificationChannels.PROXIMITY,
+            title = context.getString(R.string.proximity_warning_title),
+            message = context.getString(R.string.proximity_warning_message, ratioPercent),
+            priority = NotificationCompat.PRIORITY_HIGH,
+            includeBreakActions = true,
+            fullScreen = true,
+        )
+    }
+
     fun showOngoingStatus(state: RuntimeStateEntity) {
         if (!canPostNotifications()) return
         try {
@@ -225,6 +255,7 @@ class NotificationService(private val context: Context) {
         message: String,
         priority: Int,
         includeBreakActions: Boolean,
+        fullScreen: Boolean = false,
     ) {
         if (!canPostNotifications()) return
         val builder = NotificationCompat.Builder(context, channel)
@@ -234,6 +265,10 @@ class NotificationService(private val context: Context) {
             .setContentIntent(openAppPendingIntent(id))
             .setAutoCancel(true)
             .setPriority(priority)
+            .setCategory(if (fullScreen) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
+        if (fullScreen) {
+            builder.setFullScreenIntent(openAppPendingIntent(id + 100), true)
+        }
         if (includeBreakActions) {
             builder.addAction(
                 R.drawable.ic_launcher_foreground,

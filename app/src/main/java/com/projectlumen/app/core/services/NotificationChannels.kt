@@ -4,4 +4,5 @@ object NotificationChannels {
     const val REMINDER = "reminder"
     const val POMODORO = "pomodoro"
     const val STATUS = "status"
+    const val PROXIMITY = "proximity"
 }

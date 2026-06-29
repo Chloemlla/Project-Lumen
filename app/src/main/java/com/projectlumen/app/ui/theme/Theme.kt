@@ -13,11 +13,19 @@ private val LightColors = lightColorScheme(
     primaryContainer = LumenTealContainer,
     onPrimaryContainer = LumenOnTealContainer,
     secondary = LumenCoral,
+    onSecondary = LumenOnCoral,
+    secondaryContainer = LumenCoralContainer,
+    onSecondaryContainer = LumenOnCoralContainer,
     tertiary = LumenIndigo,
+    onTertiary = LumenOnIndigo,
+    tertiaryContainer = LumenIndigoContainer,
+    onTertiaryContainer = LumenOnIndigoContainer,
     surface = LumenSurface,
     surfaceVariant = LumenSurfaceVariant,
     surfaceContainer = LumenSurfaceContainer,
     background = LumenBackground,
+    outline = LumenOutline,
+    outlineVariant = LumenOutlineVariant,
 )
 
 private val DarkColors = darkColorScheme(
@@ -26,11 +34,19 @@ private val DarkColors = darkColorScheme(
     primaryContainer = LumenTealContainerDark,
     onPrimaryContainer = LumenOnTealContainerDark,
     secondary = LumenCoralDark,
+    onSecondary = LumenOnCoralDark,
+    secondaryContainer = LumenCoralContainerDark,
+    onSecondaryContainer = LumenOnCoralContainerDark,
     tertiary = LumenIndigoDark,
+    onTertiary = LumenOnIndigoDark,
+    tertiaryContainer = LumenIndigoContainerDark,
+    onTertiaryContainer = LumenOnIndigoContainerDark,
     surface = LumenSurfaceDark,
     surfaceVariant = LumenSurfaceVariantDark,
     surfaceContainer = LumenSurfaceContainerDark,
     background = LumenBackgroundDark,
+    outline = LumenOutlineDark,
+    outlineVariant = LumenOutlineVariantDark,
 )
 
 @Composable

@@ -13,6 +13,7 @@ import com.projectlumen.app.core.time.todayKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlin.math.max
 
 class ReminderActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -33,9 +34,11 @@ class ReminderActionReceiver : BroadcastReceiver() {
                                 reminderPhase = ReminderPhase.RESTING.name,
                                 breakStartedAt = now,
                                 breakEndAt = now + settings.restDurationSeconds * 1000L,
+                                lastStatsTickAt = now,
                                 updatedAt = now,
                             )
                             db.runtimeStateDao().upsert(next)
+                            if (settings.keepAliveEnabled) app.startTimerService()
                             if (settings.notificationEnabled) {
                                 app.notifications.scheduleBreakDone(next.breakEndAt)
                                 app.notifications.showOngoingStatus(next)
@@ -59,9 +62,11 @@ class ReminderActionReceiver : BroadcastReceiver() {
                                 reminderStartedAt = now,
                                 nextPreAlertAt = preAlertAt.coerceAtLeast(now),
                                 nextReminderAt = reminderAt,
+                                lastStatsTickAt = now,
                                 updatedAt = now,
                             )
                             db.runtimeStateDao().upsert(next)
+                            if (settings.keepAliveEnabled) app.startTimerService()
                             if (settings.notificationEnabled) {
                                 app.notifications.scheduleReminder(next.nextPreAlertAt, next.nextReminderAt)
                                 app.notifications.showOngoingStatus(next)
@@ -86,7 +91,8 @@ class ReminderActionReceiver : BroadcastReceiver() {
         runtime: RuntimeStateEntity,
         now: Long,
     ) {
-        val seconds = now.coerceElapsedSecondsSince(runtime.reminderStartedAt)
+        if (db.appSettingsDao().get()?.statsEnabled == false) return
+        val seconds = now.coerceElapsedSecondsSince(max(runtime.reminderStartedAt, runtime.lastStatsTickAt))
         if (seconds <= 0L) return
         incrementEyeStats(db, now) { it.copy(workingSeconds = it.workingSeconds + seconds) }
     }
@@ -96,6 +102,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
         now: Long,
         transform: (DailyEyeStatsEntity) -> DailyEyeStatsEntity,
     ) {
+        if (db.appSettingsDao().get()?.statsEnabled == false) return
         val date = todayKey(now)
         val current = db.dailyEyeStatsDao().get(date) ?: DailyEyeStatsEntity(statDate = date)
         db.dailyEyeStatsDao().upsert(transform(current).copy(updatedAt = now))

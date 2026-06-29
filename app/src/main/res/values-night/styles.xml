@@ -2,7 +2,7 @@
 <resources>
     <style name="Theme.ProjectLumen" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:navigationBarColor">#111318</item>
-        <item name="android:statusBarColor">#111318</item>
+        <item name="android:navigationBarColor">#0C1210</item>
+        <item name="android:statusBarColor">#0C1210</item>
     </style>
 </resources>

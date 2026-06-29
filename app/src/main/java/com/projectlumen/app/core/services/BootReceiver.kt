@@ -19,6 +19,12 @@ class BootReceiver : BroadcastReceiver() {
                 val app = context.applicationContext as ProjectLumenApplication
                 val settings = app.database.appSettingsDao().get()
                 val runtime = app.database.runtimeStateDao().get()
+                if (settings?.proximityMonitoringEnabled == true) {
+                    app.scheduleProximityMonitoring()
+                }
+                if (settings?.keepAliveEnabled == true && runtime?.activeEngine != ActiveEngine.IDLE.name) {
+                    app.startTimerService()
+                }
                 if (settings?.notificationEnabled == true && runtime?.activeEngine == ActiveEngine.REMINDER.name) {
                     when (runtime.reminderPhase) {
                         ReminderPhase.WORKING.name,

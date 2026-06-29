@@ -25,5 +25,13 @@ data class RuntimeStateEntity(
     val suspendedUntil: Long = 0L,
     val lastForegroundAt: Long = 0L,
     val lastBackgroundAt: Long = 0L,
+    val lastStatsTickAt: Long = 0L,
+    val proximityMonitoringActive: Boolean = false,
+    val proximityTooClose: Boolean = false,
+    val proximityLastFaceAt: Long = 0L,
+    val proximityCloseStartedAt: Long = 0L,
+    val proximityCloseTickAt: Long = 0L,
+    val proximityLastWarningAt: Long = 0L,
+    val proximityLastRatioPercent: Int = 0,
     val updatedAt: Long = System.currentTimeMillis(),
 )
