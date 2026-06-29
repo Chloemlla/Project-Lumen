@@ -209,12 +209,17 @@ private enum class SystemBackgroundColor(
 private val LumenCardShape = RoundedCornerShape(8.dp)
 @Composable
 private fun LumenCardElevation() = CardDefaults.cardElevation(
-    defaultElevation = 0.dp,
+    defaultElevation = 1.dp,
     pressedElevation = 0.dp,
-    focusedElevation = 0.dp,
-    hoveredElevation = 0.dp,
-    draggedElevation = 0.dp,
+    focusedElevation = 1.dp,
+    hoveredElevation = 2.dp,
+    draggedElevation = 3.dp,
     disabledElevation = 0.dp,
+)
+
+@Composable
+private fun LumenCardColors() = CardDefaults.cardColors(
+    containerColor = MaterialTheme.colorScheme.surfaceContainer,
 )
 
 @Composable
@@ -408,11 +413,12 @@ fun ProjectLumenApp(
                         )
                     }
                     composable(Destination.TEMPLATES.route) { TemplatesScreen(uiState, viewModel) }
-                    composable(Destination.ABOUT.route) { AboutScreen() }
+                    composable(Destination.ABOUT.route) { AboutScreen(viewModel) }
                 }
             }
                     if (updateDialogState !is UpdateDialogState.Hidden) {
                 UpdateDialog(
+                    viewModel = viewModel,
                     state = updateDialogState,
                     downloadingUpdate = downloadingUpdate,
                     downloadProgressBytes = downloadProgressBytes,
@@ -456,6 +462,7 @@ private fun CrashReportScreen(report: CrashReport) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = LumenCardShape,
+            colors = LumenCardColors(),
             elevation = LumenCardElevation(),
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -506,6 +513,7 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
             shape = LumenCardShape,
+            colors = LumenCardColors(),
             elevation = LumenCardElevation(),
         ) {
             Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -632,6 +640,7 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
             shape = LumenCardShape,
+            colors = LumenCardColors(),
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionHeader(Icons.Outlined.LocalCafe, R.string.section_pomodoro)
@@ -818,6 +827,7 @@ private fun TrendCard(uiState: ProjectLumenUiState) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
+        colors = LumenCardColors(),
         elevation = LumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -880,6 +890,7 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                     .border(1.dp, borderColor, LumenCardShape)
                     .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
                 shape = LumenCardShape,
+                colors = LumenCardColors(),
                 elevation = LumenCardElevation(),
             ) {
                 Column(
@@ -916,7 +927,7 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
 
 @Composable
 private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation()) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = LumenCardColors(), elevation = LumenCardElevation()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Style, R.string.system_background_color)
             LumenFlowRow {
@@ -941,24 +952,25 @@ private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: Proje
 }
 
 @Composable
-private fun AboutScreen() {
+private fun AboutScreen(viewModel: ProjectLumenViewModel) {
     val versionLabel = rememberBuildVersionLabel()
 
     LumenPage {
         AboutHeroCard(versionLabel = versionLabel)
-        AboutLinksCard()
+        AboutLinksCard(viewModel)
     }
 }
 
 @Composable
 private fun AboutHeroCard(versionLabel: String) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-        shape = LumenCardShape,
-        elevation = LumenCardElevation(),
-    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            shape = LumenCardShape,
+            colors = LumenCardColors(),
+            elevation = LumenCardElevation(),
+        ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(Icons.Outlined.Info, R.string.app_name)
             Text(versionLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
@@ -972,12 +984,12 @@ private fun AboutHeroCard(versionLabel: String) {
 }
 
 @Composable
-private fun AboutLinksCard() {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation()) {
+private fun AboutLinksCard(viewModel: ProjectLumenViewModel) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = LumenCardColors(), elevation = LumenCardElevation()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
-            ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL)
-            ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL)
+            ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL, viewModel)
+            ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL, viewModel)
         }
     }
 }
@@ -988,7 +1000,7 @@ private fun AboutUpdateCard(
     manualCheckError: String?,
     onManualCheck: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation()) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = LumenCardColors(), elevation = LumenCardElevation()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Sync, R.string.about_update_status)
             if (checkingUpdate) {
@@ -1005,8 +1017,7 @@ private fun AboutUpdateCard(
 }
 
 @Composable
-private fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String) {
-    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<ProjectLumenViewModel>()
+private fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String, viewModel: ProjectLumenViewModel) {
     var pendingUrl by remember { mutableStateOf<String?>(null) }
     OutlinedButton(onClick = { pendingUrl = url }) {
         Icon(icon, contentDescription = null)
@@ -1037,6 +1048,7 @@ private fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: In
 
 @Composable
 private fun UpdateDialog(
+    viewModel: ProjectLumenViewModel,
     state: UpdateDialogState,
     downloadingUpdate: Boolean,
     downloadProgressBytes: Long,
@@ -1047,7 +1059,6 @@ private fun UpdateDialog(
     onError: (String) -> Unit,
     updateInstaller: UpdateInstaller,
 ) {
-    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<ProjectLumenViewModel>()
     val context = LocalContext.current
     var pendingReleaseUrl by remember { mutableStateOf<String?>(null) }
     val showReleaseInfo: @Composable (ReleaseInfo, BuildMetadata, UpdateCandidate?) -> Unit = { release, current, candidate ->
@@ -1218,13 +1229,14 @@ private fun UpdateDialog(
 }
 @Composable
 private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-        shape = LumenCardShape,
-        elevation = LumenCardElevation(),
-    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            shape = LumenCardShape,
+            colors = LumenCardColors(),
+            elevation = LumenCardElevation(),
+        ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.NotificationsActive, R.string.current_state)
             AnimatedContent(
@@ -1322,12 +1334,13 @@ private fun TimerCard(label: String, seconds: Long, progress: Float, fallbackTex
         label = "timerPulseScale",
     )
     val pulse = if (running) pulseScale else 1f
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-        shape = LumenCardShape,
-    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            shape = LumenCardShape,
+            colors = LumenCardColors(),
+        ) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(label, style = MaterialTheme.typography.titleMedium)
             Box(
