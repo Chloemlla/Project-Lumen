@@ -81,13 +81,7 @@ jobs:
           mkdir -p release-assets
           VERSION="${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
           APK_DIR="app/build/outputs/apk/release"
-          AGGREGATED_APK=""
-
-          if [ -f "$APK_DIR/app-release.apk" ]; then
-            AGGREGATED_APK="$APK_DIR/app-release.apk"
-          elif [ -f "$APK_DIR/app-release-unsigned.apk" ]; then
-            AGGREGATED_APK="$APK_DIR/app-release-unsigned.apk"
-          fi
+          AGGREGATED_APK="$(find "$APK_DIR" -maxdepth 1 -type f \( -name "app-release.apk" -o -name "app-release-unsigned.apk" \) | head -n 1)"
 
           if [ -z "$AGGREGATED_APK" ]; then
             echo "Aggregated release APK was not found."
@@ -97,16 +91,12 @@ jobs:
 
           cp "$AGGREGATED_APK" "release-assets/Project-Lumen_android_${VERSION}.apk"
 
-          for variant in universal armeabi-v7a arm64-v8a x86 x86_64; do
-            VARIANT_APK=$(find app/build/outputs/apk/release -type f \( -name "*${variant}*.apk" -o -name "*${variant}*release*.apk" \) | head -n 1)
-            if [ -n "$VARIANT_APK" ] && [ "$VARIANT_APK" != "$AGGREGATED_APK" ]; then
+          for variant in armeabi-v7a arm64-v8a x86 x86_64; do
+            VARIANT_APK="$(find "$APK_DIR" -maxdepth 2 -type f \( -name "*${variant}*.apk" -o -name "*${variant}*release*.apk" \) | head -n 1)"
+            if [ -n "$VARIANT_APK" ]; then
               cp "$VARIANT_APK" "release-assets/Project-Lumen_android_${VERSION}_${variant}.apk"
             fi
           done
-
-          if [ -f "release-assets/Project-Lumen_android_${VERSION}.apk" ]; then
-            cp "release-assets/Project-Lumen_android_${VERSION}.apk" "release-assets/Project-Lumen_android_${VERSION}_universal.apk"
-          fi
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4

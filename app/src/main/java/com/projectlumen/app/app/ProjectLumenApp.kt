@@ -156,6 +156,7 @@ private const val PROJECT_LUMEN_REPO_URL = "https://github.com/Chloemlla/Project
 private const val PROJECT_LUMEN_RELEASES_URL = "https://github.com/Chloemlla/Project-Lumen/releases/latest"
 private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases"
 private const val PROJECT_LUMEN_APK_MIME = "application/vnd.android.package-archive"
+private const val PREFERRED_AGGREGATED_ASSET_NAME = "Project-Lumen_android_aggregated.apk"
 private val crashDetailsTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
 private enum class Destination(
@@ -1418,14 +1419,7 @@ private fun fetchLatestUpdateInfo(): UpdateInfo? {
         val createdAt = latest.extractJsonString("created_at") ?: return null
         val createdAtMillis = runCatching { Instant.parse(createdAt).toEpochMilli() }.getOrNull() ?: return null
         val assets = latest.extractArrayObjects("assets")
-        val apk = assets.asSequence()
-            .mapNotNull { asset ->
-                val name = asset.extractJsonString("name") ?: return@mapNotNull null
-                val url = asset.extractJsonString("browser_download_url") ?: return@mapNotNull null
-                if (!name.contains("android", ignoreCase = true) && !name.endsWith(".apk", ignoreCase = true)) return@mapNotNull null
-                UpdateAsset(name, url)
-            }
-            .firstOrNull() ?: return null
+        val apk = selectPreferredAsset(assets) ?: return null
         return UpdateInfo(
             tagName = tagName,
             releaseName = releaseName,
@@ -1504,6 +1498,19 @@ private fun String.extractFirstArrayObject(): String? {
         }
     }
     return null
+}
+
+private fun selectPreferredAsset(assets: List<String>): UpdateAsset? {
+    val parsed = assets.mapNotNull { asset ->
+        val name = asset.extractJsonString("name") ?: return@mapNotNull null
+        val url = asset.extractJsonString("browser_download_url") ?: return@mapNotNull null
+        UpdateAsset(name, url)
+    }
+    return parsed.firstOrNull { it.name.equals(PREFERRED_AGGREGATED_ASSET_NAME, ignoreCase = true) }
+        ?: parsed.firstOrNull { it.name.endsWith("_universal.apk", ignoreCase = true) }
+        ?: parsed.firstOrNull { it.name.contains("universal", ignoreCase = true) }
+        ?: parsed.firstOrNull { it.name.contains("android", ignoreCase = true) && it.name.endsWith(".apk", ignoreCase = true) }
+        ?: parsed.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
 }
 
 private data class UpdateInfo(

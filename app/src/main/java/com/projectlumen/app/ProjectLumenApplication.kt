@@ -72,14 +72,7 @@ class ProjectLumenApplication : Application() {
             ?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() }
             ?: return null
         val assets = latest.extractArrayObjects("assets")
-        val asset = assets.asSequence()
-            .mapNotNull { asset ->
-                val name = asset.extractJsonString("name") ?: return@mapNotNull null
-                val url = asset.extractJsonString("browser_download_url") ?: return@mapNotNull null
-                if (!name.contains("android", ignoreCase = true) && !name.endsWith(".apk", ignoreCase = true)) return@mapNotNull null
-                ReleaseAsset(name = name, url = url)
-            }
-            .firstOrNull() ?: return null
+        val asset = selectPreferredAsset(assets) ?: return null
         return ReleaseInfo(
             tagName = tagName,
             releaseName = releaseName,
@@ -95,15 +88,11 @@ class ProjectLumenApplication : Application() {
         return regex.find(this)?.groupValues?.getOrNull(1)?.replace("\\\"", "\"")?.replace("\\\\", "\\")
     }
 
-    private fun String.extractArrayObjects(key: String): List<String> {
-        val marker = "\"$key\":"
-        val start = indexOf(marker)
-        if (start < 0) return emptyList()
-        val arrayStart = indexOf('[', start)
-        if (arrayStart < 0) return emptyList()
+    private fun String.extractFirstArrayObject(): String? {
+        val arrayStart = indexOf('[')
+        if (arrayStart < 0) return null
         var depth = 0
         var currentStart = -1
-        val objects = mutableListOf<String>()
         for (i in arrayStart until length) {
             when (this[i]) {
                 '{' -> {
@@ -112,20 +101,11 @@ class ProjectLumenApplication : Application() {
                 }
                 '}' -> {
                     depth--
-                    if (depth == 0 && currentStart >= 0) {
-                        objects += substring(currentStart, i + 1)
-                        currentStart = -1
-                    }
+                    if (depth == 0 && currentStart >= 0) return substring(currentStart, i + 1)
                 }
-                ']' -> if (depth == 0) break
             }
         }
-        return objects
-    }
-
-    private fun String.extractFirstArrayObject(): String? {
-        val objects = extractArrayObjects("")
-        return objects.firstOrNull()
+        return null
     }
 
     private fun String.extractArrayObjects(key: String): List<String> {
@@ -155,6 +135,20 @@ class ProjectLumenApplication : Application() {
         }
         return objects
     }
+
+    private fun selectPreferredAsset(assets: List<String>): ReleaseAsset? {
+        val parsed = assets.mapNotNull { asset ->
+            val name = asset.extractJsonString("name") ?: return@mapNotNull null
+            val url = asset.extractJsonString("browser_download_url") ?: return@mapNotNull null
+            ReleaseAsset(name = name, url = url)
+        }
+        return parsed.firstOrNull { it.name.equals(PREFERRED_AGGREGATED_ASSET_NAME, ignoreCase = true) }
+            ?: parsed.firstOrNull { it.name.endsWith("_universal.apk", ignoreCase = true) }
+            ?: parsed.firstOrNull { it.name.contains("universal", ignoreCase = true) }
+            ?: parsed.firstOrNull { it.name.contains("android", ignoreCase = true) && it.name.endsWith(".apk", ignoreCase = true) }
+            ?: parsed.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
+    }
+
     private data class ReleaseInfo(
         val tagName: String,
         val releaseName: String,
@@ -168,5 +162,6 @@ class ProjectLumenApplication : Application() {
 
     private companion object {
         const val PROJECT_LUMEN_RELEASES_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases"
+        const val PREFERRED_AGGREGATED_ASSET_NAME = "Project-Lumen_android_aggregated.apk"
     }
 }
