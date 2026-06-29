@@ -83,6 +83,7 @@ class UpdateChecker(
     private fun normalizeVersion(value: String): SemanticVersion? {
         val cleaned = value.trim()
             .removePrefix("v")
+            .removePrefix("V")
             .substringBefore('-')
             .substringBefore('+')
         val parts = cleaned.split('.')

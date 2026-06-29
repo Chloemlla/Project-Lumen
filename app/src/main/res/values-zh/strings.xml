@@ -68,8 +68,11 @@
     <string name="about_update_failed_title">检查更新失败</string>
     <string name="about_external_link_prompt_title">打开外部链接？</string>
     <string name="about_external_link_prompt_message">这将打开浏览器并跳转到外部网站。</string>
-    <string name="about_download_prompt_title">打开下载链接？</string>
-    <string name="about_download_prompt_message">这将打开浏览器或下载处理器来获取 APK。</string>
+    <string name="about_download_prompt_title">下载更新？</string>
+    <string name="about_download_prompt_message">这会在应用内下载 APK，然后打开系统安装器。</string>
+    <string name="about_install_permission_prompt_title">允许安装应用？</string>
+    <string name="about_install_permission_prompt_message">Android 需要先允许本应用打开已下载 APK 的安装器。</string>
+    <string name="about_install_now">立即安装</string>
     <string name="auto_update_check">自动检查更新</string>
     <string name="section_general">通用</string>
     <string name="section_reminder">提醒</string>

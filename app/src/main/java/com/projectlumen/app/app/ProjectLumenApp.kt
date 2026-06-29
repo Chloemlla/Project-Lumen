@@ -145,9 +145,11 @@ import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.update.BuildMetadata
 import com.projectlumen.app.core.update.ReleaseAsset
 import com.projectlumen.app.core.update.ReleaseInfo
+import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -204,10 +206,15 @@ fun ProjectLumenApp(
     val baseContext = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val updateChecker = remember { UpdateChecker(PROJECT_LUMEN_RELEASE_API) }
+    val updateInstaller = remember { UpdateInstaller(baseContext) }
     var checkingUpdate by remember { mutableStateOf(false) }
+    var downloadingUpdate by remember { mutableStateOf(false) }
     var manualUpdateError by remember { mutableStateOf<String?>(null) }
+    var downloadError by remember { mutableStateOf<String?>(null) }
     var updateCandidate by remember { mutableStateOf<UpdateCandidate?>(null) }
     var updateDialogVisible by remember { mutableStateOf(false) }
+    var installPermissionPromptVisible by remember { mutableStateOf(false) }
+    var installPermissionPromptFile by remember { mutableStateOf<File?>(null) }
     var autoCheckStarted by rememberSaveable { mutableStateOf(false) }
 
     fun triggerUpdateCheck(manual: Boolean) {
@@ -229,6 +236,32 @@ fun ProjectLumenApp(
                 if (!manual) autoCheckStarted = true
             }
         }
+    }
+
+    fun triggerUpdateDownload(asset: ReleaseAsset) {
+        coroutineScope.launch {
+            downloadingUpdate = true
+            downloadError = null
+            val result = withContext(Dispatchers.IO) {
+                runCatching { updateInstaller.downloadApk(asset) }
+            }
+            downloadingUpdate = false
+            result.onSuccess { file ->
+                startInstallIfAllowed(file)
+            }.onFailure { throwable ->
+                downloadError = throwable.message ?: "Update download failed."
+            }
+        }
+    }
+
+    fun startInstallIfAllowed(file: File) {
+        if (updateInstaller.canInstallPackages()) {
+            runCatching { updateInstaller.installApk(file) }
+                .onFailure { downloadError = it.message ?: "Unable to open installer." }
+            return
+        }
+        installPermissionPromptFile = file
+        installPermissionPromptVisible = true
     }
 
     LaunchedEffect(uiState.settings.languageCode) {
@@ -345,7 +378,9 @@ fun ProjectLumenApp(
             if (updateDialogVisible && updateCandidate != null) {
                 UpdateDialog(
                     candidate = updateCandidate!!,
+                    downloadingUpdate = downloadingUpdate,
                     onDismiss = { updateDialogVisible = false },
+                    onDownloadUpdate = { asset -> triggerUpdateDownload(asset) },
                 )
             }
             if (manualUpdateError != null) {
@@ -356,6 +391,47 @@ fun ProjectLumenApp(
                     confirmButton = {
                         OutlinedButton(onClick = { manualUpdateError = null }) {
                             Text(stringResource(android.R.string.ok))
+                        }
+                    },
+                )
+            }
+            if (downloadError != null) {
+                AlertDialog(
+                    onDismissRequest = { downloadError = null },
+                    title = { Text(stringResource(R.string.about_update_failed_title)) },
+                    text = { Text(downloadError.orEmpty()) },
+                    confirmButton = {
+                        OutlinedButton(onClick = { downloadError = null }) {
+                            Text(stringResource(android.R.string.ok))
+                        }
+                    },
+                )
+            }
+            if (installPermissionPromptVisible) {
+                AlertDialog(
+                    onDismissRequest = {
+                        installPermissionPromptVisible = false
+                        installPermissionPromptFile = null
+                    },
+                    title = { Text(stringResource(R.string.about_install_permission_prompt_title)) },
+                    text = { Text(stringResource(R.string.about_install_permission_prompt_message)) },
+                    confirmButton = {
+                        OutlinedButton(onClick = {
+                            installPermissionPromptVisible = false
+                            installPermissionPromptFile?.let {
+                                runCatching { baseContext.startActivity(updateInstaller.createInstallPermissionIntent()) }
+                                    .onFailure { downloadError = it.message ?: "Unable to open install settings." }
+                            }
+                        }) {
+                            Text(stringResource(R.string.about_install_now))
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(onClick = {
+                            installPermissionPromptVisible = false
+                            installPermissionPromptFile = null
+                        }) {
+                            Text(stringResource(android.R.string.cancel))
                         }
                     },
                 )
@@ -963,7 +1039,12 @@ private fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: In
 }
 
 @Composable
-private fun UpdateDialog(candidate: UpdateCandidate, onDismiss: () -> Unit) {
+private fun UpdateDialog(
+    candidate: UpdateCandidate,
+    downloadingUpdate: Boolean,
+    onDismiss: () -> Unit,
+    onDownloadUpdate: (ReleaseAsset) -> Unit,
+) {
     val context = LocalContext.current
     val release = candidate.release
     val targetAsset = candidate.matchedAsset ?: chooseFallbackAsset(release.assets)
@@ -971,7 +1052,6 @@ private fun UpdateDialog(candidate: UpdateCandidate, onDismiss: () -> Unit) {
     val publishTime = Instant.ofEpochMilli(release.publishedAtUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
     val buildTime = Instant.ofEpochMilli(current.buildTimeUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
     val primaryActionLabel = if (targetAsset != null) R.string.about_download_update else R.string.about_open_release
-    var pendingDownloadUrl by remember { mutableStateOf<String?>(null) }
     var pendingReleaseUrl by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
@@ -993,38 +1073,21 @@ private fun UpdateDialog(candidate: UpdateCandidate, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            OutlinedButton(onClick = {
-                if (targetAsset != null) {
-                    pendingDownloadUrl = targetAsset.downloadUrl
-                } else {
-                    pendingReleaseUrl = release.htmlUrl.ifBlank { PROJECT_LUMEN_RELEASES_BASE_URL }
-                }
-            }) {
+            OutlinedButton(
+                enabled = !downloadingUpdate,
+                onClick = {
+                    if (targetAsset != null) {
+                        onDownloadUpdate(targetAsset)
+                    } else {
+                        pendingReleaseUrl = release.htmlUrl.ifBlank { PROJECT_LUMEN_RELEASES_BASE_URL }
+                    }
+                },
+            ) {
                 ButtonLabel(Icons.Outlined.FileDownload, primaryActionLabel)
             }
         },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
     )
-    pendingDownloadUrl?.let { url ->
-        AlertDialog(
-            onDismissRequest = { pendingDownloadUrl = null },
-            title = { Text(stringResource(R.string.about_download_prompt_title)) },
-            text = { Text(stringResource(R.string.about_download_prompt_message)) },
-            confirmButton = {
-                OutlinedButton(onClick = {
-                    pendingDownloadUrl = null
-                    openUrl(context, url)
-                }) {
-                    Text(stringResource(R.string.about_download_update))
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { pendingDownloadUrl = null }) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            },
-        )
-    }
     pendingReleaseUrl?.let { url ->
         AlertDialog(
             onDismissRequest = { pendingReleaseUrl = null },

@@ -68,8 +68,11 @@
     <string name="about_update_failed_title">Update check failed</string>
     <string name="about_external_link_prompt_title">Open external link?</string>
     <string name="about_external_link_prompt_message">This will open your browser to an external website.</string>
-    <string name="about_download_prompt_title">Open download?</string>
-    <string name="about_download_prompt_message">This will open your browser or download handler to fetch the APK.</string>
+    <string name="about_download_prompt_title">Download update?</string>
+    <string name="about_download_prompt_message">This will download the APK inside the app and then open the system installer.</string>
+    <string name="about_install_permission_prompt_title">Allow app installs?</string>
+    <string name="about_install_permission_prompt_message">Android needs permission before this app can open the installer for downloaded APK files.</string>
+    <string name="about_install_now">Install now</string>
     <string name="auto_update_check">Auto update check</string>
     <string name="section_general">General</string>
     <string name="section_reminder">Reminder</string>
