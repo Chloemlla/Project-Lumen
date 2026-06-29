@@ -109,10 +109,10 @@ class ProjectLumenApplication : Application() {
     }
 
     private fun String.extractArrayObjects(key: String): List<String> {
-        val marker = if (key.isBlank()) "[" else "\"$key\":"
+        val marker = "\"$key\":"
         val start = indexOf(marker)
         if (start < 0) return emptyList()
-        val arrayStart = if (key.isBlank()) start else indexOf('[', start)
+        val arrayStart = indexOf('[', start)
         if (arrayStart < 0) return emptyList()
         var depth = 0
         var currentStart = -1
