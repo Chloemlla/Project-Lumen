@@ -1194,11 +1194,7 @@ private fun LumenFlowRow(content: @Composable () -> Unit) {
 private fun LanguageChip(@StringRes labelRes: Int, code: String, settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
     FilterChip(
         selected = LocaleController.normalize(settings.languageCode) == LocaleController.normalize(code),
-        onClick = {
-            viewModel.updateSettings {
-                it.copy(languageCode = LocaleController.normalize(code))
-            }
-        },
+        onClick = { viewModel.setLanguageCode(code) },
         label = { Text(stringResource(labelRes)) },
     )
 }

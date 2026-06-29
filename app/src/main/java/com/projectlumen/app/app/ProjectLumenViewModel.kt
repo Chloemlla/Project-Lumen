@@ -13,6 +13,7 @@ import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
+import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
@@ -291,6 +292,14 @@ class ProjectLumenViewModel(
         updateSettings { it.copy(activeTipTemplateId = templateId) }
     }
 
+    fun setLanguageCode(languageCode: String) {
+        viewModelScope.launch {
+            val normalized = LocaleController.normalize(languageCode)
+            val current = settingsDao.get() ?: AppSettingsEntity()
+            settingsDao.upsert(current.copy(languageCode = normalized, updatedAt = System.currentTimeMillis()))
+        }
+    }
+
     fun updateTemplateSystemBackground(template: TipTemplateEntity, backgroundValue: String, primaryColor: String) {
         viewModelScope.launch {
             tipTemplatesDao.upsert(
@@ -559,6 +568,9 @@ class ProjectLumenViewModel(
     }
 
     fun setThemeMode(mode: AppThemeMode) {
-        updateSettings { it.copy(themeMode = mode.name) }
+        viewModelScope.launch {
+            val current = settingsDao.get() ?: AppSettingsEntity()
+            settingsDao.upsert(current.copy(themeMode = mode.name, updatedAt = System.currentTimeMillis()))
+        }
     }
 }
