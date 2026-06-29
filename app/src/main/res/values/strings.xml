@@ -56,7 +56,10 @@
     <string name="about_download_update">Download update</string>
     <string name="about_open_release">Open release</string>
     <string name="about_update_status">Update status</string>
+    <string name="about_update_checking_title">Checking for updates</string>
     <string name="about_update_checking">Checking GitHub releases...</string>
+    <string name="about_update_up_to_date_title">Already up to date</string>
+    <string name="about_update_up_to_date_message">Your installed version is already the latest release.</string>
     <string name="about_update_found">Latest release: %1$s</string>
     <string name="about_update_unavailable">No update data available right now.</string>
     <string name="about_update_current_version">Current version: %1$s (%2$s)</string>
@@ -64,6 +67,7 @@
     <string name="about_update_publish_time">Published: %1$s</string>
     <string name="about_update_release_notes">Release notes: %1$s</string>
     <string name="about_update_time_fallback">This release is newer by published time even if the version string looks lower.</string>
+    <string name="about_update_downloading_title">Downloading update</string>
     <string name="about_update_downloading">Downloading update...</string>
     <string name="about_update_downloading_progress">Downloading update... %1$d%%</string>
     <string name="about_update_failed_title">Update check failed</string>
@@ -73,6 +77,7 @@
     <string name="about_download_prompt_message">This will download the APK inside the app and then open the system installer.</string>
     <string name="about_install_permission_prompt_title">Allow app installs?</string>
     <string name="about_install_permission_prompt_message">Android needs permission before this app can open the installer for downloaded APK files.</string>
+    <string name="about_update_grant_permission">Open settings</string>
     <string name="about_install_now">Install now</string>
     <string name="auto_update_check">Auto update check</string>
     <string name="section_general">General</string>

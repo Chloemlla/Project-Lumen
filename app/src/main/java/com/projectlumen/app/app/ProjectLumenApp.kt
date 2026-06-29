@@ -82,10 +82,10 @@ import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -167,6 +167,16 @@ private const val PROJECT_LUMEN_RELEASES_BASE_URL = "https://github.com/Chloemll
 private val crashDetailsTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 private val updateDialogTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
+private sealed interface UpdateDialogState {
+    data object Hidden : UpdateDialogState
+    data object Checking : UpdateDialogState
+    data class UpdateAvailable(val candidate: UpdateCandidate) : UpdateDialogState
+    data object NoUpdate : UpdateDialogState
+    data class Downloading(val candidate: UpdateCandidate, val asset: ReleaseAsset) : UpdateDialogState
+    data class InstallAuthorization(val candidate: UpdateCandidate, val file: File) : UpdateDialogState
+    data class Error(val message: String) : UpdateDialogState
+}
+
 private enum class Destination(
     val route: String,
     @StringRes val labelRes: Int,
@@ -194,6 +204,14 @@ private enum class SystemBackgroundColor(
 }
 
 private val LumenCardShape = RoundedCornerShape(8.dp)
+private val LumenCardElevation = CardDefaults.cardElevation(
+    defaultElevation = 0.dp,
+    pressedElevation = 0.dp,
+    focusedElevation = 0.dp,
+    hoveredElevation = 0.dp,
+    draggedElevation = 0.dp,
+    disabledElevation = 0.dp,
+)
 
 @Composable
 fun ProjectLumenApp(
@@ -207,55 +225,53 @@ fun ProjectLumenApp(
     val coroutineScope = rememberCoroutineScope()
     val updateChecker = remember(baseContext) { UpdateChecker(baseContext, PROJECT_LUMEN_RELEASE_API) }
     val updateInstaller = remember { UpdateInstaller(baseContext) }
-    var checkingUpdate by remember { mutableStateOf(false) }
+    var updateDialogState by remember { mutableStateOf<UpdateDialogState>(UpdateDialogState.Hidden) }
     var downloadingUpdate by remember { mutableStateOf(false) }
     var downloadProgressBytes by remember { mutableStateOf(0L) }
     var downloadProgressTotalBytes by remember { mutableStateOf<Long?>(null) }
-    var manualUpdateError by remember { mutableStateOf<String?>(null) }
-    var downloadError by remember { mutableStateOf<String?>(null) }
-    var updateCandidate by remember { mutableStateOf<UpdateCandidate?>(null) }
-    var updateDialogVisible by remember { mutableStateOf(false) }
-    var installPermissionPromptVisible by remember { mutableStateOf(false) }
-    var installPermissionPromptFile by remember { mutableStateOf<File?>(null) }
     var autoCheckStarted by rememberSaveable { mutableStateOf(false) }
+    val checkingUpdate = updateDialogState is UpdateDialogState.Checking
 
     fun triggerUpdateCheck(manual: Boolean) {
         coroutineScope.launch {
-            checkingUpdate = true
-            if (manual) manualUpdateError = null
+            if (manual) {
+                updateDialogState = UpdateDialogState.Checking
+            }
             val result = withContext(Dispatchers.IO) {
                 runCatching { updateChecker.checkForUpdate() }
             }
-            checkingUpdate = false
             result.onSuccess { candidate ->
-                updateCandidate = candidate
-                updateDialogVisible = candidate != null
+                updateDialogState = when {
+                    candidate != null -> UpdateDialogState.UpdateAvailable(candidate)
+                    manual -> UpdateDialogState.NoUpdate
+                    else -> UpdateDialogState.Hidden
+                }
                 if (!manual) autoCheckStarted = true
             }.onFailure { throwable ->
                 if (manual) {
-                    manualUpdateError = throwable.message ?: "Update check failed."
+                    updateDialogState = UpdateDialogState.Error(throwable.message ?: "Update check failed.")
                 }
                 if (!manual) autoCheckStarted = true
             }
         }
     }
 
-    fun startInstallIfAllowed(file: File) {
+    fun startInstallIfAllowed(candidate: UpdateCandidate, file: File) {
         if (updateInstaller.canInstallPackages()) {
             runCatching { updateInstaller.installApk(file) }
-                .onFailure { downloadError = it.message ?: "Unable to open installer." }
+                .onSuccess { updateDialogState = UpdateDialogState.Hidden }
+                .onFailure { updateDialogState = UpdateDialogState.Error(it.message ?: "Unable to open installer.") }
             return
         }
-        installPermissionPromptFile = file
-        installPermissionPromptVisible = true
+        updateDialogState = UpdateDialogState.InstallAuthorization(candidate, file)
     }
 
-    fun triggerUpdateDownload(asset: ReleaseAsset) {
+    fun triggerUpdateDownload(candidate: UpdateCandidate, asset: ReleaseAsset) {
         coroutineScope.launch {
             downloadingUpdate = true
+            updateDialogState = UpdateDialogState.Downloading(candidate, asset)
             downloadProgressBytes = 0L
             downloadProgressTotalBytes = null
-            downloadError = null
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     updateInstaller.downloadApk(asset) { downloadedBytes, totalBytes ->
@@ -268,9 +284,9 @@ fun ProjectLumenApp(
             downloadProgressBytes = 0L
             downloadProgressTotalBytes = null
             result.onSuccess { file ->
-                startInstallIfAllowed(file)
+                startInstallIfAllowed(candidate, file)
             }.onFailure { throwable ->
-                downloadError = throwable.message ?: "Update download failed."
+                updateDialogState = UpdateDialogState.Error(throwable.message ?: "Update download failed.")
             }
         }
     }
@@ -375,8 +391,7 @@ fun ProjectLumenApp(
                         SettingsScreen(
                             uiState = uiState,
                             viewModel = viewModel,
-                            checkingUpdate = checkingUpdate,
-                            updateError = manualUpdateError,
+                            checkingUpdate = updateDialogState is UpdateDialogState.Checking,
                             onManualUpdateCheck = { triggerUpdateCheck(manual = true) },
                             openTemplates = { navController.navigate(Destination.TEMPLATES.route) },
                             openAbout = { navController.navigate(Destination.ABOUT.route) },
@@ -386,67 +401,17 @@ fun ProjectLumenApp(
                     composable(Destination.ABOUT.route) { AboutScreen() }
                 }
             }
-            if (updateDialogVisible && updateCandidate != null) {
+            if (updateDialogState !is UpdateDialogState.Hidden) {
                 UpdateDialog(
-                    candidate = updateCandidate!!,
+                    state = updateDialogState,
                     downloadingUpdate = downloadingUpdate,
                     downloadProgressBytes = downloadProgressBytes,
                     downloadProgressTotalBytes = downloadProgressTotalBytes,
-                    onDismiss = { updateDialogVisible = false },
-                    onDownloadUpdate = { asset -> triggerUpdateDownload(asset) },
-                )
-            }
-            if (manualUpdateError != null) {
-                AlertDialog(
-                    onDismissRequest = { manualUpdateError = null },
-                    title = { Text(stringResource(R.string.about_update_failed_title)) },
-                    text = { Text(manualUpdateError.orEmpty()) },
-                    confirmButton = {
-                        OutlinedButton(onClick = { manualUpdateError = null }) {
-                            Text(stringResource(android.R.string.ok))
-                        }
-                    },
-                )
-            }
-            if (downloadError != null) {
-                AlertDialog(
-                    onDismissRequest = { downloadError = null },
-                    title = { Text(stringResource(R.string.about_update_failed_title)) },
-                    text = { Text(downloadError.orEmpty()) },
-                    confirmButton = {
-                        OutlinedButton(onClick = { downloadError = null }) {
-                            Text(stringResource(android.R.string.ok))
-                        }
-                    },
-                )
-            }
-            if (installPermissionPromptVisible) {
-                AlertDialog(
-                    onDismissRequest = {
-                        installPermissionPromptVisible = false
-                        installPermissionPromptFile = null
-                    },
-                    title = { Text(stringResource(R.string.about_install_permission_prompt_title)) },
-                    text = { Text(stringResource(R.string.about_install_permission_prompt_message)) },
-                    confirmButton = {
-                        OutlinedButton(onClick = {
-                            installPermissionPromptVisible = false
-                            installPermissionPromptFile?.let {
-                                runCatching { baseContext.startActivity(updateInstaller.createInstallPermissionIntent()) }
-                                    .onFailure { downloadError = it.message ?: "Unable to open install settings." }
-                            }
-                        }) {
-                            Text(stringResource(R.string.about_install_now))
-                        }
-                    },
-                    dismissButton = {
-                        OutlinedButton(onClick = {
-                            installPermissionPromptVisible = false
-                            installPermissionPromptFile = null
-                        }) {
-                            Text(stringResource(android.R.string.cancel))
-                        }
-                    },
+                    onDismiss = { updateDialogState = UpdateDialogState.Hidden },
+                    onDownloadUpdate = { candidate, asset -> triggerUpdateDownload(candidate, asset) },
+                    onInstallDownloadedApk = { candidate, file -> startInstallIfAllowed(candidate, file) },
+                    onError = { message -> updateDialogState = UpdateDialogState.Error(message) },
+                    updateInstaller = updateInstaller,
                 )
             }
         }
@@ -472,9 +437,10 @@ private fun CrashReportScreen(report: CrashReport) {
             titleRes = R.string.app_name,
             message = "应用检测到崩溃，报告已保留。",
         )
-        ElevatedCard(
+        Card(
             modifier = Modifier.fillMaxWidth(),
             shape = LumenCardShape,
+            elevation = LumenCardElevation,
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricRow("时间", formattedTime)
@@ -519,11 +485,12 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
         )
         StateCard(uiState.runtime, uiState.nowMillis)
         TodayStatsCard(uiState.eyeStats.firstOrNull())
-        ElevatedCard(
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
             shape = LumenCardShape,
+            elevation = LumenCardElevation,
         ) {
             Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
@@ -644,7 +611,7 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
     LumenPage {
         TodayStatsCard(eye)
         TrendCard(uiState)
-        ElevatedCard(
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
@@ -668,7 +635,6 @@ private fun SettingsScreen(
     uiState: ProjectLumenUiState,
     viewModel: ProjectLumenViewModel,
     checkingUpdate: Boolean,
-    updateError: String?,
     onManualUpdateCheck: () -> Unit,
     openTemplates: () -> Unit,
     openAbout: () -> Unit,
@@ -831,11 +797,12 @@ private fun SettingsScreen(
 @Composable
 private fun TrendCard(uiState: ProjectLumenUiState) {
     val recent = uiState.eyeStats.take(7).reversed()
-    ElevatedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
+        elevation = LumenCardElevation,
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.weekly_trend)
@@ -891,12 +858,13 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                 animationSpec = tween(180),
                 label = "templateBorderColor",
             )
-            ElevatedCard(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(1.dp, borderColor, LumenCardShape)
                     .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
                 shape = LumenCardShape,
+                elevation = LumenCardElevation,
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -932,7 +900,7 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
 
 @Composable
 private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Style, R.string.system_background_color)
             LumenFlowRow {
@@ -968,11 +936,12 @@ private fun AboutScreen() {
 
 @Composable
 private fun AboutHeroCard(versionLabel: String) {
-    ElevatedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
+        elevation = LumenCardElevation,
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(Icons.Outlined.Info, R.string.app_name)
@@ -988,7 +957,7 @@ private fun AboutHeroCard(versionLabel: String) {
 
 @Composable
 private fun AboutLinksCard() {
-    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL)
@@ -1003,7 +972,7 @@ private fun AboutUpdateCard(
     manualCheckError: String?,
     onManualCheck: () -> Unit,
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, elevation = LumenCardElevation) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Sync, R.string.about_update_status)
             if (checkingUpdate) {
@@ -1052,71 +1021,163 @@ private fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: In
 
 @Composable
 private fun UpdateDialog(
-    candidate: UpdateCandidate,
+    state: UpdateDialogState,
     downloadingUpdate: Boolean,
     downloadProgressBytes: Long,
     downloadProgressTotalBytes: Long?,
     onDismiss: () -> Unit,
-    onDownloadUpdate: (ReleaseAsset) -> Unit,
+    onDownloadUpdate: (UpdateCandidate, ReleaseAsset) -> Unit,
+    onInstallDownloadedApk: (UpdateCandidate, File) -> Unit,
+    onError: (String) -> Unit,
+    updateInstaller: UpdateInstaller,
 ) {
     val context = LocalContext.current
-    val release = candidate.release
-    val targetAsset = candidate.matchedAsset ?: chooseFallbackAsset(release.assets)
-    val current = candidate.currentBuild
-    val publishTime = Instant.ofEpochMilli(release.publishedAtUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
-    val buildTime = Instant.ofEpochMilli(current.buildTimeUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
-    val primaryActionLabel = if (targetAsset != null) R.string.about_download_update else R.string.about_open_release
     var pendingReleaseUrl by remember { mutableStateOf<String?>(null) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(release.tagName) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.about_update_found, release.tagName))
-                Text(stringResource(R.string.about_update_current_version, current.versionName, current.shortHash))
-                Text(stringResource(R.string.about_update_build_time, buildTime))
-                Text(stringResource(R.string.about_update_publish_time, publishTime))
-                if (candidate.isTimeFallback) {
-                    Text(stringResource(R.string.about_update_time_fallback), color = MaterialTheme.colorScheme.primary)
-                }
-                if (release.body.isNotBlank()) {
-                    Text(release.body)
-                }
-                if (downloadingUpdate) {
-                    val progress = downloadProgressTotalBytes?.takeIf { it > 0 }?.let {
-                        downloadProgressBytes.toFloat() / it.toFloat()
-                    }
-                    LinearProgressIndicator(
-                        progress = { progress ?: 0f },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Text(
-                        text = downloadProgressTotalBytes?.takeIf { it > 0 }?.let {
-                            val percent = ((downloadProgressBytes * 100) / it).coerceIn(0, 100)
-                            stringResource(R.string.about_update_downloading_progress, percent)
-                        } ?: stringResource(R.string.about_update_downloading),
-                    )
-                }
-                Text(stringResource(R.string.about_update_release_notes, release.releaseName))
+    val showReleaseInfo: @Composable (ReleaseInfo, BuildMetadata, UpdateCandidate?) -> Unit = { release, current, candidate ->
+        val publishTime = Instant.ofEpochMilli(release.publishedAtUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
+        val buildTime = Instant.ofEpochMilli(current.buildTimeUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.about_update_found, release.tagName))
+            Text(stringResource(R.string.about_update_current_version, current.versionName, current.shortHash))
+            Text(stringResource(R.string.about_update_build_time, buildTime))
+            Text(stringResource(R.string.about_update_publish_time, publishTime))
+            if (candidate?.isTimeFallback == true) {
+                Text(stringResource(R.string.about_update_time_fallback), color = MaterialTheme.colorScheme.primary)
             }
-        },
-        confirmButton = {
-            OutlinedButton(
-                enabled = !downloadingUpdate,
-                onClick = {
-                    if (targetAsset != null) {
-                        onDownloadUpdate(targetAsset)
-                    } else {
-                        pendingReleaseUrl = release.htmlUrl.ifBlank { PROJECT_LUMEN_RELEASES_BASE_URL }
+            if (release.body.isNotBlank()) {
+                Text(release.body)
+            }
+            Text(stringResource(R.string.about_update_release_notes, release.releaseName))
+        }
+    }
+
+    when (val currentState = state) {
+        UpdateDialogState.Hidden -> Unit
+        UpdateDialogState.Checking -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.about_update_checking_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator()
+                    Text(stringResource(R.string.about_update_checking))
+                }
+            },
+            confirmButton = {
+                OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+            },
+        )
+        UpdateDialogState.NoUpdate -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.about_update_up_to_date_title)) },
+            text = { Text(stringResource(R.string.about_update_up_to_date_message)) },
+            confirmButton = {
+                OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.ok)) }
+            },
+        )
+        is UpdateDialogState.Error -> AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.about_update_failed_title)) },
+            text = { Text(currentState.message) },
+            confirmButton = {
+                OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.ok)) }
+            },
+        )
+        is UpdateDialogState.UpdateAvailable -> {
+            val candidate = currentState.candidate
+            val release = candidate.release
+            val targetAsset = candidate.matchedAsset ?: chooseFallbackAsset(release.assets)
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text(release.tagName) },
+                text = { showReleaseInfo(release, candidate.currentBuild, candidate) },
+                confirmButton = {
+                    OutlinedButton(
+                        enabled = !downloadingUpdate,
+                        onClick = {
+                            if (targetAsset != null) {
+                                onDownloadUpdate(candidate, targetAsset)
+                            } else {
+                                pendingReleaseUrl = release.htmlUrl.ifBlank { PROJECT_LUMEN_RELEASES_BASE_URL }
+                            }
+                        },
+                    ) {
+                        ButtonLabel(Icons.Outlined.FileDownload, if (targetAsset != null) R.string.about_download_update else R.string.about_open_release)
                     }
                 },
-            ) {
-                ButtonLabel(Icons.Outlined.FileDownload, primaryActionLabel)
-            }
-        },
-        dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
-    )
+                dismissButton = {
+                    OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+                },
+            )
+        }
+        is UpdateDialogState.Downloading -> {
+            val candidate = currentState.candidate
+            val release = candidate.release
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text(stringResource(R.string.about_update_downloading_title)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        showReleaseInfo(release, candidate.currentBuild, candidate)
+                        val progress = downloadProgressTotalBytes?.takeIf { it > 0 }?.let {
+                            downloadProgressBytes.toFloat() / it.toFloat()
+                        }
+                        LinearProgressIndicator(
+                            progress = { progress ?: 0f },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            text = downloadProgressTotalBytes?.takeIf { it > 0 }?.let {
+                                val percent = ((downloadProgressBytes * 100) / it).coerceIn(0, 100)
+                                stringResource(R.string.about_update_downloading_progress, percent)
+                            } ?: stringResource(R.string.about_update_downloading),
+                        )
+                    }
+                },
+                confirmButton = {
+                    OutlinedButton(enabled = false, onClick = {}) {
+                        ButtonLabel(Icons.Outlined.FileDownload, R.string.about_update_downloading)
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+                },
+            )
+        }
+        is UpdateDialogState.InstallAuthorization -> {
+            val candidate = currentState.candidate
+            val release = candidate.release
+            val permissionGranted = updateInstaller.canInstallPackages()
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text(stringResource(R.string.about_install_permission_prompt_title)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.about_install_permission_prompt_message))
+                        showReleaseInfo(release, candidate.currentBuild, candidate)
+                    }
+                },
+                confirmButton = {
+                    OutlinedButton(onClick = {
+                        if (permissionGranted) {
+                            onInstallDownloadedApk(candidate, currentState.file)
+                        } else {
+                            runCatching { context.startActivity(updateInstaller.createInstallPermissionIntent()) }
+                                .onFailure { onError(it.message ?: "Unable to open install settings.") }
+                        }
+                    }) {
+                        ButtonLabel(
+                            if (permissionGranted) Icons.Outlined.FileDownload else Icons.AutoMirrored.Outlined.OpenInNew,
+                            if (permissionGranted) R.string.about_install_now else R.string.about_update_grant_permission,
+                        )
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+                },
+            )
+        }
+    }
+
     pendingReleaseUrl?.let { url ->
         AlertDialog(
             onDismissRequest = { pendingReleaseUrl = null },
@@ -1137,15 +1198,14 @@ private fun UpdateDialog(
             },
         )
     }
-}
-
 @Composable
 private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
-    ElevatedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
+        elevation = LumenCardElevation,
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.NotificationsActive, R.string.current_state)
@@ -1169,11 +1229,12 @@ private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
 
 @Composable
 private fun TodayStatsCard(stat: DailyEyeStatsEntity?) {
-    ElevatedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
+        elevation = LumenCardElevation,
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.today_summary)
@@ -1208,7 +1269,7 @@ private fun TimerCard(label: String, seconds: Long, progress: Float, fallbackTex
         label = "timerPulseScale",
     )
     val pulse = if (running) pulseScale else 1f
-    ElevatedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
@@ -1256,12 +1317,13 @@ private fun TemplatePreviewCard(template: TipTemplateEntity?) {
     val primary = templatePrimaryColor(template)
     val animatedBackground by animateColorAsState(background, tween(220), label = "templateBackground")
     val animatedPrimary by animateColorAsState(primary, tween(220), label = "templatePrimary")
-    ElevatedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = CardDefaults.elevatedCardColors(containerColor = animatedBackground),
+        colors = CardDefaults.cardColors(containerColor = animatedBackground),
+        elevation = LumenCardElevation,
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             ColorSwatch(animatedBackground)
@@ -1303,11 +1365,12 @@ private fun SectionHeader(icon: ImageVector, @StringRes titleRes: Int) {
 
 @Composable
 private fun SettingsSection(@StringRes titleRes: Int, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
-    ElevatedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
+        elevation = LumenCardElevation,
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(icon, titleRes)
