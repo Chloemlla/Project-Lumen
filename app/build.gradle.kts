@@ -27,6 +27,8 @@ android {
             commandLine("git", "rev-parse", "--short=8", "HEAD")
         }.standardOutput.asText.get().trim().ifBlank { "unknown" }
         buildConfigField("String", "GIT_SHA_SHORT", "\"$gitShaShort\"")
+        val buildTimeMillis = System.currentTimeMillis()
+        buildConfigField("long", "BUILD_TIME", "${buildTimeMillis}L")
 
         applicationId = "com.projectlumen.app"
         minSdk = 26
@@ -61,6 +63,15 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            isUniversalApk = true
         }
     }
 

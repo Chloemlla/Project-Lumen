@@ -106,7 +106,7 @@ class NotificationService(private val context: Context) {
         )
     }
 
-    fun showUpdateAvailable(tagName: String, apkName: String, apkUrl: String) {
+    fun showUpdateAvailable(tagName: String, releaseName: String, body: String, apkName: String, apkUrl: String) {
         if (!canPostNotifications()) return
         val updateIntent = Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)).apply {
             setPackage(context.packageName)
@@ -125,7 +125,7 @@ class NotificationService(private val context: Context) {
                 NotificationCompat.Builder(context, NotificationChannels.STATUS)
                     .setSmallIcon(R.drawable.ic_launcher_foreground)
                     .setContentTitle(context.getString(R.string.about_update_status))
-                    .setContentText("$apkName")
+                    .setContentText("$tagName $releaseName")
                     .setContentIntent(PendingIntent.getActivity(
                         context,
                         NotificationIds.POMODORO + 1001,

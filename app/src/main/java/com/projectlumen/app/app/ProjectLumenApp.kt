@@ -154,7 +154,7 @@ import kotlin.math.roundToInt
 
 private const val PROJECT_LUMEN_REPO_URL = "https://github.com/Chloemlla/Project-Lumen"
 private const val PROJECT_LUMEN_RELEASES_URL = "https://github.com/Chloemlla/Project-Lumen/releases/latest"
-private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases/latest"
+private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases"
 private const val PROJECT_LUMEN_APK_MIME = "application/vnd.android.package-archive"
 private val crashDetailsTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 
@@ -840,7 +840,7 @@ private fun AboutLinksCard() {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
             LinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL)
-            LinkButton(Icons.Outlined.CloudDownload, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL)
+    LinkButton(Icons.Outlined.CloudDownload, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL)
         }
     }
 }
@@ -1411,19 +1411,28 @@ private fun fetchLatestUpdateInfo(): UpdateInfo? {
     try {
         if (connection.responseCode !in 200..299) return null
         val body = connection.inputStream.bufferedReader().use { it.readText() }
-        val tagName = body.extractJsonString("tag_name") ?: return null
-        val releaseName = body.extractJsonString("name") ?: tagName
-        val releaseBody = body.extractJsonString("body") ?: ""
-        val assets = body.extractArrayObjects("assets")
-        val apkAssets = assets.filter { it.extractJsonString("name")?.endsWith(".apk", ignoreCase = true) == true }
-        if (apkAssets.size != 1) return null
-        val apk = apkAssets.single()
+        val latest = body.extractFirstArrayObject() ?: return null
+        val tagName = latest.extractJsonString("tag_name") ?: return null
+        val releaseName = latest.extractJsonString("name") ?: tagName
+        val releaseBody = latest.extractJsonString("body") ?: ""
+        val createdAt = latest.extractJsonString("created_at") ?: return null
+        val createdAtMillis = runCatching { Instant.parse(createdAt).toEpochMilli() }.getOrNull() ?: return null
+        val assets = latest.extractArrayObjects("assets")
+        val apk = assets.asSequence()
+            .mapNotNull { asset ->
+                val name = asset.extractJsonString("name") ?: return@mapNotNull null
+                val url = asset.extractJsonString("browser_download_url") ?: return@mapNotNull null
+                if (!name.contains("android", ignoreCase = true) && !name.endsWith(".apk", ignoreCase = true)) return@mapNotNull null
+                UpdateAsset(name, url)
+            }
+            .firstOrNull() ?: return null
         return UpdateInfo(
             tagName = tagName,
             releaseName = releaseName,
             body = releaseBody,
-            apkName = apk.extractJsonString("name") ?: return null,
-            apkUrl = apk.extractJsonString("browser_download_url") ?: return null,
+            createdAtMillis = createdAtMillis,
+            apkName = apk.name,
+            apkUrl = apk.url,
         )
     } finally {
         connection.disconnect()
@@ -1475,12 +1484,40 @@ private fun String.extractArrayObjects(key: String): List<String> {
     return objects
 }
 
+private fun String.extractFirstArrayObject(): String? {
+    val start = indexOf('[')
+    if (start < 0) return null
+    var depth = 0
+    var currentStart = -1
+    for (i in start until length) {
+        when (this[i]) {
+            '{' -> {
+                if (depth == 0) currentStart = i
+                depth++
+            }
+            '}' -> {
+                depth--
+                if (depth == 0 && currentStart >= 0) {
+                    return substring(currentStart, i + 1)
+                }
+            }
+        }
+    }
+    return null
+}
+
 private data class UpdateInfo(
     val tagName: String,
     val releaseName: String,
     val body: String,
+    val createdAtMillis: Long,
     val apkName: String,
     val apkUrl: String,
+)
+
+private data class UpdateAsset(
+    val name: String,
+    val url: String,
 )
 
 private fun openAppNotificationSettings(context: Context) {
