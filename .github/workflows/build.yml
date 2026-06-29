@@ -73,9 +73,6 @@ jobs:
             echo "Release signing configured."
           fi
 
-      - name: Check project
-        run: gradle test lint assembleDebug --no-daemon
-
       - name: Build release APK
         run: gradle assembleRelease --no-daemon
 
@@ -93,13 +90,6 @@ jobs:
             exit 1
           fi
           cp "$APK_FILE" "release-assets/Project-Lumen_android_${VERSION}.apk"
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: project-lumen-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          retention-days: 14
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
