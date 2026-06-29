@@ -23,7 +23,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
@@ -41,6 +43,8 @@ class ProjectLumenViewModel(
     private val pomodoroStatsDao = database.dailyPomodoroStatsDao()
     private val tipTemplatesDao = database.tipTemplatesDao()
     private val now = MutableStateFlow(System.currentTimeMillis())
+    private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val webPageRequests = _webPageRequests.asSharedFlow()
 
     private val dataState = combine(
         settingsDao.observe(),
@@ -82,6 +86,10 @@ class ProjectLumenViewModel(
                 delay(1_000)
             }
         }
+    }
+
+    fun navigateWebPage(url: String) {
+        _webPageRequests.tryEmit(url)
     }
 
     fun startReminder() {

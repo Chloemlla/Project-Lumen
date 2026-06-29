@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.webkit.WebView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -121,6 +122,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -190,6 +192,7 @@ private enum class Destination(
     SETTINGS("settings", R.string.nav_settings, Icons.Outlined.Settings),
     TEMPLATES("templates", R.string.nav_templates, Icons.Outlined.Style, false),
     ABOUT("about", R.string.nav_about, Icons.Outlined.Info, false),
+    WEB("web", R.string.about_external_link_prompt_title, Icons.AutoMirrored.Outlined.OpenInNew, false),
 }
 
 private enum class SystemBackgroundColor(
@@ -225,6 +228,7 @@ fun ProjectLumenApp(
     val coroutineScope = rememberCoroutineScope()
     val updateChecker = remember(baseContext) { UpdateChecker(baseContext, PROJECT_LUMEN_RELEASE_API) }
     val updateInstaller = remember { UpdateInstaller(baseContext) }
+    var pendingWebUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var updateDialogState by remember { mutableStateOf<UpdateDialogState>(UpdateDialogState.Hidden) }
     var downloadingUpdate by remember { mutableStateOf(false) }
     var downloadProgressBytes by remember { mutableStateOf(0L) }
@@ -293,6 +297,11 @@ fun ProjectLumenApp(
 
     LaunchedEffect(uiState.settings.languageCode) {
         LocaleController.apply(uiState.settings.languageCode)
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.webPageRequests.collect { url ->
+            pendingWebUrl = url
+        }
     }
     LaunchedEffect(uiState.isReady, uiState.settings.autoUpdateCheckEnabled, autoCheckStarted) {
         if (uiState.isReady && uiState.settings.autoUpdateCheckEnabled && !autoCheckStarted && !checkingUpdate) {
@@ -401,7 +410,7 @@ fun ProjectLumenApp(
                     composable(Destination.ABOUT.route) { AboutScreen() }
                 }
             }
-            if (updateDialogState !is UpdateDialogState.Hidden) {
+                    if (updateDialogState !is UpdateDialogState.Hidden) {
                 UpdateDialog(
                     state = updateDialogState,
                     downloadingUpdate = downloadingUpdate,
@@ -412,6 +421,12 @@ fun ProjectLumenApp(
                     onInstallDownloadedApk = { candidate, file -> startInstallIfAllowed(candidate, file) },
                     onError = { message -> updateDialogState = UpdateDialogState.Error(message) },
                     updateInstaller = updateInstaller,
+                )
+            }
+            pendingWebUrl?.let { url ->
+                WebViewScreen(
+                    url = url,
+                    onDismiss = { pendingWebUrl = null },
                 )
             }
         }
@@ -990,7 +1005,7 @@ private fun AboutUpdateCard(
 
 @Composable
 private fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String) {
-    val context = LocalContext.current
+    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<ProjectLumenViewModel>()
     var pendingUrl by remember { mutableStateOf<String?>(null) }
     OutlinedButton(onClick = { pendingUrl = url }) {
         Icon(icon, contentDescription = null)
@@ -1005,7 +1020,7 @@ private fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: In
             confirmButton = {
                 OutlinedButton(onClick = {
                     pendingUrl = null
-                    openUrl(context, targetUrl)
+                    viewModel.navigateWebPage(targetUrl)
                 }) {
                     Text(stringResource(android.R.string.ok))
                 }
@@ -1031,7 +1046,7 @@ private fun UpdateDialog(
     onError: (String) -> Unit,
     updateInstaller: UpdateInstaller,
 ) {
-    val context = LocalContext.current
+    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<ProjectLumenViewModel>()
     var pendingReleaseUrl by remember { mutableStateOf<String?>(null) }
     val showReleaseInfo: @Composable (ReleaseInfo, BuildMetadata, UpdateCandidate?) -> Unit = { release, current, candidate ->
         val publishTime = Instant.ofEpochMilli(release.publishedAtUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
@@ -1186,7 +1201,7 @@ private fun UpdateDialog(
             confirmButton = {
                 OutlinedButton(onClick = {
                     pendingReleaseUrl = null
-                    openUrl(context, url)
+                    viewModel.navigateWebPage(url)
                 }) {
                     Text(stringResource(android.R.string.ok))
                 }
@@ -1198,6 +1213,7 @@ private fun UpdateDialog(
             },
         )
     }
+}
 @Composable
 private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
     Card(
@@ -1225,6 +1241,41 @@ private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
             )
         }
     }
+}
+
+@Composable
+private fun WebViewScreen(
+    url: String,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    var webView by remember { mutableStateOf<WebView?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+        title = { Text(url) },
+        text = {
+            AndroidView(
+                factory = {
+                    WebView(it).apply {
+                        settings.javaScriptEnabled = true
+                        loadUrl(url)
+                    }.also { view ->
+                        webView = view
+                    }
+                },
+                update = { view ->
+                    if (view.url != url) {
+                        view.loadUrl(url)
+                    }
+                },
+            )
+        },
+    )
 }
 
 @Composable
@@ -1703,10 +1754,6 @@ private fun systemThemeColor(key: String?): Color {
 
 private fun parseColor(hex: String?, fallback: Color): Color {
     return runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(fallback)
-}
-
-private fun openUrl(context: Context, url: String) {
-    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
 @Composable
