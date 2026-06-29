@@ -48,7 +48,17 @@
     <string name="active_template">当前模板</string>
     <string name="about_title">关于</string>
     <string name="about_version">原生 Android Kotlin V1</string>
+    <string name="about_version_hint">基于当前提交 SHA 构建。</string>
     <string name="about_body">Project Lumen 用于安排用眼休息、番茄专注和本地使用统计。</string>
+    <string name="about_links">开源</string>
+    <string name="about_source_code">源代码</string>
+    <string name="about_latest_release">最新发布</string>
+    <string name="about_check_updates">检查更新</string>
+    <string name="about_download_update">下载更新</string>
+    <string name="about_update_status">更新状态</string>
+    <string name="about_update_checking">正在检查 GitHub 发布版本...</string>
+    <string name="about_update_found">最新版本：%1$s</string>
+    <string name="about_update_unavailable">当前没有可用的更新数据。</string>
     <string name="section_general">通用</string>
     <string name="section_reminder">提醒</string>
     <string name="section_pre_alert">预提醒</string>

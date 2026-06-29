@@ -40,7 +40,7 @@ abstract class AppDatabase : RoomDatabase() {
                 AppDatabase::class.java,
                 "project_lumen_mobile.db",
             )
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration(dropAllTables = true)
                 .build()
         }
     }
