@@ -114,6 +114,7 @@ kotlin {
 
 ksp {
     arg("room.incremental", "true")
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {

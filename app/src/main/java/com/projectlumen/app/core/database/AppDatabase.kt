@@ -16,6 +16,7 @@ import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
+import com.projectlumen.app.BuildConfig
 
 @Database(
     entities = [
@@ -26,7 +27,7 @@ import com.projectlumen.app.core.database.entities.TipTemplateEntity
         TipTemplateEntity::class,
     ],
     version = 4,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun appSettingsDao(): AppSettingsDao
@@ -82,14 +83,16 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         fun create(context: Context): AppDatabase {
-            return Room.databaseBuilder(
+            val builder = Room.databaseBuilder(
                 context.applicationContext,
                 AppDatabase::class.java,
                 "project_lumen_mobile.db",
             )
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
-                .fallbackToDestructiveMigration(dropAllTables = true)
-                .build()
+            if (BuildConfig.DEBUG) {
+                builder.fallbackToDestructiveMigration(dropAllTables = true)
+            }
+            return builder.build()
         }
     }
 }

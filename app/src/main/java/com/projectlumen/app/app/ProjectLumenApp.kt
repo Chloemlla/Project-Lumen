@@ -2176,14 +2176,6 @@ private fun openAppNotificationSettings(context: Context) {
     context.startActivity(intent)
 }
 
-private fun openAppSettings(context: Context) {
-    val intent = Intent(
-        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-        Uri.parse("package:${context.packageName}"),
-    )
-    context.startActivity(intent)
-}
-
 private fun persistReadableUri(context: Context, uri: Uri) {
     runCatching {
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)

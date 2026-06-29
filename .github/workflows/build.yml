@@ -36,7 +36,10 @@ jobs:
       - name: Read app version
         run: |
           VERSION_NAME=$(tr -d '\r' < app/application.version | sed -n '1{s/^[[:space:]]*//; s/[[:space:]]*$//; p;}')
-          VERSION_CODE=1
+          VERSION_CODE="${GITHUB_RUN_NUMBER:-1}"
+          if ! [[ "$VERSION_CODE" =~ ^[0-9]+$ ]] || [ "$VERSION_CODE" -lt 1 ]; then
+            VERSION_CODE=1
+          fi
           BUILD_TIME_UTC_MILLIS=$(date -u +%s%3N)
           COMMIT_HASH="${GITHUB_SHA}"
           SHORT_HASH="${GITHUB_SHA::8}"
@@ -45,6 +48,15 @@ jobs:
           echo "PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS=$BUILD_TIME_UTC_MILLIS" >> "$GITHUB_ENV"
           echo "PROJECT_LUMEN_COMMIT_HASH=$COMMIT_HASH" >> "$GITHUB_ENV"
           echo "PROJECT_LUMEN_SHORT_HASH=$SHORT_HASH" >> "$GITHUB_ENV"
+
+      - name: Run state machine unit tests
+        env:
+          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
+          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
+          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
+          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
+          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
+        run: gradle testDebugUnitTest --no-daemon
 
       - name: Write signing config
         env:
@@ -108,11 +120,16 @@ jobs:
             fi
           done
 
+          (
+            cd release-assets
+            sha256sum *.apk > checksums.txt
+          )
+
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: project-lumen-release-apk
-          path: release-assets/*.apk
+          path: release-assets/*
           retention-days: 30
 
       - name: Automatic release
@@ -126,4 +143,4 @@ jobs:
           tag_name: "v${{ env.PROJECT_LUMEN_VERSION_NAME }}-${{ env.PROJECT_LUMEN_SHORT_HASH }}"
           prerelease: false
           name: "Project-Lumen ${{ env.PROJECT_LUMEN_VERSION_NAME }}-${{ env.PROJECT_LUMEN_SHORT_HASH }}"
-          files: release-assets/*.apk
+          files: release-assets/*

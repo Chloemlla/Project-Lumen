@@ -24,6 +24,7 @@ data class ReleaseAsset(
     val name: String,
     val downloadUrl: String,
     val contentType: String? = null,
+    val sha256: String? = null,
 )
 
 data class ReleaseInfo(
@@ -48,4 +49,3 @@ data class UpdateCandidate(
 ) {
     val isTimeFallback: Boolean get() = matchReason == UpdateMatchReason.PUBLISHED_AT
 }
-
