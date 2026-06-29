@@ -1299,6 +1299,7 @@ private fun TodayStatsCard(stat: DailyEyeStatsEntity?) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
+        colors = LumenCardColors(),
         elevation = LumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1436,6 +1437,7 @@ private fun SettingsSection(@StringRes titleRes: Int, icon: ImageVector, content
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
+        colors = LumenCardColors(),
         elevation = LumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
