@@ -13,7 +13,12 @@ class UpdateChecker(
 ) {
     fun checkForUpdate(currentBuild: BuildMetadata = BuildMetadata.current()): UpdateCandidate? {
         val latest = fetchLatestRelease() ?: return null
-        val versionComparison = compareReleaseVersion(latest.tagName, currentBuild.versionName)
+        val localVersion = parseVersionDescriptor("${currentBuild.versionName}-${currentBuild.shortHash}")
+            ?: parseVersionDescriptor(currentBuild.versionName)
+            ?: return null
+        if (isExactVersionMatch(latest.tagName, localVersion)) return null
+
+        val versionComparison = compareReleaseVersion(latest.tagName, localVersion)
         val publishTimeNewer = latest.publishedAtUtcMillis > currentBuild.buildTimeUtcMillis + PUBLISH_TIME_TOLERANCE_MILLIS
 
         val shouldUpdate = versionComparison > 0 || publishTimeNewer
@@ -74,26 +79,52 @@ class UpdateChecker(
         }
     }
 
-    private fun compareReleaseVersion(remoteTagName: String, localVersionName: String): Int {
-        val remote = normalizeVersion(remoteTagName) ?: return 0
-        val local = normalizeVersion(localVersionName) ?: return 0
-        return remote.compareTo(local)
+    private fun compareReleaseVersion(remoteTagName: String, localVersion: VersionDescriptor): Int {
+        val remote = parseVersionDescriptor(remoteTagName) ?: return 0
+        return remote.semanticVersion.compareTo(localVersion.semanticVersion)
     }
 
-    private fun normalizeVersion(value: String): SemanticVersion? {
+    private fun isExactVersionMatch(remoteTagName: String, localVersion: VersionDescriptor): Boolean {
+        val remote = parseVersionDescriptor(remoteTagName) ?: return false
+        return remote.semanticVersion == local.semanticVersion &&
+            remote.shortHash.isNotBlank() &&
+            localVersion.shortHash.isNotBlank() &&
+            remote.shortHash.equals(localVersion.shortHash, ignoreCase = true)
+    }
+
+    private fun parseVersionDescriptor(value: String): VersionDescriptor? {
         val cleaned = value.trim()
+        if (cleaned.isBlank()) return null
+
+        val versionPart = cleaned
             .removePrefix("v")
             .removePrefix("V")
-            .substringBefore('-')
+            .substringBefore('(')
             .substringBefore('+')
-        val parts = cleaned.split('.')
+            .substringBefore('-')
+
+        val shortHash = extractShortHash(cleaned)
+        val parts = versionPart.split('.')
             .mapNotNull { it.toIntOrNull() }
         if (parts.isEmpty()) return null
-        return SemanticVersion(
-            major = parts.getOrNull(0) ?: 0,
-            minor = parts.getOrNull(1) ?: 0,
-            patch = parts.getOrNull(2) ?: 0,
+        return VersionDescriptor(
+            semanticVersion = SemanticVersion(
+                major = parts.getOrNull(0) ?: 0,
+                minor = parts.getOrNull(1) ?: 0,
+                patch = parts.getOrNull(2) ?: 0,
+            ),
+            shortHash = shortHash,
         )
+    }
+
+    private fun extractShortHash(value: String): String {
+        val bracketMatch = SHORT_HASH_IN_PARENS_REGEX.find(value)
+        if (bracketMatch != null) return bracketMatch.groupValues[1]
+
+        val suffixMatch = SHORT_HASH_SUFFIX_REGEX.find(value)
+        if (suffixMatch != null) return suffixMatch.groupValues[1]
+
+        return ""
     }
 
     private fun selectBestAsset(assets: List<ReleaseAsset>): ReleaseAsset? {
@@ -148,10 +179,17 @@ class UpdateChecker(
         }
     }
 
+    private data class VersionDescriptor(
+        val semanticVersion: SemanticVersion,
+        val shortHash: String,
+    )
+
     private companion object {
         private const val REQUEST_TIMEOUT_MILLIS = 6_000
         private const val PUBLISH_TIME_TOLERANCE_MILLIS = 90_000L
         private const val USER_AGENT = "Project-Lumen"
         private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases/latest"
+        private val SHORT_HASH_IN_PARENS_REGEX = Regex("""\(([0-9a-fA-F]{7,40})\)$""")
+        private val SHORT_HASH_SUFFIX_REGEX = Regex("""(?:-|_)([0-9a-fA-F]{7,40})$""")
     }
 }
