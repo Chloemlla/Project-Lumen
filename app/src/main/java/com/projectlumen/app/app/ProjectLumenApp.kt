@@ -976,7 +976,6 @@ private fun AboutHeroCard(versionLabel: String) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(Icons.Outlined.Info, R.string.app_name)
-            Text(stringResource(R.string.about_version), style = MaterialTheme.typography.titleMedium)
             Text(versionLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
                 stringResource(R.string.about_body),
@@ -1685,5 +1684,3 @@ private fun openExactAlarmSettings(context: Context) {
     runCatching { context.startActivity(intent) }
         .onFailure { openAppNotificationSettings(context) }
 }
-
-

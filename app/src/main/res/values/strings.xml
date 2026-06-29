@@ -47,7 +47,6 @@
     <string name="template_preview">Preview</string>
     <string name="active_template">Active template</string>
     <string name="about_title">About</string>
-    <string name="about_version">Version</string>
     <string name="about_version_hint">Built from the current commit SHA.</string>
     <string name="about_body">Project Lumen helps schedule eye breaks, pomodoro focus sessions, and local usage statistics.</string>
     <string name="about_links">Open source</string>

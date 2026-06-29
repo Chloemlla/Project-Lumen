@@ -47,7 +47,6 @@
     <string name="template_preview">预览</string>
     <string name="active_template">当前模板</string>
     <string name="about_title">关于</string>
-    <string name="about_version">原生 Android Kotlin</string>
     <string name="about_version_hint">基于当前提交 SHA 构建。</string>
     <string name="about_body">Project Lumen 用于安排用眼休息、番茄专注和本地使用统计。</string>
     <string name="about_links">开源</string>
