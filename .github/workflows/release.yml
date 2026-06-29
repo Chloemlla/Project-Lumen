@@ -32,8 +32,8 @@ jobs:
 
       - name: Read app version
         run: |
-          VERSION_NAME=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)
-          VERSION_CODE=$(sed -n 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*\([0-9][0-9]*\).*/\1/p' app/build.gradle.kts | head -n 1)
+          VERSION_NAME=$(tr -d '\r' < app/application.version | sed -n '1{s/^[[:space:]]*//; s/[[:space:]]*$//; p;}')
+          VERSION_CODE=1
           BUILD_TIME_UTC_MILLIS=$(date -u +%s%3N)
           COMMIT_HASH="${GITHUB_SHA}"
           SHORT_HASH="${GITHUB_SHA::8}"

@@ -25,7 +25,7 @@ android {
     val projectLumenVersionName = providers.environmentVariable("PROJECT_LUMEN_VERSION_NAME")
         .orNull
         ?.takeIf { it.isNotBlank() }
-        ?: "1.0.0"
+        ?: layout.projectDirectory.file("application.version").asFile.readText(Charsets.UTF_8).trim().ifBlank { "1.0.0" }
     val projectLumenVersionCode = providers.environmentVariable("PROJECT_LUMEN_VERSION_CODE")
         .orNull
         ?.toIntOrNull()
