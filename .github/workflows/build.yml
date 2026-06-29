@@ -81,7 +81,7 @@ jobs:
           mkdir -p release-assets
           VERSION="${{ env.VERSION_NAME }}-${{ env.SHORT_HASH }}"
           APK_DIR="app/build/outputs/apk/release"
-          AGGREGATED_APK="$(find "$APK_DIR" -maxdepth 1 -type f \( -name "app-release.apk" -o -name "app-release-unsigned.apk" \) | head -n 1)"
+          AGGREGATED_APK="$(find "$APK_DIR" -maxdepth 1 -type f \( -name "app-universal-release.apk" -o -name "app-release.apk" -o -name "app-release-unsigned.apk" \) | head -n 1)"
 
           if [ -z "$AGGREGATED_APK" ]; then
             echo "Aggregated release APK was not found."
@@ -92,7 +92,7 @@ jobs:
           cp "$AGGREGATED_APK" "release-assets/Project-Lumen_android_${VERSION}.apk"
 
           for variant in armeabi-v7a arm64-v8a x86 x86_64; do
-            VARIANT_APK="$(find "$APK_DIR" -maxdepth 2 -type f \( -name "*${variant}*.apk" -o -name "*${variant}*release*.apk" \) | head -n 1)"
+            VARIANT_APK="$(find "$APK_DIR" -maxdepth 1 -type f -name "app-${variant}-release.apk" | head -n 1)"
             if [ -n "$VARIANT_APK" ]; then
               cp "$VARIANT_APK" "release-assets/Project-Lumen_android_${VERSION}_${variant}.apk"
             fi
