@@ -238,6 +238,16 @@ fun ProjectLumenApp(
         }
     }
 
+    fun startInstallIfAllowed(file: File) {
+        if (updateInstaller.canInstallPackages()) {
+            runCatching { updateInstaller.installApk(file) }
+                .onFailure { downloadError = it.message ?: "Unable to open installer." }
+            return
+        }
+        installPermissionPromptFile = file
+        installPermissionPromptVisible = true
+    }
+
     fun triggerUpdateDownload(asset: ReleaseAsset) {
         coroutineScope.launch {
             downloadingUpdate = true
@@ -252,16 +262,6 @@ fun ProjectLumenApp(
                 downloadError = throwable.message ?: "Update download failed."
             }
         }
-    }
-
-    fun startInstallIfAllowed(file: File) {
-        if (updateInstaller.canInstallPackages()) {
-            runCatching { updateInstaller.installApk(file) }
-                .onFailure { downloadError = it.message ?: "Unable to open installer." }
-            return
-        }
-        installPermissionPromptFile = file
-        installPermissionPromptVisible = true
     }
 
     LaunchedEffect(uiState.settings.languageCode) {
