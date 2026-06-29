@@ -66,6 +66,10 @@
     <string name="about_update_release_notes">发布说明：%1$s</string>
     <string name="about_update_time_fallback">该版本通过发布时间判定为更新，即使版本号看起来更低也应优先升级。</string>
     <string name="about_update_failed_title">检查更新失败</string>
+    <string name="about_external_link_prompt_title">打开外部链接？</string>
+    <string name="about_external_link_prompt_message">这将打开浏览器并跳转到外部网站。</string>
+    <string name="about_download_prompt_title">打开下载链接？</string>
+    <string name="about_download_prompt_message">这将打开浏览器或下载处理器来获取 APK。</string>
     <string name="auto_update_check">自动检查更新</string>
     <string name="section_general">通用</string>
     <string name="section_reminder">提醒</string>

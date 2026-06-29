@@ -66,6 +66,10 @@
     <string name="about_update_release_notes">Release notes: %1$s</string>
     <string name="about_update_time_fallback">This release is newer by published time even if the version string looks lower.</string>
     <string name="about_update_failed_title">Update check failed</string>
+    <string name="about_external_link_prompt_title">Open external link?</string>
+    <string name="about_external_link_prompt_message">This will open your browser to an external website.</string>
+    <string name="about_download_prompt_title">Open download?</string>
+    <string name="about_download_prompt_message">This will open your browser or download handler to fetch the APK.</string>
     <string name="auto_update_check">Auto update check</string>
     <string name="section_general">General</string>
     <string name="section_reminder">Reminder</string>

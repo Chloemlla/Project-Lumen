@@ -903,8 +903,8 @@ private fun AboutLinksCard() {
     ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
-            LinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL)
-            LinkButton(Icons.Outlined.Code, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL)
+            ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL)
+            ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL)
         }
     }
 }
@@ -932,12 +932,33 @@ private fun AboutUpdateCard(
 }
 
 @Composable
-private fun LinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String) {
+private fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String) {
     val context = LocalContext.current
-    OutlinedButton(onClick = { openUrl(context, url) }) {
+    var pendingUrl by remember { mutableStateOf<String?>(null) }
+    OutlinedButton(onClick = { pendingUrl = url }) {
         Icon(icon, contentDescription = null)
         Spacer(Modifier.width(8.dp))
         Text(stringResource(labelRes))
+    }
+    pendingUrl?.let { targetUrl ->
+        AlertDialog(
+            onDismissRequest = { pendingUrl = null },
+            title = { Text(stringResource(R.string.about_external_link_prompt_title)) },
+            text = { Text(stringResource(R.string.about_external_link_prompt_message)) },
+            confirmButton = {
+                OutlinedButton(onClick = {
+                    pendingUrl = null
+                    openUrl(context, targetUrl)
+                }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { pendingUrl = null }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
     }
 }
 
@@ -950,6 +971,7 @@ private fun UpdateDialog(candidate: UpdateCandidate, onDismiss: () -> Unit) {
     val publishTime = Instant.ofEpochMilli(release.publishedAtUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
     val buildTime = Instant.ofEpochMilli(current.buildTimeUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
     val primaryActionLabel = if (targetAsset != null) R.string.about_download_update else R.string.about_open_release
+    var pendingDownloadUrl by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -972,7 +994,7 @@ private fun UpdateDialog(candidate: UpdateCandidate, onDismiss: () -> Unit) {
         confirmButton = {
             OutlinedButton(onClick = {
                 if (targetAsset != null) {
-                    openUrl(context, targetAsset.downloadUrl)
+                    pendingDownloadUrl = targetAsset.downloadUrl
                 } else {
                     openUrl(context, release.htmlUrl.ifBlank { PROJECT_LUMEN_RELEASES_BASE_URL })
                 }
@@ -982,6 +1004,26 @@ private fun UpdateDialog(candidate: UpdateCandidate, onDismiss: () -> Unit) {
         },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
     )
+    pendingDownloadUrl?.let { url ->
+        AlertDialog(
+            onDismissRequest = { pendingDownloadUrl = null },
+            title = { Text(stringResource(R.string.about_download_prompt_title)) },
+            text = { Text(stringResource(R.string.about_download_prompt_message)) },
+            confirmButton = {
+                OutlinedButton(onClick = {
+                    pendingDownloadUrl = null
+                    openUrl(context, url)
+                }) {
+                    Text(stringResource(R.string.about_download_update))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { pendingDownloadUrl = null }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
 }
 
 @Composable

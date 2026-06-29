@@ -9,7 +9,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -106,11 +105,9 @@ class NotificationService(private val context: Context) {
         )
     }
 
-    fun showUpdateAvailable(tagName: String, releaseName: String, body: String, apkName: String, apkUrl: String) {
+    fun showUpdateAvailable(tagName: String, releaseName: String, body: String) {
         if (!canPostNotifications()) return
-        val updateIntent = Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)).apply {
-            setPackage(context.packageName)
-        }
+        val updateIntent = Intent(context, MainActivity::class.java).setPackage(context.packageName)
         show(
             id = NotificationIds.POMODORO + 1000,
             channel = NotificationChannels.STATUS,
