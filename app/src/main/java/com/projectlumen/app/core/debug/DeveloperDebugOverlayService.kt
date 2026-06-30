@@ -1,6 +1,7 @@
 package com.projectlumen.app.core.debug
 
 import android.app.Service
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -112,7 +113,7 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
     }
 
     override fun onTrimMemory(level: Int) {
-        if (level >= TRIM_MEMORY_RUNNING_CRITICAL) {
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
             DeveloperDebugFrameStore.clear()
         }
         super.onTrimMemory(level)
@@ -284,7 +285,7 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
 
     private fun simulateLowMemory(app: ProjectLumenApplication) {
         DeveloperDebugFrameStore.clear()
-        onTrimMemory(TRIM_MEMORY_RUNNING_CRITICAL)
+        onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
         scope.launch {
             val now = System.currentTimeMillis()
             app.database.runtimeStateDao().get()?.let {

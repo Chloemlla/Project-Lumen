@@ -2,6 +2,7 @@ package com.projectlumen.app.core.proximity
 
 import android.Manifest
 import android.app.Service
+import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -81,7 +82,7 @@ class ProximityDetectionService : Service() {
     }
 
     override fun onTrimMemory(level: Int) {
-        if (level >= TRIM_MEMORY_RUNNING_CRITICAL) {
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
             DeveloperDebugFrameStore.clear()
             val app = application as? ProjectLumenApplication
             if (app != null) {
