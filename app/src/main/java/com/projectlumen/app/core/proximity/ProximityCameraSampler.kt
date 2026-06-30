@@ -80,8 +80,8 @@ class ProximityCameraSampler(private val context: Context) {
     @SuppressLint("MissingPermission")
     private suspend fun capturePreviewFrame(): CapturedFrame? {
         val cameraManager = context.getSystemService(CameraManager::class.java)
-        val cameraId = frontCameraId(cameraManager) ?: return null
-        val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+        val cameraId = runCatching { frontCameraId(cameraManager) }.getOrNull() ?: return null
+        val characteristics = runCatching { cameraManager.getCameraCharacteristics(cameraId) }.getOrNull() ?: return null
         val size = choosePreviewSize(characteristics) ?: Size(640, 480)
         val rotation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
         val thread = HandlerThread("ProjectLumenProximityCamera").apply { start() }
