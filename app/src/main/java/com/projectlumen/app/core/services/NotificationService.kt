@@ -201,6 +201,19 @@ class NotificationService(private val context: Context) {
             .build()
     }
 
+    fun buildDeveloperDebugForegroundNotification(): Notification {
+        return NotificationCompat.Builder(context, NotificationChannels.STATUS)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(context.getString(R.string.developer_debug_running_title))
+            .setContentText(context.getString(R.string.developer_debug_running_message))
+            .setContentIntent(openAppPendingIntent(NotificationIds.DEVELOPER_DEBUG_FOREGROUND))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
     fun showProximityWarning(ratioPercent: Int) {
         show(
             id = NotificationIds.PROXIMITY_WARNING,

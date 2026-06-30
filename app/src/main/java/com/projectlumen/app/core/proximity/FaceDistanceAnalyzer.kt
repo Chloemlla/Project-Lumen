@@ -24,13 +24,23 @@ class FaceDistanceAnalyzer {
     )
 
     suspend fun analyze(bitmap: Bitmap, rotationDegrees: Int): FaceDistanceSample? {
+        val startedAt = System.currentTimeMillis()
         val image = InputImage.fromBitmap(bitmap, rotationDegrees)
         val faces = detector.process(image).await()
         val face = faces.maxByOrNull { it.boundingBox.width() * it.boundingBox.height() } ?: return null
         val orientedWidth = if (rotationDegrees % 180 == 0) bitmap.width else bitmap.height
+        val box = face.boundingBox
         return FaceDistanceSample(
             eyeDistancePx = face.eyeDistancePx(),
             faceWidthPercent = face.faceWidthPercent(orientedWidth),
+            faceWidthPx = box.safeWidth(),
+            frameWidthPx = bitmap.width,
+            frameHeightPx = bitmap.height,
+            faceLeftPx = box.left.coerceAtLeast(0),
+            faceTopPx = box.top.coerceAtLeast(0),
+            faceRightPx = box.right.coerceAtMost(bitmap.width),
+            faceBottomPx = box.bottom.coerceAtMost(bitmap.height),
+            inferenceMillis = System.currentTimeMillis() - startedAt,
             leftEyeOpenProbability = face.leftEyeOpenProbability,
             rightEyeOpenProbability = face.rightEyeOpenProbability,
         )

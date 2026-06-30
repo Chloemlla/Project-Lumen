@@ -38,7 +38,7 @@ import com.projectlumen.app.BuildConfig
         EntitlementEntity::class,
         ReminderPlanEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -146,6 +146,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                migrateDeveloperDebug(db)
+            }
+        }
+
         private fun migrateEyeProtection(db: SupportSQLiteDatabase) {
             addColumnIfMissing(db, "app_settings", "blinkMonitoringEnabled", "INTEGER NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "app_settings", "blinkNoBlinkThresholdSeconds", "INTEGER NOT NULL DEFAULT 10")
@@ -166,6 +172,29 @@ abstract class AppDatabase : RoomDatabase() {
             addColumnIfMissing(db, "runtime_state", "ambientLastWarningAt", "INTEGER NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "daily_eye_stats", "eyeDryWarningCount", "INTEGER NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "daily_eye_stats", "lowLightWarningCount", "INTEGER NOT NULL DEFAULT 0")
+        }
+
+        private fun migrateDeveloperDebug(db: SupportSQLiteDatabase) {
+            addColumnIfMissing(db, "app_settings", "developerModeEnabled", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "app_settings", "developerDebugOverlayEnabled", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "app_settings", "developerDebugPreviewEnabled", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "app_settings", "developerTickIntervalSeconds", "INTEGER NOT NULL DEFAULT 180")
+            addColumnIfMissing(db, "app_settings", "developerTimeTriggerEnabled", "INTEGER NOT NULL DEFAULT 1")
+            addColumnIfMissing(db, "app_settings", "developerUnlockTriggerEnabled", "INTEGER NOT NULL DEFAULT 1")
+            addColumnIfMissing(db, "app_settings", "developerStillnessTriggerEnabled", "INTEGER NOT NULL DEFAULT 1")
+            addColumnIfMissing(db, "app_settings", "developerShakeSuppressionEnabled", "INTEGER NOT NULL DEFAULT 1")
+            addColumnIfMissing(db, "runtime_state", "proximityDebugInferenceMillis", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "runtime_state", "proximityDebugCameraLatencyMillis", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "runtime_state", "proximityDebugFaceWidthPx", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "runtime_state", "foregroundServiceStartedAt", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "runtime_state", "foregroundServiceStoppedAt", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "runtime_state", "foregroundServiceLastTaskRemovedAt", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "runtime_state", "foregroundServiceLastStickyRestartAt", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "runtime_state", "developerLastLowMemorySimulatedAt", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "runtime_state", "sensorPitchDegrees", "REAL NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "runtime_state", "sensorRollDegrees", "REAL NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "runtime_state", "sensorYawDegrees", "REAL NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "runtime_state", "sensorLastAccelerationMagnitude", "REAL NOT NULL DEFAULT 0")
         }
 
         private fun migrateCommerceAndPersonalization(db: SupportSQLiteDatabase) {
@@ -284,6 +313,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_6_7,
                     MIGRATION_7_8,
                     MIGRATION_8_9,
+                    MIGRATION_9_10,
                 )
             if (BuildConfig.DEBUG) {
                 builder.fallbackToDestructiveMigration(dropAllTables = true)

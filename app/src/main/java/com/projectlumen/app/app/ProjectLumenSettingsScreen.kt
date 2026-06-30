@@ -205,6 +205,7 @@ internal fun SettingsScreen(
     onManualUpdateCheck: () -> Unit,
     openTemplates: () -> Unit,
     openAbout: () -> Unit,
+    openDeveloperOptions: () -> Unit,
 ) {
     val settings = uiState.settings
     val template = activeTemplate(uiState)
@@ -768,6 +769,13 @@ internal fun SettingsScreen(
             }
             NumberSlider(R.string.pomodoro_long_break, Icons.Outlined.Spa, settings.pomodoroLongBreakMinutes, 5f..45f, 39, minutesLabel(settings.pomodoroLongBreakMinutes)) {
                 viewModel.updateSettings { current -> current.copy(pomodoroLongBreakMinutes = it) }
+            }
+        }
+        if (settings.developerModeEnabled) {
+            SettingsSection(R.string.nav_developer, Icons.Outlined.Code) {
+                OutlinedButton(onClick = openDeveloperOptions) {
+                    ButtonLabel(Icons.Outlined.Code, R.string.nav_developer)
+                }
             }
         }
     }

@@ -19,6 +19,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.util.Size
 import androidx.core.content.ContextCompat
+import com.projectlumen.app.core.debug.DeveloperDebugFrameStore
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
@@ -31,6 +32,7 @@ class ProximityCameraSampler(private val context: Context) {
     suspend fun captureFaceDistanceSamples(
         durationMillis: Long,
         sampleIntervalMillis: Long = 900L,
+        publishDebugFrame: Boolean = false,
     ): List<FaceDistanceSample> {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             return emptyList()
@@ -40,21 +42,39 @@ class ProximityCameraSampler(private val context: Context) {
         do {
             val captureBudgetMillis = (deadline - System.currentTimeMillis()).coerceAtMost(1_500L)
             if (captureBudgetMillis < 750L) break
-            captureFaceDistance(maxDurationMillis = captureBudgetMillis)?.let(samples::add)
+            captureFaceDistance(
+                maxDurationMillis = captureBudgetMillis,
+                publishDebugFrame = publishDebugFrame,
+            )?.let(samples::add)
             val remaining = deadline - System.currentTimeMillis()
             if (remaining > sampleIntervalMillis) delay(sampleIntervalMillis.coerceAtLeast(300L))
         } while (System.currentTimeMillis() < deadline)
         return samples
     }
 
-    suspend fun captureFaceDistance(maxDurationMillis: Long = 2_000L): FaceDistanceSample? {
+    suspend fun captureFaceDistance(
+        maxDurationMillis: Long = 2_000L,
+        publishDebugFrame: Boolean = false,
+    ): FaceDistanceSample? {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             return null
         }
         val timeoutMillis = maxDurationMillis.coerceIn(750L, 2_500L)
+        val captureStartedAt = System.currentTimeMillis()
         val capture = withTimeoutOrNull(timeoutMillis) { capturePreviewFrame() } ?: return null
+        val cameraLatencyMillis = System.currentTimeMillis() - captureStartedAt
         val bitmap = BitmapFactory.decodeByteArray(capture.bytes, 0, capture.bytes.size) ?: return null
-        return FaceDistanceAnalyzer().analyze(bitmap, capture.rotationDegrees)
+        return try {
+            val sample = FaceDistanceAnalyzer()
+                .analyze(bitmap, capture.rotationDegrees)
+                ?.copy(cameraLatencyMillis = cameraLatencyMillis)
+            if (publishDebugFrame) {
+                DeveloperDebugFrameStore.publish(bitmap, sample)
+            }
+            sample
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     @SuppressLint("MissingPermission")

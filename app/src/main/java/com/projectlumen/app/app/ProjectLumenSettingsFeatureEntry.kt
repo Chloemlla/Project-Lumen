@@ -25,10 +25,13 @@ internal class ProjectLumenSettingsFeatureEntry(
     private val calibrateProximityMonitoring: () -> Unit,
     private val startLightMonitoring: () -> Unit,
     private val stopLightMonitoring: () -> Unit,
+    private val startDeveloperDebugService: () -> Unit,
+    private val stopDeveloperDebugService: () -> Unit,
 ) {
     fun applyStartupMonitoring(settings: AppSettingsEntity) {
         if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) scheduleProximityMonitoring()
         applyLightMonitoringSettings(settings)
+        applyDeveloperDebugSettings(settings)
     }
 
     fun updateSettings(transform: (AppSettingsEntity) -> AppSettingsEntity) {
@@ -44,11 +47,17 @@ internal class ProjectLumenSettingsFeatureEntry(
                     current.proximityAlertCooldownSeconds != updated.proximityAlertCooldownSeconds ||
                     current.blinkMonitoringEnabled != updated.blinkMonitoringEnabled ||
                     current.blinkNoBlinkThresholdSeconds != updated.blinkNoBlinkThresholdSeconds ||
-                    current.blinkAlertCooldownSeconds != updated.blinkAlertCooldownSeconds
+                    current.blinkAlertCooldownSeconds != updated.blinkAlertCooldownSeconds ||
+                    current.developerModeEnabled != updated.developerModeEnabled ||
+                    current.developerTickIntervalSeconds != updated.developerTickIntervalSeconds ||
+                    current.developerTimeTriggerEnabled != updated.developerTimeTriggerEnabled ||
+                    current.developerStillnessTriggerEnabled != updated.developerStillnessTriggerEnabled ||
+                    current.developerShakeSuppressionEnabled != updated.developerShakeSuppressionEnabled
                 )
             runtimeEntry.applySettingsToActiveRuntime(updated, nowMillis)
             if (shouldRescheduleProximity) scheduleProximityMonitoring()
             applyLightMonitoringSettings(updated)
+            applyDeveloperDebugSettings(updated)
         }
     }
 
@@ -171,6 +180,14 @@ internal class ProjectLumenSettingsFeatureEntry(
             startLightMonitoring()
         } else {
             stopLightMonitoring()
+        }
+    }
+
+    private fun applyDeveloperDebugSettings(settings: AppSettingsEntity) {
+        if (settings.developerModeEnabled) {
+            startDeveloperDebugService()
+        } else {
+            stopDeveloperDebugService()
         }
     }
 }

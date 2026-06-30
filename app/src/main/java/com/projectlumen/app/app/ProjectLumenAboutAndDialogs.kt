@@ -49,6 +49,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -200,15 +201,36 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun AboutScreen(viewModel: ProjectLumenViewModel) {
     val versionLabel = rememberBuildVersionLabel()
+    val context = LocalContext.current
+    var versionTapCount by rememberSaveable { mutableIntStateOf(0) }
 
     LumenPage {
-        AboutHeroCard(versionLabel = versionLabel)
+        AboutHeroCard(
+            versionLabel = versionLabel,
+            onVersionClick = {
+                versionTapCount += 1
+                when {
+                    versionTapCount in 3..6 -> {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.developer_unlock_steps, 7 - versionTapCount),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                    versionTapCount >= 7 -> {
+                        viewModel.updateSettings { current -> current.copy(developerModeEnabled = true) }
+                        Toast.makeText(context, context.getString(R.string.developer_unlocked), Toast.LENGTH_SHORT).show()
+                        versionTapCount = 0
+                    }
+                }
+            },
+        )
         AboutLinksCard(viewModel)
     }
 }
 
 @Composable
-internal fun AboutHeroCard(versionLabel: String) {
+internal fun AboutHeroCard(versionLabel: String, onVersionClick: () -> Unit) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -219,7 +241,12 @@ internal fun AboutHeroCard(versionLabel: String) {
         ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(Icons.Outlined.Info, R.string.app_name)
-            Text(versionLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                versionLabel,
+                modifier = Modifier.clickable(onClick = onVersionClick),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
             Text(
                 stringResource(R.string.about_body),
                 style = MaterialTheme.typography.bodyLarge,

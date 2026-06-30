@@ -8,6 +8,7 @@ import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
+import com.projectlumen.app.core.debug.DeveloperDebugOverlayService
 import com.projectlumen.app.core.lifecycle.AppLifecycleCoordinator
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.services.AudioService
@@ -74,5 +75,17 @@ class ProjectLumenApplication : Application() {
 
     fun stopLightMonitoring() {
         LightMonitorService.stop(this)
+    }
+
+    fun startDeveloperDebugService() {
+        DeveloperDebugOverlayService.start(this)
+    }
+
+    fun stopDeveloperDebugService() {
+        DeveloperDebugOverlayService.stop(this)
+    }
+
+    fun simulateDeveloperLowMemory() {
+        DeveloperDebugOverlayService.simulateLowMemory(this)
     }
 }

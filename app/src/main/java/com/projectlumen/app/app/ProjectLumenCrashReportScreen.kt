@@ -77,6 +77,7 @@ private const val CRASH_STACK_COLLAPSED_LINES = 18
 internal fun CrashReportScreen(
     report: CrashReport,
     onContinue: (() -> Unit)? = null,
+    clearStoredReportOnContinue: Boolean = true,
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
@@ -221,7 +222,9 @@ internal fun CrashReportScreen(
                     )
                 },
                 onClear = {
-                    (context.applicationContext as? ProjectLumenApplication)?.crashReports?.clear()
+                    if (clearStoredReportOnContinue) {
+                        (context.applicationContext as? ProjectLumenApplication)?.crashReports?.clear()
+                    }
                     Toast.makeText(context, context.getString(R.string.crash_report_cleared), Toast.LENGTH_SHORT).show()
                     onContinue?.invoke()
                 },

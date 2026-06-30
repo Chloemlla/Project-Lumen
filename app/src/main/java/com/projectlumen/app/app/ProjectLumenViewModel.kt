@@ -32,6 +32,9 @@ class ProjectLumenViewModel(
     calibrateProximityMonitoring: () -> Unit,
     startLightMonitoring: () -> Unit,
     stopLightMonitoring: () -> Unit,
+    startDeveloperDebugService: () -> Unit,
+    stopDeveloperDebugService: () -> Unit,
+    private val simulateDeveloperLowMemory: () -> Unit,
 ) : ViewModel() {
     private val repositories = ProjectLumenRepositories(database, eyeCarePreferences)
     private val now = MutableStateFlow(System.currentTimeMillis())
@@ -59,6 +62,8 @@ class ProjectLumenViewModel(
         calibrateProximityMonitoring = calibrateProximityMonitoring,
         startLightMonitoring = startLightMonitoring,
         stopLightMonitoring = stopLightMonitoring,
+        startDeveloperDebugService = startDeveloperDebugService,
+        stopDeveloperDebugService = stopDeveloperDebugService,
     )
     private val templatesEntry = ProjectLumenTemplatesFeatureEntry(
         scope = viewModelScope,
@@ -128,6 +133,7 @@ class ProjectLumenViewModel(
     fun setThemeMode(mode: AppThemeMode) = settingsEntry.setThemeMode(mode)
     fun setAutoUpdateCheckEnabled(enabled: Boolean) = settingsEntry.setAutoUpdateCheckEnabled(enabled)
     fun updateDailyGoal(transform: (DailyGoalEntity) -> DailyGoalEntity) = settingsEntry.updateDailyGoal(transform)
+    fun simulateLowMemory() = simulateDeveloperLowMemory()
 
     fun selectTemplate(templateId: Long) = templatesEntry.selectTemplate(templateId)
     fun updateTemplateSystemBackground(template: TipTemplateEntity, backgroundValue: String, primaryColor: String) =

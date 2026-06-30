@@ -13,4 +13,5 @@ object NotificationIds {
     const val LOW_LIGHT_FOREGROUND = 9201
     const val LOW_LIGHT_WARNING = 9202
     const val OVERLAY_FOREGROUND = 9301
+    const val DEVELOPER_DEBUG_FOREGROUND = 9401
 }

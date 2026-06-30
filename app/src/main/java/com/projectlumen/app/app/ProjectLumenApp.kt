@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Spa
@@ -88,6 +89,7 @@ internal enum class Destination(
     SETTINGS("settings", R.string.nav_settings, Icons.Outlined.Settings),
     TEMPLATES("templates", R.string.nav_templates, Icons.Outlined.Style, false),
     ABOUT("about", R.string.nav_about, Icons.Outlined.Info, false),
+    DEVELOPER("developer", R.string.nav_developer, Icons.Outlined.Code, false),
     WEB("web", R.string.about_external_link_prompt_title, Icons.AutoMirrored.Outlined.OpenInNew, false),
 }
 
@@ -123,6 +125,7 @@ fun ProjectLumenApp(
     var autoCheckStarted by rememberSaveable { mutableStateOf(false) }
     val checkingUpdate = updateDialogState is UpdateDialogState.Checking
     var activeCrashReport by remember(crashReport) { mutableStateOf(crashReport) }
+    var activeCrashReportClearsStore by remember(crashReport) { mutableStateOf(crashReport != null) }
 
     fun triggerUpdateCheck(manual: Boolean) {
         coroutineScope.launch {
@@ -204,6 +207,7 @@ fun ProjectLumenApp(
                 CrashReportScreen(
                     report = report,
                     onContinue = { activeCrashReport = null },
+                    clearStoredReportOnContinue = activeCrashReportClearsStore,
                 )
                 return@ProjectLumenTheme
             }
@@ -302,10 +306,21 @@ fun ProjectLumenApp(
                             onManualUpdateCheck = { triggerUpdateCheck(manual = true) },
                             openTemplates = { navController.navigate(Destination.TEMPLATES.route) },
                             openAbout = { navController.navigate(Destination.ABOUT.route) },
+                            openDeveloperOptions = { navController.navigate(Destination.DEVELOPER.route) },
                         )
                     }
                     composable(Destination.TEMPLATES.route) { TemplatesScreen(uiState, viewModel) }
                     composable(Destination.ABOUT.route) { AboutScreen(viewModel) }
+                    composable(Destination.DEVELOPER.route) {
+                        DeveloperDebugScreen(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            onPreviewCrashReport = { report ->
+                                activeCrashReportClearsStore = false
+                                activeCrashReport = report
+                            },
+                        )
+                    }
                 }
             }
             if (updateDialogState !is UpdateDialogState.Hidden) {

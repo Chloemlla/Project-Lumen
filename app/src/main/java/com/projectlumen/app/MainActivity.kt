@@ -34,6 +34,9 @@ class MainActivity : ComponentActivity() {
                             calibrateProximityMonitoring = app::calibrateProximityMonitoring,
                             startLightMonitoring = app::startLightMonitoring,
                             stopLightMonitoring = app::stopLightMonitoring,
+                            startDeveloperDebugService = app::startDeveloperDebugService,
+                            stopDeveloperDebugService = app::stopDeveloperDebugService,
+                            simulateDeveloperLowMemory = app::simulateDeveloperLowMemory,
                         ) as T
                     }
                 },

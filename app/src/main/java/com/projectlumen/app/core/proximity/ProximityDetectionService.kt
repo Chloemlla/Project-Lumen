@@ -14,6 +14,7 @@ import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
+import com.projectlumen.app.core.debug.DeveloperDebugFrameStore
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
 import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.time.todayKey
@@ -40,17 +41,64 @@ class ProximityDetectionService : Service() {
             },
         )
         val calibrate = intent?.getBooleanExtra(EXTRA_CALIBRATE, false) == true
+        val now = System.currentTimeMillis()
+        scope.launch {
+            recordForegroundServiceStart(app, now, flags)
+        }
         scope.launch {
             runCatching { runDetection(app, calibrate) }
                 .onFailure { clearActiveState(app) }
             stopSelf(startId)
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     override fun onDestroy() {
+        val app = application as? ProjectLumenApplication
+        if (app != null) {
+            CoroutineScope(Dispatchers.IO).launch { recordForegroundServiceStop(app, System.currentTimeMillis()) }
+        }
         scope.cancel()
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        val app = application as? ProjectLumenApplication
+        if (app != null) {
+            scope.launch {
+                val now = System.currentTimeMillis()
+                app.database.runtimeStateDao().get()?.let {
+                    app.database.runtimeStateDao().upsert(
+                        it.copy(
+                            foregroundServiceLastTaskRemovedAt = now,
+                            updatedAt = now,
+                        ),
+                    )
+                }
+            }
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
+    override fun onTrimMemory(level: Int) {
+        if (level >= TRIM_MEMORY_RUNNING_CRITICAL) {
+            DeveloperDebugFrameStore.clear()
+            val app = application as? ProjectLumenApplication
+            if (app != null) {
+                scope.launch {
+                    val now = System.currentTimeMillis()
+                    app.database.runtimeStateDao().get()?.let {
+                        app.database.runtimeStateDao().upsert(
+                            it.copy(
+                                developerLastLowMemorySimulatedAt = now,
+                                updatedAt = now,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+        super.onTrimMemory(level)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -74,7 +122,10 @@ class ProximityDetectionService : Service() {
             ).coerceIn(2, 15)
             else -> settings.proximityCaptureSeconds.coerceIn(1, 2)
         }
-        val samples = ProximityCameraSampler(this).captureFaceDistanceSamples(captureSeconds * 1000L)
+        val samples = ProximityCameraSampler(this).captureFaceDistanceSamples(
+            durationMillis = captureSeconds * 1000L,
+            publishDebugFrame = latestSettingsNeedsDebugFrame(settings),
+        )
         val sample = samples.maxByOrNull { it.faceWidthPercent }
         val latestSettings = if (calibrate && sample != null && (sample.eyeDistancePx > 0f || sample.faceWidthPercent > 0)) {
             val updated = settings.copy(
@@ -146,10 +197,46 @@ class ProximityDetectionService : Service() {
                     proximityCloseTickAt = if (tooClose) now else 0L,
                     proximityLastWarningAt = if (shouldWarn) now else it.proximityLastWarningAt,
                     proximityLastRatioPercent = ratioPercent,
+                    proximityDebugInferenceMillis = sample?.inferenceMillis ?: it.proximityDebugInferenceMillis,
+                    proximityDebugCameraLatencyMillis = sample?.cameraLatencyMillis ?: it.proximityDebugCameraLatencyMillis,
+                    proximityDebugFaceWidthPx = sample?.faceWidthPx ?: it.proximityDebugFaceWidthPx,
                     blinkLastBlinkAt = blinkState.lastBlinkAt,
                     blinkLastWarningAt = if (blinkState.shouldWarn) now else it.blinkLastWarningAt,
                     blinkLastEyeOpenProbabilityPercent = blinkState.eyeOpenProbabilityPercent,
                     updatedAt = now,
+                ),
+            )
+        }
+    }
+
+    private fun latestSettingsNeedsDebugFrame(settings: AppSettingsEntity): Boolean {
+        return settings.developerModeEnabled &&
+            (settings.developerDebugOverlayEnabled || settings.developerDebugPreviewEnabled)
+    }
+
+    private suspend fun recordForegroundServiceStart(
+        app: ProjectLumenApplication,
+        nowMillis: Long,
+        flags: Int,
+    ) {
+        app.database.runtimeStateDao().get()?.let {
+            val restarted = flags and (START_FLAG_REDELIVERY or START_FLAG_RETRY) != 0
+            app.database.runtimeStateDao().upsert(
+                it.copy(
+                    foregroundServiceStartedAt = nowMillis,
+                    foregroundServiceLastStickyRestartAt = if (restarted) nowMillis else it.foregroundServiceLastStickyRestartAt,
+                    updatedAt = nowMillis,
+                ),
+            )
+        }
+    }
+
+    private suspend fun recordForegroundServiceStop(app: ProjectLumenApplication, nowMillis: Long) {
+        app.database.runtimeStateDao().get()?.let {
+            app.database.runtimeStateDao().upsert(
+                it.copy(
+                    foregroundServiceStoppedAt = nowMillis,
+                    updatedAt = nowMillis,
                 ),
             )
         }

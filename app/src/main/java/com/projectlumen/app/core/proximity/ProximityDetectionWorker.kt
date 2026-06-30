@@ -19,11 +19,14 @@ class ProximityDetectionWorker(
         val calibrate = inputData.getBoolean(KEY_CALIBRATE, false)
         val app = applicationContext as ProjectLumenApplication
         val settings = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences).get()
-        if (calibrate || settings?.proximityMonitoringEnabled == true || settings?.blinkMonitoringEnabled == true) {
+        val monitoringEnabled = settings?.proximityMonitoringEnabled == true || settings?.blinkMonitoringEnabled == true
+        val timeTriggerAllowed = settings?.developerModeEnabled != true || settings.developerTimeTriggerEnabled
+        val gateAllowed = settings == null || calibrate || ProximityTriggerGate(applicationContext).canRun(settings)
+        if (calibrate || (monitoringEnabled && timeTriggerAllowed && gateAllowed)) {
             ProximityDetectionService.start(applicationContext, calibrate)
         }
-        if (!calibrate && settings != null && (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled)) {
-            enqueueNext(applicationContext, settings.proximityCheckIntervalMinutes)
+        if (!calibrate && settings != null && monitoringEnabled && timeTriggerAllowed) {
+            enqueueNext(applicationContext, delaySeconds = settings.proximityIntervalSeconds())
         }
         return Result.success()
     }
@@ -33,9 +36,10 @@ class ProximityDetectionWorker(
         private const val UNIQUE_CALIBRATION_WORK = "project-lumen-proximity-calibration"
         private const val KEY_CALIBRATE = "calibrate"
 
-        fun enqueueNext(context: Context, delayMinutes: Int = 0) {
+        fun enqueueNext(context: Context, delaySeconds: Int? = null, delayMinutes: Int = 0) {
+            val delay = delaySeconds ?: delayMinutes.coerceAtLeast(0) * 60
             val request = OneTimeWorkRequestBuilder<ProximityDetectionWorker>()
-                .setInitialDelay(delayMinutes.coerceAtLeast(0).toLong(), TimeUnit.MINUTES)
+                .setInitialDelay(delay.coerceAtLeast(0).toLong(), TimeUnit.SECONDS)
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
                 UNIQUE_SAMPLE_WORK,
@@ -57,6 +61,14 @@ class ProximityDetectionWorker(
 
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_SAMPLE_WORK)
+        }
+
+        private fun com.projectlumen.app.core.database.entities.AppSettingsEntity.proximityIntervalSeconds(): Int {
+            return if (developerModeEnabled) {
+                developerTickIntervalSeconds.coerceIn(10, 30 * 60)
+            } else {
+                proximityCheckIntervalMinutes.coerceAtLeast(1) * 60
+            }
         }
     }
 }

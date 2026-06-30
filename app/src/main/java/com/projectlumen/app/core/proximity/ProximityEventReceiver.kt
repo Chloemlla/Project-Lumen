@@ -36,9 +36,11 @@ class ProximityEventReceiver : BroadcastReceiver() {
                 val app = context.applicationContext as? ProjectLumenApplication ?: return@launch
                 val settings = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences).get()
                 if (settings?.proximityMonitoringEnabled != true && settings?.blinkMonitoringEnabled != true) return@launch
+                if (settings.developerModeEnabled && !settings.developerUnlockTriggerEnabled) return@launch
                 if (!hasCameraPermission(app)) return@launch
                 if (!shouldRunEventSample(app)) return@launch
-                ProximityDetectionWorker.enqueueNext(app, delayMinutes = 0)
+                if (!ProximityTriggerGate(app).canRun(settings)) return@launch
+                ProximityDetectionWorker.enqueueNext(app, delaySeconds = 0)
             } finally {
                 pendingResult.finish()
             }
