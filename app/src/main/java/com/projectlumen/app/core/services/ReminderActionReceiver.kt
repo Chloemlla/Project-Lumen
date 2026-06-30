@@ -4,16 +4,17 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.projectlumen.app.ProjectLumenApplication
-import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
+import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.ReminderPhase
-import com.projectlumen.app.core.time.coerceElapsedSecondsSince
-import com.projectlumen.app.core.time.todayKey
+import com.projectlumen.app.core.repositories.RuntimeRepository
+import com.projectlumen.app.core.repositories.StatisticsRepository
+import com.projectlumen.app.core.runtime.ReminderEngine
+import com.projectlumen.app.core.runtime.RuntimeTransition
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlin.math.max
 
 class ReminderActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -24,58 +25,27 @@ class ReminderActionReceiver : BroadcastReceiver() {
                 val db = app.database
                 val settings = db.appSettingsDao().get()
                 val runtime = db.runtimeStateDao().get() ?: RuntimeStateEntity()
+                val runtimeRepository = RuntimeRepository(db.runtimeStateDao())
+                val statisticsRepository = StatisticsRepository(db.dailyEyeStatsDao(), db.dailyPomodoroStatsDao())
+                val reminderEngine = ReminderEngine()
                 val now = System.currentTimeMillis()
                 when (intent.action) {
                     ACTION_START_BREAK -> {
                         if (settings != null) {
-                            addWorkingSeconds(db, runtime, now)
-                            val next = runtime.copy(
-                                activeEngine = ActiveEngine.REMINDER.name,
-                                reminderPhase = ReminderPhase.RESTING.name,
-                                breakStartedAt = now,
-                                breakEndAt = now + settings.restDurationSeconds * 1000L,
-                                lastStatsTickAt = now,
-                                updatedAt = now,
-                            )
-                            db.runtimeStateDao().upsert(next)
-                            if (settings.keepAliveEnabled) app.startTimerService()
-                            if (settings.notificationEnabled) {
-                                app.notifications.scheduleBreakDone(next.breakEndAt)
-                                app.notifications.showOngoingStatus(next)
-                            }
+                            val transition = reminderEngine.startBreak(settings, runtime, now)
+                            applyTransition(app, runtimeRepository, statisticsRepository, settings, now, transition)
                         }
                     }
 
                     ACTION_SKIP_BREAK -> {
                         if (settings != null) {
-                            addWorkingSeconds(db, runtime, now)
-                            incrementEyeStats(db, now) { it.copy(skipCount = it.skipCount + 1) }
-                            val reminderAt = now + settings.warnIntervalMinutes * 60_000L
-                            val preAlertAt = if (settings.preAlertEnabled) {
-                                reminderAt - settings.preAlertSeconds * 1000L
-                            } else {
-                                reminderAt
-                            }
-                            val next = RuntimeStateEntity(
-                                activeEngine = ActiveEngine.REMINDER.name,
-                                reminderPhase = ReminderPhase.WORKING.name,
-                                reminderStartedAt = now,
-                                nextPreAlertAt = preAlertAt.coerceAtLeast(now),
-                                nextReminderAt = reminderAt,
-                                lastStatsTickAt = now,
-                                updatedAt = now,
-                            )
-                            db.runtimeStateDao().upsert(next)
-                            if (settings.keepAliveEnabled) app.startTimerService()
-                            if (settings.notificationEnabled) {
-                                app.notifications.scheduleReminder(next.nextPreAlertAt, next.nextReminderAt)
-                                app.notifications.showOngoingStatus(next)
-                            }
+                            val transition = reminderEngine.skipBreak(settings, runtime, now)
+                            applyTransition(app, runtimeRepository, statisticsRepository, settings, now, transition)
                         }
                     }
 
                     ACTION_STOP_ALL -> {
-                        db.runtimeStateDao().upsert(RuntimeStateEntity(updatedAt = now))
+                        runtimeRepository.reset(now)
                         app.notifications.cancelAllScheduled()
                         app.notifications.cancelOngoingStatus()
                         context.stopService(Intent(context, TimerForegroundService::class.java))
@@ -86,26 +56,37 @@ class ReminderActionReceiver : BroadcastReceiver() {
         }
     }
 
-    private suspend fun addWorkingSeconds(
-        db: com.projectlumen.app.core.database.AppDatabase,
-        runtime: RuntimeStateEntity,
+    private suspend fun applyTransition(
+        app: ProjectLumenApplication,
+        runtimeRepository: RuntimeRepository,
+        statisticsRepository: StatisticsRepository,
+        settings: AppSettingsEntity,
         now: Long,
+        transition: RuntimeTransition,
     ) {
-        if (db.appSettingsDao().get()?.statsEnabled == false) return
-        val seconds = now.coerceElapsedSecondsSince(max(runtime.reminderStartedAt, runtime.lastStatsTickAt))
-        if (seconds <= 0L) return
-        incrementEyeStats(db, now) { it.copy(workingSeconds = it.workingSeconds + seconds) }
+        statisticsRepository.applyEyeDelta(settings.statsEnabled, now, transition.eyeStatsDelta)
+        runtimeRepository.upsert(transition.nextRuntime)
+        refreshAfterAction(app, settings, transition.nextRuntime)
     }
 
-    private suspend fun incrementEyeStats(
-        db: com.projectlumen.app.core.database.AppDatabase,
-        now: Long,
-        transform: (DailyEyeStatsEntity) -> DailyEyeStatsEntity,
+    private fun refreshAfterAction(
+        app: ProjectLumenApplication,
+        settings: AppSettingsEntity,
+        runtime: RuntimeStateEntity,
     ) {
-        if (db.appSettingsDao().get()?.statsEnabled == false) return
-        val date = todayKey(now)
-        val current = db.dailyEyeStatsDao().get(date) ?: DailyEyeStatsEntity(statDate = date)
-        db.dailyEyeStatsDao().upsert(transform(current).copy(updatedAt = now))
+        if (settings.keepAliveEnabled) app.startTimerService()
+        if (!settings.notificationEnabled) return
+        when (runtime.activeEngine) {
+            ActiveEngine.REMINDER.name -> when (runtime.reminderPhase) {
+                ReminderPhase.WORKING.name,
+                ReminderPhase.PRE_ALERT.name,
+                ReminderPhase.AWAITING_ACTION.name -> {
+                    app.notifications.scheduleReminder(runtime.nextPreAlertAt, runtime.nextReminderAt)
+                }
+                ReminderPhase.RESTING.name -> app.notifications.scheduleBreakDone(runtime.breakEndAt)
+            }
+        }
+        app.notifications.showOngoingStatus(runtime)
     }
 
     companion object {

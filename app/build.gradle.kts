@@ -18,6 +18,18 @@ val projectLumenReleaseSigningConfigured = listOf(
     projectLumenKeyPassword,
 ).all { !it.isNullOrBlank() }
 
+fun projectLumenVersionCodeFromName(versionName: String): Int {
+    val parts = versionName
+        .substringBefore('-')
+        .substringBefore('+')
+        .split('.')
+        .map { it.toIntOrNull() ?: 0 }
+    val code = (parts.getOrElse(0) { 0 } * 10_000L) +
+        (parts.getOrElse(1) { 0 } * 100L) +
+        parts.getOrElse(2) { 0 }
+    return code.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()
+}
+
 android {
     namespace = "com.projectlumen.app"
     compileSdk = 36
@@ -29,7 +41,7 @@ android {
     val projectLumenVersionCode = providers.environmentVariable("PROJECT_LUMEN_VERSION_CODE")
         .orNull
         ?.toIntOrNull()
-        ?: 1
+        ?: projectLumenVersionCodeFromName(projectLumenVersionName)
     val projectLumenBuildTimeUtcMillis = providers.environmentVariable("PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS")
         .orNull
         ?.toLongOrNull()

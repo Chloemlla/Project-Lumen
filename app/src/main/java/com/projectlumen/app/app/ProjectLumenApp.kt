@@ -58,6 +58,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -123,6 +124,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -508,7 +510,7 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
     val reminderActive = runtime.activeEngine == ActiveEngine.REMINDER.name &&
         runtime.reminderPhase != ReminderPhase.IDLE.name
     val reminderPaused = reminderActive && runtime.reminderPhase == ReminderPhase.PAUSED.name
-    val canStartReminder = uiState.settings.reminderEnabled && !reminderActive
+    val canStartReminder = uiState.settings.reminderEnabled && runtime.activeEngine == ActiveEngine.IDLE.name
     val canPauseReminder = reminderActive && !reminderPaused
     val canResumeReminder = uiState.settings.reminderEnabled && reminderPaused
     val runWithNotificationPermission = rememberNotificationPermissionGate()
@@ -524,50 +526,44 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
         )
         StateCard(uiState.runtime, uiState.nowMillis)
         TodayStatsCard(uiState.eyeStats.firstOrNull())
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-            shape = LumenCardShape,
-            colors = LumenCardColors(),
-            elevation = LumenCardElevation(),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Button(
-                    modifier = Modifier.weight(1f),
-                    enabled = canStartReminder,
-                    onClick = { runReminderAction(viewModel::startReminder) },
-                ) {
-                    ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_reminder)
+        ActionCard {
+            SectionHeader(Icons.Outlined.Schedule, R.string.quick_actions)
+            when {
+                !uiState.settings.reminderEnabled -> EmptyStateMessage(R.string.reminder_disabled_hint)
+                !reminderActive && runtime.activeEngine != ActiveEngine.IDLE.name -> EmptyStateMessage(R.string.other_timer_running_hint)
+                canStartReminder -> {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { runReminderAction(viewModel::startReminder) },
+                    ) {
+                        ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_reminder)
+                    }
                 }
-                OutlinedButton(
-                    modifier = Modifier.weight(1f),
-                    enabled = canPauseReminder,
-                    onClick = viewModel::pauseReminder,
-                ) {
-                    ButtonLabel(Icons.Outlined.Pause, R.string.pause)
+                canPauseReminder -> {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            onClick = viewModel::pauseReminder,
+                        ) {
+                            ButtonLabel(Icons.Outlined.Pause, R.string.pause)
+                        }
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f),
+                            onClick = viewModel::pauseForOneHour,
+                        ) {
+                            ButtonLabel(Icons.Outlined.Schedule, R.string.silent_until)
+                        }
+                    }
                 }
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                enabled = canPauseReminder,
-                onClick = viewModel::pauseForOneHour,
-            ) {
-                ButtonLabel(Icons.Outlined.Schedule, R.string.silent_until)
-            }
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                enabled = canResumeReminder,
-                onClick = { runReminderAction(viewModel::resumeReminder) },
-            ) {
-                ButtonLabel(Icons.Outlined.Refresh, R.string.resume_now)
+                canResumeReminder -> {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { runReminderAction(viewModel::resumeReminder) },
+                    ) {
+                        ButtonLabel(Icons.Outlined.Refresh, R.string.resume_now)
+                    }
+                }
+                else -> EmptyStateMessage(R.string.reminder_idle_hint)
             }
         }
     }
@@ -577,15 +573,29 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
 private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
     val runtime = uiState.runtime
     val template = activeTemplate(uiState)
+    val reminderActive = runtime.activeEngine == ActiveEngine.REMINDER.name &&
+        runtime.reminderPhase != ReminderPhase.IDLE.name
     val isResting = runtime.reminderPhase == ReminderPhase.RESTING.name
-    val canSkip = runtime.activeEngine == ActiveEngine.REMINDER.name &&
+    val canStartBreak = uiState.settings.reminderEnabled &&
+        reminderActive &&
+        runtime.reminderPhase in setOf(
+            ReminderPhase.WORKING.name,
+            ReminderPhase.PRE_ALERT.name,
+            ReminderPhase.AWAITING_ACTION.name,
+        )
+    val canSkip = !uiState.settings.disableSkip &&
+        reminderActive &&
         runtime.reminderPhase in setOf(
             ReminderPhase.PRE_ALERT.name,
             ReminderPhase.AWAITING_ACTION.name,
             ReminderPhase.RESTING.name,
         )
+    val runWithNotificationPermission = rememberNotificationPermissionGate()
+    fun runReminderAction(action: () -> Unit) {
+        if (uiState.settings.notificationEnabled) runWithNotificationPermission(action) else action()
+    }
     LumenPage(horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
         TemplatePreviewCard(template)
         PageIntro(
             icon = Icons.Outlined.Spa,
@@ -598,22 +608,51 @@ private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
             progress = if (isResting) progress(runtime.breakStartedAt, runtime.breakEndAt, uiState.nowMillis) else 0f,
             fallbackText = statusLabel(runtime),
         )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                modifier = Modifier.weight(1f),
-                enabled = uiState.settings.reminderEnabled && !isResting,
-                onClick = viewModel::startBreak,
-            ) {
-                ButtonLabel(Icons.Outlined.Spa, R.string.start_break)
-            }
-            if (!uiState.settings.disableSkip) {
-                OutlinedButton(
-                    modifier = Modifier.weight(1f),
-                    enabled = canSkip,
-                    onClick = viewModel::skipBreak,
-                ) {
-                    ButtonLabel(Icons.Outlined.SkipNext, R.string.skip_break)
+        ActionCard {
+            SectionHeader(Icons.Outlined.Spa, R.string.quick_actions)
+            when {
+                !uiState.settings.reminderEnabled -> EmptyStateMessage(R.string.reminder_disabled_hint)
+                canStartBreak && canSkip -> {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            onClick = viewModel::startBreak,
+                        ) {
+                            ButtonLabel(Icons.Outlined.Spa, R.string.start_break)
+                        }
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f),
+                            onClick = viewModel::skipBreak,
+                        ) {
+                            ButtonLabel(Icons.Outlined.SkipNext, R.string.skip_break)
+                        }
+                    }
                 }
+                canStartBreak -> {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::startBreak,
+                    ) {
+                        ButtonLabel(Icons.Outlined.Spa, R.string.start_break)
+                    }
+                }
+                canSkip -> {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::skipBreak,
+                    ) {
+                        ButtonLabel(Icons.Outlined.SkipNext, R.string.skip_break)
+                    }
+                }
+                !reminderActive && runtime.activeEngine == ActiveEngine.IDLE.name -> {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { runReminderAction(viewModel::startReminder) },
+                    ) {
+                        ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_reminder)
+                    }
+                }
+                else -> EmptyStateMessage(R.string.break_action_unavailable)
             }
         }
     }
@@ -623,6 +662,7 @@ private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
 private fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
     val runtime = uiState.runtime
     val running = runtime.activeEngine == ActiveEngine.POMODORO.name && runtime.pomodoroPhase != PomodoroPhase.IDLE.name
+    val canStartPomodoro = uiState.settings.pomodoroEnabled && runtime.activeEngine == ActiveEngine.IDLE.name
     val runWithNotificationPermission = rememberNotificationPermissionGate()
     fun runPomodoroAction(action: () -> Unit) {
         if (uiState.settings.notificationEnabled) runWithNotificationPermission(action) else action()
@@ -638,20 +678,27 @@ private fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumen
             progress = if (running) progress(runtime.pomodoroPhaseStartedAt, runtime.pomodoroPhaseEndAt, uiState.nowMillis) else 0f,
             fallbackText = stringResource(R.string.status_ready),
         )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                modifier = Modifier.weight(1f),
-                enabled = uiState.settings.pomodoroEnabled && !running,
-                onClick = { runPomodoroAction(viewModel::startPomodoro) },
-            ) {
-                ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_pomodoro)
-            }
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                enabled = running,
-                onClick = viewModel::stopPomodoro,
-            ) {
-                ButtonLabel(Icons.Outlined.Stop, R.string.stop_pomodoro)
+        ActionCard {
+            SectionHeader(Icons.Outlined.LocalCafe, R.string.quick_actions)
+            when {
+                !uiState.settings.pomodoroEnabled -> EmptyStateMessage(R.string.pomodoro_disabled_hint)
+                running -> {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::stopPomodoro,
+                    ) {
+                        ButtonLabel(Icons.Outlined.Stop, R.string.stop_pomodoro)
+                    }
+                }
+                canStartPomodoro -> {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { runPomodoroAction(viewModel::startPomodoro) },
+                    ) {
+                        ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_pomodoro)
+                    }
+                }
+                else -> EmptyStateMessage(R.string.other_timer_running_hint)
             }
         }
     }
@@ -689,20 +736,27 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                 MetricRow(R.string.rest_time, minutesLabel(((pomodoro?.totalBreakSeconds ?: 0L) / 60L).toInt()))
             }
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                modifier = Modifier.weight(1f),
-                enabled = hasExportableStats,
-                onClick = viewModel::shareStatistics,
-            ) {
-                ButtonLabel(Icons.Outlined.FileDownload, R.string.export_csv)
-            }
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                enabled = hasExportableStats,
-                onClick = viewModel::shareStatisticsImage,
-            ) {
-                ButtonLabel(Icons.Outlined.BarChart, R.string.share_stats_image)
+        ActionCard {
+            SectionHeader(Icons.Outlined.FileDownload, R.string.statistics_export)
+            if (hasExportableStats) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = viewModel::shareStatistics,
+                    ) {
+                        ButtonLabel(Icons.Outlined.FileDownload, R.string.export_csv)
+                    }
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = viewModel::shareStatisticsImage,
+                    ) {
+                        ButtonLabel(Icons.Outlined.BarChart, R.string.share_stats_image)
+                    }
+                }
+            } else {
+                EmptyStateMessage(
+                    if (statsEnabled) R.string.statistics_no_export_data else R.string.statistics_disabled,
+                )
             }
         }
     }
@@ -806,10 +860,11 @@ private fun SettingsScreen(
         }
         SettingsSection(R.string.about_update_status, Icons.Outlined.Sync) {
             if (checkingUpdate) {
-                Text(stringResource(R.string.about_update_checking), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            OutlinedButton(onClick = onManualUpdateCheck, enabled = !checkingUpdate) {
-                ButtonLabel(Icons.Outlined.Sync, R.string.about_check_updates)
+                StatusLine(Icons.Outlined.Sync, stringResource(R.string.about_update_checking))
+            } else {
+                OutlinedButton(onClick = onManualUpdateCheck) {
+                    ButtonLabel(Icons.Outlined.Sync, R.string.about_check_updates)
+                }
             }
         }
         SettingsSection(R.string.section_notifications, Icons.Outlined.NotificationsActive) {
@@ -846,17 +901,12 @@ private fun SettingsScreen(
                     onClick = { openExactAlarmSettings(context) },
                 )
             }
-            Button(onClick = {
-                if (notificationPermissionNeeded) {
-                    runWithNotificationPermission { viewModel.setNotificationsEnabled(true) }
-                } else {
+            if (!notificationPermissionNeeded) {
+                OutlinedButton(onClick = {
                     openAppNotificationSettings(context)
+                }) {
+                    ButtonLabel(Icons.AutoMirrored.Outlined.OpenInNew, R.string.notification_system_settings)
                 }
-            }) {
-                ButtonLabel(
-                    if (notificationPermissionNeeded) Icons.Outlined.NotificationsActive else Icons.AutoMirrored.Outlined.OpenInNew,
-                    if (notificationPermissionNeeded) R.string.allow_notifications else R.string.notification_system_settings,
-                )
             }
         }
         SettingsSection(R.string.section_keep_alive, Icons.Outlined.Schedule) {
@@ -1065,7 +1115,7 @@ private fun TrendCard(uiState: ProjectLumenUiState) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.weekly_trend)
             if (recent.isEmpty()) {
-                Text(stringResource(R.string.not_set), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                EmptyStateMessage(R.string.statistics_no_trend_data)
             } else {
                 val maxSeconds = recent.maxOf { max(it.workingSeconds, 1L) }
                 recent.forEach { stat ->
@@ -1150,7 +1200,13 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                     FilterChip(
                         selected = selected,
                         onClick = { viewModel.selectTemplate(template.id) },
-                        label = { Text(stringResource(R.string.active_template)) },
+                        label = {
+                            Text(
+                                stringResource(
+                                    if (selected) R.string.active_template else R.string.use_template,
+                                ),
+                            )
+                        },
                         leadingIcon = {
                             AnimatedVisibility(
                                 visible = selected,
@@ -1168,11 +1224,12 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                         }) {
                             ButtonLabel(Icons.Outlined.FileDownload, R.string.choose_template_image)
                         }
-                        OutlinedButton(
-                            enabled = template.imagePath.isNotBlank(),
-                            onClick = { viewModel.updateTemplateImage(template, "") },
-                        ) {
-                            Text(stringResource(R.string.clear_custom_file))
+                        if (template.imagePath.isNotBlank()) {
+                            OutlinedButton(
+                                onClick = { viewModel.updateTemplateImage(template, "") },
+                            ) {
+                                Text(stringResource(R.string.clear_custom_file))
+                            }
                         }
                     }
                 }
@@ -1246,28 +1303,6 @@ private fun AboutLinksCard(viewModel: ProjectLumenViewModel) {
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL, viewModel)
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL, viewModel)
-        }
-    }
-}
-
-@Composable
-private fun AboutUpdateCard(
-    checkingUpdate: Boolean,
-    manualCheckError: String?,
-    onManualCheck: () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = LumenCardColors(), elevation = LumenCardElevation()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeader(Icons.Outlined.Sync, R.string.about_update_status)
-            if (checkingUpdate) {
-                Text(stringResource(R.string.about_update_checking), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            manualCheckError?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
-            OutlinedButton(onClick = onManualCheck, enabled = !checkingUpdate) {
-                ButtonLabel(Icons.Outlined.Sync, R.string.about_check_updates)
-            }
         }
     }
 }
@@ -1696,9 +1731,13 @@ private fun TemplatePreviewCard(template: TipTemplateEntity?) {
 
 @Composable
 private fun PageIntro(icon: ImageVector, @StringRes titleRes: Int, message: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(stringResource(titleRes), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text(message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -1715,9 +1754,18 @@ private fun InlineHeader(icon: ImageVector, text: String) {
 
 @Composable
 private fun SectionHeader(icon: ImageVector, @StringRes titleRes: Int) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(stringResource(titleRes), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            stringResource(titleRes),
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -1739,6 +1787,55 @@ private fun SettingsSection(@StringRes titleRes: Int, icon: ImageVector, content
 }
 
 @Composable
+private fun ActionCard(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+        colors = LumenCardColors(),
+        elevation = LumenCardElevation(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun EmptyStateMessage(@StringRes messageRes: Int) {
+    Text(
+        text = stringResource(messageRes),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(12.dp),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+}
+
+@Composable
+private fun StatusLine(icon: ImageVector, text: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
 private fun FileSettingRow(
     @StringRes labelRes: Int,
     path: String,
@@ -1753,15 +1850,19 @@ private fun FileSettingRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(modifier = Modifier.weight(1f), onClick = onChoose) {
+            OutlinedButton(
+                modifier = Modifier.weight(if (path.isBlank()) 1f else 0.62f),
+                onClick = onChoose,
+            ) {
                 ButtonLabel(Icons.Outlined.FileDownload, R.string.choose_custom_file)
             }
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                enabled = path.isNotBlank(),
-                onClick = onClear,
-            ) {
-                Text(stringResource(R.string.clear_custom_file))
+            if (path.isNotBlank()) {
+                OutlinedButton(
+                    modifier = Modifier.weight(0.38f),
+                    onClick = onClear,
+                ) {
+                    Text(stringResource(R.string.clear_custom_file))
+                }
             }
         }
     }
@@ -1868,7 +1969,7 @@ private fun SwitchRow(@StringRes labelRes: Int, icon: ImageVector, checked: Bool
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LabelWithIcon(icon, labelRes)
+        LabelWithIcon(icon, labelRes, Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
@@ -1885,7 +1986,7 @@ private fun NumberSlider(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            LabelWithIcon(icon, labelRes)
+            LabelWithIcon(icon, labelRes, Modifier.weight(1f))
             AnimatedContent(
                 targetState = valueLabel,
                 transitionSpec = {
@@ -1907,8 +2008,8 @@ private fun NumberSlider(
 }
 
 @Composable
-private fun LabelWithIcon(icon: ImageVector, @StringRes labelRes: Int) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun LabelWithIcon(icon: ImageVector, @StringRes labelRes: Int, modifier: Modifier = Modifier) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge)
     }
@@ -2010,13 +2111,15 @@ private fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Star
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.TopCenter,
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .widthIn(max = 720.dp)
                 .verticalScroll(rememberScrollState())
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
-                .padding(PaddingValues(16.dp)),
+                .padding(PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 24.dp)),
             horizontalAlignment = horizontalAlignment,
             verticalArrangement = Arrangement.spacedBy(16.dp),
             content = content,
@@ -2166,8 +2269,11 @@ private fun rememberBuildVersionLabel(): String {
 }
 
 private fun chooseFallbackAsset(assets: List<ReleaseAsset>): ReleaseAsset? {
-    return assets.firstOrNull { it.name.contains("universal", ignoreCase = true) }
-        ?: assets.firstOrNull { it.name.contains("all", ignoreCase = true) }
+    val verifiedApks = assets.filter { asset ->
+        asset.name.endsWith(".apk", ignoreCase = true) && !asset.sha256.isNullOrBlank()
+    }
+    return verifiedApks.firstOrNull { it.name.contains("universal", ignoreCase = true) }
+        ?: verifiedApks.firstOrNull { it.name.contains("all", ignoreCase = true) }
 }
 
 private fun openAppNotificationSettings(context: Context) {

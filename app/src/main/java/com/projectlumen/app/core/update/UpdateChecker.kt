@@ -50,6 +50,8 @@ class UpdateChecker(
             }
             val payload = connection.inputStream.bufferedReader().use { it.readText() }
             val json = JSONObject(payload)
+            val releaseAssets = parseReleaseAssets(json)
+            val checksums = parseSha256Checksums(json.optString("body")) + fetchSha256ChecksumAssets(releaseAssets)
             return ReleaseInfo(
                 tagName = json.optString("tag_name").orEmpty(),
                 releaseName = json.optString("name").ifBlank { json.optString("tag_name").orEmpty() },
@@ -57,29 +59,102 @@ class UpdateChecker(
                 htmlUrl = json.optString("html_url").orEmpty(),
                 publishedAtUtcMillis = parseInstant(json.optString("published_at"))
                     ?: throw IOException("Release published_at is missing or invalid"),
-                assets = json.optJSONArray("assets")
-                    ?.let { array ->
-                        buildList {
-                            for (index in 0 until array.length()) {
-                                val asset = array.optJSONObject(index) ?: continue
-                                val name = asset.optString("name").orEmpty()
-                                val downloadUrl = asset.optString("browser_download_url").orEmpty()
-                                if (name.isBlank() || downloadUrl.isBlank()) continue
-                                add(
-                                    ReleaseAsset(
-                                        name = name,
-                                        downloadUrl = downloadUrl,
-                                        contentType = asset.optString("content_type").takeIf { it.isNotBlank() },
-                                    ),
-                                )
-                            }
-                        }
+                assets = releaseAssets.map { asset ->
+                    if (asset.name.endsWith(".apk", ignoreCase = true)) {
+                        asset.copy(sha256 = checksums[normalizeChecksumName(asset.name)])
+                    } else {
+                        asset
                     }
-                    .orEmpty(),
+                },
             )
         } finally {
             connection.disconnect()
         }
+    }
+
+    private fun parseReleaseAssets(json: JSONObject): List<ReleaseAsset> {
+        return json.optJSONArray("assets")
+            ?.let { array ->
+                buildList {
+                    for (index in 0 until array.length()) {
+                        val asset = array.optJSONObject(index) ?: continue
+                        val name = asset.optString("name").orEmpty()
+                        val downloadUrl = asset.optString("browser_download_url").orEmpty()
+                        if (name.isBlank() || downloadUrl.isBlank()) continue
+                        add(
+                            ReleaseAsset(
+                                name = name,
+                                downloadUrl = downloadUrl,
+                                contentType = asset.optString("content_type").takeIf { it.isNotBlank() },
+                            ),
+                        )
+                    }
+                }
+            }
+            .orEmpty()
+    }
+
+    private fun fetchSha256ChecksumAssets(assets: List<ReleaseAsset>): Map<String, String> {
+        return assets
+            .filter { asset ->
+                !asset.name.endsWith(".apk", ignoreCase = true) &&
+                    normalizeName(asset.name).let { it.contains("checksum") || it.contains("sha256") }
+            }
+            .fold(emptyMap()) { checksums, asset ->
+                val assetChecksums = fetchTextAsset(asset.downloadUrl)
+                    ?.let(::parseSha256Checksums)
+                    .orEmpty()
+                checksums + assetChecksums
+            }
+    }
+
+    private fun fetchTextAsset(url: String): String? {
+        val connection = openHttpConnection(url).apply {
+            requestMethod = "GET"
+            connectTimeout = REQUEST_TIMEOUT_MILLIS
+            readTimeout = REQUEST_TIMEOUT_MILLIS
+            setRequestProperty("Accept", "text/plain, application/octet-stream")
+            setRequestProperty("User-Agent", USER_AGENT)
+        }
+        return try {
+            if (connection.responseCode !in 200..299) {
+                null
+            } else {
+                connection.inputStream.bufferedReader().use { it.readText() }
+            }
+        } catch (_: IOException) {
+            null
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun parseSha256Checksums(text: String): Map<String, String> {
+        if (text.isBlank()) return emptyMap()
+        return buildMap {
+            text.lineSequence().forEach { rawLine ->
+                val line = rawLine.trim()
+                val match = SHA256_REGEX.find(line) ?: return@forEach
+                val hash = match.value.lowercase()
+                val beforeHash = line.substring(0, match.range.first)
+                val afterHash = line.substring(match.range.last + 1)
+                val assetName = (apkFileNames(afterHash) + apkFileNames(beforeHash)).firstOrNull()
+                    ?: return@forEach
+                put(normalizeChecksumName(assetName), hash)
+            }
+        }
+    }
+
+    private fun apkFileNames(value: String): List<String> {
+        return APK_FILE_NAME_REGEX.findAll(value)
+            .map { it.value.substringAfterLast('/') }
+            .toList()
+    }
+
+    private fun normalizeChecksumName(value: String): String {
+        return value.substringAfterLast('/')
+            .lowercase()
+            .trim()
     }
 
     private fun openHttpConnection(url: String): HttpURLConnection {
@@ -138,7 +213,9 @@ class UpdateChecker(
     }
 
     private fun selectBestAsset(assets: List<ReleaseAsset>): ReleaseAsset? {
-        val apkAssets = assets.filter { it.name.endsWith(".apk", ignoreCase = true) }
+        val apkAssets = assets.filter {
+            it.name.endsWith(".apk", ignoreCase = true) && !it.sha256.isNullOrBlank()
+        }
         if (apkAssets.isEmpty()) return null
 
         val preferredAbis = Build.SUPPORTED_ABIS.map { normalizeAbiToken(it) }
@@ -201,5 +278,7 @@ class UpdateChecker(
         private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases/latest"
         private val SHORT_HASH_IN_PARENS_REGEX = Regex("""\(([0-9a-fA-F]{7,40})\)$""")
         private val SHORT_HASH_SUFFIX_REGEX = Regex("""(?:-|_)([0-9a-fA-F]{7,40})$""")
+        private val SHA256_REGEX = Regex("""\b[0-9a-fA-F]{64}\b""")
+        private val APK_FILE_NAME_REGEX = Regex("""[A-Za-z0-9._+-]+\.apk""", RegexOption.IGNORE_CASE)
     }
 }

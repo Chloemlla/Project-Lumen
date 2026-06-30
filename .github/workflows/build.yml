@@ -36,15 +36,15 @@ jobs:
       - name: Read app version
         run: |
           VERSION_NAME=$(tr -d '\r' < app/application.version | sed -n '1{s/^[[:space:]]*//; s/[[:space:]]*$//; p;}')
-          VERSION_CODE="${GITHUB_RUN_NUMBER:-1}"
+          VERSION_CODE="${GITHUB_RUN_NUMBER:-$(date -u +%s)}"
           if ! [[ "$VERSION_CODE" =~ ^[0-9]+$ ]] || [ "$VERSION_CODE" -lt 1 ]; then
-            VERSION_CODE=1
+            VERSION_CODE="$(date -u +%s)"
           fi
           BUILD_TIME_UTC_MILLIS=$(date -u +%s%3N)
           COMMIT_HASH="${GITHUB_SHA}"
           SHORT_HASH="${GITHUB_SHA::8}"
           echo "PROJECT_LUMEN_VERSION_NAME=${VERSION_NAME:-0.0.0}" >> "$GITHUB_ENV"
-          echo "PROJECT_LUMEN_VERSION_CODE=${VERSION_CODE:-1}" >> "$GITHUB_ENV"
+          echo "PROJECT_LUMEN_VERSION_CODE=${VERSION_CODE}" >> "$GITHUB_ENV"
           echo "PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS=$BUILD_TIME_UTC_MILLIS" >> "$GITHUB_ENV"
           echo "PROJECT_LUMEN_COMMIT_HASH=$COMMIT_HASH" >> "$GITHUB_ENV"
           echo "PROJECT_LUMEN_SHORT_HASH=$SHORT_HASH" >> "$GITHUB_ENV"
