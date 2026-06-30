@@ -4,12 +4,7 @@ use crate::{
     models::{FaceAnalysisFrameUploadRequest, FaceAnalysisFrameUploadResponse},
     state::AppState,
 };
-use axum::{
-    extract::State,
-    http::HeaderMap,
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::State, http::HeaderMap, routing::post, Json, Router};
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/face-analysis/frames", post(upload_frame))

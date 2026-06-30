@@ -4,12 +4,7 @@ use crate::{
     models::{TelemetryUploadRequest, TelemetryUploadResponse},
     state::AppState,
 };
-use axum::{
-    extract::State,
-    http::HeaderMap,
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::State, http::HeaderMap, routing::post, Json, Router};
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/telemetry", post(upload))

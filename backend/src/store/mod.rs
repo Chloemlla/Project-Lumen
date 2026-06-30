@@ -19,7 +19,6 @@ use documents::{
     AdminTelemetryRecord, AdminTemplateRecord, BackupRecord, CounterRecord, EntitlementRecord,
     PendingLogin, SessionRecord, StoredSyncChange,
 };
-use telemetry::TelemetryUploadRecord;
 use face_analysis::FaceAnalysisFrameRecord;
 use mongodb::{
     bson::doc,
@@ -27,6 +26,7 @@ use mongodb::{
     Client, Collection, IndexModel,
 };
 use serde_json::json;
+use telemetry::TelemetryUploadRecord;
 
 pub use documents::UserRecord;
 
