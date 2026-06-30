@@ -1,5 +1,7 @@
 package com.projectlumen.app.app
 
+import android.content.ClipData
+import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +37,7 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -62,9 +66,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.R
 import com.projectlumen.app.core.crash.CrashReport
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -82,6 +88,7 @@ internal fun CrashReportScreen(
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     var stackExpanded by rememberSaveable(report.crashedAtMillis) { mutableStateOf(false) }
+    var shareOptionsVisible by rememberSaveable(report.crashedAtMillis) { mutableStateOf(false) }
     val formattedTime = remember(report.crashedAtMillis) {
         Instant.ofEpochMilli(report.crashedAtMillis)
             .atZone(ZoneId.systemDefault())
@@ -210,16 +217,7 @@ internal fun CrashReportScreen(
                     Toast.makeText(context, context.getString(R.string.crash_report_copied), Toast.LENGTH_SHORT).show()
                 },
                 onShare = {
-                    val intent = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.crash_report_share_subject))
-                        putExtra(Intent.EXTRA_TEXT, report.toClipboardText())
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(
-                        Intent.createChooser(intent, context.getString(R.string.crash_report_share))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
+                    shareOptionsVisible = true
                 },
                 onClear = {
                     if (clearStoredReportOnContinue) {
@@ -230,6 +228,20 @@ internal fun CrashReportScreen(
                 },
             )
         }
+    }
+
+    if (shareOptionsVisible) {
+        CrashReportShareOptionsDialog(
+            onDismiss = { shareOptionsVisible = false },
+            onShareText = {
+                shareOptionsVisible = false
+                shareCrashReportText(context, report)
+            },
+            onShareFile = {
+                shareOptionsVisible = false
+                shareCrashReportFile(context, report)
+            },
+        )
     }
 }
 
@@ -407,5 +419,122 @@ private fun CrashReportActionPanel(
                 Text(stringResource(R.string.crash_report_clear_and_continue))
             }
         }
+    }
+}
+
+@Composable
+private fun CrashReportShareOptionsDialog(
+    onDismiss: () -> Unit,
+    onShareText: () -> Unit,
+    onShareFile: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(imageVector = Icons.Outlined.Share, contentDescription = null)
+        },
+        title = {
+            Text(text = stringResource(R.string.crash_report_share_options_title))
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = stringResource(R.string.crash_report_share_options_message),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                CrashReportShareChoice(
+                    icon = Icons.Outlined.ContentCopy,
+                    title = stringResource(R.string.crash_report_share_as_text),
+                    description = stringResource(R.string.crash_report_share_as_text_description),
+                    onClick = onShareText,
+                )
+                CrashReportShareChoice(
+                    icon = Icons.Outlined.Share,
+                    title = stringResource(R.string.crash_report_share_as_file),
+                    description = stringResource(R.string.crash_report_share_as_file_description),
+                    onClick = onShareFile,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.crash_report_share_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun CrashReportShareChoice(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        contentPadding = PaddingValues(14.dp),
+    ) {
+        Icon(imageVector = icon, contentDescription = null)
+        Spacer(modifier = Modifier.size(12.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalAlignment = Alignment.Start,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun shareCrashReportText(context: Context, report: CrashReport) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.crash_report_share_subject))
+        putExtra(Intent.EXTRA_TEXT, report.toClipboardText())
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    launchCrashReportShare(context, intent)
+}
+
+private fun shareCrashReportFile(context: Context, report: CrashReport) {
+    runCatching {
+        val file = File(context.cacheDir, "project_lumen_crash_report_${report.crashedAtMillis}.txt")
+        file.writeText(report.toClipboardText(), Charsets.UTF_8)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.crash_report_share_subject))
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newUri(context.contentResolver, file.name, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        launchCrashReportShare(context, intent)
+    }.onFailure {
+        Toast.makeText(context, context.getString(R.string.crash_report_share_failed), Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun launchCrashReportShare(context: Context, intent: Intent) {
+    runCatching {
+        context.startActivity(
+            Intent.createChooser(intent, context.getString(R.string.crash_report_share))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.onFailure {
+        Toast.makeText(context, context.getString(R.string.crash_report_share_failed), Toast.LENGTH_SHORT).show()
     }
 }

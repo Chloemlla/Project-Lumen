@@ -349,6 +349,14 @@
     <string name="crash_report_clear_and_continue">清除并继续</string>
     <string name="crash_report_share">分享报告</string>
     <string name="crash_report_share_subject">Project Lumen 崩溃报告</string>
+    <string name="crash_report_share_options_title">选择分享格式</string>
+    <string name="crash_report_share_options_message">可以将报告作为纯文本快速发送，也可以作为文本文件附件分享给问题追踪或邮件应用。</string>
+    <string name="crash_report_share_as_text">作为文本分享</string>
+    <string name="crash_report_share_as_text_description">把报告内容直接填入所选应用。</string>
+    <string name="crash_report_share_as_file">作为文件分享</string>
+    <string name="crash_report_share_as_file_description">附加一份 UTF-8 .txt 崩溃报告。</string>
+    <string name="crash_report_share_cancel">取消</string>
+    <string name="crash_report_share_failed">无法分享崩溃报告。</string>
     <string name="nav_developer">开发者高级调试选项</string>
     <string name="developer_unlock_steps">还差 %1$d 步即可开启开发者模式</string>
     <string name="developer_unlocked">您已进入开发者模式</string>

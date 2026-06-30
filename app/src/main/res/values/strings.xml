@@ -350,6 +350,14 @@
     <string name="crash_report_clear_and_continue">Clear and continue</string>
     <string name="crash_report_share">Share report</string>
     <string name="crash_report_share_subject">Project Lumen crash report</string>
+    <string name="crash_report_share_options_title">Choose share format</string>
+    <string name="crash_report_share_options_message">Share the report as plain text for quick messages, or attach it as a text file for issue trackers and email.</string>
+    <string name="crash_report_share_as_text">Share as text</string>
+    <string name="crash_report_share_as_text_description">Pastes the report into the selected app.</string>
+    <string name="crash_report_share_as_file">Share as file</string>
+    <string name="crash_report_share_as_file_description">Attaches a UTF-8 .txt crash report.</string>
+    <string name="crash_report_share_cancel">Cancel</string>
+    <string name="crash_report_share_failed">Unable to share the crash report.</string>
     <string name="nav_developer">Developer advanced debug options</string>
     <string name="developer_unlock_steps">You are %1$d steps away from developer mode.</string>
     <string name="developer_unlocked">You have entered developer mode.</string>
