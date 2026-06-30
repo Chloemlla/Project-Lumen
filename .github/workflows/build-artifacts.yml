@@ -37,7 +37,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GH_TOKEN }}
 
       - name: Compute image tags
         id: image
@@ -78,7 +78,7 @@ jobs:
       - name: Publish package visibility
         if: github.event_name != 'pull_request'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           OWNER_TYPE: ${{ github.event.repository.owner.type }}
           PACKAGE_NAME: ${{ steps.image.outputs.package_name }}
