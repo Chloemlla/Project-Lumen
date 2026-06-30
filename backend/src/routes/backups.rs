@@ -4,7 +4,12 @@ use crate::{
     models::{BackupMetadata, BackupUploadRequest, LatestBackupResponse},
     state::AppState,
 };
-use axum::{extract::State, http::HeaderMap, routing::{get, post}, Json, Router};
+use axum::{
+    extract::State,
+    http::HeaderMap,
+    routing::{get, post},
+    Json, Router,
+};
 
 pub fn router() -> Router<AppState> {
     Router::new()

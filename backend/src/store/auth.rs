@@ -56,7 +56,10 @@ impl AppStore {
             .map_err(database_error)?
             .ok_or_else(|| ApiError::BadRequest("Login request was not found.".to_owned()))?;
 
-        if pending.email != email || pending.code != request.code || pending.expires_at < now_millis() {
+        if pending.email != email
+            || pending.code != request.code
+            || pending.expires_at < now_millis()
+        {
             return Err(ApiError::Unauthorized);
         }
 
@@ -109,7 +112,11 @@ impl AppStore {
             .ok_or(ApiError::Unauthorized)
     }
 
-    async fn upsert_user(&self, email: String, device_installation_id: String) -> Result<UserRecord, ApiError> {
+    async fn upsert_user(
+        &self,
+        email: String,
+        device_installation_id: String,
+    ) -> Result<UserRecord, ApiError> {
         if let Some(mut user) = self
             .users
             .find_one(doc! { "email": &email }, None)
@@ -136,7 +143,10 @@ impl AppStore {
             created_at: now_millis(),
             device_installation_id,
         };
-        self.users.insert_one(&user, None).await.map_err(database_error)?;
+        self.users
+            .insert_one(&user, None)
+            .await
+            .map_err(database_error)?;
         Ok(user)
     }
 }
@@ -146,6 +156,8 @@ fn normalize_email(email: &str) -> Result<String, ApiError> {
     if normalized.contains('@') && normalized.len() <= 254 {
         Ok(normalized)
     } else {
-        Err(ApiError::BadRequest("A valid email address is required.".to_owned()))
+        Err(ApiError::BadRequest(
+            "A valid email address is required.".to_owned(),
+        ))
     }
 }

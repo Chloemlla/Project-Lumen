@@ -29,7 +29,9 @@ pub struct AppStore {
 
 impl AppStore {
     pub async fn connect(config: &Config) -> Result<Self, ApiError> {
-        let client_options = ClientOptions::parse(&config.mongodb_uri).await.map_err(database_error)?;
+        let client_options = ClientOptions::parse(&config.mongodb_uri)
+            .await
+            .map_err(database_error)?;
         let client = Client::with_options(client_options).map_err(database_error)?;
         let database = client.database(&config.mongodb_database);
         let store = Self {
@@ -59,15 +61,27 @@ impl AppStore {
             .await
             .map_err(database_error)?;
         self.entitlements
-            .create_index(index("entitlement_user", doc! { "userId": 1, "purchasedAt": -1 }), None)
+            .create_index(
+                index("entitlement_user", doc! { "userId": 1, "purchasedAt": -1 }),
+                None,
+            )
             .await
             .map_err(database_error)?;
         self.sync_changes
-            .create_index(index("sync_user_cursor", doc! { "userId": 1, "cursor": 1 }), None)
+            .create_index(
+                index("sync_user_cursor", doc! { "userId": 1, "cursor": 1 }),
+                None,
+            )
             .await
             .map_err(database_error)?;
         self.backups
-            .create_index(index("backup_user_uploaded", doc! { "userId": 1, "uploadedAt": -1 }), None)
+            .create_index(
+                index(
+                    "backup_user_uploaded",
+                    doc! { "userId": 1, "uploadedAt": -1 },
+                ),
+                None,
+            )
             .await
             .map_err(database_error)?;
         Ok(())

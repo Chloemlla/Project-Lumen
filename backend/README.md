@@ -15,6 +15,9 @@ The service mounts all routes under `/api` by default.
 ```text
 LUMEN_BIND_ADDRESS=0.0.0.0:8080
 LUMEN_API_PREFIX=/api
+LUMEN_ADMIN_STATIC_DIR=backend/admin
+LUMEN_MONGODB_URI=mongodb://localhost:27017
+LUMEN_MONGODB_DATABASE=project_lumen
 LUMEN_DEV_LOGIN_CODE=000000
 LUMEN_LOGIN_TTL_SECONDS=600
 LUMEN_ACCESS_TOKEN_TTL_SECONDS=604800
@@ -22,6 +25,25 @@ LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false
 ```
 
 `LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false` is intentionally fail-closed for Google Play purchases until real platform verification credentials are wired in.
+
+## Admin Dashboard
+
+The admin frontend is a zero-build static dashboard served by the Rust service:
+
+```text
+GET /admin
+```
+
+It lives in `backend/admin/` and uses plain HTML, CSS, and JavaScript. It does not require React, npm, a bundler, or any frontend install step.
+
+The dashboard includes the 20 operations modules needed for Project Lumen admin workflows:
+
+- Users, devices, access audit, entitlement changes, Google purchase audit, and cloud backups.
+- Crash aggregation, sanitized stack review, version/device impact, API health, and sync throughput.
+- Template CMS, visual template parameters, audio/haptics matrix, i18n dispatch, and anonymous macro telemetry.
+- OTA integrity registry, rollout policy, Rust route topology, HTTP allowlist review, and admin session security.
+
+Sensitive action buttons are disabled when the dashboard is opened over non-local HTTP. Production admin access should be served through HTTPS only.
 
 ## Endpoints
 

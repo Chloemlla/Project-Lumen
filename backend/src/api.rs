@@ -1,5 +1,6 @@
 use crate::state::AppState;
 use axum::Router;
+use tower_http::services::{ServeDir, ServeFile};
 
 #[path = "routes/backups.rs"]
 pub mod backups;
@@ -18,6 +19,7 @@ pub mod sync;
 
 pub fn router(state: AppState) -> Router {
     let prefix = state.config.api_prefix.clone();
+    let admin_static_dir = state.config.admin_static_dir.clone();
     let api = Router::new()
         .route("/health", axum::routing::get(health::health))
         .nest("/v1/auth", session::router())
@@ -27,5 +29,13 @@ pub fn router(state: AppState) -> Router {
         .nest("/v1", sync::router())
         .nest("/v1", backups::router());
 
-    Router::new().nest(&prefix, api).with_state(state)
+    Router::new()
+        .nest(&prefix, api)
+        .nest_service(
+            "/admin",
+            ServeDir::new(&admin_static_dir)
+                .append_index_html_on_directories(true)
+                .fallback(ServeFile::new(format!("{admin_static_dir}/index.html"))),
+        )
+        .with_state(state)
 }

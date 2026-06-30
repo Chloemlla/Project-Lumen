@@ -1,9 +1,4 @@
-use super::{
-    database_error,
-    documents::EntitlementRecord,
-    time::now_millis,
-    AppStore,
-};
+use super::{database_error, documents::EntitlementRecord, time::now_millis, AppStore};
 use crate::{
     error::ApiError,
     models::{EntitlementsResponse, GooglePurchaseVerifyRequest, PurchaseVerifyResponse},
@@ -27,7 +22,10 @@ impl AppStore {
             .await
             .map_err(database_error)?;
         let tier = resolve_active_tier(&entitlements);
-        let entitlement_dtos = entitlements.into_iter().map(EntitlementRecord::to_dto).collect();
+        let entitlement_dtos = entitlements
+            .into_iter()
+            .map(EntitlementRecord::to_dto)
+            .collect();
 
         Ok(EntitlementsResponse {
             tier,
@@ -43,11 +41,17 @@ impl AppStore {
         accept_unverified: bool,
     ) -> Result<PurchaseVerifyResponse, ApiError> {
         if request.product_id.trim().is_empty() || request.purchase_token.trim().is_empty() {
-            return Err(ApiError::BadRequest("productId and purchaseToken are required.".to_owned()));
+            return Err(ApiError::BadRequest(
+                "productId and purchaseToken are required.".to_owned(),
+            ));
         }
 
         let now = now_millis();
-        let status = if accept_unverified { "active" } else { "pending" };
+        let status = if accept_unverified {
+            "active"
+        } else {
+            "pending"
+        };
         let tier = if accept_unverified {
             tier_for_product(&request.product_id)
         } else {
@@ -75,7 +79,10 @@ impl AppStore {
         };
         let dto = record.clone().to_dto();
 
-        self.entitlements.insert_one(record, None).await.map_err(database_error)?;
+        self.entitlements
+            .insert_one(record, None)
+            .await
+            .map_err(database_error)?;
 
         Ok(PurchaseVerifyResponse {
             status: status.to_owned(),
@@ -100,7 +107,10 @@ fn tier_for_product(product_id: &str) -> String {
     let normalized = product_id.to_ascii_lowercase();
     if normalized.contains("team") {
         "TEAM"
-    } else if normalized.contains("plus") || normalized.contains("monthly") || normalized.contains("yearly") {
+    } else if normalized.contains("plus")
+        || normalized.contains("monthly")
+        || normalized.contains("yearly")
+    {
         "PLUS"
     } else if normalized.contains("pro") {
         "PRO"

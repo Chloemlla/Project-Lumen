@@ -16,7 +16,11 @@ use mongodb::{
 use uuid::Uuid;
 
 impl AppStore {
-    pub async fn push_changes(&self, user_id: &str, request: SyncPushRequest) -> Result<SyncPushResponse, ApiError> {
+    pub async fn push_changes(
+        &self,
+        user_id: &str,
+        request: SyncPushRequest,
+    ) -> Result<SyncPushResponse, ApiError> {
         let mut last_cursor = request.cursor.unwrap_or_default() as i64;
         let mut accepted = 0usize;
 
@@ -46,7 +50,11 @@ impl AppStore {
         })
     }
 
-    pub async fn changes_since(&self, user_id: &str, since: u64) -> Result<SyncChangesResponse, ApiError> {
+    pub async fn changes_since(
+        &self,
+        user_id: &str,
+        since: u64,
+    ) -> Result<SyncChangesResponse, ApiError> {
         let options = FindOptions::builder().sort(doc! { "cursor": 1 }).build();
         let stored_changes: Vec<StoredSyncChange> = self
             .sync_changes
@@ -67,7 +75,10 @@ impl AppStore {
             .map(|change| change.cursor)
             .max()
             .unwrap_or(since as i64);
-        let changes = stored_changes.into_iter().map(|change| change.change).collect();
+        let changes = stored_changes
+            .into_iter()
+            .map(|change| change.change)
+            .collect();
 
         Ok(SyncChangesResponse {
             changes,

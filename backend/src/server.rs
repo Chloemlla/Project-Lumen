@@ -9,7 +9,12 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
     let bind_address = config.bind_address.clone();
     let state = AppState::connect(config).await?;
     let app = api::router(state)
-        .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any),
+        )
         .layer(TraceLayer::new_for_http());
 
     let listener = TcpListener::bind(&bind_address).await?;

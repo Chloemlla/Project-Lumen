@@ -23,7 +23,12 @@ async fn changes(
     Query(query): Query<SyncChangesQuery>,
 ) -> Result<Json<SyncChangesResponse>, ApiError> {
     let user = require_user(&headers, &state).await?;
-    Ok(Json(state.store.changes_since(&user.id, query.since.unwrap_or_default()).await?))
+    Ok(Json(
+        state
+            .store
+            .changes_since(&user.id, query.since.unwrap_or_default())
+            .await?,
+    ))
 }
 
 async fn push(

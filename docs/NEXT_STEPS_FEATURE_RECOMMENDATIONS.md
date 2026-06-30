@@ -46,7 +46,9 @@
 - [x] Android 端新增轻量 `ProjectLumenApiClient`，沿用 `HttpURLConnection`，通过 `BuildConfig.API_BASE_URL` 默认接入 `http://eye.chloemlla.com/api`。
 - [x] Android 网络安全配置已针对 `eye.chloemlla.com` 允许 HTTP 明文访问，适配当前 API base URL。
 - [x] GitHub Actions 新增 Rust 后端格式检查与测试任务；本地仍不执行构建、测试、Lint 或安装命令。
-- [ ] 后端当前使用内存存储，生产部署前仍需替换 PostgreSQL/Redis 等持久化组件，并接入真实邮件发送与 Google Play 服务端验签。
+- [x] 后端生产数据存储切换为 MongoDB，覆盖用户、登录请求、会话、权益、同步变更、备份和计数器集合。
+- [x] 新增零构建 Admin Dashboard 静态前端，Rust 服务默认在 `/admin` 托管，前端不依赖 React、npm 或现代构建链。
+- [ ] 后端仍需接入真实邮件发送、Google Play 服务端验签、Admin 专用鉴权 API 和生产 HTTPS 入口。
 
 ## 1. 当前能力盘点
 

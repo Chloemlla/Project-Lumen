@@ -17,7 +17,11 @@ async fn start_email(
 ) -> Result<Json<StartEmailResponse>, ApiError> {
     let response = state
         .store
-        .start_email_login(&payload.email, &state.config.login_code, state.config.login_ttl_seconds)
+        .start_email_login(
+            &payload.email,
+            &state.config.login_code,
+            state.config.login_ttl_seconds,
+        )
         .await?;
     Ok(Json(response))
 }

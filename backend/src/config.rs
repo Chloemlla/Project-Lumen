@@ -4,6 +4,7 @@ use std::env;
 pub struct Config {
     pub bind_address: String,
     pub api_prefix: String,
+    pub admin_static_dir: String,
     pub mongodb_uri: String,
     pub mongodb_database: String,
     pub login_code: String,
@@ -17,6 +18,7 @@ impl Config {
         Self {
             bind_address: env_value("LUMEN_BIND_ADDRESS", "0.0.0.0:8080"),
             api_prefix: normalize_prefix(&env_value("LUMEN_API_PREFIX", "/api")),
+            admin_static_dir: env_value("LUMEN_ADMIN_STATIC_DIR", "backend/admin"),
             mongodb_uri: env_value("LUMEN_MONGODB_URI", "mongodb://localhost:27017"),
             mongodb_database: env_value("LUMEN_MONGODB_DATABASE", "project_lumen"),
             login_code: env_value("LUMEN_DEV_LOGIN_CODE", "000000"),

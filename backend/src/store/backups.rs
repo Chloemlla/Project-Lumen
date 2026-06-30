@@ -1,9 +1,4 @@
-use super::{
-    database_error,
-    documents::BackupRecord,
-    time::now_millis,
-    AppStore,
-};
+use super::{database_error, documents::BackupRecord, time::now_millis, AppStore};
 use crate::{
     error::ApiError,
     models::{BackupDocument, BackupMetadata, BackupUploadRequest},
@@ -29,7 +24,10 @@ impl AppStore {
         };
         let metadata = record.to_metadata();
 
-        self.backups.insert_one(record, None).await.map_err(database_error)?;
+        self.backups
+            .insert_one(record, None)
+            .await
+            .map_err(database_error)?;
         Ok(metadata)
     }
 
