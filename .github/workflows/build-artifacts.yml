@@ -75,23 +75,6 @@ jobs:
             org.opencontainers.image.description=Project Lumen container image
             org.opencontainers.image.licenses=MIT
 
-      - name: Publish package visibility
-        if: github.event_name != 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          OWNER: ${{ github.repository_owner }}
-          OWNER_TYPE: ${{ github.event.repository.owner.type }}
-          PACKAGE_NAME: ${{ steps.image.outputs.package_name }}
-        shell: bash
-        run: |
-          encoded_package="$(printf '%s' "$PACKAGE_NAME" | jq -sRr @uri)"
-
-          if [ "$OWNER_TYPE" = "Organization" ]; then
-            gh api --method PATCH "/orgs/${OWNER}/packages/container/${encoded_package}/visibility" -f visibility=public
-          else
-            gh api --method PATCH "/user/packages/container/${encoded_package}/visibility" -f visibility=public
-          fi
-
   deploy-image:
     name: Deploy GHCR image
     needs: build-image
