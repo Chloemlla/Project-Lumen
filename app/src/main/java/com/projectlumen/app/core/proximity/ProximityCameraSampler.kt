@@ -128,72 +128,88 @@ class ProximityCameraSampler(private val context: Context) {
                     complete(result)
                 }, handler)
 
-                cameraManager.openCamera(
-                    cameraId,
-                    object : CameraDevice.StateCallback() {
-                        override fun onOpened(camera: CameraDevice) {
-                            cameraDevice = camera
-                            camera.createCaptureSession(
-                                listOf(reader.surface),
-                                object : CameraCaptureSession.StateCallback() {
-                                    override fun onConfigured(session: CameraCaptureSession) {
-                                        captureSession = session
-                                        val request = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-                                            .apply {
-                                                addTarget(reader.surface)
-                                                set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
-                                                set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+                runCatching {
+                    cameraManager.openCamera(
+                        cameraId,
+                        object : CameraDevice.StateCallback() {
+                            override fun onOpened(camera: CameraDevice) {
+                                cameraDevice = camera
+                                runCatching {
+                                    camera.createCaptureSession(
+                                        listOf(reader.surface),
+                                        object : CameraCaptureSession.StateCallback() {
+                                            override fun onConfigured(session: CameraCaptureSession) {
+                                                captureSession = session
+                                                submitPreviewRequest(camera, session, handler, reader) { result ->
+                                                    complete(result)
+                                                }
                                             }
-                                            .build()
-                                        session.capture(
-                                            request,
-                                            object : CameraCaptureSession.CaptureCallback() {
-                                                override fun onCaptureCompleted(
-                                                    session: CameraCaptureSession,
-                                                    request: android.hardware.camera2.CaptureRequest,
-                                                    result: android.hardware.camera2.TotalCaptureResult,
-                                                ) {
-                                                    // ImageReader completion owns the final release path.
-                                                }
 
-                                                override fun onCaptureFailed(
-                                                    session: CameraCaptureSession,
-                                                    request: android.hardware.camera2.CaptureRequest,
-                                                    failure: android.hardware.camera2.CaptureFailure,
-                                                ) {
-                                                    complete(Result.success(null))
-                                                }
-                                            },
-                                            handler,
-                                        )
-                                    }
+                                            override fun onConfigureFailed(session: CameraCaptureSession) {
+                                                session.close()
+                                                camera.close()
+                                                complete(Result.success(null))
+                                            }
+                                        },
+                                        handler,
+                                    )
+                                }.onFailure {
+                                    complete(Result.success(null))
+                                }
+                            }
 
-                                    override fun onConfigureFailed(session: CameraCaptureSession) {
-                                        session.close()
-                                        camera.close()
-                                        complete(Result.success(null))
-                                    }
-                                },
-                                handler,
-                            )
-                        }
+                            override fun onDisconnected(camera: CameraDevice) {
+                                camera.close()
+                                complete(Result.success(null))
+                            }
 
-                        override fun onDisconnected(camera: CameraDevice) {
-                            camera.close()
-                            complete(Result.success(null))
-                        }
-
-                        override fun onError(camera: CameraDevice, error: Int) {
-                            camera.close()
-                            complete(Result.success(null))
-                        }
-                    },
-                    handler,
-                )
+                            override fun onError(camera: CameraDevice, error: Int) {
+                                camera.close()
+                                complete(Result.success(null))
+                            }
+                        },
+                        handler,
+                    )
+                }.onFailure {
+                    complete(Result.success(null))
+                }
             }
         } finally {
             reader.close()
             thread.quitSafely()
+        }
+    }
+
+    private fun submitPreviewRequest(
+        camera: CameraDevice,
+        session: CameraCaptureSession,
+        handler: Handler,
+        reader: ImageReader,
+        complete: (Result<CapturedFrame?>) -> Unit,
+    ) {
+        runCatching {
+            val request = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                .apply {
+                    addTarget(reader.surface)
+                    set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
+                    set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+                }
+                .build()
+            session.setRepeatingRequest(
+                request,
+                object : CameraCaptureSession.CaptureCallback() {
+                    override fun onCaptureFailed(
+                        session: CameraCaptureSession,
+                        request: android.hardware.camera2.CaptureRequest,
+                        failure: android.hardware.camera2.CaptureFailure,
+                    ) {
+                        complete(Result.success(null))
+                    }
+                },
+                handler,
+            )
+        }.onFailure {
+            complete(Result.success(null))
         }
     }
 

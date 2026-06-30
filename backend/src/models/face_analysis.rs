@@ -61,9 +61,9 @@ pub struct FaceTopologyPoint {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FaceAnalysisProcessingMetrics {
-    pub frameConversionMillis: i64,
-    pub mlKitInferenceMillis: i64,
-    pub uploadQueuedAt: i64,
+    pub frame_conversion_millis: i64,
+    pub ml_kit_inference_millis: i64,
+    pub upload_queued_at: i64,
 }
 
 #[derive(Serialize)]
