@@ -80,13 +80,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
+          OWNER_TYPE: ${{ github.event.repository.owner.type }}
           PACKAGE_NAME: ${{ steps.image.outputs.package_name }}
         shell: bash
         run: |
-          owner_type="$(gh api "/users/${OWNER}" --jq '.type')"
           encoded_package="$(printf '%s' "$PACKAGE_NAME" | jq -sRr @uri)"
 
-          if [ "$owner_type" = "Organization" ]; then
+          if [ "$OWNER_TYPE" = "Organization" ]; then
             gh api --method PATCH "/orgs/${OWNER}/packages/container/${encoded_package}/visibility" -f visibility=public
           else
             gh api --method PATCH "/user/packages/container/${encoded_package}/visibility" -f visibility=public
