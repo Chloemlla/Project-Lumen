@@ -1,9 +1,4 @@
-use super::{
-    database_error,
-    documents::StoredSyncChange,
-    time::now_millis,
-    AppStore,
-};
+use super::{database_error, documents::StoredSyncChange, time::now_millis, AppStore};
 use crate::{
     error::ApiError,
     models::{SyncChangesResponse, SyncPushRequest, SyncPushResponse},
