@@ -95,6 +95,10 @@ class ProximityDetectionService : Service() {
         val settings = SettingsRepository(db.appSettingsDao(), app.eyeCarePreferences).get() ?: return
         if (!calibrate && !settings.proximityMonitoringEnabled && !settings.blinkMonitoringEnabled) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return
+        if (!calibrate && app.shizuku.shouldDeferSampling(settings)) {
+            clearActiveState(app)
+            return
+        }
 
         val now = System.currentTimeMillis()
         db.runtimeStateDao().get()?.let {

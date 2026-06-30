@@ -15,10 +15,12 @@ import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
+import com.projectlumen.app.core.services.ShizukuResilienceWorker
 import com.projectlumen.app.core.services.TimerForegroundService
 import com.projectlumen.app.core.services.TimerReconciliationWorker
 import com.projectlumen.app.core.light.LightMonitorService
 import com.projectlumen.app.core.proximity.ProximityDetectionWorker
+import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.telemetry.EyeCareTelemetryReporter
 
 class ProjectLumenApplication : Application() {
@@ -31,6 +33,7 @@ class ProjectLumenApplication : Application() {
     val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient(this) }
     val crashReports: CrashReportStore by lazy { CrashReportStore(this) }
     val telemetry: EyeCareTelemetryReporter by lazy { EyeCareTelemetryReporter(this, database, apiClient) }
+    val shizuku: ShizukuCapabilityManager by lazy { ShizukuCapabilityManager(this) }
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
 
     override fun onCreate() {
@@ -89,5 +92,13 @@ class ProjectLumenApplication : Application() {
 
     fun simulateDeveloperLowMemory() {
         DeveloperDebugOverlayService.simulateLowMemory(this)
+    }
+
+    fun startShizukuResilience() {
+        ShizukuResilienceWorker.enqueue(this)
+    }
+
+    fun stopShizukuResilience() {
+        ShizukuResilienceWorker.cancel(this)
     }
 }

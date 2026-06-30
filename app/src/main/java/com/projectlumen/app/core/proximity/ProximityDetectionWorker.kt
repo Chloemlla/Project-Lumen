@@ -22,6 +22,15 @@ class ProximityDetectionWorker(
         val monitoringEnabled = settings?.proximityMonitoringEnabled == true || settings?.blinkMonitoringEnabled == true
         val timeTriggerAllowed = settings?.developerModeEnabled != true || settings.developerTimeTriggerEnabled
         val gateAllowed = settings == null || calibrate || ProximityTriggerGate(applicationContext).canRun(settings)
+        if (!calibrate && settings != null && app.shizuku.shouldDeferSampling(settings)) {
+            val retryDelaySeconds = if (settings.developerModeEnabled) {
+                settings.developerTickIntervalSeconds.coerceIn(10, 30 * 60)
+            } else {
+                settings.proximityCheckIntervalMinutes.coerceAtLeast(1) * 60
+            }
+            enqueueNext(applicationContext, delaySeconds = minOf(120, retryDelaySeconds))
+            return Result.success()
+        }
         if (calibrate || (monitoringEnabled && timeTriggerAllowed && gateAllowed)) {
             ProximityDetectionService.start(applicationContext, calibrate)
         }

@@ -27,11 +27,14 @@ internal class ProjectLumenSettingsFeatureEntry(
     private val stopLightMonitoring: () -> Unit,
     private val startDeveloperDebugService: () -> Unit,
     private val stopDeveloperDebugService: () -> Unit,
+    private val startShizukuResilience: () -> Unit,
+    private val stopShizukuResilience: () -> Unit,
 ) {
     fun applyStartupMonitoring(settings: AppSettingsEntity) {
         if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) scheduleProximityMonitoring()
         applyLightMonitoringSettings(settings)
         applyDeveloperDebugSettings(settings)
+        applyShizukuResilienceSettings(settings)
     }
 
     fun updateSettings(transform: (AppSettingsEntity) -> AppSettingsEntity) {
@@ -58,6 +61,7 @@ internal class ProjectLumenSettingsFeatureEntry(
             if (shouldRescheduleProximity) scheduleProximityMonitoring()
             applyLightMonitoringSettings(updated)
             applyDeveloperDebugSettings(updated)
+            applyShizukuResilienceSettings(updated)
         }
     }
 
@@ -188,6 +192,14 @@ internal class ProjectLumenSettingsFeatureEntry(
             startDeveloperDebugService()
         } else {
             stopDeveloperDebugService()
+        }
+    }
+
+    private fun applyShizukuResilienceSettings(settings: AppSettingsEntity) {
+        if (settings.shizukuAdvancedModeEnabled && settings.shizukuServiceRecoveryEnabled) {
+            startShizukuResilience()
+        } else {
+            stopShizukuResilience()
         }
     }
 }

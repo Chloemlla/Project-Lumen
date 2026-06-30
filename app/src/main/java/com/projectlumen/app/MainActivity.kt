@@ -36,6 +36,9 @@ class MainActivity : ComponentActivity() {
                             stopLightMonitoring = app::stopLightMonitoring,
                             startDeveloperDebugService = app::startDeveloperDebugService,
                             stopDeveloperDebugService = app::stopDeveloperDebugService,
+                            startShizukuResilience = app::startShizukuResilience,
+                            stopShizukuResilience = app::stopShizukuResilience,
+                            shizuku = app.shizuku,
                             simulateDeveloperLowMemory = app::simulateDeveloperLowMemory,
                             uploadTelemetrySnapshot = { app.telemetry.uploadCurrentSnapshot(force = true) },
                         ) as T

@@ -52,6 +52,9 @@ data class EyeCarePreferences(
     val globalOverlayEnabled: Boolean = true,
     val overlayRestDurationSeconds: Int = 20,
     val overlayStrictDistancePercent: Int = 160,
+    val shizukuAdvancedModeEnabled: Boolean = false,
+    val shizukuContextAwareSamplingEnabled: Boolean = true,
+    val shizukuServiceRecoveryEnabled: Boolean = true,
 )
 
 class EyeCarePreferencesDataStore(context: Context) {
@@ -103,6 +106,9 @@ class EyeCarePreferencesDataStore(context: Context) {
             preferences[Keys.GLOBAL_OVERLAY_ENABLED] = settings.globalOverlayEnabled
             preferences[Keys.OVERLAY_REST_DURATION_SECONDS] = settings.overlayRestDurationSeconds
             preferences[Keys.OVERLAY_STRICT_DISTANCE_PERCENT] = settings.overlayStrictDistancePercent
+            preferences[Keys.SHIZUKU_ADVANCED_MODE_ENABLED] = settings.shizukuAdvancedModeEnabled
+            preferences[Keys.SHIZUKU_CONTEXT_AWARE_SAMPLING_ENABLED] = settings.shizukuContextAwareSamplingEnabled
+            preferences[Keys.SHIZUKU_SERVICE_RECOVERY_ENABLED] = settings.shizukuServiceRecoveryEnabled
         }
     }
 
@@ -139,6 +145,9 @@ class EyeCarePreferencesDataStore(context: Context) {
             globalOverlayEnabled = preferences[Keys.GLOBAL_OVERLAY_ENABLED] ?: true,
             overlayRestDurationSeconds = preferences[Keys.OVERLAY_REST_DURATION_SECONDS] ?: 20,
             overlayStrictDistancePercent = preferences[Keys.OVERLAY_STRICT_DISTANCE_PERCENT] ?: 160,
+            shizukuAdvancedModeEnabled = preferences[Keys.SHIZUKU_ADVANCED_MODE_ENABLED] ?: false,
+            shizukuContextAwareSamplingEnabled = preferences[Keys.SHIZUKU_CONTEXT_AWARE_SAMPLING_ENABLED] ?: true,
+            shizukuServiceRecoveryEnabled = preferences[Keys.SHIZUKU_SERVICE_RECOVERY_ENABLED] ?: true,
         )
     }
 
@@ -173,6 +182,9 @@ class EyeCarePreferencesDataStore(context: Context) {
         val GLOBAL_OVERLAY_ENABLED = booleanPreferencesKey("global_overlay_enabled")
         val OVERLAY_REST_DURATION_SECONDS = intPreferencesKey("overlay_rest_duration_seconds")
         val OVERLAY_STRICT_DISTANCE_PERCENT = intPreferencesKey("overlay_strict_distance_percent")
+        val SHIZUKU_ADVANCED_MODE_ENABLED = booleanPreferencesKey("shizuku_advanced_mode_enabled")
+        val SHIZUKU_CONTEXT_AWARE_SAMPLING_ENABLED = booleanPreferencesKey("shizuku_context_aware_sampling_enabled")
+        val SHIZUKU_SERVICE_RECOVERY_ENABLED = booleanPreferencesKey("shizuku_service_recovery_enabled")
     }
 }
 
@@ -209,5 +221,8 @@ fun AppSettingsEntity.withEyeCarePreferences(preferences: EyeCarePreferences): A
         globalOverlayEnabled = preferences.globalOverlayEnabled,
         overlayRestDurationSeconds = preferences.overlayRestDurationSeconds,
         overlayStrictDistancePercent = preferences.overlayStrictDistancePercent,
+        shizukuAdvancedModeEnabled = preferences.shizukuAdvancedModeEnabled,
+        shizukuContextAwareSamplingEnabled = preferences.shizukuContextAwareSamplingEnabled,
+        shizukuServiceRecoveryEnabled = preferences.shizukuServiceRecoveryEnabled,
     )
 }

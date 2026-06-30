@@ -48,6 +48,9 @@ class AppLifecycleCoordinator(
             if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) {
                 app.startLightMonitoring()
             }
+            if (settings.shizukuAdvancedModeEnabled && settings.shizukuServiceRecoveryEnabled) {
+                app.startShizukuResilience()
+            }
             if (foregroundRuntime.activeEngine != ActiveEngine.IDLE.name && settings.keepAliveEnabled) {
                 app.startTimerService()
             }

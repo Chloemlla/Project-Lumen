@@ -179,6 +179,7 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.4")
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
+    implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.mlkit:face-mesh-detection:16.0.0-beta3")
     ksp("androidx.room:room-compiler:2.8.4")

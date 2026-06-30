@@ -39,6 +39,7 @@ class ProximityEventReceiver : BroadcastReceiver() {
                 if (settings.developerModeEnabled && !settings.developerUnlockTriggerEnabled) return@launch
                 if (!hasCameraPermission(app)) return@launch
                 if (!shouldRunEventSample(app)) return@launch
+                if (app.shizuku.shouldDeferSampling(settings)) return@launch
                 if (!ProximityTriggerGate(app).canRun(settings)) return@launch
                 ProximityDetectionWorker.enqueueNext(app, delaySeconds = 0)
             } finally {

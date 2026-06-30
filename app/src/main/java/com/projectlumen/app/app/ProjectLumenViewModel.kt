@@ -13,6 +13,7 @@ import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
+import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -34,6 +35,9 @@ class ProjectLumenViewModel(
     stopLightMonitoring: () -> Unit,
     startDeveloperDebugService: () -> Unit,
     stopDeveloperDebugService: () -> Unit,
+    startShizukuResilience: () -> Unit,
+    stopShizukuResilience: () -> Unit,
+    private val shizuku: ShizukuCapabilityManager,
     private val simulateDeveloperLowMemory: () -> Unit,
     private val uploadTelemetrySnapshot: suspend () -> Unit,
 ) : ViewModel() {
@@ -66,6 +70,8 @@ class ProjectLumenViewModel(
         stopLightMonitoring = stopLightMonitoring,
         startDeveloperDebugService = startDeveloperDebugService,
         stopDeveloperDebugService = stopDeveloperDebugService,
+        startShizukuResilience = startShizukuResilience,
+        stopShizukuResilience = stopShizukuResilience,
     )
     private val templatesEntry = ProjectLumenTemplatesFeatureEntry(
         scope = viewModelScope,
@@ -91,6 +97,7 @@ class ProjectLumenViewModel(
 
     val webPageRequests = _webPageRequests.asSharedFlow()
     val backupImportPreview = backupEntry.importPreview
+    val shizukuState = shizuku.state
     val uiState = stateStore.uiState
 
     init {
@@ -137,6 +144,8 @@ class ProjectLumenViewModel(
     fun setAutoUpdateCheckEnabled(enabled: Boolean) = settingsEntry.setAutoUpdateCheckEnabled(enabled)
     fun updateDailyGoal(transform: (DailyGoalEntity) -> DailyGoalEntity) = settingsEntry.updateDailyGoal(transform)
     fun simulateLowMemory() = simulateDeveloperLowMemory()
+    fun refreshShizukuState() = shizuku.refreshState()
+    fun requestShizukuAuthorization() = shizuku.requestPermission()
 
     fun selectTemplate(templateId: Long) = templatesEntry.selectTemplate(templateId)
     fun updateTemplateSystemBackground(template: TipTemplateEntity, backgroundValue: String, primaryColor: String) =

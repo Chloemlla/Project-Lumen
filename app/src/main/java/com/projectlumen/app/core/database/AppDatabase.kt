@@ -38,7 +38,7 @@ import com.projectlumen.app.BuildConfig
         EntitlementEntity::class,
         ReminderPlanEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -152,6 +152,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                migrateShizukuAdvancedMode(db)
+            }
+        }
+
         private fun migrateEyeProtection(db: SupportSQLiteDatabase) {
             addColumnIfMissing(db, "app_settings", "blinkMonitoringEnabled", "INTEGER NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "app_settings", "blinkNoBlinkThresholdSeconds", "INTEGER NOT NULL DEFAULT 10")
@@ -195,6 +201,12 @@ abstract class AppDatabase : RoomDatabase() {
             addColumnIfMissing(db, "runtime_state", "sensorRollDegrees", "REAL NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "runtime_state", "sensorYawDegrees", "REAL NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "runtime_state", "sensorLastAccelerationMagnitude", "REAL NOT NULL DEFAULT 0")
+        }
+
+        private fun migrateShizukuAdvancedMode(db: SupportSQLiteDatabase) {
+            addColumnIfMissing(db, "app_settings", "shizukuAdvancedModeEnabled", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "app_settings", "shizukuContextAwareSamplingEnabled", "INTEGER NOT NULL DEFAULT 1")
+            addColumnIfMissing(db, "app_settings", "shizukuServiceRecoveryEnabled", "INTEGER NOT NULL DEFAULT 1")
         }
 
         private fun migrateCommerceAndPersonalization(db: SupportSQLiteDatabase) {
@@ -314,6 +326,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
+                    MIGRATION_10_11,
                 )
             if (BuildConfig.DEBUG) {
                 builder.fallbackToDestructiveMigration(dropAllTables = true)

@@ -177,6 +177,9 @@ class DataBackupService(
             globalOverlayEnabled = json.optBoolean("globalOverlayEnabled", current.globalOverlayEnabled),
             overlayRestDurationSeconds = json.optInt("overlayRestDurationSeconds", current.overlayRestDurationSeconds),
             overlayStrictDistancePercent = json.optInt("overlayStrictDistancePercent", current.overlayStrictDistancePercent),
+            shizukuAdvancedModeEnabled = json.optBoolean("shizukuAdvancedModeEnabled", current.shizukuAdvancedModeEnabled),
+            shizukuContextAwareSamplingEnabled = json.optBoolean("shizukuContextAwareSamplingEnabled", current.shizukuContextAwareSamplingEnabled),
+            shizukuServiceRecoveryEnabled = json.optBoolean("shizukuServiceRecoveryEnabled", current.shizukuServiceRecoveryEnabled),
             autoUpdateCheckEnabled = json.optBoolean("autoUpdateCheckEnabled", current.autoUpdateCheckEnabled),
             updatedAt = System.currentTimeMillis(),
         )
@@ -350,6 +353,9 @@ class DataBackupService(
         .put("globalOverlayEnabled", globalOverlayEnabled)
         .put("overlayRestDurationSeconds", overlayRestDurationSeconds)
         .put("overlayStrictDistancePercent", overlayStrictDistancePercent)
+        .put("shizukuAdvancedModeEnabled", shizukuAdvancedModeEnabled)
+        .put("shizukuContextAwareSamplingEnabled", shizukuContextAwareSamplingEnabled)
+        .put("shizukuServiceRecoveryEnabled", shizukuServiceRecoveryEnabled)
         .put("autoUpdateCheckEnabled", autoUpdateCheckEnabled)
 
     private fun DailyGoalEntity.toJson(): JSONObject = JSONObject()

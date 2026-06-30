@@ -177,6 +177,7 @@ import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.services.BackupImportSummary
+import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
 import com.projectlumen.app.core.update.BuildMetadata
 import com.projectlumen.app.core.update.ReleaseAsset
 import com.projectlumen.app.core.update.ReleaseInfo
@@ -220,6 +221,7 @@ internal fun SettingsScreen(
     val overlayPermissionNeeded = permissionRequirements.overlay
     val writeSettingsPermissionNeeded = permissionRequirements.writeSettings
     val backupImportPreview by viewModel.backupImportPreview.collectAsStateWithLifecycle()
+    val shizukuState by viewModel.shizukuState.collectAsStateWithLifecycle()
     var pendingBackupImportUri by remember { mutableStateOf<Uri?>(null) }
     var showProximityCalibrationDialog by rememberSaveable { mutableStateOf(false) }
     val proximityCalibrated = settings.proximityBaselineEyeDistancePx > 0f ||
@@ -288,6 +290,11 @@ internal fun SettingsScreen(
                 }
             },
         )
+    }
+    LaunchedEffect(settings.shizukuAdvancedModeEnabled) {
+        if (settings.shizukuAdvancedModeEnabled) {
+            viewModel.refreshShizukuState()
+        }
     }
     LumenPage {
         PageIntro(
@@ -453,6 +460,70 @@ internal fun SettingsScreen(
         SettingsSection(R.string.section_keep_alive, Icons.Outlined.Schedule, initiallyExpanded = false) {
             SwitchRow(R.string.enable_keep_alive, Icons.Outlined.Schedule, settings.keepAliveEnabled) {
                 viewModel.setKeepAliveEnabled(it)
+            }
+        }
+        SettingsSection(R.string.section_shizuku_advanced, Icons.Outlined.Lock, initiallyExpanded = false) {
+            Text(
+                stringResource(R.string.shizuku_advanced_summary),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            StatusLine(Icons.Outlined.Lock, shizukuStatusLabel(shizukuState))
+            if (shizukuState.foregroundPackage.isNotBlank()) {
+                StatusLine(
+                    Icons.Outlined.PhotoCamera,
+                    if (shizukuState.foregroundShouldDeferSampling) {
+                        stringResource(R.string.shizuku_context_deferred, shizukuState.foregroundCategory)
+                    } else {
+                        stringResource(R.string.shizuku_context_normal)
+                    },
+                )
+            }
+            SwitchRow(R.string.enable_shizuku_advanced_mode, Icons.Outlined.Lock, settings.shizukuAdvancedModeEnabled) { enabled ->
+                viewModel.updateSettings { current ->
+                    current.copy(
+                        shizukuAdvancedModeEnabled = enabled,
+                        shizukuServiceRecoveryEnabled = if (enabled) current.shizukuServiceRecoveryEnabled else false,
+                    )
+                }
+                if (enabled) viewModel.requestShizukuAuthorization()
+            }
+            AnimatedVisibility(
+                visible = settings.shizukuAdvancedModeEnabled,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LumenFlowRow {
+                        OutlinedButton(onClick = viewModel::refreshShizukuState) {
+                            ButtonLabel(Icons.Outlined.Refresh, R.string.shizuku_refresh_status)
+                        }
+                        if (!shizukuState.ready) {
+                            Button(onClick = viewModel::requestShizukuAuthorization) {
+                                ButtonLabel(Icons.Outlined.Lock, R.string.shizuku_authorize)
+                            }
+                        }
+                    }
+                    SwitchRow(
+                        R.string.shizuku_context_aware_sampling,
+                        Icons.Outlined.PhotoCamera,
+                        settings.shizukuContextAwareSamplingEnabled,
+                    ) {
+                        viewModel.updateSettings { current -> current.copy(shizukuContextAwareSamplingEnabled = it) }
+                    }
+                    SwitchRow(
+                        R.string.shizuku_service_recovery,
+                        Icons.Outlined.Schedule,
+                        settings.shizukuServiceRecoveryEnabled,
+                    ) {
+                        viewModel.updateSettings { current -> current.copy(shizukuServiceRecoveryEnabled = it) }
+                    }
+                    Text(
+                        stringResource(R.string.shizuku_privacy_boundary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         SettingsSection(R.string.section_proximity, Icons.Outlined.PhotoCamera, initiallyExpanded = false) {
@@ -804,6 +875,16 @@ internal fun SettingsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun shizukuStatusLabel(state: ShizukuCapabilityState): String {
+    return when {
+        state.ready -> stringResource(R.string.shizuku_status_ready)
+        !state.binderAvailable -> stringResource(R.string.shizuku_status_no_service)
+        !state.permissionGranted -> stringResource(R.string.shizuku_status_permission_needed)
+        else -> stringResource(R.string.shizuku_status_unavailable)
     }
 }
 
