@@ -1,5 +1,7 @@
 package com.projectlumen.app.core.shizuku
 
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.PackageManager
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
@@ -7,7 +9,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import rikka.shizuku.Shizuku
 
 class ShizukuCapabilityManager(
@@ -45,28 +46,14 @@ class ShizukuCapabilityManager(
             _state.value = baseState
             return@withContext null
         }
-        val output = withTimeoutOrNull(FOREGROUND_QUERY_TIMEOUT_MS) {
-            runPrivilegedCommand(FOREGROUND_CONTEXT_COMMAND)
-        }
-        val context = output?.lineSequence()
-            ?.mapNotNull(::parseActivityComponent)
-            ?.firstOrNull()
-        val foregroundContext = context?.let { (packageName, activityName) ->
-            val category = classifyForegroundContext(packageName, activityName)
-            ShizukuForegroundContext(
-                packageName = packageName,
-                activityName = activityName,
-                category = category,
-                shouldDeferSampling = category != CATEGORY_NORMAL,
-            )
-        }
+        val foregroundContext = latestForegroundContext()
         _state.value = baseState.copy(
             foregroundPackage = foregroundContext?.packageName.orEmpty(),
             foregroundActivity = foregroundContext?.activityName.orEmpty(),
             foregroundCategory = foregroundContext?.category.orEmpty(),
             foregroundShouldDeferSampling = foregroundContext?.shouldDeferSampling == true,
             lastCheckedAt = System.currentTimeMillis(),
-            lastError = if (output == null) "Unable to query foreground context." else "",
+            lastError = if (foregroundContext == null) "Foreground context unavailable." else "",
         )
         foregroundContext
     }
@@ -115,22 +102,32 @@ class ShizukuCapabilityManager(
         )
     }
 
-    private fun runPrivilegedCommand(command: String): String {
-        val process = Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
-        val output = process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText().take(MAX_COMMAND_OUTPUT_BYTES) }
-        val error = process.errorStream.bufferedReader(Charsets.UTF_8).use { it.readText().take(MAX_COMMAND_OUTPUT_BYTES / 4) }
-        runCatching { process.waitFor() }
-        return output.ifBlank { error }
-    }
-
-    private fun parseActivityComponent(line: String): Pair<String, String>? {
-        if (!foregroundLineHints.any { line.contains(it, ignoreCase = true) }) return null
-        val match = componentRegex.find(line) ?: return null
-        val packageName = match.groupValues.getOrNull(1).orEmpty()
-        val rawActivity = match.groupValues.getOrNull(2).orEmpty()
-        if (packageName.isBlank() || rawActivity.isBlank()) return null
-        val activityName = if (rawActivity.startsWith(".")) "$packageName$rawActivity" else rawActivity
-        return packageName to activityName
+    private fun latestForegroundContext(): ShizukuForegroundContext? {
+        val usageStats = context.getSystemService(UsageStatsManager::class.java) ?: return null
+        val nowMillis = System.currentTimeMillis()
+        val events = runCatching {
+            usageStats.queryEvents(nowMillis - FOREGROUND_QUERY_WINDOW_MILLIS, nowMillis)
+        }.getOrNull() ?: return null
+        val event = UsageEvents.Event()
+        var packageName = ""
+        var activityName = ""
+        var latestEventAt = 0L
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            if (event.eventType != UsageEvents.Event.MOVE_TO_FOREGROUND) continue
+            if (event.timeStamp < latestEventAt) continue
+            packageName = event.packageName.orEmpty()
+            activityName = event.className.orEmpty()
+            latestEventAt = event.timeStamp
+        }
+        if (packageName.isBlank()) return null
+        val category = classifyForegroundContext(packageName, activityName)
+        return ShizukuForegroundContext(
+            packageName = packageName,
+            activityName = activityName,
+            category = category,
+            shouldDeferSampling = category != CATEGORY_NORMAL,
+        )
     }
 
     private fun classifyForegroundContext(packageName: String, activityName: String): String {
@@ -146,23 +143,13 @@ class ShizukuCapabilityManager(
 
     private companion object {
         private const val PERMISSION_REQUEST_CODE = 42017
-        private const val FOREGROUND_QUERY_TIMEOUT_MS = 2_500L
-        private const val MAX_COMMAND_OUTPUT_BYTES = 96_000
-        private const val FOREGROUND_CONTEXT_COMMAND =
-            "dumpsys activity activities | grep -E 'topResumedActivity|mResumedActivity|ResumedActivity|mCurrentFocus' | head -n 8"
+        private const val FOREGROUND_QUERY_WINDOW_MILLIS = 10 * 60 * 1000L
         private const val CATEGORY_NORMAL = "normal"
         private const val CATEGORY_CAMERA = "camera"
         private const val CATEGORY_COMMUNICATION = "communication"
         private const val CATEGORY_MEDIA = "media"
         private const val CATEGORY_GAME = "game"
 
-        private val foregroundLineHints = listOf(
-            "topResumedActivity",
-            "mResumedActivity",
-            "ResumedActivity",
-            "mCurrentFocus",
-        )
-        private val componentRegex = Regex("""\b([A-Za-z][A-Za-z0-9_.]*)/([A-Za-z0-9_.$]+|\.[A-Za-z0-9_.$]+)""")
         private val sensitiveCameraHints = listOf("camera", "camerax", "scanner", "barcode", "qr")
         private val sensitiveCallHints = listOf("call", "voip", "meeting", "conference", "telecom", "zoom", "meet")
         private val sensitiveMediaHints = listOf("player", "video", "fullscreen", "youtube", "netflix", "bilibili", "tiktok")
