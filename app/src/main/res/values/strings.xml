@@ -104,6 +104,9 @@
     <string name="language_zh">Chinese</string>
     <string name="language_en">English</string>
     <string name="enable_statistics">Record statistics</string>
+    <string name="use_wallpaper_colors">Use wallpaper colors</string>
+    <string name="wallpaper_colors_message">On Android 12 and newer, Project Lumen uses the system wallpaper palette for the whole Material color scheme, including background, surfaces, controls, and navigation.</string>
+    <string name="wallpaper_colors_unavailable">Wallpaper colors require Android 12 or newer. This device will use the built-in Lumen palette.</string>
     <string name="enable_reminder">Enable reminder</string>
     <string name="warn_interval">Reminder interval</string>
     <string name="rest_duration">Rest duration</string>

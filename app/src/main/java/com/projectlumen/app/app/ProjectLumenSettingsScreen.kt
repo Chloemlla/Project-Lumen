@@ -780,6 +780,20 @@ internal fun SettingsScreen(
         }
         SettingsSection(R.string.section_appearance, Icons.Outlined.Style) {
             val proEnabled = planTier(settings) >= PlanTier.PRO
+            SwitchRow(R.string.use_wallpaper_colors, Icons.Outlined.Style, settings.useDynamicColors) {
+                viewModel.updateSettings { current -> current.copy(useDynamicColors = it) }
+            }
+            Text(
+                stringResource(
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        R.string.wallpaper_colors_message
+                    } else {
+                        R.string.wallpaper_colors_unavailable
+                    },
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             TemplatePreviewCard(template)
             LumenFlowRow {
                 uiState.templates.filter { !it.isPremium || proEnabled }.forEach { template ->

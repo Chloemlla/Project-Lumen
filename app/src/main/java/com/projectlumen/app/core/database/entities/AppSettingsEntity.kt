@@ -13,6 +13,7 @@ data class AppSettingsEntity(
     val deviceInstallationId: String = "",
     val languageCode: String = "system",
     val themeMode: String = AppThemeMode.SYSTEM.name,
+    val useDynamicColors: Boolean = true,
     val planTier: String = PlanTier.FREE.name,
     val entitlementExpiresAt: Long = 0L,
     val lastEntitlementSyncAt: Long = 0L,

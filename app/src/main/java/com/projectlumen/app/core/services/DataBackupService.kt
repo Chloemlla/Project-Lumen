@@ -108,6 +108,7 @@ class DataBackupService(
         val imported = current.copy(
             languageCode = json.optString("languageCode", current.languageCode),
             themeMode = json.optString("themeMode", current.themeMode),
+            useDynamicColors = json.optBoolean("useDynamicColors", current.useDynamicColors),
             planTier = json.optString("planTier", current.planTier),
             entitlementExpiresAt = json.optLong("entitlementExpiresAt", current.entitlementExpiresAt),
             lastEntitlementSyncAt = json.optLong("lastEntitlementSyncAt", current.lastEntitlementSyncAt),
@@ -284,6 +285,7 @@ class DataBackupService(
     private fun AppSettingsEntity.toJson(): JSONObject = JSONObject()
         .put("languageCode", languageCode)
         .put("themeMode", themeMode)
+        .put("useDynamicColors", useDynamicColors)
         .put("planTier", planTier)
         .put("entitlementExpiresAt", entitlementExpiresAt)
         .put("lastEntitlementSyncAt", lastEntitlementSyncAt)

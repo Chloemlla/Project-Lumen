@@ -27,6 +27,7 @@ data class EyeCarePreferences(
     val restDurationSeconds: Int = 20,
     val preAlertEnabled: Boolean = true,
     val preAlertSeconds: Int = 60,
+    val useDynamicColors: Boolean = true,
     val pomodoroEnabled: Boolean = true,
     val pomodoroWorkMinutes: Int = 25,
     val pomodoroShortBreakMinutes: Int = 5,
@@ -81,6 +82,7 @@ class EyeCarePreferencesDataStore(context: Context) {
             preferences[Keys.REST_DURATION_SECONDS] = settings.restDurationSeconds
             preferences[Keys.PRE_ALERT_ENABLED] = settings.preAlertEnabled
             preferences[Keys.PRE_ALERT_SECONDS] = settings.preAlertSeconds
+            preferences[Keys.USE_DYNAMIC_COLORS] = settings.useDynamicColors
             preferences[Keys.POMODORO_ENABLED] = settings.pomodoroEnabled
             preferences[Keys.POMODORO_WORK_MINUTES] = settings.pomodoroWorkMinutes
             preferences[Keys.POMODORO_SHORT_BREAK_MINUTES] = settings.pomodoroShortBreakMinutes
@@ -120,6 +122,7 @@ class EyeCarePreferencesDataStore(context: Context) {
             restDurationSeconds = preferences[Keys.REST_DURATION_SECONDS] ?: 20,
             preAlertEnabled = preferences[Keys.PRE_ALERT_ENABLED] ?: true,
             preAlertSeconds = preferences[Keys.PRE_ALERT_SECONDS] ?: 60,
+            useDynamicColors = preferences[Keys.USE_DYNAMIC_COLORS] ?: true,
             pomodoroEnabled = preferences[Keys.POMODORO_ENABLED] ?: true,
             pomodoroWorkMinutes = preferences[Keys.POMODORO_WORK_MINUTES] ?: 25,
             pomodoroShortBreakMinutes = preferences[Keys.POMODORO_SHORT_BREAK_MINUTES] ?: 5,
@@ -157,6 +160,7 @@ class EyeCarePreferencesDataStore(context: Context) {
         val REST_DURATION_SECONDS = intPreferencesKey("rest_duration_seconds")
         val PRE_ALERT_ENABLED = booleanPreferencesKey("pre_alert_enabled")
         val PRE_ALERT_SECONDS = intPreferencesKey("pre_alert_seconds")
+        val USE_DYNAMIC_COLORS = booleanPreferencesKey("use_dynamic_colors")
         val POMODORO_ENABLED = booleanPreferencesKey("pomodoro_enabled")
         val POMODORO_WORK_MINUTES = intPreferencesKey("pomodoro_work_minutes")
         val POMODORO_SHORT_BREAK_MINUTES = intPreferencesKey("pomodoro_short_break_minutes")
@@ -196,6 +200,7 @@ fun AppSettingsEntity.withEyeCarePreferences(preferences: EyeCarePreferences): A
         restDurationSeconds = preferences.restDurationSeconds,
         preAlertEnabled = preferences.preAlertEnabled,
         preAlertSeconds = preferences.preAlertSeconds,
+        useDynamicColors = preferences.useDynamicColors,
         pomodoroEnabled = preferences.pomodoroEnabled,
         pomodoroWorkMinutes = preferences.pomodoroWorkMinutes,
         pomodoroShortBreakMinutes = preferences.pomodoroShortBreakMinutes,

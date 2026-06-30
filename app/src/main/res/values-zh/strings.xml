@@ -104,6 +104,9 @@
     <string name="language_zh">中文</string>
     <string name="language_en">English</string>
     <string name="enable_statistics">记录统计</string>
+    <string name="use_wallpaper_colors">使用壁纸取色</string>
+    <string name="wallpaper_colors_message">Android 12 及以上会使用系统壁纸调色板生成整套 Material 配色，包括底色、表面、控件和导航。</string>
+    <string name="wallpaper_colors_unavailable">壁纸取色需要 Android 12 或更高版本，当前设备将使用内置 Lumen 配色。</string>
     <string name="enable_reminder">启用提醒</string>
     <string name="warn_interval">提醒间隔</string>
     <string name="rest_duration">休息时长</string>

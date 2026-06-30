@@ -206,7 +206,10 @@ fun ProjectLumenApp(
     val localizedContext = baseContext
 
     CompositionLocalProvider(LocalContext provides localizedContext) {
-        ProjectLumenTheme(themeMode = themeMode) {
+        ProjectLumenTheme(
+            themeMode = themeMode,
+            useDynamicColors = uiState.settings.useDynamicColors,
+        ) {
             activeCrashReport?.let { report ->
                 CrashReportScreen(
                     report = report,
