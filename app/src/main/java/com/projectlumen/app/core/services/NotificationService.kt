@@ -159,7 +159,7 @@ class NotificationService(private val context: Context) {
             NotificationManagerCompat.from(context).notify(
                 NotificationIds.POMODORO + 1001,
                 NotificationCompat.Builder(context, NotificationChannels.STATUS)
-                    .setSmallIcon(R.mipmap.ic_launcher_round)
+                    .setSmallIcon(R.drawable.ic_notification_lumen)
                     .setContentTitle(context.getString(R.string.about_update_status))
                     .setContentText("$tagName $releaseName")
                     .setContentIntent(PendingIntent.getActivity(
@@ -179,7 +179,7 @@ class NotificationService(private val context: Context) {
     fun buildOngoingStatusNotification(state: RuntimeStateEntity? = null): Notification {
         val (title, message) = ongoingStatusText(state)
         return NotificationCompat.Builder(context, NotificationChannels.STATUS)
-            .setSmallIcon(R.mipmap.ic_launcher_round)
+            .setSmallIcon(R.drawable.ic_notification_lumen)
             .setContentTitle(title)
             .setContentText(message)
             .setContentIntent(openAppPendingIntent(NotificationIds.FOREGROUND_TIMER))
@@ -197,7 +197,7 @@ class NotificationService(private val context: Context) {
 
     fun buildProximityForegroundNotification(): Notification {
         return NotificationCompat.Builder(context, NotificationChannels.PROXIMITY)
-            .setSmallIcon(R.mipmap.ic_launcher_round)
+            .setSmallIcon(R.drawable.ic_notification_lumen)
             .setContentTitle(context.getString(R.string.proximity_check_running_title))
             .setContentText(context.getString(R.string.proximity_check_running_message))
             .setContentIntent(openAppPendingIntent(NotificationIds.PROXIMITY_FOREGROUND))
@@ -210,7 +210,7 @@ class NotificationService(private val context: Context) {
 
     fun buildLightMonitorForegroundNotification(): Notification {
         return NotificationCompat.Builder(context, NotificationChannels.STATUS)
-            .setSmallIcon(R.mipmap.ic_launcher_round)
+            .setSmallIcon(R.drawable.ic_notification_lumen)
             .setContentTitle(context.getString(R.string.light_monitor_running_title))
             .setContentText(context.getString(R.string.light_monitor_running_message))
             .setContentIntent(openAppPendingIntent(NotificationIds.LOW_LIGHT_FOREGROUND))
@@ -223,7 +223,7 @@ class NotificationService(private val context: Context) {
 
     fun buildOverlayForegroundNotification(): Notification {
         return NotificationCompat.Builder(context, NotificationChannels.STATUS)
-            .setSmallIcon(R.mipmap.ic_launcher_round)
+            .setSmallIcon(R.drawable.ic_notification_lumen)
             .setContentTitle(context.getString(R.string.overlay_running_title))
             .setContentText(context.getString(R.string.overlay_running_message))
             .setContentIntent(openAppPendingIntent(NotificationIds.OVERLAY_FOREGROUND))
@@ -236,7 +236,7 @@ class NotificationService(private val context: Context) {
 
     fun buildDeveloperDebugForegroundNotification(): Notification {
         return NotificationCompat.Builder(context, NotificationChannels.STATUS)
-            .setSmallIcon(R.mipmap.ic_launcher_round)
+            .setSmallIcon(R.drawable.ic_notification_lumen)
             .setContentTitle(context.getString(R.string.developer_debug_running_title))
             .setContentText(context.getString(R.string.developer_debug_running_message))
             .setContentIntent(openAppPendingIntent(NotificationIds.DEVELOPER_DEBUG_FOREGROUND))
@@ -358,7 +358,7 @@ class NotificationService(private val context: Context) {
     ) {
         if (!canPostNotifications()) return
         val builder = NotificationCompat.Builder(context, channel)
-            .setSmallIcon(R.mipmap.ic_launcher_round)
+            .setSmallIcon(R.drawable.ic_notification_lumen)
             .setContentTitle(title)
             .setContentText(message)
             .setContentIntent(openAppPendingIntent(id))

@@ -15,8 +15,14 @@ class ShizukuCapabilityManager(
 ) {
     private val _state = MutableStateFlow(ShizukuCapabilityState())
     val state = _state.asStateFlow()
+    private val permissionResultListener = Shizuku.OnRequestPermissionResultListener { requestCode, _ ->
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            refreshState()
+        }
+    }
 
     init {
+        runCatching { Shizuku.addRequestPermissionResultListener(permissionResultListener) }
         refreshState()
     }
 
@@ -40,7 +46,7 @@ class ShizukuCapabilityManager(
             return@withContext null
         }
         val output = withTimeoutOrNull(FOREGROUND_QUERY_TIMEOUT_MS) {
-            runPrivilegedCommand("dumpsys activity activities")
+            runPrivilegedCommand(FOREGROUND_CONTEXT_COMMAND)
         }
         val context = output?.lineSequence()
             ?.mapNotNull(::parseActivityComponent)
@@ -142,6 +148,8 @@ class ShizukuCapabilityManager(
         private const val PERMISSION_REQUEST_CODE = 42017
         private const val FOREGROUND_QUERY_TIMEOUT_MS = 2_500L
         private const val MAX_COMMAND_OUTPUT_BYTES = 96_000
+        private const val FOREGROUND_CONTEXT_COMMAND =
+            "dumpsys activity activities | grep -E 'topResumedActivity|mResumedActivity|ResumedActivity|mCurrentFocus' | head -n 8"
         private const val CATEGORY_NORMAL = "normal"
         private const val CATEGORY_CAMERA = "camera"
         private const val CATEGORY_COMMUNICATION = "communication"

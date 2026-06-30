@@ -144,7 +144,10 @@ class ProjectLumenViewModel(
     fun setAutoUpdateCheckEnabled(enabled: Boolean) = settingsEntry.setAutoUpdateCheckEnabled(enabled)
     fun updateDailyGoal(transform: (DailyGoalEntity) -> DailyGoalEntity) = settingsEntry.updateDailyGoal(transform)
     fun simulateLowMemory() = simulateDeveloperLowMemory()
-    fun refreshShizukuState() = shizuku.refreshState()
+    fun refreshShizukuState() {
+        shizuku.refreshState()
+        viewModelScope.launch { shizuku.refreshForegroundContext() }
+    }
     fun requestShizukuAuthorization() = shizuku.requestPermission()
 
     fun selectTemplate(templateId: Long) = templatesEntry.selectTemplate(templateId)

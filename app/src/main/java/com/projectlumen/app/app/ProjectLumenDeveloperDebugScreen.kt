@@ -34,8 +34,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.projectlumen.app.R
 import com.projectlumen.app.core.crash.CrashReport
+import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
 import kotlin.math.roundToInt
 
 @Composable
@@ -48,6 +50,7 @@ internal fun DeveloperDebugScreen(
     val runtime = uiState.runtime
     val context = LocalContext.current
     val permissionRequirements = rememberPermissionRequirements()
+    val shizukuState = viewModel.shizukuState.collectAsStateWithLifecycle().value
     val luxHistory = remember { mutableStateListOf<Float>() }
     LaunchedEffect(runtime.ambientLastLux, uiState.nowMillis) {
         luxHistory += runtime.ambientLastLux.coerceAtLeast(0f)
@@ -115,6 +118,11 @@ internal fun DeveloperDebugScreen(
             MetricRow(R.string.developer_service_uptime, serviceUptimeLabel(runtime.foregroundServiceStartedAt, runtime.foregroundServiceStoppedAt, uiState.nowMillis))
             MetricRow(R.string.developer_service_last_restart, timestampLabel(runtime.foregroundServiceLastStickyRestartAt))
             MetricRow(R.string.developer_service_task_removed, timestampLabel(runtime.foregroundServiceLastTaskRemovedAt))
+            MetricRow(R.string.shizuku_status, developerShizukuStatusLabel(shizukuState))
+            MetricRow(R.string.shizuku_foreground_context, developerShizukuContextLabel(shizukuState))
+            OutlinedButton(onClick = viewModel::refreshShizukuState) {
+                ButtonLabel(Icons.Outlined.Settings, R.string.shizuku_refresh_status)
+            }
             MetricRow(R.string.developer_low_memory_last, timestampLabel(runtime.developerLastLowMemorySimulatedAt))
             Button(onClick = viewModel::simulateLowMemory) {
                 ButtonLabel(Icons.Outlined.Memory, R.string.developer_simulate_low_memory)
@@ -199,6 +207,26 @@ private fun timestampLabel(value: Long): String {
             .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
     } else {
         "-"
+    }
+}
+
+@Composable
+private fun developerShizukuStatusLabel(state: ShizukuCapabilityState): String {
+    return when {
+        state.ready -> stringResource(R.string.shizuku_status_ready)
+        !state.binderAvailable -> stringResource(R.string.shizuku_status_no_service)
+        !state.permissionGranted -> stringResource(R.string.shizuku_status_permission_needed)
+        else -> stringResource(R.string.shizuku_status_unavailable)
+    }
+}
+
+@Composable
+private fun developerShizukuContextLabel(state: ShizukuCapabilityState): String {
+    if (state.foregroundPackage.isBlank()) return "-"
+    return if (state.foregroundShouldDeferSampling) {
+        stringResource(R.string.shizuku_context_deferred, state.foregroundCategory)
+    } else {
+        "${state.foregroundPackage}/${state.foregroundActivity.substringAfterLast('.')}"
     }
 }
 

@@ -481,10 +481,7 @@ internal fun SettingsScreen(
             }
             SwitchRow(R.string.enable_shizuku_advanced_mode, Icons.Outlined.Lock, settings.shizukuAdvancedModeEnabled) { enabled ->
                 viewModel.updateSettings { current ->
-                    current.copy(
-                        shizukuAdvancedModeEnabled = enabled,
-                        shizukuServiceRecoveryEnabled = if (enabled) current.shizukuServiceRecoveryEnabled else false,
-                    )
+                    current.copy(shizukuAdvancedModeEnabled = enabled)
                 }
                 if (enabled) viewModel.requestShizukuAuthorization()
             }
