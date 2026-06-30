@@ -29,7 +29,11 @@ class FaceDistanceAnalyzer(private val includeTopology: Boolean = false) {
             .build(),
     )
     private val meshDetector = if (includeTopology) {
-        FaceMeshDetection.getClient(FaceMeshDetectorOptions.DEFAULT_OPTIONS)
+        FaceMeshDetection.getClient(
+            FaceMeshDetectorOptions.Builder()
+                .setUseCase(FaceMeshDetectorOptions.FACE_MESH)
+                .build(),
+        )
     } else {
         null
     }
