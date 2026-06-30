@@ -194,6 +194,22 @@ class ProximityDetectionService : Service() {
                 ),
             )
         }
+        val distanceViolationTelemetry = if (tooClose) {
+            app.telemetry.distanceViolation(
+                recordedAt = now,
+                ratioPercent = ratioPercent,
+                closeSeconds = captureSeconds.toLong(),
+            )
+        } else {
+            null
+        }
+        runCatching {
+            app.telemetry.uploadCurrentSnapshot(
+                distanceViolation = distanceViolationTelemetry,
+                averageBlinksPerMinute = blinkState.averageBlinksPerMinute,
+                force = calibrate || shouldWarn || blinkState.shouldWarn,
+            )
+        }
     }
 
     private fun latestSettingsNeedsDebugFrame(settings: AppSettingsEntity): Boolean {
@@ -292,18 +308,14 @@ class ProximityDetectionService : Service() {
         nowMillis: Long,
     ): BlinkState {
         if (!settings.blinkMonitoringEnabled || samples.isEmpty()) {
-            return BlinkState(previousLastBlinkAt, previousLastWarningAt, 0, shouldWarn = false)
+            return BlinkState(previousLastBlinkAt, previousLastWarningAt, 0, averageBlinksPerMinute = null, shouldWarn = false)
         }
         val probabilitySamples = samples.mapNotNull { it.averageEyeOpenProbability() }
         if (probabilitySamples.isEmpty()) {
-            return BlinkState(previousLastBlinkAt, previousLastWarningAt, 0, shouldWarn = false)
+            return BlinkState(previousLastBlinkAt, previousLastWarningAt, 0, averageBlinksPerMinute = null, shouldWarn = false)
         }
-        var sawClosed = false
-        var blinked = false
-        probabilitySamples.forEach { probability ->
-            if (probability <= CLOSED_EYE_PROBABILITY) sawClosed = true
-            if (sawClosed && probability >= OPEN_EYE_PROBABILITY) blinked = true
-        }
+        val blinkCount = probabilitySamples.countBlinkTransitions()
+        val blinked = blinkCount > 0
         val lastBlinkAt = when {
             blinked -> nowMillis
             previousLastBlinkAt > 0L -> previousLastBlinkAt
@@ -319,6 +331,7 @@ class ProximityDetectionService : Service() {
             lastBlinkAt = lastBlinkAt,
             lastWarningAt = if (shouldWarn) nowMillis else previousLastWarningAt,
             eyeOpenProbabilityPercent = (probabilitySamples.last() * 100f).roundToInt().coerceIn(0, 100),
+            averageBlinksPerMinute = blinkRatePerMinute(samples, blinkCount),
             shouldWarn = shouldWarn,
         )
     }
@@ -329,10 +342,31 @@ class ProximityDetectionService : Service() {
         return values.average().toFloat().coerceIn(0f, 1f)
     }
 
+    private fun List<Float>.countBlinkTransitions(): Int {
+        var sawClosed = false
+        var blinkCount = 0
+        forEach { probability ->
+            if (probability <= CLOSED_EYE_PROBABILITY) sawClosed = true
+            if (sawClosed && probability >= OPEN_EYE_PROBABILITY) {
+                blinkCount += 1
+                sawClosed = false
+            }
+        }
+        return blinkCount
+    }
+
+    private fun blinkRatePerMinute(samples: List<FaceDistanceSample>, blinkCount: Int): Double? {
+        if (blinkCount < 0 || samples.size < 2) return null
+        val durationMillis = samples.last().capturedAtMillis - samples.first().capturedAtMillis
+        if (durationMillis <= 0L) return null
+        return blinkCount * 60_000.0 / durationMillis.toDouble()
+    }
+
     private data class BlinkState(
         val lastBlinkAt: Long,
         val lastWarningAt: Long,
         val eyeOpenProbabilityPercent: Int,
+        val averageBlinksPerMinute: Double?,
         val shouldWarn: Boolean,
     )
 

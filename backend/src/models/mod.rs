@@ -1,13 +1,17 @@
-pub mod auth;
 pub mod admin;
+pub mod auth;
 pub mod backups;
 pub mod common;
 pub mod entitlements;
+pub mod face_analysis;
 pub mod sync;
+pub mod telemetry;
 
-pub use auth::*;
 pub use admin::*;
+pub use auth::*;
 pub use backups::*;
 pub use common::*;
 pub use entitlements::*;
+pub use face_analysis::*;
 pub use sync::*;
+pub use telemetry::*;

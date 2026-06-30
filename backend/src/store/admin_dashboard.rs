@@ -25,8 +25,14 @@ impl AppStore {
                 id: user.id.clone(),
                 email: user.email.clone(),
                 registered_at: user.created_at,
-                last_sync_at: latest_sync_by_user.get(&user.id).copied().unwrap_or_default(),
-                plan_tier: tier_by_user.get(&user.id).cloned().unwrap_or_else(|| "FREE".to_owned()),
+                last_sync_at: latest_sync_by_user
+                    .get(&user.id)
+                    .copied()
+                    .unwrap_or_default(),
+                plan_tier: tier_by_user
+                    .get(&user.id)
+                    .cloned()
+                    .unwrap_or_else(|| "FREE".to_owned()),
                 feature_flags: Vec::new(),
             })
             .collect();
@@ -112,7 +118,10 @@ impl AppStore {
     }
 
     async fn access_audit(&self) -> Result<Vec<AdminAccessAuditEntry>, ApiError> {
-        let options = FindOptions::builder().sort(doc! { "at": -1 }).limit(25).build();
+        let options = FindOptions::builder()
+            .sort(doc! { "at": -1 })
+            .limit(25)
+            .build();
         let entries: Vec<AdminAccessAuditRecord> = self
             .admin_access_audit
             .find(doc! {}, options)
@@ -210,7 +219,6 @@ impl AppStore {
             })
             .collect())
     }
-
 }
 
 fn backup_summary(backup: &Value) -> AdminBackupSummary {

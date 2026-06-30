@@ -1,7 +1,10 @@
 use crate::{error::ApiError, models::AdminOperatorDto, state::AppState};
 use axum::http::{header::AUTHORIZATION, HeaderMap};
 
-pub async fn require_admin(headers: &HeaderMap, state: &AppState) -> Result<AdminOperatorDto, ApiError> {
+pub async fn require_admin(
+    headers: &HeaderMap,
+    state: &AppState,
+) -> Result<AdminOperatorDto, ApiError> {
     let token = bearer_token(headers)?;
     state.store.admin_operator_for_token(token).await
 }

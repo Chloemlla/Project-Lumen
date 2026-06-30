@@ -28,7 +28,10 @@ impl Config {
             admin_username: env_value("LUMEN_ADMIN_USERNAME", "admin"),
             admin_password: env_value("LUMEN_ADMIN_PASSWORD", "change-me"),
             admin_access_token_ttl_seconds: env_u64("LUMEN_ADMIN_ACCESS_TOKEN_TTL_SECONDS", 3_600),
-            admin_refresh_token_ttl_seconds: env_u64("LUMEN_ADMIN_REFRESH_TOKEN_TTL_SECONDS", 604_800),
+            admin_refresh_token_ttl_seconds: env_u64(
+                "LUMEN_ADMIN_REFRESH_TOKEN_TTL_SECONDS",
+                604_800,
+            ),
             login_code: env_value("LUMEN_DEV_LOGIN_CODE", "000000"),
             login_ttl_seconds: env_u64("LUMEN_LOGIN_TTL_SECONDS", 600),
             access_token_ttl_seconds: env_u64("LUMEN_ACCESS_TOKEN_TTL_SECONDS", 604_800),

@@ -16,7 +16,6 @@ import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageView
@@ -184,10 +183,7 @@ import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
-import org.json.JSONObject
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -203,13 +199,6 @@ internal const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chl
 internal const val PROJECT_LUMEN_RELEASES_BASE_URL = "https://github.com/Chloemlla/Project-Lumen/releases"
 internal const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIFICATIONS"
 internal const val MINI_CHROME_VERSION = 107
-internal const val GKD_DOC_HOST = "gkd.li"
-internal const val GKD_DOC_CONFIG_URL =
-    "https://registry.npmmirror.com/@gkd-kit/docs/latest/files/_config.json"
-internal const val GKD_DEBUG_JS_TEXT = """
-<script src="https://registry.npmmirror.com/eruda/latest/files"></script>
-<script>eruda.init();</script>
-"""
 internal const val COUNTDOWN_STYLE_CIRCLE = "circle"
 internal const val COUNTDOWN_STYLE_BAR = "bar"
 internal const val COUNTDOWN_STYLE_NUMBER = "number"

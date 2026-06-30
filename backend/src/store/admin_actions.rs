@@ -1,8 +1,8 @@
 use super::{
     database_error,
     documents::{
-        AdminActionAuditRecord, AdminReleaseRecord, AdminSecurityAllowlistRecord, AdminTemplateRecord,
-        EntitlementRecord,
+        AdminActionAuditRecord, AdminReleaseRecord, AdminSecurityAllowlistRecord,
+        AdminTemplateRecord, EntitlementRecord,
     },
     time::now_millis,
     AppStore,
@@ -23,7 +23,8 @@ impl AppStore {
         payload: Value,
     ) -> Result<AdminActionResponse, ApiError> {
         let recorded_at = now_millis();
-        self.apply_admin_action(&action, &payload, recorded_at).await?;
+        self.apply_admin_action(&action, &payload, recorded_at)
+            .await?;
         self.admin_actions
             .insert_one(
                 AdminActionAuditRecord {
@@ -45,7 +46,12 @@ impl AppStore {
         })
     }
 
-    async fn apply_admin_action(&self, action: &str, payload: &Value, now: i64) -> Result<(), ApiError> {
+    async fn apply_admin_action(
+        &self,
+        action: &str,
+        payload: &Value,
+        now: i64,
+    ) -> Result<(), ApiError> {
         match action {
             "change-plan" => self.apply_change_plan(payload, now).await,
             "revoke-pro" => self.apply_revoke_pro(payload, now).await,
@@ -69,7 +75,10 @@ impl AppStore {
                     tier: payload_str(payload, "tier", "PRO"),
                     status: "active".to_owned(),
                     purchased_at: now,
-                    expires_at: payload.get("expiresAt").and_then(Value::as_i64).unwrap_or_default(),
+                    expires_at: payload
+                        .get("expiresAt")
+                        .and_then(Value::as_i64)
+                        .unwrap_or_default(),
                     last_verified_at: now,
                     raw_payload_json: payload.to_string(),
                 },
@@ -108,9 +117,18 @@ impl AppStore {
             locales: payload
                 .get("locales")
                 .and_then(Value::as_array)
-                .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_owned)
+                        .collect()
+                })
                 .unwrap_or_else(|| vec!["en".to_owned(), "zh".to_owned()]),
-            layout_json: payload.get("layoutJson").cloned().unwrap_or_else(|| serde_json::json!({})),
+            layout_json: payload
+                .get("layoutJson")
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!({})),
             updated_at: now,
         };
         self.admin_templates
@@ -125,7 +143,10 @@ impl AppStore {
     }
 
     async fn apply_force_update(&self, payload: &Value, now: i64) -> Result<(), ApiError> {
-        let version_code = payload.get("versionCode").and_then(Value::as_i64).unwrap_or_default();
+        let version_code = payload
+            .get("versionCode")
+            .and_then(Value::as_i64)
+            .unwrap_or_default();
         let id = payload
             .get("id")
             .and_then(Value::as_str)

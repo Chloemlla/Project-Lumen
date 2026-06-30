@@ -1,13 +1,15 @@
 mod admin_actions;
-mod admin_auth;
 mod admin_audit;
+mod admin_auth;
 mod admin_dashboard;
 mod admin_dashboard_ops;
 mod auth;
 mod backups;
 mod documents;
 mod entitlements;
+mod face_analysis;
 mod sync;
+mod telemetry;
 mod time;
 
 use crate::{config::Config, error::ApiError};
@@ -17,6 +19,8 @@ use documents::{
     AdminTelemetryRecord, AdminTemplateRecord, BackupRecord, CounterRecord, EntitlementRecord,
     PendingLogin, SessionRecord, StoredSyncChange,
 };
+use telemetry::TelemetryUploadRecord;
+use face_analysis::FaceAnalysisFrameRecord;
 use mongodb::{
     bson::doc,
     options::{ClientOptions, IndexOptions, UpdateOptions},
@@ -32,6 +36,8 @@ pub struct AppStore {
     pub(crate) sessions: Collection<SessionRecord>,
     pub(crate) entitlements: Collection<EntitlementRecord>,
     pub(crate) sync_changes: Collection<StoredSyncChange>,
+    pub(crate) telemetry_uploads: Collection<TelemetryUploadRecord>,
+    pub(crate) face_analysis_frames: Collection<FaceAnalysisFrameRecord>,
     pub(crate) backups: Collection<BackupRecord>,
     pub(crate) counters: Collection<CounterRecord>,
     pub(crate) admin_sessions: Collection<AdminSessionRecord>,
@@ -59,6 +65,8 @@ impl AppStore {
             sessions: database.collection("sessions"),
             entitlements: database.collection("entitlements"),
             sync_changes: database.collection("sync_changes"),
+            telemetry_uploads: database.collection("telemetry_uploads"),
+            face_analysis_frames: database.collection("face_analysis_frames"),
             backups: database.collection("backups"),
             counters: database.collection("counters"),
             admin_sessions: database.collection("admin_sessions"),
@@ -104,6 +112,26 @@ impl AppStore {
             )
             .await
             .map_err(database_error)?;
+        self.telemetry_uploads
+            .create_index(
+                index(
+                    "telemetry_user_received",
+                    doc! { "userId": 1, "receivedAt": -1 },
+                ),
+                None,
+            )
+            .await
+            .map_err(database_error)?;
+        self.face_analysis_frames
+            .create_index(
+                index(
+                    "face_analysis_user_received",
+                    doc! { "userId": 1, "receivedAt": -1 },
+                ),
+                None,
+            )
+            .await
+            .map_err(database_error)?;
         self.backups
             .create_index(
                 index(
@@ -126,7 +154,10 @@ impl AppStore {
             .await
             .map_err(database_error)?;
         self.admin_actions
-            .create_index(index("admin_action_recorded", doc! { "recordedAt": -1 }), None)
+            .create_index(
+                index("admin_action_recorded", doc! { "recordedAt": -1 }),
+                None,
+            )
             .await
             .map_err(database_error)?;
         self.admin_access_audit
@@ -134,7 +165,10 @@ impl AppStore {
             .await
             .map_err(database_error)?;
         self.admin_crash_reports
-            .create_index(index("admin_crash_last_seen", doc! { "lastSeenAt": -1 }), None)
+            .create_index(
+                index("admin_crash_last_seen", doc! { "lastSeenAt": -1 }),
+                None,
+            )
             .await
             .map_err(database_error)?;
         self.admin_releases
@@ -146,7 +180,10 @@ impl AppStore {
             .map_err(database_error)?;
         self.admin_security_allowlist
             .create_index(
-                unique_index("admin_allowlist_origin", doc! { "origin": 1, "protocol": 1 }),
+                unique_index(
+                    "admin_allowlist_origin",
+                    doc! { "origin": 1, "protocol": 1 },
+                ),
                 None,
             )
             .await

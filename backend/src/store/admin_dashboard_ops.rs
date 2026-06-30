@@ -2,8 +2,8 @@ use super::{database_error, AppStore};
 use crate::{
     error::ApiError,
     models::{
-        AdminApiMetric, AdminCrashGroup, AdminReleaseItem, AdminSecurityAllowlistItem, AdminSyncMetric,
-        AdminTelemetryItem, AdminTemplateItem,
+        AdminApiMetric, AdminCrashGroup, AdminReleaseItem, AdminSecurityAllowlistItem,
+        AdminSyncMetric, AdminTelemetryItem, AdminTemplateItem,
     },
 };
 use futures_util::TryStreamExt;
@@ -88,7 +88,9 @@ impl AppStore {
     }
 
     pub(crate) async fn template_catalog(&self) -> Result<Vec<AdminTemplateItem>, ApiError> {
-        let options = FindOptions::builder().sort(doc! { "updatedAt": -1 }).build();
+        let options = FindOptions::builder()
+            .sort(doc! { "updatedAt": -1 })
+            .build();
         self.admin_templates
             .find(doc! {}, options)
             .await
@@ -149,7 +151,9 @@ impl AppStore {
             .map_err(database_error)
     }
 
-    pub(crate) async fn security_allowlist(&self) -> Result<Vec<AdminSecurityAllowlistItem>, ApiError> {
+    pub(crate) async fn security_allowlist(
+        &self,
+    ) -> Result<Vec<AdminSecurityAllowlistItem>, ApiError> {
         self.admin_security_allowlist
             .find(doc! {}, None)
             .await

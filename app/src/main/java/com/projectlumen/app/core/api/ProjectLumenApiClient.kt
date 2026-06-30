@@ -91,6 +91,26 @@ class ProjectLumenApiClient(
             .put("changes", JSONArray(changes.map { it.toJson() })),
     ) { it.toSyncPushResult() }
 
+    suspend fun uploadTelemetry(
+        accessToken: String,
+        upload: RemoteTelemetryUpload,
+    ): RemoteTelemetryUploadResult = request(
+        method = "POST",
+        path = "v1/telemetry",
+        accessToken = accessToken,
+        body = upload.toJson(),
+    ) { it.toTelemetryUploadResult() }
+
+    suspend fun uploadFaceAnalysisFrame(
+        accessToken: String,
+        upload: RemoteFaceAnalysisFrameUpload,
+    ): RemoteFaceAnalysisFrameUploadResult = request(
+        method = "POST",
+        path = "v1/face-analysis/frames",
+        accessToken = accessToken,
+        body = upload.toJson(),
+    ) { it.toFaceAnalysisFrameUploadResult() }
+
     suspend fun uploadBackup(
         accessToken: String,
         deviceInstallationId: String,

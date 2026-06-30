@@ -28,6 +28,7 @@ internal class ProjectLumenRuntimeFeatureEntry(
     private val audio: AudioService,
     private val startTimerService: () -> Unit,
     private val stopTimerService: () -> Unit,
+    private val uploadTelemetrySnapshot: suspend () -> Unit,
 ) {
     private val reminderEngine = ReminderEngine()
     private val pomodoroEngine = PomodoroEngine()
@@ -207,6 +208,7 @@ internal class ProjectLumenRuntimeFeatureEntry(
         runtimeRepository.upsert(transition.nextRuntime)
         playAudioEvent(transition.audioEvent)
         refreshActiveNotifications(settings, transition.nextRuntime)
+        uploadTelemetrySnapshot()
     }
 
     private fun adjustRuntimeForSettings(

@@ -104,6 +104,9 @@ class LightMonitorService : Service(), SensorEventListener {
                 ),
             )
         }
+        if (shouldWarn) {
+            runCatching { app.telemetry.uploadCurrentSnapshot(force = true) }
+        }
     }
 
     private fun applyBrightness(lux: Float, minPercent: Int, maxPercent: Int) {

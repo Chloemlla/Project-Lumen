@@ -37,6 +37,7 @@ class MainActivity : ComponentActivity() {
                             startDeveloperDebugService = app::startDeveloperDebugService,
                             stopDeveloperDebugService = app::stopDeveloperDebugService,
                             simulateDeveloperLowMemory = app::simulateDeveloperLowMemory,
+                            uploadTelemetrySnapshot = { app.telemetry.uploadCurrentSnapshot(force = true) },
                         ) as T
                     }
                 },

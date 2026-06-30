@@ -8,4 +8,7 @@ object ProjectLumenApiConfig {
 
     val baseUrl: String
         get() = BuildConfig.API_BASE_URL.trim().ifBlank { DEFAULT_BASE_URL }.trimEnd('/')
+
+    val telemetryAccessToken: String
+        get() = BuildConfig.TELEMETRY_ACCESS_TOKEN.trim()
 }

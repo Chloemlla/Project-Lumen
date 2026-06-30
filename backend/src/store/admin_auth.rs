@@ -44,7 +44,10 @@ impl AppStore {
         self.issue_admin_session(&session.username, config).await
     }
 
-    pub async fn admin_operator_for_token(&self, access_token: &str) -> Result<AdminOperatorDto, ApiError> {
+    pub async fn admin_operator_for_token(
+        &self,
+        access_token: &str,
+    ) -> Result<AdminOperatorDto, ApiError> {
         let session = self
             .admin_sessions
             .find_one(doc! { "_id": access_token }, None)
@@ -76,7 +79,8 @@ impl AppStore {
         let access_token = Uuid::new_v4().to_string();
         let refresh_token = Uuid::new_v4().to_string();
         let expires_at = now + ttl_seconds_to_millis(config.admin_access_token_ttl_seconds);
-        let refresh_expires_at = now + ttl_seconds_to_millis(config.admin_refresh_token_ttl_seconds);
+        let refresh_expires_at =
+            now + ttl_seconds_to_millis(config.admin_refresh_token_ttl_seconds);
         let operator = AdminOperatorDto {
             id: username.to_owned(),
             username: username.to_owned(),

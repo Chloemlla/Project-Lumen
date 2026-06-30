@@ -35,6 +35,7 @@ class ProjectLumenViewModel(
     startDeveloperDebugService: () -> Unit,
     stopDeveloperDebugService: () -> Unit,
     private val simulateDeveloperLowMemory: () -> Unit,
+    private val uploadTelemetrySnapshot: suspend () -> Unit,
 ) : ViewModel() {
     private val repositories = ProjectLumenRepositories(database, eyeCarePreferences)
     private val now = MutableStateFlow(System.currentTimeMillis())
@@ -48,6 +49,7 @@ class ProjectLumenViewModel(
         audio = audio,
         startTimerService = startTimerService,
         stopTimerService = stopTimerService,
+        uploadTelemetrySnapshot = uploadTelemetrySnapshot,
     )
     private val settingsEntry = ProjectLumenSettingsFeatureEntry(
         scope = viewModelScope,
@@ -101,6 +103,7 @@ class ProjectLumenViewModel(
             val settings = repositories.settings.getOrDefault()
             settingsEntry.applyStartupMonitoring(settings)
             runtimeEntry.refreshActiveNotifications(settings, repositories.runtime.getOrDefault())
+            uploadTelemetrySnapshot()
         }
         runtimeEntry.startClock(now)
     }

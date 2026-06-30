@@ -16,7 +16,6 @@ import android.provider.Settings
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageView
@@ -184,10 +183,7 @@ import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
-import org.json.JSONObject
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -204,6 +200,8 @@ internal fun WebViewScreen(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
+    val initialPageUri = remember(url) { url.toUri() }
+    val initialPageAllowed = remember(url) { isProjectLumenRepoUrl(initialPageUri) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     var pageTitle by remember(url) { mutableStateOf("") }
     var currentUrl by rememberSaveable(url) { mutableStateOf(url) }
@@ -211,6 +209,14 @@ internal fun WebViewScreen(
     var expanded by remember { mutableStateOf(false) }
     var showCompatibilityDialog by remember { mutableStateOf(false) }
     val currentPageUrl = webView?.url ?: currentUrl
+
+    LaunchedEffect(initialPageAllowed, initialPageUri) {
+        if (!initialPageAllowed) {
+            openUri(context, initialPageUri)
+            onDismiss()
+        }
+    }
+    if (!initialPageAllowed) return
 
     BackHandler(onBack = onDismiss)
     DisposableEffect(webView) {
@@ -228,7 +234,7 @@ internal fun WebViewScreen(
             text = {
                 Text(
                     "检测到您的系统内置浏览器版本($chromeVersion)过低, 可能无法正常浏览网页文档\n\n" +
-                        "建议自行升级版本后重启 GKD 再查看文档, 或点击右上角后在外部浏览器打开查阅\n\n" +
+                        "建议自行升级版本后重启 Project Lumen 再查看文档, 或点击右上角后在外部浏览器打开查阅\n\n" +
                         "若能正常浏览文档请忽略此项提示",
                 )
             },
@@ -312,7 +318,7 @@ internal fun WebViewScreen(
                 factory = {
                     WebView(it).apply {
                         webView = this
-                        addJavascriptInterface(ProjectLumenWebViewJsApi(it.applicationContext), "gkd")
+                        addJavascriptInterface(ProjectLumenWebViewJsApi(it.applicationContext), "projectLumen")
                         @SuppressLint("SetJavaScriptEnabled")
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
@@ -365,27 +371,20 @@ internal class ProjectLumenWebViewClient(
 
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val uri = request.url
-        if (uri.host != GKD_DOC_HOST) {
+        if (request.isForMainFrame && !isProjectLumenRepoUrl(uri)) {
             openUri(view.context, uri)
             return true
         }
-        return super.shouldOverrideUrlLoading(view, request)
+        return false
     }
+}
 
-    override fun shouldInterceptRequest(
-        view: WebView,
-        request: WebResourceRequest,
-    ): WebResourceResponse? {
-        try {
-            if (request.isForMainFrame && request.url.host == GKD_DOC_HOST && request.method == "GET") {
-                val path = request.url.path?.takeIf { it.isNotEmpty() } ?: "/"
-                loadGkdDocResponse(path)?.let { return it }
-            }
-        } catch (e: Throwable) {
-            e.printStackTrace()
-        }
-        return super.shouldInterceptRequest(view, request)
-    }
+internal fun isProjectLumenRepoUrl(uri: Uri): Boolean {
+    val url = uri.toString()
+    return url == PROJECT_LUMEN_REPO_URL ||
+        url.startsWith("$PROJECT_LUMEN_REPO_URL/") ||
+        url.startsWith("$PROJECT_LUMEN_REPO_URL?") ||
+        url.startsWith("$PROJECT_LUMEN_REPO_URL#")
 }
 
 internal class ProjectLumenWebViewJsApi(private val context: Context) {
@@ -406,33 +405,6 @@ internal class ProjectLumenWebViewJsApi(private val context: Context) {
 
     @JavascriptInterface
     fun getDebuggable() = BuildConfig.DEBUG
-}
-
-internal fun loadGkdDocResponse(path: String): WebResourceResponse? {
-    val docConfig = JSONObject(httpGetText(GKD_DOC_CONFIG_URL))
-    val mirrorBaseUrl = docConfig.getString("mirrorBaseUrl")
-    val htmlUrlMap = docConfig.getJSONObject("htmlUrlMap")
-    val htmlPath = htmlUrlMap.optString(path).takeIf { it.isNotBlank() } ?: return null
-    val htmlText = httpGetText(mirrorBaseUrl + htmlPath).let {
-        if (BuildConfig.DEBUG) GKD_DEBUG_JS_TEXT + it else it
-    }
-    return WebResourceResponse(
-        "text/html",
-        "UTF-8",
-        htmlText.byteInputStream(Charsets.UTF_8),
-    )
-}
-
-internal fun httpGetText(url: String): String {
-    val connection = URL(url).openConnection() as HttpURLConnection
-    return try {
-        connection.requestMethod = "GET"
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 15_000
-        connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-    } finally {
-        connection.disconnect()
-    }
 }
 
 internal fun copyWebPageUrl(context: Context, url: String) {

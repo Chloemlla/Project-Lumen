@@ -19,6 +19,7 @@ import com.projectlumen.app.core.services.TimerForegroundService
 import com.projectlumen.app.core.services.TimerReconciliationWorker
 import com.projectlumen.app.core.light.LightMonitorService
 import com.projectlumen.app.core.proximity.ProximityDetectionWorker
+import com.projectlumen.app.core.telemetry.EyeCareTelemetryReporter
 
 class ProjectLumenApplication : Application() {
     val database: AppDatabase by lazy { AppDatabase.create(this) }
@@ -29,6 +30,7 @@ class ProjectLumenApplication : Application() {
     val backup: DataBackupService by lazy { DataBackupService(this, database, eyeCarePreferences) }
     val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient(this) }
     val crashReports: CrashReportStore by lazy { CrashReportStore(this) }
+    val telemetry: EyeCareTelemetryReporter by lazy { EyeCareTelemetryReporter(this, database, apiClient) }
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
 
     override fun onCreate() {

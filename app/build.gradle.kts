@@ -67,12 +67,20 @@ android {
             .orNull
             ?.takeIf { it.isNotBlank() }
         ?: "http://eye.chloemlla.com/api"
+    val projectLumenTelemetryAccessToken = providers.environmentVariable("PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN")
+        .orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: providers.gradleProperty("PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN")
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+        ?: ""
 
     defaultConfig {
         buildConfigField("long", "BUILD_TIME_UTC_MILLIS", "${projectLumenBuildTimeUtcMillis}L")
         buildConfigField("String", "COMMIT_HASH", "\"$projectLumenCommitHash\"")
         buildConfigField("String", "SHORT_HASH", "\"$projectLumenShortHash\"")
         buildConfigField("String", "API_BASE_URL", "\"${projectLumenBuildConfigString(projectLumenApiBaseUrl)}\"")
+        buildConfigField("String", "TELEMETRY_ACCESS_TOKEN", "\"${projectLumenBuildConfigString(projectLumenTelemetryAccessToken)}\"")
 
         applicationId = "com.projectlumen.app"
         minSdk = 26

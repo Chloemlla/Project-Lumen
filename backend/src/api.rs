@@ -2,14 +2,16 @@ use crate::state::AppState;
 use axum::{middleware, Router};
 use tower_http::services::{ServeDir, ServeFile};
 
-#[path = "routes/backups.rs"]
-pub mod backups;
 #[path = "routes/admin.rs"]
 pub mod admin;
 #[path = "routes/audit.rs"]
 pub mod audit;
+#[path = "routes/backups.rs"]
+pub mod backups;
 #[path = "routes/entitlements.rs"]
 pub mod entitlements;
+#[path = "routes/face_analysis.rs"]
+pub mod face_analysis;
 #[path = "routes/health.rs"]
 pub mod health;
 #[path = "routes/me.rs"]
@@ -20,6 +22,8 @@ pub mod purchases;
 pub mod session;
 #[path = "routes/sync.rs"]
 pub mod sync;
+#[path = "routes/telemetry.rs"]
+pub mod telemetry;
 
 pub fn router(state: AppState) -> Router {
     let prefix = state.config.api_prefix.clone();
@@ -30,10 +34,15 @@ pub fn router(state: AppState) -> Router {
         .nest("/v1/auth", session::router())
         .nest("/v1", me::router())
         .nest("/v1", entitlements::router())
+        .nest("/v1", face_analysis::router())
         .nest("/v1", purchases::router())
         .nest("/v1", sync::router())
+        .nest("/v1", telemetry::router())
         .nest("/v1", backups::router())
-        .layer(middleware::from_fn_with_state(state.clone(), audit::audit_request));
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            audit::audit_request,
+        ));
 
     Router::new()
         .nest(&prefix, api)
