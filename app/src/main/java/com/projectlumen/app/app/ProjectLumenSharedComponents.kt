@@ -197,6 +197,21 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun LumenTopBar(title: String) {
+    TopAppBar(
+        title = {
+            Text(
+                text = title,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+    )
+}
+
 @Composable
 internal fun PageIntro(icon: ImageVector, @StringRes titleRes: Int, message: String) {
     PageIntroText(icon = icon, title = stringResource(titleRes), message = message)
