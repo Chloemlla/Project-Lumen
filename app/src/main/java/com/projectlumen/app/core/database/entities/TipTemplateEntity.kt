@@ -17,7 +17,10 @@ data class TipTemplateEntity(
     val imagePath: String = "",
     val showSkipButton: Boolean = true,
     val layoutJson: String = "{}",
+    val isPremium: Boolean = false,
+    val remoteId: String = "",
     val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
+    val deletedAt: Long = 0L,
 )

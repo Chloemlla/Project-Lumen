@@ -58,6 +58,26 @@ jobs:
           PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
         run: gradle testDebugUnitTest --no-daemon
 
+      - name: Run Android lint
+        env:
+          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
+          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
+          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
+          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
+          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
+        run: gradle lintDebug --no-daemon
+
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-lumen-verification-reports
+          path: |
+            app/build/reports/tests/**
+            app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-debug.xml
+          retention-days: 14
+
       - name: Write signing config
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}

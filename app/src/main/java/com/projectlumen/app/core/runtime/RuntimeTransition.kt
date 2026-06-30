@@ -15,13 +15,15 @@ data class EyeStatsDelta(
     val skipCount: Int = 0,
     val completedBreakCount: Int = 0,
     val preAlertCount: Int = 0,
+    val maxContinuousWorkSeconds: Long = 0L,
 ) {
     val isEmpty: Boolean
         get() = workingSeconds == 0L &&
             restSeconds == 0L &&
             skipCount == 0 &&
             completedBreakCount == 0 &&
-            preAlertCount == 0
+            preAlertCount == 0 &&
+            maxContinuousWorkSeconds == 0L
 }
 
 data class PomodoroStatsDelta(
@@ -45,5 +47,7 @@ sealed interface AudioEvent {
     data class ReminderTone(
         val enabled: Boolean,
         val path: String = "",
+        val volumePercent: Int = 70,
+        val vibrate: Boolean = false,
     ) : AudioEvent
 }

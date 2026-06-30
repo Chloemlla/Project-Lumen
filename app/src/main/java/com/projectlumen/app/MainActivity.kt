@@ -25,11 +25,15 @@ class MainActivity : ComponentActivity() {
                             notifications = app.notifications,
                             audio = app.audio,
                             export = app.export,
+                            backup = app.backup,
+                            eyeCarePreferences = app.eyeCarePreferences,
                             startTimerService = app::startTimerService,
                             stopTimerService = app::stopTimerService,
                             scheduleProximityMonitoring = app::scheduleProximityMonitoring,
                             cancelProximityMonitoring = app::cancelProximityMonitoring,
                             calibrateProximityMonitoring = app::calibrateProximityMonitoring,
+                            startLightMonitoring = app::startLightMonitoring,
+                            stopLightMonitoring = app::stopLightMonitoring,
                         ) as T
                     }
                 },

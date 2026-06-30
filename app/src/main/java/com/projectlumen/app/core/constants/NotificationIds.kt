@@ -9,4 +9,8 @@ object NotificationIds {
     const val STOP_TIMER_ACTION = 9010
     const val PROXIMITY_FOREGROUND = 9101
     const val PROXIMITY_WARNING = 9102
+    const val EYE_DRY_WARNING = 9103
+    const val LOW_LIGHT_FOREGROUND = 9201
+    const val LOW_LIGHT_WARNING = 9202
+    const val OVERLAY_FOREGROUND = 9301
 }

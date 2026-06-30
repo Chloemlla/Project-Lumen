@@ -1,16 +1,25 @@
 package com.projectlumen.app.app
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
+import com.projectlumen.app.core.database.entities.DailyGoalEntity
+import com.projectlumen.app.core.database.entities.EntitlementEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.AppThemeMode
+import com.projectlumen.app.core.enums.PlanTier
+import com.projectlumen.app.core.enums.PremiumFeature
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
+import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
+import com.projectlumen.app.core.repositories.DailyGoalsRepository
+import com.projectlumen.app.core.repositories.EntitlementRepository
+import com.projectlumen.app.core.repositories.ReminderPlansRepository
 import com.projectlumen.app.core.repositories.RuntimeRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.repositories.StatisticsRepository
@@ -20,8 +29,12 @@ import com.projectlumen.app.core.runtime.PomodoroEngine
 import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
 import com.projectlumen.app.core.services.AudioService
+import com.projectlumen.app.core.services.BackupImportSummary
+import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
+import com.projectlumen.app.core.time.QuietHours
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,32 +43,43 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 class ProjectLumenViewModel(
     private val database: AppDatabase,
     private val notifications: NotificationService,
     private val audio: AudioService,
     private val export: ExportService,
+    private val backup: DataBackupService,
+    private val eyeCarePreferences: EyeCarePreferencesDataStore,
     private val startTimerService: () -> Unit,
     private val stopTimerService: () -> Unit,
     private val scheduleProximityMonitoring: () -> Unit,
     private val cancelProximityMonitoring: () -> Unit,
     private val calibrateProximityMonitoring: () -> Unit,
+    private val startLightMonitoring: () -> Unit,
+    private val stopLightMonitoring: () -> Unit,
 ) : ViewModel() {
-    private val settingsRepository = SettingsRepository(database.appSettingsDao())
+    private val settingsRepository = SettingsRepository(database.appSettingsDao(), eyeCarePreferences)
     private val runtimeRepository = RuntimeRepository(database.runtimeStateDao())
     private val statisticsRepository = StatisticsRepository(
         database.dailyEyeStatsDao(),
         database.dailyPomodoroStatsDao(),
     )
     private val tipTemplateRepository = TipTemplateRepository(database.tipTemplatesDao())
+    private val dailyGoalsRepository = DailyGoalsRepository(database.dailyGoalsDao())
+    private val entitlementRepository = EntitlementRepository(database.entitlementsDao())
+    private val reminderPlansRepository = ReminderPlansRepository(database.reminderPlansDao())
     private val reminderEngine = ReminderEngine()
     private val pomodoroEngine = PomodoroEngine()
     private val now = MutableStateFlow(System.currentTimeMillis())
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val webPageRequests = _webPageRequests.asSharedFlow()
+    private val _backupImportPreview = MutableStateFlow<BackupImportSummary?>(null)
+    val backupImportPreview = _backupImportPreview
 
-    private val dataState = combine(
+    private val baseDataState = combine(
         settingsRepository.observe(),
         runtimeRepository.observe(),
         statisticsRepository.observeEyeStats(),
@@ -72,6 +96,20 @@ class ProjectLumenViewModel(
         )
     }
 
+    private val dataState = combine(
+        baseDataState,
+        dailyGoalsRepository.observe(),
+        entitlementRepository.observeAll(),
+        reminderPlansRepository.observeActive(),
+    ) { state, dailyGoal, entitlements, reminderPlans ->
+        state.copy(
+            dailyGoal = dailyGoal ?: DailyGoalEntity(),
+            entitlements = entitlements,
+            reminderPlans = reminderPlans,
+            isReady = state.isReady && dailyGoal != null,
+        )
+    }
+
     val uiState = combine(dataState, now) { state, nowMillis ->
         state.copy(nowMillis = nowMillis)
     }.stateIn(
@@ -84,10 +122,12 @@ class ProjectLumenViewModel(
         viewModelScope.launch {
             settingsRepository.ensureDefault()
             runtimeRepository.ensureDefault()
+            dailyGoalsRepository.ensureDefault()
             seedTemplates()
             restoreFromClock()
             val settings = settingsRepository.getOrDefault()
-            if (settings.proximityMonitoringEnabled) scheduleProximityMonitoring()
+            if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) scheduleProximityMonitoring()
+            if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) startLightMonitoring()
             refreshActiveNotifications(settings, runtimeRepository.getOrDefault())
         }
         viewModelScope.launch {
@@ -209,15 +249,19 @@ class ProjectLumenViewModel(
             val current = settingsRepository.getOrDefault()
             val nowMillis = System.currentTimeMillis()
             val updated = settingsRepository.update(nowMillis, transform)
-            val shouldRescheduleProximity = updated.proximityMonitoringEnabled && (
+            val shouldRescheduleProximity = (updated.proximityMonitoringEnabled || updated.blinkMonitoringEnabled) && (
                 current.proximityCheckIntervalMinutes != updated.proximityCheckIntervalMinutes ||
                     current.proximityCaptureSeconds != updated.proximityCaptureSeconds ||
                     current.proximityDistanceMultiplierPercent != updated.proximityDistanceMultiplierPercent ||
                     current.proximityFaceThresholdPercent != updated.proximityFaceThresholdPercent ||
-                    current.proximityAlertCooldownSeconds != updated.proximityAlertCooldownSeconds
+                    current.proximityAlertCooldownSeconds != updated.proximityAlertCooldownSeconds ||
+                    current.blinkMonitoringEnabled != updated.blinkMonitoringEnabled ||
+                    current.blinkNoBlinkThresholdSeconds != updated.blinkNoBlinkThresholdSeconds ||
+                    current.blinkAlertCooldownSeconds != updated.blinkAlertCooldownSeconds
                 )
             applySettingsToActiveRuntime(updated, nowMillis)
             if (shouldRescheduleProximity) scheduleProximityMonitoring()
+            applyLightMonitoringSettings(updated)
         }
     }
 
@@ -268,7 +312,12 @@ class ProjectLumenViewModel(
             if (enabled) {
                 scheduleProximityMonitoring()
             } else {
-                cancelProximityMonitoring()
+                val settings = settingsRepository.getOrDefault()
+                if (settings.blinkMonitoringEnabled) {
+                    scheduleProximityMonitoring()
+                } else {
+                    cancelProximityMonitoring()
+                }
                 val state = runtimeRepository.getOrDefault()
                 runtimeRepository.upsert(
                     state.copy(
@@ -281,12 +330,42 @@ class ProjectLumenViewModel(
         }
     }
 
+    fun setBlinkMonitoringEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val settings = settingsRepository.update { it.copy(blinkMonitoringEnabled = enabled) }
+            if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) {
+                scheduleProximityMonitoring()
+            } else {
+                cancelProximityMonitoring()
+            }
+        }
+    }
+
+    fun setAmbientLightMonitoringEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val settings = settingsRepository.update { it.copy(ambientLightMonitoringEnabled = enabled) }
+            applyLightMonitoringSettings(settings)
+        }
+    }
+
+    fun setAutoBrightnessEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val settings = settingsRepository.update { it.copy(autoBrightnessEnabled = enabled) }
+            applyLightMonitoringSettings(settings)
+        }
+    }
+
     fun calibrateProximity() {
         calibrateProximityMonitoring()
     }
 
     fun selectTemplate(templateId: Long) {
-        updateSettings { it.copy(activeTipTemplateId = templateId) }
+        viewModelScope.launch {
+            val settings = settingsRepository.getOrDefault()
+            val template = tipTemplateRepository.get(templateId) ?: return@launch
+            if (template.isPremium && !canUse(settings, PremiumFeature.PRO_TEMPLATES)) return@launch
+            settingsRepository.update { it.copy(activeTipTemplateId = templateId) }
+        }
     }
 
     fun setLanguageCode(languageCode: String) {
@@ -320,6 +399,40 @@ class ProjectLumenViewModel(
         }
     }
 
+    fun updateTemplateContent(
+        template: TipTemplateEntity,
+        titleText: String,
+        subtitleText: String,
+        showSkipButton: Boolean,
+    ) {
+        viewModelScope.launch {
+            tipTemplateRepository.upsert(
+                template.copy(
+                    titleText = titleText,
+                    subtitleText = subtitleText,
+                    showSkipButton = showSkipButton,
+                    updatedAt = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
+    fun updateTemplateCountdownStyle(template: TipTemplateEntity, countdownStyle: String) {
+        viewModelScope.launch {
+            val layoutJson = runCatching {
+                JSONObject(template.layoutJson.takeIf { it.isNotBlank() } ?: "{}")
+            }.getOrElse { JSONObject() }
+                .put("countdownStyle", countdownStyle)
+                .toString()
+            tipTemplateRepository.upsert(
+                template.copy(
+                    layoutJson = layoutJson,
+                    updatedAt = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
     fun shareStatistics() {
         val state = uiState.value
         if (!state.settings.statsEnabled) return
@@ -330,6 +443,70 @@ class ProjectLumenViewModel(
         val state = uiState.value
         if (!state.settings.statsEnabled) return
         export.shareStatsImage(state.eyeStats, state.pomodoroStats)
+    }
+
+    fun shareMonthlyReportPdf() {
+        val state = uiState.value
+        if (!state.settings.statsEnabled) return
+        export.shareMonthlyPdf(state.eyeStats, state.pomodoroStats)
+    }
+
+    fun shareBackup() {
+        viewModelScope.launch {
+            backup.shareBackup()
+        }
+    }
+
+    fun previewBackupImport(uri: Uri) {
+        viewModelScope.launch {
+            _backupImportPreview.value = withContext(Dispatchers.IO) {
+                backup.previewImport(uri)
+            }
+        }
+    }
+
+    fun clearBackupImportPreview() {
+        _backupImportPreview.value = null
+    }
+
+    fun importBackup(uri: Uri) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                backup.importBackup(uri)
+            }
+            _backupImportPreview.value = null
+            val settings = settingsRepository.getOrDefault()
+            applySettingsToActiveRuntime(settings, System.currentTimeMillis())
+        }
+    }
+
+    fun updateDailyGoal(transform: (DailyGoalEntity) -> DailyGoalEntity) {
+        viewModelScope.launch {
+            dailyGoalsRepository.update(transform = transform)
+        }
+    }
+
+    fun recordManualProEntitlement(productId: String = "manual_pro") {
+        viewModelScope.launch {
+            val nowMillis = System.currentTimeMillis()
+            entitlementRepository.upsert(
+                EntitlementEntity(
+                    source = "manual_license",
+                    productId = productId,
+                    tier = PlanTier.PRO.name,
+                    status = "active",
+                    purchasedAt = nowMillis,
+                    lastVerifiedAt = nowMillis,
+                ),
+            )
+            settingsRepository.update(nowMillis) {
+                it.copy(
+                    planTier = PlanTier.PRO.name,
+                    entitlementExpiresAt = 0L,
+                    lastEntitlementSyncAt = nowMillis,
+                )
+            }
+        }
     }
 
     private suspend fun restoreFromClock() {
@@ -362,12 +539,18 @@ class ProjectLumenViewModel(
     private fun playAudioEvent(event: AudioEvent) {
         when (event) {
             AudioEvent.None -> Unit
-            is AudioEvent.ReminderTone -> audio.playReminderTone(event.enabled, event.path)
+            is AudioEvent.ReminderTone -> audio.playReminderTone(
+                enabled = event.enabled,
+                soundPath = event.path,
+                volumePercent = event.volumePercent,
+                vibrate = event.vibrate,
+            )
         }
     }
 
     private fun scheduleActiveNotifications(settings: AppSettingsEntity, state: RuntimeStateEntity) {
         if (!settings.notificationEnabled) return
+        if (QuietHours.suppressesReminderNotifications(settings, System.currentTimeMillis())) return
         when (state.activeEngine) {
             ActiveEngine.REMINDER.name -> when (state.reminderPhase) {
                 ReminderPhase.WORKING.name,
@@ -418,6 +601,26 @@ class ProjectLumenViewModel(
         } else if (state.activeEngine == ActiveEngine.IDLE.name || !settings.keepAliveEnabled) {
             notifications.cancelOngoingStatus()
             if (!settings.keepAliveEnabled) stopTimerService()
+        }
+    }
+
+    private fun applyLightMonitoringSettings(settings: AppSettingsEntity) {
+        if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) {
+            startLightMonitoring()
+        } else {
+            stopLightMonitoring()
+        }
+    }
+
+    private fun canUse(settings: AppSettingsEntity, feature: PremiumFeature): Boolean {
+        val tier = PlanTier.entries.firstOrNull { it.name == settings.planTier } ?: PlanTier.FREE
+        return when (feature) {
+            PremiumFeature.PRO_TEMPLATES,
+            PremiumFeature.ADVANCED_STATISTICS,
+            PremiumFeature.LOCAL_BACKUP,
+            PremiumFeature.MULTIPLE_REMINDER_PLANS,
+            PremiumFeature.ADVANCED_EXPORT -> tier >= PlanTier.PRO
+            PremiumFeature.CLOUD_SYNC -> tier >= PlanTier.PLUS
         }
     }
 
@@ -475,6 +678,7 @@ class ProjectLumenViewModel(
                 name = "Clear sky",
                 backgroundValue = "#DCEBFF",
                 primaryColor = "#2563EB",
+                isPremium = true,
                 sortOrder = 5,
                 createdAt = nowMillis,
                 updatedAt = nowMillis,
@@ -484,13 +688,103 @@ class ProjectLumenViewModel(
                 name = "Rose quartz",
                 backgroundValue = "#FFE1EA",
                 primaryColor = "#BE3455",
+                isPremium = true,
                 sortOrder = 6,
                 createdAt = nowMillis,
                 updatedAt = nowMillis,
             ),
+            TipTemplateEntity(
+                id = 8L,
+                name = "Deep slate",
+                backgroundValue = "#E9EEF5",
+                primaryColor = "#42526E",
+                isPremium = true,
+                sortOrder = 7,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            ),
+            TipTemplateEntity(
+                id = 9L,
+                name = "Paper mint",
+                backgroundValue = "#F2FFF7",
+                primaryColor = "#26734D",
+                isPremium = true,
+                sortOrder = 8,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            ),
+            TipTemplateEntity(
+                id = 10L,
+                name = "Warm desk",
+                backgroundValue = "#FFF4E6",
+                primaryColor = "#9A5A16",
+                isPremium = true,
+                sortOrder = 9,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            ),
+            TipTemplateEntity(
+                id = 11L,
+                name = "Graphite focus",
+                backgroundValue = "#F1F2F4",
+                primaryColor = "#30343B",
+                isPremium = true,
+                sortOrder = 10,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            ),
+            TipTemplateEntity(
+                id = 12L,
+                name = "Lotus pause",
+                backgroundValue = "#F7E9F2",
+                primaryColor = "#8A3F66",
+                isPremium = true,
+                sortOrder = 11,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            ),
+            TipTemplateEntity(
+                id = 13L,
+                name = "Clinic calm",
+                backgroundValue = "#E8F7FA",
+                primaryColor = "#1D6F7A",
+                isPremium = true,
+                sortOrder = 12,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            ),
+            TipTemplateEntity(
+                id = 14L,
+                name = "Night amber",
+                backgroundValue = "#2C2A26",
+                primaryColor = "#F0B35B",
+                isPremium = true,
+                sortOrder = 13,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            ),
+            TipTemplateEntity(
+                id = 15L,
+                name = "Reading green",
+                backgroundValue = "#EEF7DF",
+                primaryColor = "#547325",
+                isPremium = true,
+                sortOrder = 14,
+                createdAt = nowMillis,
+                updatedAt = nowMillis,
+            ),
         ).forEach { template ->
-            if (tipTemplateRepository.get(template.id) == null) {
+            val existing = tipTemplateRepository.get(template.id)
+            if (existing == null) {
                 tipTemplateRepository.upsert(template)
+            } else if (existing.isBuiltin) {
+                tipTemplateRepository.upsert(
+                    existing.copy(
+                        isPremium = template.isPremium,
+                        sortOrder = template.sortOrder,
+                        updatedAt = nowMillis,
+                    ),
+                )
             }
         }
     }

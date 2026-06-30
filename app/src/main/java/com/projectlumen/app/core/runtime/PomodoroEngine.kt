@@ -20,6 +20,8 @@ class PomodoroEngine {
             audioEvent = AudioEvent.ReminderTone(
                 settings.soundEnabled && settings.pomodoroWorkStartSoundEnabled,
                 settings.pomodoroWorkStartSoundPath,
+                settings.pomodoroWorkStartVolumePercent,
+                settings.vibrationEnabled,
             ),
         )
     }
@@ -63,6 +65,8 @@ class PomodoroEngine {
                     audioEvent = AudioEvent.ReminderTone(
                         settings.soundEnabled && settings.pomodoroWorkEndSoundEnabled,
                         settings.pomodoroWorkEndSoundPath,
+                        settings.pomodoroWorkEndVolumePercent,
+                        settings.vibrationEnabled,
                     ),
                 )
             }
@@ -84,6 +88,8 @@ class PomodoroEngine {
                     audioEvent = AudioEvent.ReminderTone(
                         settings.soundEnabled && settings.pomodoroWorkStartSoundEnabled,
                         settings.pomodoroWorkStartSoundPath,
+                        settings.pomodoroWorkStartVolumePercent,
+                        settings.vibrationEnabled,
                     ),
                 )
             }

@@ -18,6 +18,7 @@ class FaceDistanceAnalyzer {
         FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
             .setMinFaceSize(0.15f)
             .build(),
     )
@@ -26,9 +27,12 @@ class FaceDistanceAnalyzer {
         val image = InputImage.fromBitmap(bitmap, rotationDegrees)
         val faces = detector.process(image).await()
         val face = faces.maxByOrNull { it.boundingBox.width() * it.boundingBox.height() } ?: return null
+        val orientedWidth = if (rotationDegrees % 180 == 0) bitmap.width else bitmap.height
         return FaceDistanceSample(
             eyeDistancePx = face.eyeDistancePx(),
-            faceWidthPercent = face.faceWidthPercent(bitmap.width),
+            faceWidthPercent = face.faceWidthPercent(orientedWidth),
+            leftEyeOpenProbability = face.leftEyeOpenProbability,
+            rightEyeOpenProbability = face.rightEyeOpenProbability,
         )
     }
 

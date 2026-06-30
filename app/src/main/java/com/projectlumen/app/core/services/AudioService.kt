@@ -5,14 +5,27 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.ToneGenerator
 import android.net.Uri
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 
 class AudioService(private val context: Context) {
-    fun playReminderTone(enabled: Boolean, soundPath: String = "") {
+    fun playReminderTone(
+        enabled: Boolean,
+        soundPath: String = "",
+        volumePercent: Int = 70,
+        vibrate: Boolean = false,
+    ) {
+        if (vibrate) vibrate()
         if (!enabled) return
         val audioManager = context.getSystemService(AudioManager::class.java)
         if (audioManager.ringerMode == AudioManager.RINGER_MODE_SILENT) return
         if (soundPath.isNotBlank() && playCustomSound(soundPath)) return
-        ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70).startTone(ToneGenerator.TONE_PROP_BEEP, 180)
+        ToneGenerator(
+            AudioManager.STREAM_NOTIFICATION,
+            volumePercent.coerceIn(0, 100),
+        ).startTone(ToneGenerator.TONE_PROP_BEEP, 180)
     }
 
     private fun playCustomSound(soundPath: String): Boolean {
@@ -28,6 +41,22 @@ class AudioService(private val context: Context) {
         }.getOrElse {
             player.release()
             false
+        }
+    }
+
+    private fun vibrate() {
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Vibrator::class.java)
+        } ?: return
+        if (!vibrator.hasVibrator()) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createOneShot(90L, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(90L)
         }
     }
 }

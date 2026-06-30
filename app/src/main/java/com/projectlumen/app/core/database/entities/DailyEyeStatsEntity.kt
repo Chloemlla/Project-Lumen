@@ -11,7 +11,10 @@ data class DailyEyeStatsEntity(
     val skipCount: Int = 0,
     val completedBreakCount: Int = 0,
     val preAlertCount: Int = 0,
+    val maxContinuousWorkSeconds: Long = 0L,
     val proximityWarningCount: Int = 0,
     val proximityCloseSeconds: Long = 0L,
+    val eyeDryWarningCount: Int = 0,
+    val lowLightWarningCount: Int = 0,
     val updatedAt: Long = System.currentTimeMillis(),
 )

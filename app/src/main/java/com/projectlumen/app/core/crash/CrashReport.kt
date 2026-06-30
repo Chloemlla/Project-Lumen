@@ -36,9 +36,9 @@ data class CrashReport(
                 crashedAtMillis = nowMillis,
                 crashedAtText = Instant.ofEpochMilli(nowMillis).atZone(ZoneId.systemDefault()).format(crashTimeFormatter),
                 exceptionType = throwable::class.java.name,
-                rootCause = root.message?.takeIf { it.isNotBlank() } ?: root::class.java.name,
+                rootCause = sanitize(root.message?.takeIf { it.isNotBlank() } ?: root::class.java.name),
                 systemInfo = buildSystemInfo(),
-                stackTrace = throwable.stackTraceText(),
+                stackTrace = sanitize(throwable.stackTraceText()),
             )
         }
 
@@ -61,6 +61,15 @@ data class CrashReport(
             val writer = StringWriter()
             printStackTrace(PrintWriter(writer))
             return writer.toString()
+        }
+
+        private fun sanitize(value: String): String {
+            return value
+                .replace(Regex("""[A-Za-z]:\\Users\\[^\\\s]+"""), "[user-home]")
+                .replace(Regex("""/home/[^/\s]+"""), "[user-home]")
+                .replace(Regex("""/Users/[^/\s]+"""), "[user-home]")
+                .replace(Regex("""content://[^\s]+"""), "[content-uri]")
+                .replace(Regex("""file://[^\s]+"""), "[file-uri]")
         }
     }
 }

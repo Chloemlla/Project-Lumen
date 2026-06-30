@@ -8,4 +8,5 @@ Regarding the garbled text issue you mentioned, it has been confirmed that it is
 powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
-Get-Content -Encoding UTF8 src\controllers\ttsController.ts
+Get-Content -Encoding UTF8 file-path
+Each time you complete the addition or modification of a feature according to my requirements, a commit message will be automatically generated and submitted after you finish modifying the code. When submitting a GPG key, you can temporarily omit the signature.

@@ -1,7 +1,11 @@
 package com.projectlumen.app.core.runtime
 
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
+import com.projectlumen.app.core.enums.QuietMode
 import com.projectlumen.app.core.enums.ReminderPhase
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -118,5 +122,53 @@ class ReminderEngineTest {
         assertEquals(ReminderPhase.WORKING.name, adjusted.reminderPhase)
         assertEquals(start + 30 * 60_000L, adjusted.nextReminderAt)
         assertEquals(start + 28 * 60_000L, adjusted.nextPreAlertAt)
+    }
+
+    @Test
+    fun pauseTimerQuietHoursDefersNextWorkCycle() {
+        val zone = ZoneId.systemDefault()
+        val now = LocalDate.of(2026, 1, 1)
+            .atTime(LocalTime.of(22, 10))
+            .atZone(zone)
+            .toInstant()
+            .toEpochMilli()
+        val settings = AppSettingsEntity(
+            quietHoursEnabled = true,
+            quietStartMinute = 22 * 60,
+            quietEndMinute = 7 * 60,
+            quietMode = QuietMode.PAUSE_TIMER.name,
+        )
+
+        val state = engine.newWorkingState(settings, now)
+
+        assertEquals(ReminderPhase.WORKING.name, state.reminderPhase)
+        assertTrue(state.reminderStartedAt > now)
+        assertEquals(state.reminderStartedAt + settings.warnIntervalMinutes * 60_000L, state.nextReminderAt)
+    }
+
+    @Test
+    fun recordOnlyQuietHoursRecordsWorkWithoutStartingBreak() {
+        val zone = ZoneId.systemDefault()
+        val start = LocalDate.of(2026, 1, 1)
+            .atTime(LocalTime.of(22, 5))
+            .atZone(zone)
+            .toInstant()
+            .toEpochMilli()
+        val settings = AppSettingsEntity(
+            warnIntervalMinutes = 20,
+            preAlertEnabled = false,
+            quietHoursEnabled = true,
+            quietStartMinute = 22 * 60,
+            quietEndMinute = 7 * 60,
+            quietMode = QuietMode.RECORD_ONLY.name,
+        )
+        val state = engine.newWorkingState(settings, start)
+
+        val transition = engine.advance(settings, state, state.nextReminderAt)
+
+        assertNotNull(transition)
+        assertEquals(ReminderPhase.WORKING.name, transition!!.nextRuntime.reminderPhase)
+        assertEquals(20 * 60L, transition.eyeStatsDelta.workingSeconds)
+        assertEquals(20 * 60L, transition.eyeStatsDelta.maxContinuousWorkSeconds)
     }
 }

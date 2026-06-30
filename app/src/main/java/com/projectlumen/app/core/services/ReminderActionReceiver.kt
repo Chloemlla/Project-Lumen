@@ -8,10 +8,13 @@ import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.ReminderPhase
+import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
 import com.projectlumen.app.core.repositories.RuntimeRepository
+import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.repositories.StatisticsRepository
 import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
+import com.projectlumen.app.core.time.QuietHours
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,7 +26,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
             runCatching {
                 val app = context.applicationContext as ProjectLumenApplication
                 val db = app.database
-                val settings = db.appSettingsDao().get()
+                val settings = SettingsRepository(db.appSettingsDao(), app.eyeCarePreferences).get()
                 val runtime = db.runtimeStateDao().get() ?: RuntimeStateEntity()
                 val runtimeRepository = RuntimeRepository(db.runtimeStateDao())
                 val statisticsRepository = StatisticsRepository(db.dailyEyeStatsDao(), db.dailyPomodoroStatsDao())
@@ -66,6 +69,14 @@ class ReminderActionReceiver : BroadcastReceiver() {
     ) {
         statisticsRepository.applyEyeDelta(settings.statsEnabled, now, transition.eyeStatsDelta)
         runtimeRepository.upsert(transition.nextRuntime)
+        if (settings.globalOverlayEnabled && transition.nextRuntime.reminderPhase == ReminderPhase.RESTING.name) {
+            EyeProtectionOverlayService.show(
+                context = app,
+                title = app.getString(com.projectlumen.app.R.string.overlay_break_title),
+                message = app.getString(com.projectlumen.app.R.string.overlay_break_message),
+                durationSeconds = settings.restDurationSeconds.coerceAtLeast(settings.overlayRestDurationSeconds),
+            )
+        }
         refreshAfterAction(app, settings, transition.nextRuntime)
     }
 
@@ -76,14 +87,16 @@ class ReminderActionReceiver : BroadcastReceiver() {
     ) {
         if (settings.keepAliveEnabled) app.startTimerService()
         if (!settings.notificationEnabled) return
-        when (runtime.activeEngine) {
-            ActiveEngine.REMINDER.name -> when (runtime.reminderPhase) {
-                ReminderPhase.WORKING.name,
-                ReminderPhase.PRE_ALERT.name,
-                ReminderPhase.AWAITING_ACTION.name -> {
-                    app.notifications.scheduleReminder(runtime.nextPreAlertAt, runtime.nextReminderAt)
+        if (!QuietHours.suppressesReminderNotifications(settings, System.currentTimeMillis())) {
+            when (runtime.activeEngine) {
+                ActiveEngine.REMINDER.name -> when (runtime.reminderPhase) {
+                    ReminderPhase.WORKING.name,
+                    ReminderPhase.PRE_ALERT.name,
+                    ReminderPhase.AWAITING_ACTION.name -> {
+                        app.notifications.scheduleReminder(runtime.nextPreAlertAt, runtime.nextReminderAt)
+                    }
+                    ReminderPhase.RESTING.name -> app.notifications.scheduleBreakDone(runtime.breakEndAt)
                 }
-                ReminderPhase.RESTING.name -> app.notifications.scheduleBreakDone(runtime.breakEndAt)
             }
         }
         app.notifications.showOngoingStatus(runtime)

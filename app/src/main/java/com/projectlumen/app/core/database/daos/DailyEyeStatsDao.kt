@@ -14,6 +14,9 @@ interface DailyEyeStatsDao {
     @Query("SELECT * FROM daily_eye_stats WHERE statDate = :date")
     suspend fun get(date: String): DailyEyeStatsEntity?
 
+    @Query("SELECT * FROM daily_eye_stats ORDER BY statDate DESC")
+    suspend fun getAll(): List<DailyEyeStatsEntity>
+
     @Upsert
     suspend fun upsert(stat: DailyEyeStatsEntity)
 }

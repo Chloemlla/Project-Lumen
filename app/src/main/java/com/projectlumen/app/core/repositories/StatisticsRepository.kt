@@ -8,6 +8,7 @@ import com.projectlumen.app.core.runtime.EyeStatsDelta
 import com.projectlumen.app.core.runtime.PomodoroStatsDelta
 import com.projectlumen.app.core.time.todayKey
 import kotlinx.coroutines.flow.Flow
+import kotlin.math.max
 
 class StatisticsRepository(
     private val eyeStatsDao: DailyEyeStatsDao,
@@ -26,6 +27,7 @@ class StatisticsRepository(
                 skipCount = it.skipCount + delta.skipCount,
                 completedBreakCount = it.completedBreakCount + delta.completedBreakCount,
                 preAlertCount = it.preAlertCount + delta.preAlertCount,
+                maxContinuousWorkSeconds = max(it.maxContinuousWorkSeconds, delta.maxContinuousWorkSeconds),
             )
         }
     }

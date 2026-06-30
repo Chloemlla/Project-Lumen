@@ -8,14 +8,17 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TipTemplatesDao {
-    @Query("SELECT * FROM tip_templates ORDER BY sortOrder ASC, id ASC")
+    @Query("SELECT * FROM tip_templates WHERE deletedAt = 0 ORDER BY sortOrder ASC, id ASC")
     fun observeAll(): Flow<List<TipTemplateEntity>>
 
-    @Query("SELECT * FROM tip_templates WHERE id = :id")
+    @Query("SELECT * FROM tip_templates WHERE id = :id AND deletedAt = 0")
     suspend fun get(id: Long): TipTemplateEntity?
 
-    @Query("SELECT COUNT(*) FROM tip_templates")
+    @Query("SELECT COUNT(*) FROM tip_templates WHERE deletedAt = 0")
     suspend fun count(): Int
+
+    @Query("SELECT * FROM tip_templates ORDER BY sortOrder ASC, id ASC")
+    suspend fun getAllIncludingDeleted(): List<TipTemplateEntity>
 
     @Upsert
     suspend fun upsert(template: TipTemplateEntity)

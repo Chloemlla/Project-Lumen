@@ -33,5 +33,11 @@ data class RuntimeStateEntity(
     val proximityCloseTickAt: Long = 0L,
     val proximityLastWarningAt: Long = 0L,
     val proximityLastRatioPercent: Int = 0,
+    val blinkLastBlinkAt: Long = 0L,
+    val blinkLastWarningAt: Long = 0L,
+    val blinkLastEyeOpenProbabilityPercent: Int = 0,
+    val ambientLastLux: Float = 0f,
+    val ambientTooDark: Boolean = false,
+    val ambientLastWarningAt: Long = 0L,
     val updatedAt: Long = System.currentTimeMillis(),
 )

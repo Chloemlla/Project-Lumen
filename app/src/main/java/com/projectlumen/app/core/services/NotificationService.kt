@@ -74,6 +74,7 @@ class NotificationService(private val context: Context) {
             message = context.getString(R.string.break_waiting_message),
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = true,
+            fullScreen = true,
         )
     }
 
@@ -174,6 +175,32 @@ class NotificationService(private val context: Context) {
             .build()
     }
 
+    fun buildLightMonitorForegroundNotification(): Notification {
+        return NotificationCompat.Builder(context, NotificationChannels.STATUS)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(context.getString(R.string.light_monitor_running_title))
+            .setContentText(context.getString(R.string.light_monitor_running_message))
+            .setContentIntent(openAppPendingIntent(NotificationIds.LOW_LIGHT_FOREGROUND))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+    fun buildOverlayForegroundNotification(): Notification {
+        return NotificationCompat.Builder(context, NotificationChannels.STATUS)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(context.getString(R.string.overlay_running_title))
+            .setContentText(context.getString(R.string.overlay_running_message))
+            .setContentIntent(openAppPendingIntent(NotificationIds.OVERLAY_FOREGROUND))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
     fun showProximityWarning(ratioPercent: Int) {
         show(
             id = NotificationIds.PROXIMITY_WARNING,
@@ -183,6 +210,29 @@ class NotificationService(private val context: Context) {
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = true,
             fullScreen = true,
+        )
+    }
+
+    fun showEyeDryWarning() {
+        show(
+            id = NotificationIds.EYE_DRY_WARNING,
+            channel = NotificationChannels.PROXIMITY,
+            title = context.getString(R.string.eye_dry_warning_title),
+            message = context.getString(R.string.eye_dry_warning_message),
+            priority = NotificationCompat.PRIORITY_HIGH,
+            includeBreakActions = true,
+            fullScreen = true,
+        )
+    }
+
+    fun showLowLightWarning(lux: Float) {
+        show(
+            id = NotificationIds.LOW_LIGHT_WARNING,
+            channel = NotificationChannels.PROXIMITY,
+            title = context.getString(R.string.low_light_warning_title),
+            message = context.getString(R.string.low_light_warning_message, lux),
+            priority = NotificationCompat.PRIORITY_HIGH,
+            includeBreakActions = false,
         )
     }
 

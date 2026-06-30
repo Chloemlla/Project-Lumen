@@ -1,19 +1,27 @@
 package com.projectlumen.app.app
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.app.AlarmManager
+import android.app.NotificationManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
-import android.os.Message
 import android.provider.Settings
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageView
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
@@ -65,6 +73,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.BarChart
@@ -74,6 +83,8 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalCafe
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PhotoCamera
@@ -86,19 +97,24 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -106,8 +122,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
@@ -125,6 +143,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -136,6 +155,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.R
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.ProjectLumenApplication
@@ -146,9 +166,12 @@ import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.enums.PomodoroPhase
+import com.projectlumen.app.core.enums.PlanTier
+import com.projectlumen.app.core.enums.QuietMode
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
+import com.projectlumen.app.core.services.BackupImportSummary
 import com.projectlumen.app.core.update.BuildMetadata
 import com.projectlumen.app.core.update.ReleaseAsset
 import com.projectlumen.app.core.update.ReleaseInfo
@@ -156,7 +179,10 @@ import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import org.json.JSONObject
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -171,8 +197,26 @@ private const val PROJECT_LUMEN_REPO_URL = "https://github.com/Chloemlla/Project
 private const val PROJECT_LUMEN_RELEASES_URL = "https://github.com/Chloemlla/Project-Lumen/releases/latest"
 private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases/latest"
 private const val PROJECT_LUMEN_RELEASES_BASE_URL = "https://github.com/Chloemlla/Project-Lumen/releases"
+private const val MINI_CHROME_VERSION = 107
+private const val GKD_DOC_HOST = "gkd.li"
+private const val GKD_DOC_CONFIG_URL =
+    "https://registry.npmmirror.com/@gkd-kit/docs/latest/files/_config.json"
+private const val GKD_DEBUG_JS_TEXT = """
+<script src="https://registry.npmmirror.com/eruda/latest/files"></script>
+<script>eruda.init();</script>
+"""
+private const val COUNTDOWN_STYLE_CIRCLE = "circle"
+private const val COUNTDOWN_STYLE_BAR = "bar"
+private const val COUNTDOWN_STYLE_NUMBER = "number"
+private const val DEFAULT_TEMPLATE_TITLE = "Time to rest"
+private const val DEFAULT_TEMPLATE_SUBTITLE = "Look away from the screen and relax your eyes."
 private val crashDetailsTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 private val updateDialogTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+private val chromeVersion by lazy {
+    WebView.getCurrentWebViewPackage()?.versionName?.run {
+        splitToSequence('.').first().toIntOrNull()
+    } ?: 0
+}
 
 private sealed interface UpdateDialogState {
     data object Hidden : UpdateDialogState
@@ -339,6 +383,13 @@ fun ProjectLumenApp(
                 CrashReportScreen(report = crashReport)
                 return@ProjectLumenTheme
             }
+            pendingWebUrl?.let { url ->
+                WebViewScreen(
+                    url = url,
+                    onDismiss = { pendingWebUrl = null },
+                )
+                return@ProjectLumenTheme
+            }
             val navController = rememberNavController()
             val backStackEntry by navController.currentBackStackEntryAsState()
             Scaffold(
@@ -447,13 +498,6 @@ fun ProjectLumenApp(
                     updateInstaller = updateInstaller,
                 )
             }
-            pendingWebUrl?.let { url ->
-                WebViewScreen(
-                    url = url,
-                    onNavigateWebPage = viewModel::navigateWebPage,
-                    onDismiss = { pendingWebUrl = null },
-                )
-            }
         }
     }
 }
@@ -499,6 +543,22 @@ private fun CrashReportScreen(report: CrashReport) {
                 ) {
                     Text("复制报告")
                 }
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.crash_report_share_subject))
+                            putExtra(Intent.EXTRA_TEXT, report.toClipboardText())
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(
+                            Intent.createChooser(intent, context.getString(R.string.crash_report_share))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    },
+                ) {
+                    Text(stringResource(R.string.crash_report_share))
+                }
             }
         }
     }
@@ -526,6 +586,7 @@ private fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenView
         )
         StateCard(uiState.runtime, uiState.nowMillis)
         TodayStatsCard(uiState.eyeStats.firstOrNull())
+        GoalProgressCard(uiState)
         ActionCard {
             SectionHeader(Icons.Outlined.Schedule, R.string.quick_actions)
             when {
@@ -584,6 +645,7 @@ private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
             ReminderPhase.AWAITING_ACTION.name,
         )
     val canSkip = !uiState.settings.disableSkip &&
+        template?.showSkipButton != false &&
         reminderActive &&
         runtime.reminderPhase in setOf(
             ReminderPhase.PRE_ALERT.name,
@@ -597,16 +659,17 @@ private fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
     LumenPage(horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(Modifier.height(8.dp))
         TemplatePreviewCard(template)
-        PageIntro(
+        PageIntroText(
             icon = Icons.Outlined.Spa,
-            titleRes = R.string.break_title,
-            message = stringResource(if (isResting) R.string.break_message else R.string.break_waiting_message),
+            title = templateBreakTitle(template),
+            message = if (isResting) templateBreakSubtitle(template) else stringResource(R.string.break_waiting_message),
         )
         TimerCard(
             label = stringResource(if (isResting) R.string.remaining else R.string.current_state),
             seconds = if (isResting) remainingSeconds(runtime.breakEndAt, uiState.nowMillis) else 0,
             progress = if (isResting) progress(runtime.breakStartedAt, runtime.breakEndAt, uiState.nowMillis) else 0f,
             fallbackText = statusLabel(runtime),
+            countdownStyle = templateCountdownStyle(template),
         )
         ActionCard {
             SectionHeader(Icons.Outlined.Spa, R.string.quick_actions)
@@ -709,6 +772,9 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
     val eye = uiState.eyeStats.firstOrNull()
     val pomodoro = uiState.pomodoroStats.firstOrNull()
     val statsEnabled = uiState.settings.statsEnabled
+    var statsWindow by rememberSaveable { mutableStateOf(7) }
+    val windowEyeStats = uiState.eyeStats.take(statsWindow)
+    val windowPomodoroStats = uiState.pomodoroStats.take(statsWindow)
     val hasExportableStats = statsEnabled && (uiState.eyeStats.any {
         it.workingSeconds > 0L || it.restSeconds > 0L || it.skipCount > 0 || it.completedBreakCount > 0
     } || uiState.pomodoroStats.any {
@@ -721,6 +787,13 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
             message = stringResource(if (statsEnabled) R.string.statistics_subtitle else R.string.statistics_disabled),
         )
         TodayStatsCard(eye)
+        LumenFlowRow {
+            FilterChip(selected = statsWindow == 7, onClick = { statsWindow = 7 }, label = { Text(stringResource(R.string.stats_range_7_days)) })
+            FilterChip(selected = statsWindow == 30, onClick = { statsWindow = 30 }, label = { Text(stringResource(R.string.stats_range_30_days)) })
+            FilterChip(selected = statsWindow == 31, onClick = { statsWindow = 31 }, label = { Text(stringResource(R.string.stats_range_month)) })
+        }
+        AdvancedStatsCard(windowEyeStats, windowPomodoroStats)
+        HabitSuggestionCard(uiState)
         TrendCard(uiState)
         Card(
             modifier = Modifier
@@ -739,18 +812,21 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
         ActionCard {
             SectionHeader(Icons.Outlined.FileDownload, R.string.statistics_export)
             if (hasExportableStats) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                LumenFlowRow {
                     Button(
-                        modifier = Modifier.weight(1f),
                         onClick = viewModel::shareStatistics,
                     ) {
                         ButtonLabel(Icons.Outlined.FileDownload, R.string.export_csv)
                     }
                     OutlinedButton(
-                        modifier = Modifier.weight(1f),
                         onClick = viewModel::shareStatisticsImage,
                     ) {
                         ButtonLabel(Icons.Outlined.BarChart, R.string.share_stats_image)
+                    }
+                    OutlinedButton(
+                        onClick = viewModel::shareMonthlyReportPdf,
+                    ) {
+                        ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)
                     }
                 }
             } else {
@@ -779,6 +855,15 @@ private fun SettingsScreen(
     val notificationPermissionNeeded = needsNotificationPermission(context)
     val cameraPermissionNeeded = needsCameraPermission(context)
     val exactAlarmSettingsNeeded = needsExactAlarmSettings(context)
+    val fullScreenIntentSettingsNeeded = needsFullScreenIntentSettings(context)
+    val overlayPermissionNeeded = needsOverlayPermission(context)
+    val writeSettingsPermissionNeeded = needsWriteSettingsPermission(context)
+    val backupImportPreview by viewModel.backupImportPreview.collectAsStateWithLifecycle()
+    var pendingBackupImportUri by remember { mutableStateOf<Uri?>(null) }
+    var showProximityCalibrationDialog by rememberSaveable { mutableStateOf(false) }
+    val proximityCalibrated = settings.proximityBaselineEyeDistancePx > 0f ||
+        settings.proximityBaselineFaceWidthPercent > 0
+    val proximityCaptureSeconds = settings.proximityCaptureSeconds.coerceIn(1, 2)
     fun persistUri(uri: Uri): String {
         persistReadableUri(context, uri)
         return uri.toString()
@@ -787,6 +872,12 @@ private fun SettingsScreen(
         uri?.let {
             val path = persistUri(it)
             viewModel.updateSettings { current -> current.copy(restSoundPath = path) }
+        }
+    }
+    val restStartSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let {
+            val path = persistUri(it)
+            viewModel.updateSettings { current -> current.copy(restStartSoundPath = path) }
         }
     }
     val workStartSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -800,6 +891,36 @@ private fun SettingsScreen(
             val path = persistUri(it)
             viewModel.updateSettings { current -> current.copy(pomodoroWorkEndSoundPath = path) }
         }
+    }
+    val backupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            pendingBackupImportUri = uri
+            viewModel.previewBackupImport(uri)
+        }
+    }
+    backupImportPreview?.let { summary ->
+        val targetUri = pendingBackupImportUri
+        BackupImportDialog(
+            summary = summary,
+            onDismiss = {
+                pendingBackupImportUri = null
+                viewModel.clearBackupImportPreview()
+            },
+            onConfirm = {
+                if (targetUri != null) viewModel.importBackup(targetUri)
+            },
+        )
+    }
+    if (showProximityCalibrationDialog) {
+        ProximityCalibrationDialog(
+            onDismiss = { showProximityCalibrationDialog = false },
+            onConfirm = {
+                runWithCameraPermission {
+                    viewModel.calibrateProximity()
+                    showProximityCalibrationDialog = false
+                }
+            },
+        )
     }
     LumenPage {
         TemplatePreviewCard(template)
@@ -858,6 +979,34 @@ private fun SettingsScreen(
                 viewModel.setAutoUpdateCheckEnabled(it)
             }
         }
+        SettingsSection(R.string.section_goals, Icons.Outlined.CheckCircle) {
+            NumberSlider(R.string.daily_rest_goal, Icons.Outlined.Spa, uiState.dailyGoal.restBreakGoal, 1f..20f, 18, "${uiState.dailyGoal.restBreakGoal}") {
+                viewModel.updateDailyGoal { current -> current.copy(restBreakGoal = it) }
+            }
+            NumberSlider(R.string.max_continuous_work_goal, Icons.Outlined.Schedule, uiState.dailyGoal.maxContinuousWorkMinutes, 15f..120f, 20, stringResource(R.string.minutes_value, uiState.dailyGoal.maxContinuousWorkMinutes)) {
+                viewModel.updateDailyGoal { current -> current.copy(maxContinuousWorkMinutes = it) }
+            }
+            NumberSlider(R.string.daily_pomodoro_goal, Icons.Outlined.LocalCafe, uiState.dailyGoal.pomodoroGoal, 1f..16f, 15, "${uiState.dailyGoal.pomodoroGoal}") {
+                viewModel.updateDailyGoal { current -> current.copy(pomodoroGoal = it) }
+            }
+            NumberSlider(R.string.weekly_active_days_goal, Icons.Outlined.CheckCircle, uiState.dailyGoal.weeklyActiveDaysGoal, 1f..7f, 5, "${uiState.dailyGoal.weeklyActiveDaysGoal}") {
+                viewModel.updateDailyGoal { current -> current.copy(weeklyActiveDaysGoal = it) }
+            }
+        }
+        SettingsSection(R.string.section_data, Icons.Outlined.FileDownload) {
+            LumenFlowRow {
+                Button(onClick = viewModel::shareBackup) {
+                    ButtonLabel(Icons.Outlined.FileDownload, R.string.backup_export)
+                }
+                OutlinedButton(onClick = { backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) {
+                    ButtonLabel(Icons.AutoMirrored.Outlined.OpenInNew, R.string.backup_import)
+                }
+            }
+        }
+        SettingsSection(R.string.section_pro, Icons.Outlined.CheckCircle) {
+            MetricRow(R.string.plan_tier, settings.planTier.lowercase())
+            MetricRow(R.string.pro_templates, uiState.templates.count { it.isPremium }.toString())
+        }
         SettingsSection(R.string.about_update_status, Icons.Outlined.Sync) {
             if (checkingUpdate) {
                 StatusLine(Icons.Outlined.Sync, stringResource(R.string.about_update_checking))
@@ -901,6 +1050,19 @@ private fun SettingsScreen(
                     onClick = { openExactAlarmSettings(context) },
                 )
             }
+            AnimatedVisibility(
+                visible = settings.notificationEnabled && !notificationPermissionNeeded && fullScreenIntentSettingsNeeded,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+            ) {
+                NotificationRequirementCard(
+                    titleRes = R.string.full_screen_intent_permission_needed,
+                    messageRes = R.string.full_screen_intent_permission_needed_message,
+                    actionLabelRes = R.string.open_system_settings,
+                    icon = Icons.AutoMirrored.Outlined.OpenInNew,
+                    onClick = { openFullScreenIntentSettings(context) },
+                )
+            }
             if (!notificationPermissionNeeded) {
                 OutlinedButton(onClick = {
                     openAppNotificationSettings(context)
@@ -917,7 +1079,10 @@ private fun SettingsScreen(
         SettingsSection(R.string.section_proximity, Icons.Outlined.PhotoCamera) {
             SwitchRow(R.string.enable_proximity_monitoring, Icons.Outlined.PhotoCamera, settings.proximityMonitoringEnabled) { enabled ->
                 if (enabled) {
-                    runWithCameraPermission { viewModel.setProximityMonitoringEnabled(true) }
+                    runWithCameraPermission {
+                        viewModel.setProximityMonitoringEnabled(true)
+                        if (!proximityCalibrated) showProximityCalibrationDialog = true
+                    }
                 } else {
                     viewModel.setProximityMonitoringEnabled(false)
                 }
@@ -932,12 +1097,19 @@ private fun SettingsScreen(
                     messageRes = R.string.camera_permission_needed_message,
                     actionLabelRes = R.string.allow_camera,
                     icon = Icons.Outlined.PhotoCamera,
-                    onClick = { runWithCameraPermission { viewModel.setProximityMonitoringEnabled(true) } },
+                    onClick = {
+                        runWithCameraPermission {
+                            viewModel.setProximityMonitoringEnabled(true)
+                            if (!proximityCalibrated) showProximityCalibrationDialog = true
+                        }
+                    },
                 )
             }
             Text(
                 if (settings.proximityBaselineEyeDistancePx > 0f) {
                     stringResource(R.string.proximity_calibrated, settings.proximityBaselineEyeDistancePx)
+                } else if (settings.proximityBaselineFaceWidthPercent > 0) {
+                    stringResource(R.string.proximity_calibrated_face, settings.proximityBaselineFaceWidthPercent)
                 } else {
                     stringResource(R.string.proximity_not_calibrated)
                 },
@@ -949,9 +1121,14 @@ private fun SettingsScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Text(
+                stringResource(R.string.eye_open_probability, uiState.runtime.blinkLastEyeOpenProbabilityPercent),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { runWithCameraPermission { viewModel.calibrateProximity() } },
+                onClick = { showProximityCalibrationDialog = true },
             ) {
                 ButtonLabel(Icons.Outlined.Refresh, R.string.calibrate_proximity)
             }
@@ -988,10 +1165,10 @@ private fun SettingsScreen(
             NumberSlider(
                 R.string.proximity_capture_seconds,
                 Icons.Outlined.Schedule,
-                settings.proximityCaptureSeconds,
-                1f..8f,
-                6,
-                stringResource(R.string.seconds_value, settings.proximityCaptureSeconds),
+                proximityCaptureSeconds,
+                1f..2f,
+                0,
+                stringResource(R.string.seconds_value, proximityCaptureSeconds),
             ) {
                 viewModel.updateSettings { current -> current.copy(proximityCaptureSeconds = it) }
             }
@@ -1006,12 +1183,101 @@ private fun SettingsScreen(
                 viewModel.updateSettings { current -> current.copy(proximityAlertCooldownSeconds = it) }
             }
         }
+        SettingsSection(R.string.section_eye_protection, Icons.Outlined.PhotoCamera) {
+            SwitchRow(R.string.enable_blink_monitoring, Icons.Outlined.PhotoCamera, settings.blinkMonitoringEnabled) { enabled ->
+                if (enabled) {
+                    runWithCameraPermission { viewModel.setBlinkMonitoringEnabled(true) }
+                } else {
+                    viewModel.setBlinkMonitoringEnabled(false)
+                }
+            }
+            AnimatedVisibility(
+                visible = settings.blinkMonitoringEnabled && cameraPermissionNeeded,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+            ) {
+                NotificationRequirementCard(
+                    titleRes = R.string.camera_permission_needed,
+                    messageRes = R.string.camera_permission_needed_message,
+                    actionLabelRes = R.string.allow_camera,
+                    icon = Icons.Outlined.PhotoCamera,
+                    onClick = { runWithCameraPermission { viewModel.setBlinkMonitoringEnabled(true) } },
+                )
+            }
+            NumberSlider(R.string.blink_no_blink_threshold, Icons.Outlined.Schedule, settings.blinkNoBlinkThresholdSeconds, 5f..60f, 10, stringResource(R.string.seconds_value, settings.blinkNoBlinkThresholdSeconds)) {
+                viewModel.updateSettings { current -> current.copy(blinkNoBlinkThresholdSeconds = it) }
+            }
+            NumberSlider(R.string.blink_alert_cooldown, Icons.Outlined.NotificationsActive, settings.blinkAlertCooldownSeconds, 30f..600f, 18, stringResource(R.string.seconds_value, settings.blinkAlertCooldownSeconds)) {
+                viewModel.updateSettings { current -> current.copy(blinkAlertCooldownSeconds = it) }
+            }
+            SwitchRow(R.string.enable_ambient_light_monitoring, Icons.Outlined.NotificationsActive, settings.ambientLightMonitoringEnabled) {
+                viewModel.setAmbientLightMonitoringEnabled(it)
+            }
+            Text(
+                stringResource(R.string.ambient_current_lux, uiState.runtime.ambientLastLux),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            NumberSlider(R.string.ambient_low_lux_threshold, Icons.Outlined.NotificationsActive, settings.ambientLightLowLuxThreshold, 1f..100f, 99, "${settings.ambientLightLowLuxThreshold} lux") {
+                viewModel.updateSettings { current -> current.copy(ambientLightLowLuxThreshold = it) }
+            }
+            SwitchRow(R.string.enable_auto_brightness, Icons.Outlined.Style, settings.autoBrightnessEnabled) {
+                viewModel.setAutoBrightnessEnabled(it)
+            }
+            AnimatedVisibility(
+                visible = settings.autoBrightnessEnabled && writeSettingsPermissionNeeded,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+            ) {
+                NotificationRequirementCard(
+                    titleRes = R.string.brightness_permission_needed,
+                    messageRes = R.string.brightness_permission_needed_message,
+                    actionLabelRes = R.string.open_system_settings,
+                    icon = Icons.AutoMirrored.Outlined.OpenInNew,
+                    onClick = { openWriteSettings(context) },
+                )
+            }
+            NumberSlider(R.string.auto_brightness_min, Icons.Outlined.Style, settings.autoBrightnessMinPercent, 5f..100f, 19, stringResource(R.string.percent_value, settings.autoBrightnessMinPercent)) {
+                viewModel.updateSettings { current -> current.copy(autoBrightnessMinPercent = it) }
+            }
+            NumberSlider(R.string.auto_brightness_max, Icons.Outlined.Style, settings.autoBrightnessMaxPercent, 5f..100f, 19, stringResource(R.string.percent_value, settings.autoBrightnessMaxPercent)) {
+                viewModel.updateSettings { current -> current.copy(autoBrightnessMaxPercent = it.coerceAtLeast(settings.autoBrightnessMinPercent)) }
+            }
+            SwitchRow(R.string.enable_global_overlay, Icons.Outlined.NotificationsActive, settings.globalOverlayEnabled) {
+                viewModel.updateSettings { current -> current.copy(globalOverlayEnabled = it) }
+            }
+            AnimatedVisibility(
+                visible = settings.globalOverlayEnabled && overlayPermissionNeeded,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+            ) {
+                NotificationRequirementCard(
+                    titleRes = R.string.overlay_permission_needed,
+                    messageRes = R.string.overlay_permission_needed_message,
+                    actionLabelRes = R.string.open_system_settings,
+                    icon = Icons.AutoMirrored.Outlined.OpenInNew,
+                    onClick = { openOverlaySettings(context) },
+                )
+            }
+            NumberSlider(R.string.overlay_rest_duration, Icons.Outlined.Spa, settings.overlayRestDurationSeconds, 5f..120f, 23, stringResource(R.string.seconds_value, settings.overlayRestDurationSeconds)) {
+                viewModel.updateSettings { current -> current.copy(overlayRestDurationSeconds = it) }
+            }
+            NumberSlider(R.string.overlay_strict_distance, Icons.Outlined.PhotoCamera, settings.overlayStrictDistancePercent, 120f..250f, 26, stringResource(R.string.percent_value, settings.overlayStrictDistancePercent)) {
+                viewModel.updateSettings { current -> current.copy(overlayStrictDistancePercent = it) }
+            }
+        }
         SettingsSection(R.string.section_sound, Icons.AutoMirrored.Outlined.VolumeUp) {
             SwitchRow(R.string.enable_sound, Icons.AutoMirrored.Outlined.VolumeUp, settings.soundEnabled) {
                 viewModel.updateSettings { current -> current.copy(soundEnabled = it) }
             }
+            SwitchRow(R.string.enable_vibration, Icons.Outlined.NotificationsActive, settings.vibrationEnabled) {
+                viewModel.updateSettings { current -> current.copy(vibrationEnabled = it) }
+            }
             SwitchRow(R.string.pre_alert_sound, Icons.Outlined.Schedule, settings.preAlertSoundEnabled) {
                 viewModel.updateSettings { current -> current.copy(preAlertSoundEnabled = it) }
+            }
+            SwitchRow(R.string.rest_start_sound, Icons.Outlined.Spa, settings.restStartSoundEnabled) {
+                viewModel.updateSettings { current -> current.copy(restStartSoundEnabled = it) }
             }
             SwitchRow(R.string.pomodoro_work_start_sound, Icons.Outlined.PlayArrow, settings.pomodoroWorkStartSoundEnabled) {
                 viewModel.updateSettings { current -> current.copy(pomodoroWorkStartSoundEnabled = it) }
@@ -1019,11 +1285,32 @@ private fun SettingsScreen(
             SwitchRow(R.string.pomodoro_work_end_sound, Icons.Outlined.Stop, settings.pomodoroWorkEndSoundEnabled) {
                 viewModel.updateSettings { current -> current.copy(pomodoroWorkEndSoundEnabled = it) }
             }
+            NumberSlider(R.string.pre_alert_volume, Icons.AutoMirrored.Outlined.VolumeUp, settings.preAlertVolumePercent, 0f..100f, 20, stringResource(R.string.percent_value, settings.preAlertVolumePercent)) {
+                viewModel.updateSettings { current -> current.copy(preAlertVolumePercent = it) }
+            }
+            NumberSlider(R.string.rest_start_volume, Icons.AutoMirrored.Outlined.VolumeUp, settings.restStartVolumePercent, 0f..100f, 20, stringResource(R.string.percent_value, settings.restStartVolumePercent)) {
+                viewModel.updateSettings { current -> current.copy(restStartVolumePercent = it) }
+            }
+            NumberSlider(R.string.rest_end_volume, Icons.AutoMirrored.Outlined.VolumeUp, settings.restEndVolumePercent, 0f..100f, 20, stringResource(R.string.percent_value, settings.restEndVolumePercent)) {
+                viewModel.updateSettings { current -> current.copy(restEndVolumePercent = it) }
+            }
+            NumberSlider(R.string.pomodoro_start_volume, Icons.AutoMirrored.Outlined.VolumeUp, settings.pomodoroWorkStartVolumePercent, 0f..100f, 20, stringResource(R.string.percent_value, settings.pomodoroWorkStartVolumePercent)) {
+                viewModel.updateSettings { current -> current.copy(pomodoroWorkStartVolumePercent = it) }
+            }
+            NumberSlider(R.string.pomodoro_end_volume, Icons.AutoMirrored.Outlined.VolumeUp, settings.pomodoroWorkEndVolumePercent, 0f..100f, 20, stringResource(R.string.percent_value, settings.pomodoroWorkEndVolumePercent)) {
+                viewModel.updateSettings { current -> current.copy(pomodoroWorkEndVolumePercent = it) }
+            }
             FileSettingRow(
                 labelRes = R.string.rest_sound_file,
                 path = settings.restSoundPath,
                 onChoose = { restSoundLauncher.launch(arrayOf("audio/*")) },
                 onClear = { viewModel.updateSettings { current -> current.copy(restSoundPath = "") } },
+            )
+            FileSettingRow(
+                labelRes = R.string.rest_start_sound_file,
+                path = settings.restStartSoundPath,
+                onChoose = { restStartSoundLauncher.launch(arrayOf("audio/*")) },
+                onClear = { viewModel.updateSettings { current -> current.copy(restStartSoundPath = "") } },
             )
             FileSettingRow(
                 labelRes = R.string.pomodoro_work_start_sound_file,
@@ -1039,8 +1326,9 @@ private fun SettingsScreen(
             )
         }
         SettingsSection(R.string.section_appearance, Icons.Outlined.Style) {
+            val proEnabled = planTier(settings) >= PlanTier.PRO
             LumenFlowRow {
-                uiState.templates.forEach { template ->
+                uiState.templates.filter { !it.isPremium || proEnabled }.forEach { template ->
                     val selected = settings.activeTipTemplateId == template.id
                     FilterChip(
                         selected = selected,
@@ -1074,6 +1362,31 @@ private fun SettingsScreen(
             }
             SwitchRow(R.string.disable_skip, Icons.Outlined.SkipNext, settings.disableSkip) {
                 viewModel.updateSettings { current -> current.copy(disableSkip = it) }
+            }
+        }
+        SettingsSection(R.string.section_quiet_hours, Icons.Outlined.Schedule) {
+            SwitchRow(R.string.quiet_hours, Icons.Outlined.Schedule, settings.quietHoursEnabled) {
+                viewModel.updateSettings { current -> current.copy(quietHoursEnabled = it) }
+            }
+            AnimatedVisibility(
+                visible = settings.quietHoursEnabled,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    NumberSlider(R.string.quiet_start, Icons.Outlined.Schedule, settings.quietStartMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietStartMinute)) {
+                        viewModel.updateSettings { current -> current.copy(quietStartMinute = snapTimeMinute(it)) }
+                    }
+                    NumberSlider(R.string.quiet_end, Icons.Outlined.Schedule, settings.quietEndMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietEndMinute)) {
+                        viewModel.updateSettings { current -> current.copy(quietEndMinute = snapTimeMinute(it)) }
+                    }
+                    Text(stringResource(R.string.quiet_mode), style = MaterialTheme.typography.titleSmall)
+                    LumenFlowRow {
+                        QuietModeChip(R.string.quiet_mode_pause_timer, QuietMode.PAUSE_TIMER, settings, viewModel)
+                        QuietModeChip(R.string.quiet_mode_silent_notifications, QuietMode.SILENT_NOTIFICATIONS, settings, viewModel)
+                        QuietModeChip(R.string.quiet_mode_record_only, QuietMode.RECORD_ONLY, settings, viewModel)
+                    }
+                }
             }
         }
         SettingsSection(R.string.section_pre_alert, Icons.Outlined.Schedule) {
@@ -1151,9 +1464,81 @@ private fun TrendCard(uiState: ProjectLumenUiState) {
 }
 
 @Composable
+private fun HabitSuggestionCard(uiState: ProjectLumenUiState) {
+    val recentEyeStats = uiState.eyeStats.take(14)
+    val completedBreaks = recentEyeStats.sumOf { it.completedBreakCount }
+    val skips = recentEyeStats.sumOf { it.skipCount }
+    val totalBreakDecisions = completedBreaks + skips
+    val skipRate = if (totalBreakDecisions > 0) (skips * 100) / totalBreakDecisions else 0
+    val completionRate = if (totalBreakDecisions > 0) (completedBreaks * 100) / totalBreakDecisions else 100
+    val maxContinuousMinutes = (recentEyeStats.maxOfOrNull { it.maxContinuousWorkSeconds } ?: 0L) / 60L
+    val lowLightWarnings = recentEyeStats.sumOf { it.lowLightWarningCount }
+    val eyeDryWarnings = recentEyeStats.sumOf { it.eyeDryWarningCount }
+    val suggestionIds = buildList {
+        if (skipRate > 50 && completionRate < 40) add(R.string.habit_suggestion_shorter_break)
+        if (maxContinuousMinutes > uiState.dailyGoal.maxContinuousWorkMinutes.toLong()) add(R.string.habit_suggestion_strict_overlay)
+        if (lowLightWarnings >= 3) add(R.string.habit_suggestion_room_light)
+        if (eyeDryWarnings >= 3) add(R.string.habit_suggestion_blink_pause)
+        if (isEmpty()) add(R.string.habit_suggestion_keep_rhythm)
+    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+        colors = LumenCardColors(),
+        elevation = LumenCardElevation(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeader(Icons.Outlined.WarningAmber, R.string.habit_suggestions)
+            suggestionIds.distinct().forEach { suggestionRes ->
+                StatusLine(Icons.Outlined.CheckCircle, stringResource(suggestionRes))
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdvancedStatsCard(
+    eyeStats: List<DailyEyeStatsEntity>,
+    pomodoroStats: List<com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity>,
+) {
+    val workSeconds = eyeStats.sumOf { it.workingSeconds }
+    val restSeconds = eyeStats.sumOf { it.restSeconds }
+    val completedBreaks = eyeStats.sumOf { it.completedBreakCount }
+    val skips = eyeStats.sumOf { it.skipCount }
+    val totalBreakDecisions = (completedBreaks + skips).coerceAtLeast(1)
+    val averageContinuousMinutes = eyeStats
+        .filter { it.maxContinuousWorkSeconds > 0L }
+        .map { it.maxContinuousWorkSeconds / 60L }
+        .average()
+        .takeIf { !it.isNaN() }
+        ?: 0.0
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+        colors = LumenCardColors(),
+        elevation = LumenCardElevation(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeader(Icons.Outlined.BarChart, R.string.advanced_statistics)
+            MetricRow(R.string.working_time, stringResource(R.string.hours_short, workSeconds / 3600.0))
+            MetricRow(R.string.rest_time, minutesLabel((restSeconds / 60L).toInt()))
+            MetricRow(R.string.rest_completion_rate, stringResource(R.string.percent_value, ((completedBreaks * 100) / totalBreakDecisions).coerceIn(0, 100)))
+            MetricRow(R.string.skip_rate, stringResource(R.string.percent_value, ((skips * 100) / totalBreakDecisions).coerceIn(0, 100)))
+            MetricRow(R.string.average_continuous_work, stringResource(R.string.minutes_value, averageContinuousMinutes.roundToInt()))
+            MetricRow(R.string.completed_tomatoes, pomodoroStats.sumOf { it.completedTomatoCount }.toString())
+        }
+    }
+}
+
+@Composable
 private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
     val activeTemplate = activeTemplate(uiState)
     val context = LocalContext.current
+    val proEnabled = planTier(uiState.settings) >= PlanTier.PRO
     var imageTargetTemplateId by remember { mutableStateOf<Long?>(null) }
     val templateImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val targetTemplate = uiState.templates.firstOrNull { it.id == imageTargetTemplateId }
@@ -1171,6 +1556,7 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
         }
         uiState.templates.forEach { template ->
             val selected = template.id == uiState.settings.activeTipTemplateId
+            val locked = template.isPremium && !proEnabled
             val borderColor by animateColorAsState(
                 targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
                 animationSpec = tween(180),
@@ -1193,49 +1579,103 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                         TemplateColorSwatch(template)
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text(templateDisplayName(template), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                if (template.isPremium) {
+                                    "${templateDisplayName(template)} · ${stringResource(R.string.premium_template)}"
+                                } else {
+                                    templateDisplayName(template)
+                                },
+                                style = MaterialTheme.typography.titleMedium,
+                            )
                             Text(templateSubtitle(template), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
-                    FilterChip(
-                        selected = selected,
-                        onClick = { viewModel.selectTemplate(template.id) },
-                        label = {
-                            Text(
-                                stringResource(
-                                    if (selected) R.string.active_template else R.string.use_template,
-                                ),
-                            )
-                        },
-                        leadingIcon = {
-                            AnimatedVisibility(
-                                visible = selected,
-                                enter = scaleIn(tween(120)) + fadeIn(tween(120)),
-                                exit = scaleOut(tween(90)) + fadeOut(tween(90)),
-                            ) {
-                                Icon(Icons.Outlined.CheckCircle, contentDescription = null)
-                            }
-                        },
-                    )
-                    LumenFlowRow {
-                        OutlinedButton(onClick = {
-                            imageTargetTemplateId = template.id
-                            templateImageLauncher.launch(arrayOf("image/*"))
-                        }) {
-                            ButtonLabel(Icons.Outlined.FileDownload, R.string.choose_template_image)
-                        }
-                        if (template.imagePath.isNotBlank()) {
+                    when {
+                        locked -> StatusPill(Icons.Outlined.Lock, R.string.pro_required)
+                        selected -> StatusPill(Icons.Outlined.CheckCircle, R.string.active_template)
+                        else -> FilterChip(
+                            selected = false,
+                            onClick = { viewModel.selectTemplate(template.id) },
+                            label = { Text(stringResource(R.string.use_template)) },
+                        )
+                    }
+                    if (!locked) {
+                        LumenFlowRow {
                             OutlinedButton(
-                                onClick = { viewModel.updateTemplateImage(template, "") },
+                                onClick = {
+                                    imageTargetTemplateId = template.id
+                                    templateImageLauncher.launch(arrayOf("image/*"))
+                                },
                             ) {
-                                Text(stringResource(R.string.clear_custom_file))
+                                ButtonLabel(Icons.Outlined.FileDownload, R.string.choose_template_image)
                             }
+                            if (template.imagePath.isNotBlank()) {
+                                OutlinedButton(
+                                    onClick = { viewModel.updateTemplateImage(template, "") },
+                                ) {
+                                    Text(stringResource(R.string.clear_custom_file))
+                                }
+                            }
+                        }
+                        if (selected) {
+                            TemplateEditor(template, viewModel)
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun TemplateEditor(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
+    var titleText by remember(template.id, template.updatedAt) { mutableStateOf(template.titleText) }
+    var subtitleText by remember(template.id, template.updatedAt) { mutableStateOf(template.subtitleText) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(R.string.template_editor), style = MaterialTheme.typography.titleSmall)
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = titleText,
+            onValueChange = {
+                titleText = it
+                viewModel.updateTemplateContent(template, it, subtitleText, template.showSkipButton)
+            },
+            label = { Text(stringResource(R.string.template_title_text)) },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = subtitleText,
+            onValueChange = {
+                subtitleText = it
+                viewModel.updateTemplateContent(template, titleText, it, template.showSkipButton)
+            },
+            label = { Text(stringResource(R.string.template_subtitle_text)) },
+        )
+        SwitchRow(R.string.template_show_skip_button, Icons.Outlined.SkipNext, template.showSkipButton) {
+            viewModel.updateTemplateContent(template, titleText, subtitleText, it)
+        }
+        Text(stringResource(R.string.template_countdown_style), style = MaterialTheme.typography.titleSmall)
+        LumenFlowRow {
+            CountdownStyleChip(R.string.template_countdown_circle, COUNTDOWN_STYLE_CIRCLE, template, viewModel)
+            CountdownStyleChip(R.string.template_countdown_bar, COUNTDOWN_STYLE_BAR, template, viewModel)
+            CountdownStyleChip(R.string.template_countdown_number, COUNTDOWN_STYLE_NUMBER, template, viewModel)
+        }
+    }
+}
+
+@Composable
+private fun CountdownStyleChip(
+    @StringRes labelRes: Int,
+    style: String,
+    template: TipTemplateEntity,
+    viewModel: ProjectLumenViewModel,
+) {
+    FilterChip(
+        selected = templateCountdownStyle(template) == style,
+        onClick = { viewModel.updateTemplateCountdownStyle(template, style) },
+        label = { Text(stringResource(labelRes)) },
+    )
 }
 
 @Composable
@@ -1338,6 +1778,62 @@ private fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: In
 }
 
 @Composable
+private fun ProximityCalibrationDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.PhotoCamera, contentDescription = null) },
+        title = { Text(stringResource(R.string.proximity_calibration_title)) },
+        text = { Text(stringResource(R.string.proximity_calibration_message)) },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(stringResource(R.string.proximity_record_baseline))
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text(stringResource(R.string.generic_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun BackupImportDialog(
+    summary: BackupImportSummary,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.backup_import_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.backup_import_message))
+                MetricRow(R.string.backup_schema_version, summary.schemaVersion.toString())
+                MetricRow(R.string.backup_templates_count, summary.templateCount.toString())
+                MetricRow(R.string.backup_eye_days_count, summary.eyeStatDays.toString())
+                MetricRow(R.string.backup_pomodoro_days_count, summary.pomodoroStatDays.toString())
+                MetricRow(R.string.backup_entitlements_count, summary.entitlementCount.toString())
+                MetricRow(R.string.backup_plans_count, summary.reminderPlanCount.toString())
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(stringResource(R.string.backup_import_confirm))
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
 private fun UpdateDialog(
     viewModel: ProjectLumenViewModel,
     state: UpdateDialogState,
@@ -1373,7 +1869,7 @@ private fun UpdateDialog(
     when (val currentState = state) {
         UpdateDialogState.Hidden -> Unit
         UpdateDialogState.Checking -> AlertDialog(
-            onDismissRequest = onDismiss,
+            onDismissRequest = {},
             title = { Text(stringResource(R.string.about_update_checking_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1381,9 +1877,7 @@ private fun UpdateDialog(
                     Text(stringResource(R.string.about_update_checking))
                 }
             },
-            confirmButton = {
-                OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
-            },
+            confirmButton = {},
         )
         UpdateDialogState.NoUpdate -> AlertDialog(
             onDismissRequest = onDismiss,
@@ -1432,7 +1926,7 @@ private fun UpdateDialog(
             val candidate = currentState.candidate
             val release = candidate.release
             AlertDialog(
-                onDismissRequest = onDismiss,
+                onDismissRequest = {},
                 title = { Text(stringResource(R.string.about_update_downloading_title)) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1453,9 +1947,7 @@ private fun UpdateDialog(
                     }
                 },
                 confirmButton = {},
-                dismissButton = {
-                    OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
-                },
+                dismissButton = {},
             )
         }
         is UpdateDialogState.InstallAuthorization -> {
@@ -1544,61 +2036,270 @@ private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WebViewScreen(
     url: String,
-    onNavigateWebPage: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text(stringResource(android.R.string.cancel))
-            }
+    val context = LocalContext.current
+    var webView by remember { mutableStateOf<WebView?>(null) }
+    var pageTitle by remember(url) { mutableStateOf("") }
+    var currentUrl by rememberSaveable(url) { mutableStateOf(url) }
+    var isLoading by remember(url) { mutableStateOf(true) }
+    var expanded by remember { mutableStateOf(false) }
+    var showCompatibilityDialog by remember { mutableStateOf(false) }
+    val currentPageUrl = webView?.url ?: currentUrl
+
+    BackHandler(onBack = onDismiss)
+    DisposableEffect(webView) {
+        val disposableWebView = webView
+        onDispose {
+            disposableWebView?.destroy()
+        }
+    }
+
+    if (showCompatibilityDialog) {
+        AlertDialog(
+            onDismissRequest = { showCompatibilityDialog = false },
+            icon = { Icon(Icons.Outlined.WarningAmber, contentDescription = null) },
+            title = { Text("兼容性提示") },
+            text = {
+                Text(
+                    "检测到您的系统内置浏览器版本($chromeVersion)过低, 可能无法正常浏览网页文档\n\n" +
+                        "建议自行升级版本后重启 GKD 再查看文档, 或点击右上角后在外部浏览器打开查阅\n\n" +
+                        "若能正常浏览文档请忽略此项提示",
+                )
+            },
+            confirmButton = {
+                OutlinedButton(onClick = { showCompatibilityDialog = false }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        )
+    }
+
+    Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = {
+            TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
+                    }
+                },
+                title = {
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    } else {
+                        Text(
+                            text = pageTitle.ifBlank { webView?.title.orEmpty() },
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
+                actions = {
+                    if (chromeVersion in 1 until MINI_CHROME_VERSION) {
+                        IconButton(onClick = { showCompatibilityDialog = true }) {
+                            Icon(Icons.Outlined.WarningAmber, contentDescription = null)
+                        }
+                    }
+                    IconButton(onClick = { expanded = true }) {
+                        Icon(Icons.Outlined.MoreVert, contentDescription = null)
+                    }
+                    Box(modifier = Modifier.wrapContentSize(Alignment.TopStart)) {
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                        ) {
+                            if (!isLoading) {
+                                DropdownMenuItem(
+                                    text = { Text("刷新页面") },
+                                    onClick = {
+                                        expanded = false
+                                        webView?.reload()
+                                    },
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("复制链接") },
+                                onClick = {
+                                    expanded = false
+                                    copyWebPageUrl(context, currentPageUrl)
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("外部打开") },
+                                onClick = {
+                                    expanded = false
+                                    openUri(context, Uri.parse(currentPageUrl))
+                                },
+                            )
+                        }
+                    }
+                },
+            )
         },
-        title = { Text(url) },
-        text = {
+    ) { contentPadding ->
+        key(url) {
             AndroidView(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding),
                 factory = {
                     WebView(it).apply {
+                        webView = this
+                        addJavascriptInterface(ProjectLumenWebViewJsApi(it.applicationContext), "gkd")
+                        @SuppressLint("SetJavaScriptEnabled")
                         settings.javaScriptEnabled = true
-                        settings.setSupportMultipleWindows(true)
-                        webViewClient = webPageNavigationClient(onNavigateWebPage)
+                        settings.domStorageEnabled = true
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            settings.setAlgorithmicDarkeningAllowed(false)
+                        }
+                        webViewClient = ProjectLumenWebViewClient(
+                            onPageStarted = { startedUrl ->
+                                isLoading = true
+                                if (!startedUrl.isNullOrBlank()) currentUrl = startedUrl
+                            },
+                            onPageFinished = { finishedUrl, title ->
+                                isLoading = false
+                                if (!finishedUrl.isNullOrBlank()) currentUrl = finishedUrl
+                                pageTitle = title.orEmpty()
+                            },
+                        )
                         webChromeClient = object : WebChromeClient() {
-                            override fun onCreateWindow(
-                                view: WebView,
-                                isDialog: Boolean,
-                                isUserGesture: Boolean,
-                                resultMsg: Message,
-                            ): Boolean {
-                                val transport = resultMsg.obj as WebView.WebViewTransport
-                                transport.webView = WebView(view.context).apply {
-                                    webViewClient = webPageNavigationClient(onNavigateWebPage)
-                                }
-                                resultMsg.sendToTarget()
-                                return true
+                            override fun onReceivedTitle(view: WebView?, title: String?) {
+                                pageTitle = title.orEmpty()
+                            }
+
+                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                isLoading = newProgress < 100
+                                view?.url?.takeIf { it.isNotBlank() }?.let { currentUrl = it }
+                                view?.title?.takeIf { it.isNotBlank() }?.let { pageTitle = it }
                             }
                         }
                         loadUrl(url)
                     }
                 },
-                update = { view ->
-                    if (view.url != url) {
-                        view.loadUrl(url)
-                    }
-                },
             )
-        },
+        }
+    }
+}
+
+private class ProjectLumenWebViewClient(
+    private val onPageStarted: (String?) -> Unit,
+    private val onPageFinished: (String?, String?) -> Unit,
+) : WebViewClient() {
+    override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+        super.onPageStarted(view, url, favicon)
+        onPageStarted(url)
+    }
+
+    override fun onPageFinished(view: WebView, url: String?) {
+        super.onPageFinished(view, url)
+        onPageFinished(url, view.title)
+    }
+
+    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+        val uri = request.url
+        if (uri.host != GKD_DOC_HOST) {
+            openUri(view.context, uri)
+            return true
+        }
+        return super.shouldOverrideUrlLoading(view, request)
+    }
+
+    override fun shouldInterceptRequest(
+        view: WebView,
+        request: WebResourceRequest,
+    ): WebResourceResponse? {
+        try {
+            if (request.isForMainFrame && request.url.host == GKD_DOC_HOST && request.method == "GET") {
+                val path = request.url.path?.takeIf { it.isNotEmpty() } ?: "/"
+                loadGkdDocResponse(path)?.let { return it }
+            }
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+        return super.shouldInterceptRequest(view, request)
+    }
+}
+
+private class ProjectLumenWebViewJsApi(private val context: Context) {
+    @JavascriptInterface
+    fun getAppId() = context.packageName
+
+    @JavascriptInterface
+    fun getAppName() = context.getString(R.string.app_name)
+
+    @JavascriptInterface
+    fun getVersionCode() = appVersionCode(context)
+
+    @JavascriptInterface
+    fun getVersionName() = appVersionName(context)
+
+    @JavascriptInterface
+    fun getChannel() = "project-lumen"
+
+    @JavascriptInterface
+    fun getDebuggable() = BuildConfig.DEBUG
+}
+
+private fun loadGkdDocResponse(path: String): WebResourceResponse? {
+    val docConfig = JSONObject(httpGetText(GKD_DOC_CONFIG_URL))
+    val mirrorBaseUrl = docConfig.getString("mirrorBaseUrl")
+    val htmlUrlMap = docConfig.getJSONObject("htmlUrlMap")
+    val htmlPath = htmlUrlMap.optString(path).takeIf { it.isNotBlank() } ?: return null
+    val htmlText = httpGetText(mirrorBaseUrl + htmlPath).let {
+        if (BuildConfig.DEBUG) GKD_DEBUG_JS_TEXT + it else it
+    }
+    return WebResourceResponse(
+        "text/html",
+        "UTF-8",
+        htmlText.byteInputStream(Charsets.UTF_8),
     )
 }
 
-private fun webPageNavigationClient(onNavigateWebPage: (String) -> Unit) = object : WebViewClient() {
-    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-        if (!request.isForMainFrame) return false
-        onNavigateWebPage(request.url.toString())
-        return true
+private fun httpGetText(url: String): String {
+    val connection = URL(url).openConnection() as HttpURLConnection
+    return try {
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 15_000
+        connection.readTimeout = 15_000
+        connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+    } finally {
+        connection.disconnect()
     }
+}
+
+private fun copyWebPageUrl(context: Context, url: String) {
+    context.getSystemService<ClipboardManager>()?.setPrimaryClip(
+        ClipData.newPlainText(context.packageName, url),
+    )
+    Toast.makeText(context, "复制成功", Toast.LENGTH_SHORT).show()
+}
+
+private fun openUri(context: Context, uri: Uri) {
+    val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    runCatching { context.startActivity(intent) }
+        .onFailure { Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show() }
+}
+
+@Suppress("DEPRECATION")
+private fun appVersionCode(context: Context): Int {
+    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        packageInfo.longVersionCode.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    } else {
+        packageInfo.versionCode
+    }
+}
+
+@Suppress("DEPRECATION")
+private fun appVersionName(context: Context): String {
+    return context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
 }
 
 @Composable
@@ -1625,17 +2326,89 @@ private fun TodayStatsCard(stat: DailyEyeStatsEntity?) {
                 SmallMetric(R.string.proximity_warnings, (stat?.proximityWarningCount ?: 0).toString())
                 SmallMetric(R.string.proximity_close_time, minutesLabel(((stat?.proximityCloseSeconds ?: 0L) / 60L).toInt()))
             }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SmallMetric(R.string.eye_dry_warnings, (stat?.eyeDryWarningCount ?: 0).toString())
+                SmallMetric(R.string.low_light_warnings, (stat?.lowLightWarningCount ?: 0).toString())
+            }
         }
     }
 }
 
 @Composable
-private fun TimerCard(label: String, seconds: Long, progress: Float, fallbackText: String) {
+private fun GoalProgressCard(uiState: ProjectLumenUiState) {
+    val goal = uiState.dailyGoal
+    val eye = uiState.eyeStats.firstOrNull()
+    val pomodoro = uiState.pomodoroStats.firstOrNull()
+    val eyeActiveDates = uiState.eyeStats.take(7)
+        .filter { it.workingSeconds > 0L || it.restSeconds > 0L }
+        .map { it.statDate }
+        .toSet()
+    val activeDays = eyeActiveDates.size + uiState.pomodoroStats.take(7)
+        .filter { it.completedFocusSessions > 0 && it.statDate !in eyeActiveDates }
+        .size
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+        colors = LumenCardColors(),
+        elevation = LumenCardElevation(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeader(Icons.Outlined.CheckCircle, R.string.today_goals)
+            GoalLine(
+                label = stringResource(R.string.daily_rest_goal),
+                value = "${eye?.completedBreakCount ?: 0}/${goal.restBreakGoal}",
+                progress = (eye?.completedBreakCount ?: 0).toFloat() / goal.restBreakGoal.coerceAtLeast(1).toFloat(),
+            )
+            val continuousMinutes = ((eye?.maxContinuousWorkSeconds ?: 0L) / 60L).toInt()
+            GoalLine(
+                label = stringResource(R.string.max_continuous_work_goal),
+                value = stringResource(R.string.minutes_value, continuousMinutes),
+                progress = 1f - (continuousMinutes.toFloat() / goal.maxContinuousWorkMinutes.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f),
+            )
+            GoalLine(
+                label = stringResource(R.string.daily_pomodoro_goal),
+                value = "${pomodoro?.completedFocusSessions ?: 0}/${goal.pomodoroGoal}",
+                progress = (pomodoro?.completedFocusSessions ?: 0).toFloat() / goal.pomodoroGoal.coerceAtLeast(1).toFloat(),
+            )
+            GoalLine(
+                label = stringResource(R.string.weekly_active_days_goal),
+                value = "$activeDays/${goal.weeklyActiveDaysGoal}",
+                progress = activeDays.toFloat() / goal.weeklyActiveDaysGoal.coerceAtLeast(1).toFloat(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun GoalLine(label: String, value: String, progress: Float) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        }
+        LinearProgressIndicator(
+            progress = { progress.coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun TimerCard(
+    label: String,
+    seconds: Long,
+    progress: Float,
+    fallbackText: String,
+    countdownStyle: String = COUNTDOWN_STYLE_CIRCLE,
+) {
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 650),
         label = "timerProgress",
     )
+    val timerText = if (seconds > 0) compactTime(seconds) else fallbackText
     val running = seconds > 0
     val transition = rememberInfiniteTransition(label = "timerPulse")
     val pulseScale by transition.animateFloat(
@@ -1657,37 +2430,62 @@ private fun TimerCard(label: String, seconds: Long, progress: Float, fallbackTex
     ) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(label, style = MaterialTheme.typography.titleMedium)
-            Box(
-                modifier = Modifier
-                    .size(220.dp)
-                    .graphicsLayer {
-                        scaleX = pulse
-                        scaleY = pulse
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(
-                    progress = { animatedProgress },
-                    modifier = Modifier.fillMaxSize(),
-                    strokeWidth = 10.dp,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                )
-                AnimatedContent(
-                    targetState = if (seconds > 0) compactTime(seconds) else fallbackText,
-                    transitionSpec = {
-                        ContentTransform(
-                            targetContentEnter = fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 2 },
-                            initialContentExit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 2 },
-                            sizeTransform = SizeTransform(clip = false),
+            when (countdownStyle) {
+                COUNTDOWN_STYLE_BAR -> {
+                    AnimatedTimerText(timerText, Modifier.padding(vertical = 40.dp))
+                    LinearProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxWidth())
+                }
+                COUNTDOWN_STYLE_NUMBER -> {
+                    AnimatedTimerText(
+                        timerText = timerText,
+                        modifier = Modifier
+                            .padding(vertical = 56.dp)
+                            .graphicsLayer {
+                                scaleX = pulse
+                                scaleY = pulse
+                            },
+                    )
+                }
+                else -> {
+                    Box(
+                        modifier = Modifier
+                            .size(220.dp)
+                            .graphicsLayer {
+                                scaleX = pulse
+                                scaleY = pulse
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            progress = { animatedProgress },
+                            modifier = Modifier.fillMaxSize(),
+                            strokeWidth = 10.dp,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
                         )
-                    },
-                    label = "timerText",
-                ) { text ->
-                    Text(text, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold)
+                        AnimatedTimerText(timerText)
+                    }
+                    LinearProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxWidth())
                 }
             }
-            LinearProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxWidth())
         }
+    }
+}
+
+@Composable
+private fun AnimatedTimerText(timerText: String, modifier: Modifier = Modifier) {
+    AnimatedContent(
+        targetState = timerText,
+        modifier = modifier,
+        transitionSpec = {
+            ContentTransform(
+                targetContentEnter = fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 2 },
+                initialContentExit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 2 },
+                sizeTransform = SizeTransform(clip = false),
+            )
+        },
+        label = "timerText",
+    ) { text ->
+        Text(text, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -1718,9 +2516,9 @@ private fun TemplatePreviewCard(template: TipTemplateEntity?) {
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(templateDisplayName(template), style = MaterialTheme.typography.titleMedium, color = animatedPrimary)
+                Text(templateBreakTitle(template), style = MaterialTheme.typography.titleMedium, color = animatedPrimary)
                 Text(
-                    templateSubtitle(template),
+                    templateBreakSubtitle(template),
                     style = MaterialTheme.typography.bodyMedium,
                     color = animatedPrimary.copy(alpha = 0.76f),
                 )
@@ -1731,6 +2529,11 @@ private fun TemplatePreviewCard(template: TipTemplateEntity?) {
 
 @Composable
 private fun PageIntro(icon: ImageVector, @StringRes titleRes: Int, message: String) {
+    PageIntroText(icon = icon, title = stringResource(titleRes), message = message)
+}
+
+@Composable
+private fun PageIntroText(icon: ImageVector, title: String, message: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -1738,7 +2541,7 @@ private fun PageIntro(icon: ImageVector, @StringRes titleRes: Int, message: Stri
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(titleRes), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text(message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -1832,6 +2635,25 @@ private fun StatusLine(icon: ImageVector, text: String) {
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun StatusPill(icon: ImageVector, @StringRes labelRes: Int) {
+    Row(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Text(
+            text = stringResource(labelRes),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -2044,6 +2866,15 @@ private fun ThemeChip(@StringRes labelRes: Int, mode: AppThemeMode, settings: Ap
 }
 
 @Composable
+private fun QuietModeChip(@StringRes labelRes: Int, mode: QuietMode, settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
+    FilterChip(
+        selected = settings.quietMode == mode.name,
+        onClick = { viewModel.updateSettings { current -> current.copy(quietMode = mode.name) } },
+        label = { Text(stringResource(labelRes)) },
+    )
+}
+
+@Composable
 private fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
     Column(
         modifier = Modifier
@@ -2190,6 +3021,14 @@ private fun templateDisplayName(template: TipTemplateEntity?): String {
         5L -> stringResource(R.string.template_forest_glass)
         6L -> stringResource(R.string.template_clear_sky)
         7L -> stringResource(R.string.template_rose_quartz)
+        8L -> stringResource(R.string.template_deep_slate)
+        9L -> stringResource(R.string.template_paper_mint)
+        10L -> stringResource(R.string.template_warm_desk)
+        11L -> stringResource(R.string.template_graphite_focus)
+        12L -> stringResource(R.string.template_lotus_pause)
+        13L -> stringResource(R.string.template_clinic_calm)
+        14L -> stringResource(R.string.template_night_amber)
+        15L -> stringResource(R.string.template_reading_green)
         else -> template?.name ?: stringResource(R.string.template_calm_teal)
     }
 }
@@ -2204,12 +3043,57 @@ private fun templateSubtitle(template: TipTemplateEntity?): String {
         5L -> stringResource(R.string.template_forest_glass_subtitle)
         6L -> stringResource(R.string.template_clear_sky_subtitle)
         7L -> stringResource(R.string.template_rose_quartz_subtitle)
+        8L -> stringResource(R.string.template_deep_slate_subtitle)
+        9L -> stringResource(R.string.template_paper_mint_subtitle)
+        10L -> stringResource(R.string.template_warm_desk_subtitle)
+        11L -> stringResource(R.string.template_graphite_focus_subtitle)
+        12L -> stringResource(R.string.template_lotus_pause_subtitle)
+        13L -> stringResource(R.string.template_clinic_calm_subtitle)
+        14L -> stringResource(R.string.template_night_amber_subtitle)
+        15L -> stringResource(R.string.template_reading_green_subtitle)
         else -> template?.subtitleText ?: stringResource(R.string.break_message)
+    }
+}
+
+@Composable
+private fun templateBreakTitle(template: TipTemplateEntity?): String {
+    val title = template?.titleText.orEmpty()
+    return if (title.isBlank() || title == DEFAULT_TEMPLATE_TITLE) {
+        stringResource(R.string.break_title)
+    } else {
+        title
+    }
+}
+
+@Composable
+private fun templateBreakSubtitle(template: TipTemplateEntity?): String {
+    val subtitle = template?.subtitleText.orEmpty()
+    return if (subtitle.isBlank() || subtitle == DEFAULT_TEMPLATE_SUBTITLE) {
+        stringResource(R.string.break_message)
+    } else {
+        subtitle
+    }
+}
+
+private fun templateCountdownStyle(template: TipTemplateEntity?): String {
+    val style = runCatching {
+        JSONObject(template?.layoutJson?.takeIf { it.isNotBlank() } ?: "{}")
+            .optString("countdownStyle", COUNTDOWN_STYLE_CIRCLE)
+    }.getOrDefault(COUNTDOWN_STYLE_CIRCLE)
+    return when (style) {
+        COUNTDOWN_STYLE_BAR,
+        COUNTDOWN_STYLE_NUMBER,
+        COUNTDOWN_STYLE_CIRCLE -> style
+        else -> COUNTDOWN_STYLE_CIRCLE
     }
 }
 
 private fun activeTemplate(uiState: ProjectLumenUiState): TipTemplateEntity? {
     return uiState.templates.firstOrNull { it.id == uiState.settings.activeTipTemplateId } ?: uiState.templates.firstOrNull()
+}
+
+private fun planTier(settings: AppSettingsEntity): PlanTier {
+    return PlanTier.entries.firstOrNull { it.name == settings.planTier } ?: PlanTier.FREE
 }
 
 private fun remainingSeconds(endAt: Long, nowMillis: Long): Long {
@@ -2305,10 +3189,52 @@ private fun needsExactAlarmSettings(context: Context): Boolean {
     return !alarmManager.canScheduleExactAlarms()
 }
 
+private fun needsFullScreenIntentSettings(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return false
+    val notificationManager = context.getSystemService(NotificationManager::class.java)
+    return !notificationManager.canUseFullScreenIntent()
+}
+
+private fun needsOverlayPermission(context: Context): Boolean {
+    return !Settings.canDrawOverlays(context)
+}
+
+private fun needsWriteSettingsPermission(context: Context): Boolean {
+    return !Settings.System.canWrite(context)
+}
+
 private fun openExactAlarmSettings(context: Context) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
     val intent = Intent(
         Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+        Uri.parse("package:${context.packageName}"),
+    )
+    runCatching { context.startActivity(intent) }
+        .onFailure { openAppNotificationSettings(context) }
+}
+
+private fun openFullScreenIntentSettings(context: Context) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+    val intent = Intent(
+        Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+        Uri.parse("package:${context.packageName}"),
+    )
+    runCatching { context.startActivity(intent) }
+        .onFailure { openAppNotificationSettings(context) }
+}
+
+private fun openOverlaySettings(context: Context) {
+    val intent = Intent(
+        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+        Uri.parse("package:${context.packageName}"),
+    )
+    runCatching { context.startActivity(intent) }
+        .onFailure { openAppNotificationSettings(context) }
+}
+
+private fun openWriteSettings(context: Context) {
+    val intent = Intent(
+        Settings.ACTION_MANAGE_WRITE_SETTINGS,
         Uri.parse("package:${context.packageName}"),
     )
     runCatching { context.startActivity(intent) }

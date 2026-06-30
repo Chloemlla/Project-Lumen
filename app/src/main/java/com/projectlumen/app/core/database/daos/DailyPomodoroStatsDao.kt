@@ -14,6 +14,9 @@ interface DailyPomodoroStatsDao {
     @Query("SELECT * FROM daily_pomodoro_stats WHERE statDate = :date")
     suspend fun get(date: String): DailyPomodoroStatsEntity?
 
+    @Query("SELECT * FROM daily_pomodoro_stats ORDER BY statDate DESC")
+    suspend fun getAll(): List<DailyPomodoroStatsEntity>
+
     @Upsert
     suspend fun upsert(stat: DailyPomodoroStatsEntity)
 }

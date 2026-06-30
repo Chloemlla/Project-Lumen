@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
@@ -50,6 +52,15 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".core.proximity.ProximityEventReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.USER_PRESENT" />
+                <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".core.services.TimerForegroundService"
             android:exported="false"
@@ -63,6 +74,24 @@
             android:name=".core.proximity.ProximityDetectionService"
             android:exported="false"
             android:foregroundServiceType="camera" />
+
+        <service
+            android:name=".core.light.LightMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Monitors ambient light and adjusts screen brightness for eye protection." />
+        </service>
+
+        <service
+            android:name=".core.overlay.EyeProtectionOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Displays a full-screen eye-rest overlay when strict eye protection rules are triggered." />
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

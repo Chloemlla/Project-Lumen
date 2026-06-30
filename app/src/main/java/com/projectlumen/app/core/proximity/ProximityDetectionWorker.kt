@@ -8,6 +8,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.projectlumen.app.ProjectLumenApplication
+import com.projectlumen.app.core.repositories.SettingsRepository
 import java.util.concurrent.TimeUnit
 
 class ProximityDetectionWorker(
@@ -17,11 +18,11 @@ class ProximityDetectionWorker(
     override suspend fun doWork(): Result {
         val calibrate = inputData.getBoolean(KEY_CALIBRATE, false)
         val app = applicationContext as ProjectLumenApplication
-        val settings = app.database.appSettingsDao().get()
-        if (calibrate || settings?.proximityMonitoringEnabled == true) {
+        val settings = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences).get()
+        if (calibrate || settings?.proximityMonitoringEnabled == true || settings?.blinkMonitoringEnabled == true) {
             ProximityDetectionService.start(applicationContext, calibrate)
         }
-        if (!calibrate && settings?.proximityMonitoringEnabled == true) {
+        if (!calibrate && settings != null && (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled)) {
             enqueueNext(applicationContext, settings.proximityCheckIntervalMinutes)
         }
         return Result.success()
