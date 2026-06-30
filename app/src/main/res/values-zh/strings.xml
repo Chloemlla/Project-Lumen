@@ -361,7 +361,6 @@
     <string name="developer_section_mode">开发者模式</string>
     <string name="developer_overlay_enabled">实时悬浮调试小窗</string>
     <string name="developer_preview_enabled">低分辨率抽样预览</string>
-    <string name="developer_privacy_warning">此画面仅在开发者模式下本地常驻内存，严禁写入本地文件或上传</string>
     <string name="developer_ai_inference">AI 推理耗时</string>
     <string name="developer_camera_latency">相机捕获延迟</string>
     <string name="developer_face_width">当前人脸宽度</string>

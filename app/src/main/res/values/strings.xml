@@ -362,7 +362,6 @@
     <string name="developer_section_mode">Developer mode</string>
     <string name="developer_overlay_enabled">Realtime floating debug window</string>
     <string name="developer_preview_enabled">Low-res sample preview</string>
-    <string name="developer_privacy_warning">This view is local memory only in developer mode. Never write it to local files or upload it.</string>
     <string name="developer_ai_inference">AI inference</string>
     <string name="developer_camera_latency">Camera latency</string>
     <string name="developer_face_width">Current face width</string>

@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.graphics.PixelFormat
-import android.graphics.Typeface
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -22,11 +21,9 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.projectlumen.app.ProjectLumenApplication
-import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,9 +38,6 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var sensorManager: SensorManager
     private var overlayView: LinearLayout? = null
-    private var statsText: TextView? = null
-    private var sensorText: TextView? = null
-    private var privacyText: TextView? = null
     private var previewImage: ImageView? = null
     private var sensorsRegistered = false
     private var overlayTicking = false
@@ -150,9 +144,13 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         scope.launch {
             val settings = (application as ProjectLumenApplication).database.appSettingsDao().get()
             handler.post {
-                if (settings?.developerDebugOverlayEnabled == true && Settings.canDrawOverlays(this@DeveloperDebugOverlayService)) {
+                if (
+                    settings?.developerModeEnabled == true &&
+                    settings.developerDebugOverlayEnabled &&
+                    Settings.canDrawOverlays(this@DeveloperDebugOverlayService)
+                ) {
                     ensureOverlay()
-                    renderOverlay(settings.developerDebugPreviewEnabled)
+                    renderOverlay()
                 } else {
                     removeOverlay()
                 }
@@ -167,25 +165,19 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         if (overlayView != null) return
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(18, 16, 18, 16)
-            setBackgroundColor(Color.argb(218, 12, 18, 24))
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            setBackgroundColor(Color.argb(214, 6, 10, 14))
         }
-        statsText = debugText(size = 12f).also(container::addView)
-        sensorText = debugText(size = 12f).also(container::addView)
         previewImage = ImageView(this).apply {
-            adjustViewBounds = true
-            maxWidth = dp(220)
-            maxHeight = dp(160)
-            visibility = View.GONE
-        }.also(container::addView)
-        privacyText = debugText(size = 11f).apply {
-            setTypeface(typeface, Typeface.BOLD)
-            text = getString(R.string.developer_privacy_warning)
+            adjustViewBounds = false
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setBackgroundColor(Color.argb(255, 8, 12, 18))
+            layoutParams = LinearLayout.LayoutParams(dp(240), dp(180))
         }.also(container::addView)
 
         val params = WindowManager.LayoutParams(
-            dp(300),
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            dp(252),
+            dp(192),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -199,50 +191,21 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         overlayView = container
     }
 
-    private fun renderOverlay(showPreview: Boolean) {
+    private fun renderOverlay() {
         val frame = DeveloperDebugFrameStore.latest()
-        val sample = frame?.sample
-        statsText?.text = buildString {
-            append("FPS: ")
-            append(frame?.fps?.let { "%.1f".format(it) } ?: "0.0")
-            append("  AI: ")
-            append(sample?.inferenceMillis ?: 0L)
-            append("ms  Camera: ")
-            append(sample?.cameraLatencyMillis ?: 0L)
-            append("ms\nCurrent Width: ")
-            append(sample?.faceWidthPx ?: 0)
-            append(" px  Eye: ")
-            append(sample?.eyeDistancePx?.roundToInt() ?: 0)
-            append(" px")
-        }
-        sensorText?.text = "Lux: ${"%.1f".format(lastLux)}  Pitch/Roll/Yaw: " +
-            "${lastPitch.roundToInt()}/${lastRoll.roundToInt()}/${lastYaw.roundToInt()} deg"
-        previewImage?.visibility = if (showPreview && frame?.thumbnail != null) View.VISIBLE else View.GONE
-        if (showPreview) {
-            previewImage?.setImageBitmap(frame?.thumbnail)
+        previewImage?.visibility = View.VISIBLE
+        if (frame?.thumbnail != null) {
+            previewImage?.setImageBitmap(frame.thumbnail)
         } else {
             previewImage?.setImageDrawable(null)
         }
-        privacyText?.visibility = if (showPreview) View.VISIBLE else View.GONE
     }
 
     private fun removeOverlay() {
         val view = overlayView ?: return
         overlayView = null
         runCatching { getSystemService(WindowManager::class.java).removeView(view) }
-        statsText = null
-        sensorText = null
-        privacyText = null
         previewImage = null
-    }
-
-    private fun debugText(size: Float): TextView {
-        return TextView(this).apply {
-            textSize = size
-            setTextColor(Color.WHITE)
-            includeFontPadding = false
-            setPadding(0, 0, 0, 8)
-        }
     }
 
     private fun handleAccelerometer(values: FloatArray) {

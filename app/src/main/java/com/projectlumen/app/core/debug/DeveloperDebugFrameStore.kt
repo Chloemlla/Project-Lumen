@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import com.projectlumen.app.core.proximity.FaceDistanceSample
+import com.projectlumen.app.core.proximity.FaceTopologyPoint
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.roundToInt
 
@@ -49,22 +50,76 @@ object DeveloperDebugFrameStore {
         val height = (bitmap.height * scale).roundToInt().coerceAtLeast(1)
         val output = Bitmap.createScaledBitmap(bitmap, width, height, true)
             .copy(Bitmap.Config.ARGB_8888, true)
-        if (sample != null && sample.faceWidthPx > 0) {
-            val rect = Rect(
-                (sample.faceLeftPx * scale).roundToInt(),
-                (sample.faceTopPx * scale).roundToInt(),
-                (sample.faceRightPx * scale).roundToInt(),
-                (sample.faceBottomPx * scale).roundToInt(),
-            )
-            Canvas(output).drawRect(
-                rect,
-                Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    style = Paint.Style.STROKE
-                    color = Color.RED
-                    strokeWidth = 4f
-                },
+        if (sample != null) drawTopology(output, sample, scale)
+        return output
+    }
+
+    private fun drawTopology(bitmap: Bitmap, sample: FaceDistanceSample, scale: Float) {
+        val canvas = Canvas(bitmap)
+        val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = Color.argb(210, 255, 82, 82)
+            strokeWidth = 3f
+        }
+        val contourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = Color.argb(230, 105, 240, 174)
+            strokeWidth = 2.5f
+        }
+        val meshPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = Color.argb(120, 64, 196, 255)
+            strokeWidth = 1f
+        }
+        val pointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            color = Color.argb(220, 255, 214, 102)
+        }
+
+        if (sample.faceWidthPx > 0) {
+            canvas.drawRect(
+                Rect(
+                    (sample.faceLeftPx * scale).roundToInt(),
+                    (sample.faceTopPx * scale).roundToInt(),
+                    (sample.faceRightPx * scale).roundToInt(),
+                    (sample.faceBottomPx * scale).roundToInt(),
+                ),
+                framePaint,
             )
         }
-        return output
+        val pointsByIndex = sample.meshPoints.associateBy { it.index }
+        sample.meshTriangles.forEach { triangle ->
+            val first = pointsByIndex[triangle.firstPointIndex]
+            val second = pointsByIndex[triangle.secondPointIndex]
+            val third = pointsByIndex[triangle.thirdPointIndex]
+            if (first != null && second != null && third != null) {
+                canvas.drawScaledLine(first, second, scale, meshPaint)
+                canvas.drawScaledLine(second, third, scale, meshPaint)
+                canvas.drawScaledLine(third, first, scale, meshPaint)
+            }
+        }
+        sample.contourPolylines.forEach { polyline ->
+            polyline.points.zipWithNext { first, second ->
+                canvas.drawScaledLine(first, second, scale, contourPaint)
+            }
+        }
+        sample.meshPoints.forEach { point ->
+            canvas.drawCircle(point.xPx * scale, point.yPx * scale, 1.5f, pointPaint)
+        }
+    }
+
+    private fun Canvas.drawScaledLine(
+        first: FaceTopologyPoint,
+        second: FaceTopologyPoint,
+        scale: Float,
+        paint: Paint,
+    ) {
+        drawLine(
+            first.xPx * scale,
+            first.yPx * scale,
+            second.xPx * scale,
+            second.yPx * scale,
+            paint,
+        )
     }
 }

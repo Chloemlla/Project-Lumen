@@ -33,7 +33,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.crash.CrashReport
@@ -66,7 +65,6 @@ internal fun DeveloperDebugScreen(
                     ButtonLabel(Icons.Outlined.Visibility, R.string.open_system_settings)
                 }
             }
-            Text(stringResource(R.string.developer_privacy_warning), fontWeight = FontWeight.Bold)
             MetricRow(R.string.developer_ai_inference, "${runtime.proximityDebugInferenceMillis} ms")
             MetricRow(R.string.developer_camera_latency, "${runtime.proximityDebugCameraLatencyMillis} ms")
             MetricRow(R.string.developer_face_width, "${runtime.proximityDebugFaceWidthPx} px")

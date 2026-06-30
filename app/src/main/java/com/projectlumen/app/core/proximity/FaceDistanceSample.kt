@@ -14,5 +14,26 @@ data class FaceDistanceSample(
     val cameraLatencyMillis: Long = 0L,
     val leftEyeOpenProbability: Float? = null,
     val rightEyeOpenProbability: Float? = null,
+    val contourPolylines: List<FaceTopologyPolyline> = emptyList(),
+    val meshPoints: List<FaceTopologyPoint> = emptyList(),
+    val meshTriangles: List<FaceMeshTriangle> = emptyList(),
     val capturedAtMillis: Long = System.currentTimeMillis(),
+)
+
+data class FaceTopologyPoint(
+    val index: Int,
+    val xPx: Float,
+    val yPx: Float,
+    val zPx: Float? = null,
+)
+
+data class FaceTopologyPolyline(
+    val type: Int,
+    val points: List<FaceTopologyPoint>,
+)
+
+data class FaceMeshTriangle(
+    val firstPointIndex: Int,
+    val secondPointIndex: Int,
+    val thirdPointIndex: Int,
 )

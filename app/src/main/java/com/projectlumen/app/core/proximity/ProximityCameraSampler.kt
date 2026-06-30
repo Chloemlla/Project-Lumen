@@ -65,7 +65,7 @@ class ProximityCameraSampler(private val context: Context) {
         val cameraLatencyMillis = System.currentTimeMillis() - captureStartedAt
         val bitmap = BitmapFactory.decodeByteArray(capture.bytes, 0, capture.bytes.size) ?: return null
         return try {
-            val sample = FaceDistanceAnalyzer()
+            val sample = FaceDistanceAnalyzer(includeTopology = publishDebugFrame)
                 .analyze(bitmap, capture.rotationDegrees)
                 ?.copy(cameraLatencyMillis = cameraLatencyMillis)
             if (publishDebugFrame) {

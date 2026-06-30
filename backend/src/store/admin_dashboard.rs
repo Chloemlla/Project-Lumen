@@ -240,7 +240,7 @@ fn json_array_len(value: &Value, key: &str) -> usize {
 }
 
 fn tier_by_user(entitlements: &[AdminEntitlementItem]) -> HashMap<String, String> {
-    let mut tiers = HashMap::new();
+    let mut tiers: HashMap<String, String> = HashMap::new();
     for entitlement in entitlements {
         if entitlement.status != "active" {
             continue;
@@ -248,7 +248,7 @@ fn tier_by_user(entitlements: &[AdminEntitlementItem]) -> HashMap<String, String
         tiers
             .entry(entitlement.user_id.clone())
             .and_modify(|tier| {
-                if tier_rank(&entitlement.tier) > tier_rank(tier) {
+                if tier_rank(&entitlement.tier) > tier_rank(tier.as_str()) {
                     *tier = entitlement.tier.clone();
                 }
             })

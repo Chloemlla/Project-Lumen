@@ -1,6 +1,6 @@
 use super::{
     database_error,
-    documents::{CounterRecord, StoredSyncChange},
+    documents::StoredSyncChange,
     time::now_millis,
     AppStore,
 };

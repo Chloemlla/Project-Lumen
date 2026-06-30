@@ -71,7 +71,7 @@ impl AppStore {
                     user_id,
                     source: "admin".to_owned(),
                     product_id: payload_str(payload, "productId", "manual_admin_grant"),
-                    purchase_token: "",
+                    purchase_token: String::new(),
                     tier: payload_str(payload, "tier", "PRO"),
                     status: "active".to_owned(),
                     purchased_at: now,
