@@ -1,0 +1,151 @@
+use super::{
+    database_error,
+    documents::{PendingLogin, SessionRecord, UserRecord},
+    time::{now_millis, ttl_seconds_to_millis},
+    AppStore,
+};
+use crate::{
+    error::ApiError,
+    models::{AuthSessionResponse, StartEmailResponse, VerifyEmailRequest},
+};
+use mongodb::bson::doc;
+use uuid::Uuid;
+
+impl AppStore {
+    pub async fn start_email_login(
+        &self,
+        email: &str,
+        code: &str,
+        ttl_seconds: u64,
+    ) -> Result<StartEmailResponse, ApiError> {
+        let email = normalize_email(email)?;
+        let request_id = Uuid::new_v4().to_string();
+        let expires_at = now_millis() + ttl_seconds_to_millis(ttl_seconds);
+
+        self.login_requests
+            .insert_one(
+                PendingLogin {
+                    request_id: request_id.clone(),
+                    email,
+                    code: code.to_owned(),
+                    expires_at,
+                },
+                None,
+            )
+            .await
+            .map_err(database_error)?;
+
+        Ok(StartEmailResponse {
+            request_id,
+            expires_at,
+            delivery: "development_code".to_owned(),
+            dev_code: Some(code.to_owned()),
+        })
+    }
+
+    pub async fn verify_email_login(
+        &self,
+        request: VerifyEmailRequest,
+        access_token_ttl_seconds: u64,
+    ) -> Result<AuthSessionResponse, ApiError> {
+        let email = normalize_email(&request.email)?;
+        let pending = self
+            .login_requests
+            .find_one_and_delete(doc! { "_id": &request.request_id }, None)
+            .await
+            .map_err(database_error)?
+            .ok_or_else(|| ApiError::BadRequest("Login request was not found.".to_owned()))?;
+
+        if pending.email != email || pending.code != request.code || pending.expires_at < now_millis() {
+            return Err(ApiError::Unauthorized);
+        }
+
+        let user = self
+            .upsert_user(email, request.device_installation_id.unwrap_or_default())
+            .await?;
+        let access_token = Uuid::new_v4().to_string();
+        let expires_at = now_millis() + ttl_seconds_to_millis(access_token_ttl_seconds);
+
+        self.sessions
+            .insert_one(
+                SessionRecord {
+                    token: access_token.clone(),
+                    user_id: user.id.clone(),
+                    expires_at,
+                },
+                None,
+            )
+            .await
+            .map_err(database_error)?;
+
+        Ok(AuthSessionResponse {
+            access_token,
+            token_type: "Bearer".to_owned(),
+            expires_at,
+            user: user.to_dto(),
+        })
+    }
+
+    pub async fn user_for_token(&self, token: &str) -> Result<UserRecord, ApiError> {
+        let session = self
+            .sessions
+            .find_one(doc! { "_id": token }, None)
+            .await
+            .map_err(database_error)?
+            .ok_or(ApiError::Unauthorized)?;
+
+        if session.expires_at < now_millis() {
+            self.sessions
+                .delete_one(doc! { "_id": token }, None)
+                .await
+                .map_err(database_error)?;
+            return Err(ApiError::Unauthorized);
+        }
+
+        self.users
+            .find_one(doc! { "_id": session.user_id }, None)
+            .await
+            .map_err(database_error)?
+            .ok_or(ApiError::Unauthorized)
+    }
+
+    async fn upsert_user(&self, email: String, device_installation_id: String) -> Result<UserRecord, ApiError> {
+        if let Some(mut user) = self
+            .users
+            .find_one(doc! { "email": &email }, None)
+            .await
+            .map_err(database_error)?
+        {
+            if !device_installation_id.trim().is_empty() {
+                self.users
+                    .update_one(
+                        doc! { "_id": &user.id },
+                        doc! { "$set": { "deviceInstallationId": &device_installation_id } },
+                        None,
+                    )
+                    .await
+                    .map_err(database_error)?;
+                user.device_installation_id = device_installation_id;
+            }
+            return Ok(user);
+        }
+
+        let user = UserRecord {
+            id: Uuid::new_v4().to_string(),
+            email,
+            created_at: now_millis(),
+            device_installation_id,
+        };
+        self.users.insert_one(&user, None).await.map_err(database_error)?;
+        Ok(user)
+    }
+}
+
+fn normalize_email(email: &str) -> Result<String, ApiError> {
+    let normalized = email.trim().to_lowercase();
+    if normalized.contains('@') && normalized.len() <= 254 {
+        Ok(normalized)
+    } else {
+        Err(ApiError::BadRequest("A valid email address is required.".to_owned()))
+    }
+}

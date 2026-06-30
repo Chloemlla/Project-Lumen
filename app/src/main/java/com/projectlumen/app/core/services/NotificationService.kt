@@ -1,6 +1,5 @@
 ﻿package com.projectlumen.app.core.services
 
-import android.Manifest
 import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -21,9 +20,10 @@ import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
 
+private const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIFICATIONS"
+
 class NotificationService(private val context: Context) {
     fun ensureChannels() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannels(
             listOf(
@@ -340,7 +340,7 @@ class NotificationService(private val context: Context) {
 
     private fun canPostNotifications(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
-        return ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+        return ContextCompat.checkSelfPermission(context, POST_NOTIFICATIONS_PERMISSION) ==
             PackageManager.PERMISSION_GRANTED
     }
 

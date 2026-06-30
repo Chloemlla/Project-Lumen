@@ -30,9 +30,15 @@ fun projectLumenVersionCodeFromName(versionName: String): Int {
     return code.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()
 }
 
+fun projectLumenBuildConfigString(value: String): String {
+    return value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+}
+
 android {
     namespace = "com.projectlumen.app"
-    compileSdk = 36
+    compileSdk = 37
 
     val projectLumenVersionName = providers.environmentVariable("PROJECT_LUMEN_VERSION_NAME")
         .orNull
@@ -54,15 +60,23 @@ android {
         .orNull
         ?.takeIf { it.isNotBlank() }
         ?: providers.exec { commandLine("git", "rev-parse", "--short=8", "HEAD") }.standardOutput.asText.get().trim().ifBlank { "unknown" }
+    val projectLumenApiBaseUrl = providers.environmentVariable("PROJECT_LUMEN_API_BASE_URL")
+        .orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: providers.gradleProperty("PROJECT_LUMEN_API_BASE_URL")
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+        ?: "http://eye.chloemlla.com/api"
 
     defaultConfig {
         buildConfigField("long", "BUILD_TIME_UTC_MILLIS", "${projectLumenBuildTimeUtcMillis}L")
         buildConfigField("String", "COMMIT_HASH", "\"$projectLumenCommitHash\"")
         buildConfigField("String", "SHORT_HASH", "\"$projectLumenShortHash\"")
+        buildConfigField("String", "API_BASE_URL", "\"${projectLumenBuildConfigString(projectLumenApiBaseUrl)}\"")
 
         applicationId = "com.projectlumen.app"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = projectLumenVersionCode
         versionName = projectLumenVersionName
 
@@ -134,32 +148,32 @@ dependencies {
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
-    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.animation:animation-graphics")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.core:core-ktx:1.16.0")
-    implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-service:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-process:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.navigation:navigation-compose:2.8.5")
-    implementation("androidx.room:room-ktx:2.7.2")
-    implementation("androidx.room:room-runtime:2.7.2")
-    implementation("androidx.work:work-runtime-ktx:2.10.1")
+    implementation("androidx.core:core-ktx:1.19.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-service:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.11.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
+    implementation("androidx.navigation:navigation-compose:2.9.8")
+    implementation("androidx.room:room-ktx:2.8.4")
+    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.work:work-runtime-ktx:2.11.2")
     implementation("com.google.mlkit:face-detection:16.1.7")
-    ksp("androidx.room:room-compiler:2.7.2")
+    ksp("androidx.room:room-compiler:2.8.4")
 
     testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -164,3 +164,21 @@ jobs:
           prerelease: false
           name: "Project-Lumen ${{ env.PROJECT_LUMEN_VERSION_NAME }}-${{ env.PROJECT_LUMEN_SHORT_HASH }}"
           files: release-assets/*
+
+  backend:
+    name: Rust backend verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Show Rust toolchain
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path backend/Cargo.toml --all -- --check
+
+      - name: Run Rust tests
+        run: cargo test --manifest-path backend/Cargo.toml --all-targets

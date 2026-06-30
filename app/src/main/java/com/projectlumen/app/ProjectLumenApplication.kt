@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
@@ -25,15 +26,21 @@ class ProjectLumenApplication : Application() {
     val audio: AudioService by lazy { AudioService(this) }
     val export: ExportService by lazy { ExportService(this) }
     val backup: DataBackupService by lazy { DataBackupService(this, database, eyeCarePreferences) }
+    val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient(this) }
     val crashReports: CrashReportStore by lazy { CrashReportStore(this) }
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
 
     override fun onCreate() {
         super.onCreate()
-        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
+        val defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             runCatching { crashReports.save(CrashReport.fromThrowable(throwable)) }
-            android.os.Process.killProcess(android.os.Process.myPid())
-            kotlin.system.exitProcess(10)
+            if (defaultExceptionHandler != null) {
+                defaultExceptionHandler.uncaughtException(thread, throwable)
+            } else {
+                android.os.Process.killProcess(android.os.Process.myPid())
+                kotlin.system.exitProcess(10)
+            }
         }
         notifications.ensureChannels()
         ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)

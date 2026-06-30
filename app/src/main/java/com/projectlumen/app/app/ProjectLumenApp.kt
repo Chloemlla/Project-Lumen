@@ -129,6 +129,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -150,6 +152,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
@@ -198,6 +202,7 @@ private const val PROJECT_LUMEN_REPO_URL = "https://github.com/Chloemlla/Project
 private const val PROJECT_LUMEN_RELEASES_URL = "https://github.com/Chloemlla/Project-Lumen/releases/latest"
 private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases/latest"
 private const val PROJECT_LUMEN_RELEASES_BASE_URL = "https://github.com/Chloemlla/Project-Lumen/releases"
+private const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIFICATIONS"
 private const val MINI_CHROME_VERSION = 107
 private const val GKD_DOC_HOST = "gkd.li"
 private const val GKD_DOC_CONFIG_URL =
@@ -258,7 +263,7 @@ private enum class SystemBackgroundColor(
 
 private val LumenCardShape = RoundedCornerShape(8.dp)
 @Composable
-private fun LumenCardElevation() = CardDefaults.cardElevation(
+private fun lumenCardElevation() = CardDefaults.cardElevation(
     defaultElevation = 1.dp,
     pressedElevation = 0.dp,
     focusedElevation = 1.dp,
@@ -268,7 +273,7 @@ private fun LumenCardElevation() = CardDefaults.cardElevation(
 )
 
 @Composable
-private fun LumenCardColors() = CardDefaults.cardColors(
+private fun lumenCardColors() = CardDefaults.cardColors(
     containerColor = MaterialTheme.colorScheme.surfaceContainer,
 )
 
@@ -299,7 +304,7 @@ fun ProjectLumenApp(
     var pendingWebUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var updateDialogState by remember { mutableStateOf<UpdateDialogState>(UpdateDialogState.Hidden) }
     var downloadingUpdate by remember { mutableStateOf(false) }
-    var downloadProgressBytes by remember { mutableStateOf(0L) }
+    var downloadProgressBytes by remember { mutableLongStateOf(0L) }
     var downloadProgressTotalBytes by remember { mutableStateOf<Long?>(null) }
     var autoCheckStarted by rememberSaveable { mutableStateOf(false) }
     val checkingUpdate = updateDialogState is UpdateDialogState.Checking
@@ -525,8 +530,8 @@ private fun CrashReportScreen(report: CrashReport) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = LumenCardShape,
-            colors = LumenCardColors(),
-            elevation = LumenCardElevation(),
+            colors = lumenCardColors(),
+            elevation = lumenCardElevation(),
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricRow("时间", formattedTime)
@@ -773,7 +778,7 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
     val eye = uiState.eyeStats.firstOrNull()
     val pomodoro = uiState.pomodoroStats.firstOrNull()
     val statsEnabled = uiState.settings.statsEnabled
-    var statsWindow by rememberSaveable { mutableStateOf(7) }
+    var statsWindow by rememberSaveable { mutableIntStateOf(7) }
     val windowEyeStats = uiState.eyeStats.take(statsWindow)
     val windowPomodoroStats = uiState.pomodoroStats.take(statsWindow)
     val hasExportableStats = statsEnabled && (uiState.eyeStats.any {
@@ -801,7 +806,7 @@ private fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
             shape = LumenCardShape,
-            colors = LumenCardColors(),
+            colors = lumenCardColors(),
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionHeader(Icons.Outlined.LocalCafe, R.string.section_pomodoro)
@@ -1423,8 +1428,8 @@ private fun TrendCard(uiState: ProjectLumenUiState) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = LumenCardColors(),
-        elevation = LumenCardElevation(),
+        colors = lumenCardColors(),
+        elevation = lumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.weekly_trend)
@@ -1487,8 +1492,8 @@ private fun HabitSuggestionCard(uiState: ProjectLumenUiState) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = LumenCardColors(),
-        elevation = LumenCardElevation(),
+        colors = lumenCardColors(),
+        elevation = lumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.WarningAmber, R.string.habit_suggestions)
@@ -1520,8 +1525,8 @@ private fun AdvancedStatsCard(
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = LumenCardColors(),
-        elevation = LumenCardElevation(),
+        colors = lumenCardColors(),
+        elevation = lumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.advanced_statistics)
@@ -1569,8 +1574,8 @@ private fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                     .border(1.dp, borderColor, LumenCardShape)
                     .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
                 shape = LumenCardShape,
-                colors = LumenCardColors(),
-                elevation = LumenCardElevation(),
+                colors = lumenCardColors(),
+                elevation = lumenCardElevation(),
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -1681,7 +1686,7 @@ private fun CountdownStyleChip(
 
 @Composable
 private fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = LumenCardColors(), elevation = LumenCardElevation()) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = lumenCardColors(), elevation = lumenCardElevation()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Style, R.string.system_background_color)
             LumenFlowRow {
@@ -1722,8 +1727,8 @@ private fun AboutHeroCard(versionLabel: String) {
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
             shape = LumenCardShape,
-            colors = LumenCardColors(),
-            elevation = LumenCardElevation(),
+            colors = lumenCardColors(),
+            elevation = lumenCardElevation(),
         ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(Icons.Outlined.Info, R.string.app_name)
@@ -1739,7 +1744,7 @@ private fun AboutHeroCard(versionLabel: String) {
 
 @Composable
 private fun AboutLinksCard(viewModel: ProjectLumenViewModel) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = LumenCardColors(), elevation = LumenCardElevation()) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = lumenCardColors(), elevation = lumenCardElevation()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL, viewModel)
@@ -2014,8 +2019,8 @@ private fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
             shape = LumenCardShape,
-            colors = LumenCardColors(),
-            elevation = LumenCardElevation(),
+            colors = lumenCardColors(),
+            elevation = lumenCardElevation(),
         ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.NotificationsActive, R.string.current_state)
@@ -2135,7 +2140,7 @@ private fun WebViewScreen(
                                 text = { Text("外部打开") },
                                 onClick = {
                                     expanded = false
-                                    openUri(context, Uri.parse(currentPageUrl))
+                                    openUri(context, currentPageUrl.toUri())
                                 },
                             )
                         }
@@ -2310,8 +2315,8 @@ private fun TodayStatsCard(stat: DailyEyeStatsEntity?) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = LumenCardColors(),
-        elevation = LumenCardElevation(),
+        colors = lumenCardColors(),
+        elevation = lumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.today_summary)
@@ -2352,8 +2357,8 @@ private fun GoalProgressCard(uiState: ProjectLumenUiState) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = LumenCardColors(),
-        elevation = LumenCardElevation(),
+        colors = lumenCardColors(),
+        elevation = lumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.CheckCircle, R.string.today_goals)
@@ -2427,7 +2432,7 @@ private fun TimerCard(
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = LumenCardColors(),
+        colors = lumenCardColors(),
     ) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(label, style = MaterialTheme.typography.titleMedium)
@@ -2502,7 +2507,7 @@ private fun TemplatePreviewCard(template: TipTemplateEntity?) {
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
         colors = CardDefaults.cardColors(containerColor = animatedBackground),
-        elevation = LumenCardElevation(),
+        elevation = lumenCardElevation(),
     ) {
         Row(
             modifier = Modifier
@@ -2580,8 +2585,8 @@ private fun SettingsSection(@StringRes titleRes: Int, icon: ImageVector, content
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = LumenCardColors(),
-        elevation = LumenCardElevation(),
+        colors = lumenCardColors(),
+        elevation = lumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(icon, titleRes)
@@ -2597,8 +2602,8 @@ private fun ActionCard(content: @Composable ColumnScope.() -> Unit) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = LumenCardColors(),
-        elevation = LumenCardElevation(),
+        colors = lumenCardColors(),
+        elevation = lumenCardElevation(),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -2700,11 +2705,11 @@ private fun UriImagePreview(path: String) {
         factory = { context ->
             ImageView(context).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
-                setImageURI(Uri.parse(path))
+                setImageURI(path.toUri())
             }
         },
         update = { imageView ->
-            imageView.setImageURI(Uri.parse(path))
+            imageView.setImageURI(path.toUri())
         },
     )
 }
@@ -2757,7 +2762,7 @@ private fun rememberNotificationPermissionGate(): ((() -> Unit) -> Unit) {
     return { action ->
         if (needsNotificationPermission(context)) {
             pendingAction = action
-            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            permissionLauncher.launch(POST_NOTIFICATIONS_PERMISSION)
         } else {
             action()
         }
@@ -3144,7 +3149,9 @@ private fun systemThemeColor(key: String?): Color {
 }
 
 private fun parseColor(hex: String?, fallback: Color): Color {
-    return runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(fallback)
+    return hex
+        ?.let { runCatching { Color(it.toColorInt()) }.getOrDefault(fallback) }
+        ?: fallback
 }
 
 @Composable
@@ -3175,7 +3182,7 @@ private fun persistReadableUri(context: Context, uri: Uri) {
 
 private fun needsNotificationPermission(context: Context): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return false
-    return ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+    return ContextCompat.checkSelfPermission(context, POST_NOTIFICATIONS_PERMISSION) !=
         PackageManager.PERMISSION_GRANTED
 }
 
@@ -3208,7 +3215,7 @@ private fun openExactAlarmSettings(context: Context) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
     val intent = Intent(
         Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-        Uri.parse("package:${context.packageName}"),
+        "package:${context.packageName}".toUri(),
     )
     runCatching { context.startActivity(intent) }
         .onFailure { openAppNotificationSettings(context) }
@@ -3218,7 +3225,7 @@ private fun openFullScreenIntentSettings(context: Context) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
     val intent = Intent(
         Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
-        Uri.parse("package:${context.packageName}"),
+        "package:${context.packageName}".toUri(),
     )
     runCatching { context.startActivity(intent) }
         .onFailure { openAppNotificationSettings(context) }
@@ -3227,7 +3234,7 @@ private fun openFullScreenIntentSettings(context: Context) {
 private fun openOverlaySettings(context: Context) {
     val intent = Intent(
         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-        Uri.parse("package:${context.packageName}"),
+        "package:${context.packageName}".toUri(),
     )
     runCatching { context.startActivity(intent) }
         .onFailure { openAppNotificationSettings(context) }
@@ -3236,7 +3243,7 @@ private fun openOverlaySettings(context: Context) {
 private fun openWriteSettings(context: Context) {
     val intent = Intent(
         Settings.ACTION_MANAGE_WRITE_SETTINGS,
-        Uri.parse("package:${context.packageName}"),
+        "package:${context.packageName}".toUri(),
     )
     runCatching { context.startActivity(intent) }
         .onFailure { openAppNotificationSettings(context) }

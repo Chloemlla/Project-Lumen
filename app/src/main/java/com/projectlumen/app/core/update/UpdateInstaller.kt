@@ -3,10 +3,9 @@ package com.projectlumen.app.core.update
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
-import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -62,17 +61,13 @@ class UpdateInstaller(private val context: Context) {
     }
 
     fun canInstallPackages(): Boolean {
-        return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            true
-        } else {
-            context.packageManager.canRequestPackageInstalls()
-        }
+        return context.packageManager.canRequestPackageInstalls()
     }
 
     fun createInstallPermissionIntent(): Intent {
         return Intent(
             Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-            Uri.parse("package:${context.packageName}"),
+            "package:${context.packageName}".toUri(),
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 

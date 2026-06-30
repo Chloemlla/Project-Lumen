@@ -4,11 +4,11 @@ import android.content.Context
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.ToneGenerator
-import android.net.Uri
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import androidx.core.net.toUri
 
 class AudioService(private val context: Context) {
     fun playReminderTone(
@@ -29,7 +29,7 @@ class AudioService(private val context: Context) {
     }
 
     private fun playCustomSound(soundPath: String): Boolean {
-        val player = runCatching { MediaPlayer.create(context, Uri.parse(soundPath)) }.getOrNull() ?: return false
+        val player = runCatching { MediaPlayer.create(context, soundPath.toUri()) }.getOrNull() ?: return false
         player.setOnCompletionListener { completedPlayer -> completedPlayer.release() }
         player.setOnErrorListener { failedPlayer, _, _ ->
             failedPlayer.release()
@@ -52,11 +52,6 @@ class AudioService(private val context: Context) {
             context.getSystemService(Vibrator::class.java)
         } ?: return
         if (!vibrator.hasVibrator()) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createOneShot(90L, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(90L)
-        }
+        vibrator.vibrate(VibrationEffect.createOneShot(90L, VibrationEffect.DEFAULT_AMPLITUDE))
     }
 }

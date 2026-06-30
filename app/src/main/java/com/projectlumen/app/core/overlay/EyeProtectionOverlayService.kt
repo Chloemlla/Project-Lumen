@@ -65,7 +65,7 @@ class EyeProtectionOverlayService : Service() {
         removeAtMillis = System.currentTimeMillis() + durationSeconds * 1000L
         val windowManager = getSystemService(WindowManager::class.java)
         countdownText = TextView(this).apply {
-            text = durationSeconds.toString()
+            text = getString(R.string.overlay_countdown_seconds, durationSeconds)
             textSize = 56f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
@@ -95,12 +95,7 @@ class EyeProtectionOverlayService : Service() {
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            },
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,

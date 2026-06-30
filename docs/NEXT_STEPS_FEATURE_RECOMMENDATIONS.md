@@ -38,6 +38,16 @@
 - [ ] 服务端 AI 个性化建议：本地规则建议已完成；如后续接入服务端 AI，仍需服务端、鉴权、隐私策略和聚合统计 API。
 - [ ] 团队版/企业版/Web 仪表盘：属于后续外部产品与后端范围，本仓库未实现。
 
+### 0.3 2026-06-30 后端 API 与客户端接入进度
+
+- [x] 新增 `backend/` Rust API 服务工程，`main.rs` 仅作为启动入口，配置、状态、存储、模型和路由均已拆分。
+- [x] 后端默认挂载 `/api` 前缀，匹配客户端 base URL：`http://eye.chloemlla.com/api`。
+- [x] 已提供健康检查、邮箱登录起始/验证、用户信息、权益快照、Google 购买校验入口、同步 changes/push、本地备份上传和最新备份读取 API。
+- [x] Android 端新增轻量 `ProjectLumenApiClient`，沿用 `HttpURLConnection`，通过 `BuildConfig.API_BASE_URL` 默认接入 `http://eye.chloemlla.com/api`。
+- [x] Android 网络安全配置已针对 `eye.chloemlla.com` 允许 HTTP 明文访问，适配当前 API base URL。
+- [x] GitHub Actions 新增 Rust 后端格式检查与测试任务；本地仍不执行构建、测试、Lint 或安装命令。
+- [ ] 后端当前使用内存存储，生产部署前仍需替换 PostgreSQL/Redis 等持久化组件，并接入真实邮件发送与 Google Play 服务端验签。
+
 ## 1. 当前能力盘点
 
 ### 1.1 已有产品功能

@@ -9,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
+import androidx.core.graphics.createBitmap
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
@@ -118,7 +119,7 @@ class ExportService(private val context: Context) {
     ): Bitmap {
         val width = 1200
         val height = 900
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(width, height)
         val canvas = Canvas(bitmap)
         val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.rgb(24, 32, 40)
