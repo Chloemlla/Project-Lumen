@@ -8,6 +8,8 @@
     <string name="nav_settings">设置</string>
     <string name="nav_templates">模板</string>
     <string name="nav_about">关于</string>
+    <string name="navigate_back">返回</string>
+    <string name="settings_subtitle">按模块调整应用。高级选项默认收起，需要时再展开。</string>
     <string name="status_ready">就绪</string>
     <string name="status_working">工作中</string>
     <string name="status_pre_alert">预提醒</string>

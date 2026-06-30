@@ -283,7 +283,11 @@ internal fun SettingsScreen(
         )
     }
     LumenPage {
-        TemplatePreviewCard(template)
+        PageIntro(
+            icon = Icons.Outlined.Settings,
+            titleRes = R.string.nav_settings,
+            message = stringResource(R.string.settings_subtitle),
+        )
         SettingsSection(R.string.section_general, Icons.Outlined.Settings) {
             Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall)
             LumenFlowRow {
@@ -339,7 +343,7 @@ internal fun SettingsScreen(
                 viewModel.setAutoUpdateCheckEnabled(it)
             }
         }
-        SettingsSection(R.string.section_goals, Icons.Outlined.CheckCircle) {
+        SettingsSection(R.string.section_goals, Icons.Outlined.CheckCircle, initiallyExpanded = false) {
             NumberSlider(R.string.daily_rest_goal, Icons.Outlined.Spa, uiState.dailyGoal.restBreakGoal, 1f..20f, 18, "${uiState.dailyGoal.restBreakGoal}") {
                 viewModel.updateDailyGoal { current -> current.copy(restBreakGoal = it) }
             }
@@ -363,11 +367,11 @@ internal fun SettingsScreen(
                 }
             }
         }
-        SettingsSection(R.string.section_pro, Icons.Outlined.CheckCircle) {
+        SettingsSection(R.string.section_pro, Icons.Outlined.CheckCircle, initiallyExpanded = false) {
             MetricRow(R.string.plan_tier, settings.planTier.lowercase())
             MetricRow(R.string.pro_templates, uiState.templates.count { it.isPremium }.toString())
         }
-        SettingsSection(R.string.about_update_status, Icons.Outlined.Sync) {
+        SettingsSection(R.string.about_update_status, Icons.Outlined.Sync, initiallyExpanded = false) {
             if (checkingUpdate) {
                 StatusLine(Icons.Outlined.Sync, stringResource(R.string.about_update_checking))
             } else {
@@ -431,12 +435,12 @@ internal fun SettingsScreen(
                 }
             }
         }
-        SettingsSection(R.string.section_keep_alive, Icons.Outlined.Schedule) {
+        SettingsSection(R.string.section_keep_alive, Icons.Outlined.Schedule, initiallyExpanded = false) {
             SwitchRow(R.string.enable_keep_alive, Icons.Outlined.Schedule, settings.keepAliveEnabled) {
                 viewModel.setKeepAliveEnabled(it)
             }
         }
-        SettingsSection(R.string.section_proximity, Icons.Outlined.PhotoCamera) {
+        SettingsSection(R.string.section_proximity, Icons.Outlined.PhotoCamera, initiallyExpanded = false) {
             SwitchRow(R.string.enable_proximity_monitoring, Icons.Outlined.PhotoCamera, settings.proximityMonitoringEnabled) { enabled ->
                 if (enabled) {
                     runWithCameraPermission {
@@ -543,7 +547,7 @@ internal fun SettingsScreen(
                 viewModel.updateSettings { current -> current.copy(proximityAlertCooldownSeconds = it) }
             }
         }
-        SettingsSection(R.string.section_eye_protection, Icons.Outlined.PhotoCamera) {
+        SettingsSection(R.string.section_eye_protection, Icons.Outlined.PhotoCamera, initiallyExpanded = false) {
             SwitchRow(R.string.enable_blink_monitoring, Icons.Outlined.PhotoCamera, settings.blinkMonitoringEnabled) { enabled ->
                 if (enabled) {
                     runWithCameraPermission { viewModel.setBlinkMonitoringEnabled(true) }
@@ -626,7 +630,7 @@ internal fun SettingsScreen(
                 viewModel.updateSettings { current -> current.copy(overlayStrictDistancePercent = it) }
             }
         }
-        SettingsSection(R.string.section_sound, Icons.AutoMirrored.Outlined.VolumeUp) {
+        SettingsSection(R.string.section_sound, Icons.AutoMirrored.Outlined.VolumeUp, initiallyExpanded = false) {
             SwitchRow(R.string.enable_sound, Icons.AutoMirrored.Outlined.VolumeUp, settings.soundEnabled) {
                 viewModel.updateSettings { current -> current.copy(soundEnabled = it) }
             }
@@ -687,6 +691,7 @@ internal fun SettingsScreen(
         }
         SettingsSection(R.string.section_appearance, Icons.Outlined.Style) {
             val proEnabled = planTier(settings) >= PlanTier.PRO
+            TemplatePreviewCard(template)
             LumenFlowRow {
                 uiState.templates.filter { !it.isPremium || proEnabled }.forEach { template ->
                     val selected = settings.activeTipTemplateId == template.id
@@ -724,7 +729,7 @@ internal fun SettingsScreen(
                 viewModel.updateSettings { current -> current.copy(disableSkip = it) }
             }
         }
-        SettingsSection(R.string.section_quiet_hours, Icons.Outlined.Schedule) {
+        SettingsSection(R.string.section_quiet_hours, Icons.Outlined.Schedule, initiallyExpanded = false) {
             SwitchRow(R.string.quiet_hours, Icons.Outlined.Schedule, settings.quietHoursEnabled) {
                 viewModel.updateSettings { current -> current.copy(quietHoursEnabled = it) }
             }
@@ -749,7 +754,7 @@ internal fun SettingsScreen(
                 }
             }
         }
-        SettingsSection(R.string.section_pre_alert, Icons.Outlined.Schedule) {
+        SettingsSection(R.string.section_pre_alert, Icons.Outlined.Schedule, initiallyExpanded = false) {
             SwitchRow(R.string.enable_pre_alert, Icons.Outlined.Schedule, settings.preAlertEnabled) {
                 viewModel.updateSettings { current -> current.copy(preAlertEnabled = it) }
             }
@@ -772,7 +777,7 @@ internal fun SettingsScreen(
             }
         }
         if (settings.developerModeEnabled) {
-            SettingsSection(R.string.nav_developer, Icons.Outlined.Code) {
+            SettingsSection(R.string.nav_developer, Icons.Outlined.Code, initiallyExpanded = false) {
                 OutlinedButton(onClick = openDeveloperOptions) {
                     ButtonLabel(Icons.Outlined.Code, R.string.nav_developer)
                 }

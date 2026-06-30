@@ -26,8 +26,10 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +48,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
@@ -221,21 +224,37 @@ fun ProjectLumenApp(
             val navController = rememberNavController()
             val backStackEntry by navController.currentBackStackEntryAsState()
             Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
                 contentWindowInsets = WindowInsets.safeDrawing,
                 topBar = {
                     val current = Destination.entries.firstOrNull {
                         it.route == backStackEntry?.destination?.route
                     } ?: Destination.HOME
-                    LumenTopBar(title = stringResource(current.labelRes))
+                    LumenTopBar(
+                        title = stringResource(current.labelRes),
+                        onNavigateBack = if (current.showInBottomNav) null else {
+                            { navController.popBackStack() }
+                        },
+                    )
                 },
                 bottomBar = {
-                    NavigationBar {
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
+                    ) {
                         Destination.entries.filter { it.showInBottomNav }.forEach { destination ->
                             val selected = backStackEntry?.destination?.hierarchy?.any {
                                 it.route == destination.route
                             } == true
                             NavigationBarItem(
                                 selected = selected,
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                ),
                                 onClick = {
                                     navController.navigate(destination.route) {
                                         popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -251,7 +270,7 @@ fun ProjectLumenApp(
                                     )
                                     Icon(
                                         destination.icon,
-                                        contentDescription = null,
+                                        contentDescription = stringResource(destination.labelRes),
                                         modifier = Modifier.graphicsLayer {
                                             scaleX = scale
                                             scaleY = scale

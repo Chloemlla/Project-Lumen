@@ -49,6 +49,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -202,7 +203,10 @@ internal fun SwitchRow(@StringRes labelRes: Int, icon: ImageVector, checked: Boo
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .clip(LumenCardShape)
+            .clickable { onCheckedChange(!checked) }
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -221,11 +225,14 @@ internal fun NumberSlider(
     valueLabel: String,
     onValueChange: (Int) -> Unit,
 ) {
+    var sliderValue by remember(value, range) { mutableStateOf(value.toFloat().coerceIn(range.start, range.endInclusive)) }
+    val liveValue = sliderValue.roundToInt()
+    val liveLabel = if (liveValue == value) valueLabel else liveValue.toString()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             LabelWithIcon(icon, labelRes, Modifier.weight(1f))
             AnimatedContent(
-                targetState = valueLabel,
+                targetState = liveLabel,
                 transitionSpec = {
                     (fadeIn(tween(140)) + slideInVertically(tween(140)) { it / 2 }) togetherWith
                         (fadeOut(tween(100)) + slideOutVertically(tween(100)) { -it / 2 })
@@ -236,10 +243,14 @@ internal fun NumberSlider(
             }
         }
         Slider(
-            value = value.toFloat().coerceIn(range.start, range.endInclusive),
+            value = sliderValue,
             valueRange = range,
             steps = steps,
-            onValueChange = { onValueChange(it.roundToInt()) },
+            onValueChange = { sliderValue = it.coerceIn(range.start, range.endInclusive) },
+            onValueChangeFinished = {
+                val committedValue = sliderValue.roundToInt()
+                if (committedValue != value) onValueChange(committedValue)
+            },
         )
     }
 }

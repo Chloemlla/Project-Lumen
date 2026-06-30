@@ -203,11 +203,17 @@ internal fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
         modifier = Modifier
             .weight(1f)
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(12.dp),
     ) {
-            Text(stringResource(labelRes), style = MaterialTheme.typography.labelLarge)
+            Text(
+                stringResource(labelRes),
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             AnimatedContent(
                 targetState = value,
                 transitionSpec = {
@@ -216,7 +222,13 @@ internal fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
                 },
                 label = "metricValue",
             ) { metricValue ->
-                Text(metricValue, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    metricValue,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
 }
@@ -229,7 +241,13 @@ internal fun MetricRow(@StringRes labelRes: Int, value: String) {
 @Composable
 internal fun MetricRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
         AnimatedContent(
             targetState = value,
             transitionSpec = {
@@ -238,7 +256,13 @@ internal fun MetricRow(label: String, value: String) {
             },
             label = "metricRowValue",
         ) { metricValue ->
-            Text(metricValue, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                metricValue,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

@@ -8,6 +8,8 @@
     <string name="nav_settings">Settings</string>
     <string name="nav_templates">Templates</string>
     <string name="nav_about">About</string>
+    <string name="navigate_back">Back</string>
+    <string name="settings_subtitle">Tune the app by area. Advanced options stay folded until you need them.</string>
     <string name="status_ready">Ready</string>
     <string name="status_working">Working</string>
     <string name="status_pre_alert">Pre-alert</string>

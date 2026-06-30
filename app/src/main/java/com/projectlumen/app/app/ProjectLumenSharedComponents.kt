@@ -49,6 +49,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -83,6 +84,7 @@ import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MoreVert
@@ -121,6 +123,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -199,11 +202,24 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun LumenTopBar(title: String) {
+internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
     TopAppBar(
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        navigationIcon = {
+            if (onNavigateBack != null) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
+                }
+            }
+        },
         title = {
             Text(
                 text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 softWrap = false,
                 overflow = TextOverflow.Ellipsis,
@@ -220,11 +236,23 @@ internal fun PageIntro(icon: ImageVector, @StringRes titleRes: Int, message: Str
 @Composable
 internal fun PageIntroText(icon: ImageVector, title: String, message: String) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text(message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -258,7 +286,18 @@ internal fun SectionHeader(icon: ImageVector, @StringRes titleRes: Int) {
 }
 
 @Composable
-internal fun SettingsSection(@StringRes titleRes: Int, icon: ImageVector, content: @Composable ColumnScope.() -> Unit) {
+internal fun SettingsSection(
+    @StringRes titleRes: Int,
+    icon: ImageVector,
+    initiallyExpanded: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    var expanded by rememberSaveable(titleRes) { mutableStateOf(initiallyExpanded) }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(180),
+        label = "settingsSectionArrow",
+    )
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -268,8 +307,36 @@ internal fun SettingsSection(@StringRes titleRes: Int, icon: ImageVector, conten
         elevation = lumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeader(icon, titleRes)
-            content()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(LumenCardShape)
+                    .clickable { expanded = !expanded }
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text(
+                    stringResource(titleRes),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Icon(
+                    Icons.Outlined.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.graphicsLayer { rotationZ = arrowRotation },
+                )
+            }
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(tween(160)) + slideInVertically(tween(160)) { -it / 8 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 8 },
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+            }
         }
     }
 }
