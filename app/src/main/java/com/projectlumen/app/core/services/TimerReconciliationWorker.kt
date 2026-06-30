@@ -19,8 +19,10 @@ class TimerReconciliationWorker(
     override suspend fun doWork(): Result {
         val app = applicationContext as ProjectLumenApplication
         val settings = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences).get()
+            ?: return Result.success()
         val runtime = app.database.runtimeStateDao().get()
-        if (settings?.keepAliveEnabled == true && runtime?.activeEngine != ActiveEngine.IDLE.name) {
+            ?: return Result.success()
+        if (settings.keepAliveEnabled && runtime.activeEngine != ActiveEngine.IDLE.name) {
             app.startTimerService()
             if (settings.notificationEnabled && runtime.activeEngine == ActiveEngine.REMINDER.name) {
                 when (runtime.reminderPhase) {
