@@ -13,8 +13,11 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.params.OutputConfiguration
+import android.hardware.camera2.params.SessionConfiguration
 import android.media.Image
 import android.media.ImageReader
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Size
@@ -135,23 +138,21 @@ class ProximityCameraSampler(private val context: Context) {
                             override fun onOpened(camera: CameraDevice) {
                                 cameraDevice = camera
                                 runCatching {
-                                    camera.createCaptureSession(
-                                        listOf(reader.surface),
-                                        object : CameraCaptureSession.StateCallback() {
-                                            override fun onConfigured(session: CameraCaptureSession) {
-                                                captureSession = session
-                                                submitPreviewRequest(camera, session, handler, reader) { result ->
-                                                    complete(result)
-                                                }
-                                            }
-
-                                            override fun onConfigureFailed(session: CameraCaptureSession) {
-                                                session.close()
-                                                camera.close()
-                                                complete(Result.success(null))
+                                    createCaptureSessionCompat(
+                                        camera = camera,
+                                        reader = reader,
+                                        handler = handler,
+                                        onConfigured = { session ->
+                                            captureSession = session
+                                            submitPreviewRequest(camera, session, handler, reader) { result ->
+                                                complete(result)
                                             }
                                         },
-                                        handler,
+                                        onConfigureFailed = { session ->
+                                            session.close()
+                                            camera.close()
+                                            complete(Result.success(null))
+                                        },
                                     )
                                 }.onFailure {
                                     complete(Result.success(null))
@@ -178,6 +179,46 @@ class ProximityCameraSampler(private val context: Context) {
             reader.close()
             thread.quitSafely()
         }
+    }
+
+    private fun createCaptureSessionCompat(
+        camera: CameraDevice,
+        reader: ImageReader,
+        handler: Handler,
+        onConfigured: (CameraCaptureSession) -> Unit,
+        onConfigureFailed: (CameraCaptureSession) -> Unit,
+    ) {
+        val callback = object : CameraCaptureSession.StateCallback() {
+            override fun onConfigured(session: CameraCaptureSession) {
+                onConfigured(session)
+            }
+
+            override fun onConfigureFailed(session: CameraCaptureSession) {
+                onConfigureFailed(session)
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            camera.createCaptureSession(
+                SessionConfiguration(
+                    SessionConfiguration.SESSION_REGULAR,
+                    listOf(OutputConfiguration(reader.surface)),
+                    { command -> handler.post(command) },
+                    callback,
+                ),
+            )
+        } else {
+            createLegacyCaptureSession(camera, reader, handler, callback)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun createLegacyCaptureSession(
+        camera: CameraDevice,
+        reader: ImageReader,
+        handler: Handler,
+        callback: CameraCaptureSession.StateCallback,
+    ) {
+        camera.createCaptureSession(listOf(reader.surface), callback, handler)
     }
 
     private fun submitPreviewRequest(

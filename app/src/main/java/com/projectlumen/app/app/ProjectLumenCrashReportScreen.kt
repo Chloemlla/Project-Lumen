@@ -1,6 +1,7 @@
 package com.projectlumen.app.app
 
 import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
@@ -57,11 +58,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -85,7 +84,6 @@ internal fun CrashReportScreen(
     onContinue: (() -> Unit)? = null,
     clearStoredReportOnContinue: Boolean = true,
 ) {
-    val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     var stackExpanded by rememberSaveable(report.crashedAtMillis) { mutableStateOf(false) }
     var shareOptionsVisible by rememberSaveable(report.crashedAtMillis) { mutableStateOf(false) }
@@ -213,7 +211,13 @@ internal fun CrashReportScreen(
 
             CrashReportActionPanel(
                 onCopy = {
-                    clipboardManager.setText(AnnotatedString(report.toClipboardText()))
+                    context.getSystemService(ClipboardManager::class.java)
+                        ?.setPrimaryClip(
+                            ClipData.newPlainText(
+                                context.getString(R.string.crash_report_title),
+                                report.toClipboardText(),
+                            ),
+                        )
                     Toast.makeText(context, context.getString(R.string.crash_report_copied), Toast.LENGTH_SHORT).show()
                 },
                 onShare = {

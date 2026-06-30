@@ -2,7 +2,6 @@ package com.projectlumen.app.core.proximity
 
 import android.Manifest
 import android.app.Service
-import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -82,7 +81,7 @@ class ProximityDetectionService : Service() {
     }
 
     override fun onTrimMemory(level: Int) {
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
+        if (level >= TRIM_MEMORY_RUNNING_CRITICAL_LEVEL) {
             DeveloperDebugFrameStore.clear()
         }
         super.onTrimMemory(level)
@@ -378,6 +377,7 @@ class ProximityDetectionService : Service() {
         private const val EXTRA_CALIBRATE = "calibrate"
         private const val CLOSED_EYE_PROBABILITY = 0.35f
         private const val OPEN_EYE_PROBABILITY = 0.75f
+        private const val TRIM_MEMORY_RUNNING_CRITICAL_LEVEL = 15
 
         fun start(context: Context, calibrate: Boolean) {
             val intent = Intent(context, ProximityDetectionService::class.java)

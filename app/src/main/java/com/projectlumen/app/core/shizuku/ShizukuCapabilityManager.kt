@@ -114,7 +114,7 @@ class ShizukuCapabilityManager(
         var latestEventAt = 0L
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
-            if (event.eventType != UsageEvents.Event.MOVE_TO_FOREGROUND) continue
+            if (event.eventType != USAGE_EVENT_ACTIVITY_RESUMED) continue
             if (event.timeStamp < latestEventAt) continue
             packageName = event.packageName.orEmpty()
             activityName = event.className.orEmpty()
@@ -144,6 +144,7 @@ class ShizukuCapabilityManager(
     private companion object {
         private const val PERMISSION_REQUEST_CODE = 42017
         private const val FOREGROUND_QUERY_WINDOW_MILLIS = 10 * 60 * 1000L
+        private const val USAGE_EVENT_ACTIVITY_RESUMED = 1
         private const val CATEGORY_NORMAL = "normal"
         private const val CATEGORY_CAMERA = "camera"
         private const val CATEGORY_COMMUNICATION = "communication"
