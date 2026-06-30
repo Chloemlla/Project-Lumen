@@ -308,6 +308,7 @@ fun ProjectLumenApp(
     var downloadProgressTotalBytes by remember { mutableStateOf<Long?>(null) }
     var autoCheckStarted by rememberSaveable { mutableStateOf(false) }
     val checkingUpdate = updateDialogState is UpdateDialogState.Checking
+    var activeCrashReport by remember(crashReport) { mutableStateOf(crashReport) }
 
     fun triggerUpdateCheck(manual: Boolean) {
         coroutineScope.launch {
@@ -385,8 +386,11 @@ fun ProjectLumenApp(
 
     CompositionLocalProvider(LocalContext provides localizedContext) {
         ProjectLumenTheme(themeMode = themeMode) {
-            if (crashReport != null) {
-                CrashReportScreen(report = crashReport)
+            activeCrashReport?.let { report ->
+                CrashReportExperienceScreen(
+                    report = report,
+                    onContinue = { activeCrashReport = null },
+                )
                 return@ProjectLumenTheme
             }
             pendingWebUrl?.let { url ->

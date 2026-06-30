@@ -327,6 +327,22 @@
     <string name="template_clinic_calm_subtitle">偏健康提醒的清洁模板。</string>
     <string name="template_night_amber_subtitle">带琥珀强调色的深色休息风格。</string>
     <string name="template_reading_green_subtitle">适合阅读模式的柔和绿色模板。</string>
+    <string name="crash_report_title">已保存崩溃报告</string>
+    <string name="crash_report_message">Project Lumen 已从异常退出中恢复。继续使用前，可以先查看、复制或分享这份报告。</string>
+    <string name="crash_report_summary">摘要</string>
+    <string name="crash_report_time">时间</string>
+    <string name="crash_report_root_cause">根因</string>
+    <string name="crash_report_exception_type">异常类型</string>
+    <string name="crash_report_system_info">系统信息</string>
+    <string name="crash_report_stack_trace">堆栈信息</string>
+    <string name="crash_report_stack_hint">已记录 %1$d 行堆栈。为便于阅读，默认只显示摘要预览。</string>
+    <string name="crash_report_show_full_stack">展开全部</string>
+    <string name="crash_report_collapse_stack">收起</string>
+    <string name="crash_report_privacy_note">显示或分享报告前，本地路径和内容 URI 会先做脱敏处理。</string>
+    <string name="crash_report_copy">复制报告</string>
+    <string name="crash_report_copied">崩溃报告已复制。</string>
+    <string name="crash_report_cleared">崩溃报告已清除。</string>
+    <string name="crash_report_clear_and_continue">清除并继续</string>
     <string name="crash_report_share">分享报告</string>
     <string name="crash_report_share_subject">Project Lumen 崩溃报告</string>
 </resources>

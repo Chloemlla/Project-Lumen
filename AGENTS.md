@@ -1,5 +1,6 @@
 Repository Guidelines
 
+Do not write to a super file!!!! Do not write to a super file!!!! Do not write to a super file!!!!
 All actual build and test commands must be executed within the GitHub workflow; running them on your local machine is prohibited—local device performance is insufficient.
 
 Do not execute any installation commands; simply modify the code.
