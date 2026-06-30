@@ -377,7 +377,9 @@
     <string name="crash_report_share_cancel">取消</string>
     <string name="crash_report_share_failed">无法分享崩溃报告。</string>
     <string name="nav_developer">开发者高级调试选项</string>
-    <string name="developer_unlock_steps">还差 %1$d 步即可开启开发者模式</string>
+    <plurals name="developer_unlock_steps">
+        <item quantity="other">还差 %1$d 步即可开启开发者模式</item>
+    </plurals>
     <string name="developer_unlocked">您已进入开发者模式</string>
     <string name="developer_mode_enabled">开发者模式</string>
     <string name="developer_debug_running_title">开发者调试已开启</string>

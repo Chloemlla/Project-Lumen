@@ -130,9 +130,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -225,7 +225,7 @@ internal fun NumberSlider(
     valueLabel: String,
     onValueChange: (Int) -> Unit,
 ) {
-    var sliderValue by remember(value, range) { mutableStateOf(value.toFloat().coerceIn(range.start, range.endInclusive)) }
+    var sliderValue by remember(value, range) { mutableFloatStateOf(value.toFloat().coerceIn(range.start, range.endInclusive)) }
     val liveValue = sliderValue.roundToInt()
     val liveLabel = if (liveValue == value) valueLabel else liveValue.toString()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

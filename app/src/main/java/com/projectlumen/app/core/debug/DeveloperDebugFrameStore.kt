@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import androidx.core.graphics.scale
 import com.projectlumen.app.core.proximity.FaceDistanceSample
 import com.projectlumen.app.core.proximity.FaceTopologyPoint
 import java.util.concurrent.atomic.AtomicReference
@@ -48,7 +49,7 @@ object DeveloperDebugFrameStore {
         val scale = (maxWidth.toFloat() / bitmap.width.toFloat()).coerceAtMost(1f)
         val width = (bitmap.width * scale).roundToInt().coerceAtLeast(1)
         val height = (bitmap.height * scale).roundToInt().coerceAtLeast(1)
-        val output = Bitmap.createScaledBitmap(bitmap, width, height, true)
+        val output = bitmap.scale(width, height)
             .copy(Bitmap.Config.ARGB_8888, true)
         if (sample != null) drawTopology(output, sample, scale)
         return output

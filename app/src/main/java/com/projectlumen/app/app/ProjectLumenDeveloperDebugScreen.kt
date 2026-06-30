@@ -3,7 +3,6 @@ package com.projectlumen.app.app
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.foundation.Canvas
@@ -34,6 +33,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.projectlumen.app.R
 import com.projectlumen.app.core.crash.CrashReport
@@ -237,7 +237,7 @@ private fun isIgnoringBatteryOptimizations(context: Context): Boolean {
 
 @SuppressLint("BatteryLife")
 private fun openBatteryOptimizationSettings(context: Context) {
-    val packageUri = Uri.parse("package:${context.packageName}")
+    val packageUri = "package:${context.packageName}".toUri()
     val requestIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, packageUri)
     runCatching { context.startActivity(requestIntent) }
         .onFailure {

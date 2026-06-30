@@ -378,7 +378,10 @@
     <string name="crash_report_share_cancel">Cancel</string>
     <string name="crash_report_share_failed">Unable to share the crash report.</string>
     <string name="nav_developer">Developer advanced debug options</string>
-    <string name="developer_unlock_steps">You are %1$d steps away from developer mode.</string>
+    <plurals name="developer_unlock_steps">
+        <item quantity="one">You are %1$d step away from developer mode.</item>
+        <item quantity="other">You are %1$d steps away from developer mode.</item>
+    </plurals>
     <string name="developer_unlocked">You have entered developer mode.</string>
     <string name="developer_mode_enabled">Developer mode</string>
     <string name="developer_debug_running_title">Developer debug is active</string>

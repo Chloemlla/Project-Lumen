@@ -211,9 +211,14 @@ internal fun AboutScreen(viewModel: ProjectLumenViewModel) {
                 versionTapCount += 1
                 when {
                     versionTapCount in 3..6 -> {
+                        val remainingSteps = 7 - versionTapCount
                         Toast.makeText(
                             context,
-                            context.getString(R.string.developer_unlock_steps, 7 - versionTapCount),
+                            context.resources.getQuantityString(
+                                R.plurals.developer_unlock_steps,
+                                remainingSteps,
+                                remainingSteps,
+                            ),
                             Toast.LENGTH_SHORT,
                         ).show()
                     }
