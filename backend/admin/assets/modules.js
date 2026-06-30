@@ -94,6 +94,7 @@ window.LumenAdminModules = (() => {
   }
 
   function renderBackups() {
+    if (!data.backups.length) return `<div class="empty-state">No cloud backups have been uploaded yet.</div>`;
     const latest = data.backups[0];
     return `
       <div class="split-panel">
@@ -129,26 +130,29 @@ window.LumenAdminModules = (() => {
   }
 
   function renderApiHealth() {
+    const rows = (data.apiMetrics || []).map((metric) => [
+      metric.endpoint,
+      `${metric.qps || 0}`,
+      `${metric.p95Ms || 0} ms`,
+      `${metric.status2xx || 0}/${metric.status4xx || 0}/${metric.status5xx || 0}`,
+    ]);
     return `
       <canvas class="mini-chart" data-chart="api" width="540" height="180"></canvas>
-      ${kvTable([
-        ["p50 latency", "64 ms"],
-        ["p95 latency", "189 ms"],
-        ["QPS", "42"],
-        ["Status mix", "99.2% 2xx / 0.7% 4xx / 0.1% 5xx"],
-      ])}
+      ${rows.length ? table(["Endpoint", "QPS", "p95", "2xx/4xx/5xx"], rows) : `<div class="empty-state">No API metric samples have been recorded.</div>`}
     `;
   }
 
   function renderSyncThroughput() {
+    const rows = (data.syncMetrics || []).map((metric) => [
+      metric.endpoint,
+      `${metric.averagePayloadKb || 0} KB`,
+      `${metric.largestPayloadKb || 0} KB`,
+      `${metric.p95Ms || 0} ms`,
+      metric.rejectedPayloads || 0,
+    ]);
     return `
       <canvas class="mini-chart" data-chart="sync" width="540" height="180"></canvas>
-      ${kvTable([
-        ["Average payload", "84 KB"],
-        ["Largest payload", "2.1 MB"],
-        ["Merge duration p95", "231 ms"],
-        ["Rejected payloads", "3"],
-      ])}
+      ${rows.length ? table(["Endpoint", "Average", "Largest", "p95", "Rejected"], rows) : `<div class="empty-state">No sync throughput samples have been recorded.</div>`}
     `;
   }
 

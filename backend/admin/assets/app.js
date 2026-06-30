@@ -6,27 +6,33 @@ const data = window.LumenAdminData;
 const sections = window.LumenAdminSections;
 const modules = window.LumenAdminModules;
 const state = {
-  section: "users",
-  query: "",
-  environment: "production",
-  range: "30",
-  token: localStorage.getItem("projectLumenAdminToken") || "",
-  tokenExpiresAt: Number(localStorage.getItem("projectLumenAdminTokenExpiresAt") || 0),
+    section: "users",
+    query: "",
+    environment: "production",
+    range: "30",
+    username: localStorage.getItem("projectLumenAdminUsername") || "admin",
+    token: localStorage.getItem("projectLumenAdminToken") || "",
+    refreshToken: localStorage.getItem("projectLumenAdminRefreshToken") || "",
+    tokenExpiresAt: Number(localStorage.getItem("projectLumenAdminTokenExpiresAt") || 0),
 };
 
 document.addEventListener("DOMContentLoaded", () => {
   bindControls();
   updateStaticLabels();
-  renderNav();
-  render();
-  refreshHealth();
-  setInterval(updateTransportStatus, 30_000);
+    renderNav();
+    render();
+    refreshHealth();
+    if (state.token) fetchDashboard();
+    setInterval(updateTransportStatus, 30_000);
 });
 
 function bindControls() {
-  byId("adminTokenInput").value = state.token;
-  byId("saveTokenButton").addEventListener("click", saveToken);
-  byId("refreshButton").addEventListener("click", refreshAll);
+    byId("adminUsernameInput").value = state.username;
+    byId("adminTokenInput").value = state.token;
+    byId("loginButton").addEventListener("click", loginAdmin);
+    byId("saveTokenButton").addEventListener("click", saveToken);
+    byId("refreshSessionButton").addEventListener("click", refreshAdminSession);
+    byId("refreshButton").addEventListener("click", refreshAll);
   byId("moduleSearch").addEventListener("input", (event) => {
     state.query = event.target.value.trim().toLowerCase();
     render();
@@ -39,7 +45,7 @@ function bindControls() {
     state.range = event.target.value;
     render();
   });
-  byId("copySecurityNoteButton").addEventListener("click", () => copyText("Admin operations require HTTPS outside localhost."));
+    byId("copySecurityNoteButton").addEventListener("click", () => copyText("Admin operations require HTTPS outside localhost."));
 }
 
 function updateStaticLabels() {
@@ -124,25 +130,48 @@ function attachModuleActions(scope) {
 }
 
 function handleAction(action) {
-  if (SENSITIVE_ACTIONS.has(action) && !isSecureAdminOrigin()) {
-    toast("Sensitive admin action blocked until HTTPS is enabled.");
-    return;
-  }
-  const payload = actionPayload(action);
-  if (action === "probe-health") {
-    refreshHealth();
-  } else if (action === "refresh-token") {
-    saveToken();
-  } else {
-    copyText(payload || `${action} queued in ${state.environment}.`);
-  }
+    if (SENSITIVE_ACTIONS.has(action) && !isSecureAdminOrigin()) {
+        toast("Sensitive admin action blocked until HTTPS is enabled.");
+        return;
+    }
+    const payload = actionPayload(action);
+    if (action === "probe-health") {
+        refreshHealth();
+    } else if (action === "refresh-token") {
+        refreshAdminSession();
+    } else if (SENSITIVE_ACTIONS.has(action)) {
+        recordAdminAction(action, payload || {});
+    } else {
+        copyText(payload || `${action} queued in ${state.environment}.`);
+    }
 }
 
 function actionPayload(action) {
+  const firstUserId = data.profile?.id || "";
+  const firstReleaseCode = Number(data.releases?.[0]?.version || 0);
   const payloads = {
+    "change-plan": { userId: firstUserId, tier: "PRO", productId: "manual_admin_pro", expiresAt: 0 },
+    "revoke-pro": { userId: firstUserId },
+    "push-template": {
+      id: `admin-template-${Date.now()}`,
+      name: "Admin dispatched template",
+      tier: "PRO",
+      countdownStyle: "circle",
+      color: "#2563EB",
+      locales: ["en", "zh"],
+      layoutJson: { countdownStyle: "circle", showSkipButton: true },
+    },
+    "force-update": {
+      versionCode: firstReleaseCode,
+      versionName: data.releases?.[0]?.name || "admin-policy",
+      sha256: data.releases?.[0]?.sha || "pending",
+      rollout: "blocked",
+      forceUpdate: true,
+    },
+    "save-allowlist": { origin: "admin.eye.chloemlla.com", protocol: "https", risk: "required" },
     "copy-stack": data.stack.join("\n"),
     "copy-audit": JSON.stringify(data.accessAudit, null, 2),
-    "copy-backup": JSON.stringify(data.backups[0].summary, null, 2),
+    "copy-backup": JSON.stringify(data.backups?.[0]?.summary || {}, null, 2),
     "copy-template-json": JSON.stringify(data.templates, null, 2),
     "copy-audio": "preAlert=70; restStart=75; restEnd=65; pomodoroStart=60; pomodoroEnd=80; vibration=short",
     "copy-telemetry": JSON.stringify(data.telemetry, null, 2),
@@ -173,18 +202,233 @@ async function refreshHealth() {
 }
 
 function refreshAll() {
-  refreshHealth();
-  render();
-  toast("Dashboard refreshed.");
+    refreshHealth();
+    fetchDashboard();
 }
 
 function saveToken() {
-  state.token = byId("adminTokenInput").value.trim();
-  state.tokenExpiresAt = state.token ? Date.now() + 50 * 60 * 1000 : 0;
-  localStorage.setItem("projectLumenAdminToken", state.token);
-  localStorage.setItem("projectLumenAdminTokenExpiresAt", String(state.tokenExpiresAt));
-  render();
-  toast(state.token ? "Admin token saved." : "Admin token cleared.");
+    state.token = byId("adminTokenInput").value.trim();
+    state.tokenExpiresAt = state.token ? Date.now() + 50 * 60 * 1000 : 0;
+    localStorage.setItem("projectLumenAdminToken", state.token);
+    localStorage.setItem("projectLumenAdminTokenExpiresAt", String(state.tokenExpiresAt));
+    render();
+    toast(state.token ? "Admin token saved." : "Admin token cleared.");
+}
+
+async function loginAdmin() {
+    const username = byId("adminUsernameInput").value.trim();
+    const password = byId("adminPasswordInput").value;
+    if (!username || !password) {
+        toast("Username and password are required.");
+        return;
+    }
+    try {
+        const session = await apiJson("admin/auth/login", {
+            method: "POST",
+            body: JSON.stringify({ username, password }),
+            skipRefresh: true,
+        });
+        applySession(session);
+        byId("adminPasswordInput").value = "";
+        toast("Admin session established.");
+        await fetchDashboard();
+    } catch (error) {
+        toast(`Login failed: ${error.message}`);
+    }
+}
+
+async function refreshAdminSession() {
+    if (!state.refreshToken) {
+        toast("No refresh token is available.");
+        return false;
+    }
+    try {
+        const session = await apiJson("admin/auth/refresh", {
+            method: "POST",
+            body: JSON.stringify({ refreshToken: state.refreshToken }),
+            skipRefresh: true,
+        });
+        applySession(session);
+        toast("Admin token refreshed.");
+        return true;
+    } catch (error) {
+        clearSession();
+        toast(`Refresh failed: ${error.message}`);
+        return false;
+    }
+}
+
+async function fetchDashboard() {
+    if (!state.token) {
+        render();
+        toast("Login or paste an admin token to load live data.");
+        return;
+    }
+    try {
+        const snapshot = await apiJson("admin/dashboard");
+        Object.assign(data, mapDashboard(snapshot));
+        updateStaticLabels();
+        render();
+        toast("Dashboard refreshed from MongoDB.");
+    } catch (error) {
+        render();
+        toast(`Dashboard refresh failed: ${error.message}`);
+    }
+}
+
+async function recordAdminAction(action, payload) {
+    try {
+        const response = await apiJson("admin/actions", {
+            method: "POST",
+            body: JSON.stringify({ action, payload }),
+        });
+        toast(response.accepted ? `${action} recorded.` : `${action} rejected.`);
+    } catch (error) {
+        toast(`Action failed: ${error.message}`);
+    }
+}
+
+async function apiJson(path, options = {}) {
+    const response = await fetch(`${API_BASE}/${path}`, {
+        method: options.method || "GET",
+        headers: {
+            Accept: "application/json",
+            ...(options.body ? { "Content-Type": "application/json" } : {}),
+            ...authHeaders(),
+        },
+        body: options.body,
+    });
+    if (response.status === 401 && !options.skipRefresh && await refreshAdminSession()) {
+        return apiJson(path, { ...options, skipRefresh: true });
+    }
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : {};
+    if (!response.ok) {
+        throw new Error(payload?.error?.message || `HTTP ${response.status}`);
+    }
+    return payload;
+}
+
+function applySession(session) {
+    state.username = session.operator?.username || state.username;
+    state.token = session.accessToken;
+    state.refreshToken = session.refreshToken;
+    state.tokenExpiresAt = session.expiresAt || 0;
+    byId("adminUsernameInput").value = state.username;
+    byId("adminTokenInput").value = state.token;
+    localStorage.setItem("projectLumenAdminUsername", state.username);
+    localStorage.setItem("projectLumenAdminToken", state.token);
+    localStorage.setItem("projectLumenAdminRefreshToken", state.refreshToken);
+    localStorage.setItem("projectLumenAdminTokenExpiresAt", String(state.tokenExpiresAt));
+}
+
+function clearSession() {
+    state.token = "";
+    state.refreshToken = "";
+    state.tokenExpiresAt = 0;
+    byId("adminTokenInput").value = "";
+    localStorage.removeItem("projectLumenAdminToken");
+    localStorage.removeItem("projectLumenAdminRefreshToken");
+    localStorage.removeItem("projectLumenAdminTokenExpiresAt");
+}
+
+function mapDashboard(snapshot) {
+    const profiles = snapshot.users?.profiles || [];
+    const profile = profiles[0] || data.profile;
+    const apiMetrics = snapshot.observability?.apiMetrics || [];
+    const syncMetrics = snapshot.observability?.syncMetrics || [];
+    const crashGroups = snapshot.observability?.crashGroups || [];
+    return {
+        profile: {
+            id: profile.id || "",
+            email: profile.email || "No users yet",
+            registeredAt: formatTime(profile.registeredAt),
+            lastSyncAt: formatTime(profile.lastSyncAt),
+            planTier: profile.planTier || "FREE",
+            featureFlags: profile.featureFlags || [],
+            localSecurity: "MongoDB-backed admin snapshot",
+        },
+        devices: (snapshot.users?.devices || []).map((device) => ({
+            id: device.deviceInstallationId || "unknown",
+            model: device.model || "Android device",
+            versionCode: device.versionCode || 0,
+            lastSeen: formatTime(device.lastSeenAt),
+            config: device.localSecurityConfig || "not reported",
+        })),
+        accessAudit: (snapshot.users?.accessAudit || []).map((entry) => ({
+            time: formatTime(entry.at),
+            endpoint: entry.endpoint,
+            ip: entry.ip,
+            geo: entry.geo,
+            status: entry.status,
+        })),
+        purchaseAudit: (snapshot.users?.purchaseAudit || []).map((entry) => ({
+            time: formatTime(entry.at),
+            product: entry.productId,
+            status: entry.status,
+            token: entry.purchaseToken,
+            action: entry.action,
+        })),
+        backups: (snapshot.users?.backups || []).map((backup) => ({
+            id: backup.id,
+            uploadedAt: formatTime(backup.uploadedAt),
+            summary: {
+                templates: backup.summary?.templates || 0,
+                eyeStatDays: backup.summary?.eyeStatDays || 0,
+                pomodoroDays: backup.summary?.pomodoroDays || 0,
+                reminderPlans: backup.summary?.reminderPlans || 0,
+                entitlements: backup.summary?.entitlements || 0,
+            },
+        })),
+        crashes: crashGroups.map((crash) => ({
+            group: crash.groupKey,
+            version: String(crash.versionCode),
+            count: crash.count,
+            affected: crash.affectedUsers,
+            risk: crash.risk || "watch",
+        })),
+        stack: snapshot.observability?.cleanStack || [],
+        apiMetrics,
+        syncMetrics,
+        apiSeries: apiMetrics.map((metric) => metric.p95Ms || 0),
+        syncSeries: syncMetrics.map((metric) => metric.averagePayloadKb || 0),
+        templates: (snapshot.content?.templates || []).map((template) => ({
+            name: template.name,
+            tier: template.tier,
+            style: template.countdownStyle,
+            color: template.color,
+            locale: (template.locales || []).join(", "),
+            layoutJson: template.layoutJson,
+        })),
+        telemetry: (snapshot.content?.telemetry || []).map((item) => ({
+            label: item.label,
+            value: item.value,
+            rangeDays: item.rangeDays,
+        })),
+        releases: (snapshot.release?.releases || []).map((release) => ({
+            version: String(release.versionCode),
+            name: release.versionName,
+            sha: release.sha256,
+            rollout: release.rollout,
+            force: release.forceUpdate,
+        })),
+        routes: (snapshot.release?.routes || []).map((route) => ({
+            module: route.module,
+            path: route.path,
+            status: route.state,
+            p95: `${route.p95Ms || 0} ms`,
+        })),
+        allowlist: (snapshot.release?.allowlist || []).map((entry) => ({
+            origin: entry.origin,
+            protocol: entry.protocol,
+            risk: entry.risk,
+        })),
+    };
+}
+
+function formatTime(value) {
+    if (!value) return "not recorded";
+    return new Date(value).toLocaleString();
 }
 
 function drawPendingCharts() {

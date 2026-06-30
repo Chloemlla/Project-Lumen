@@ -335,7 +335,9 @@
     <string name="crash_report_exception_type">异常类型</string>
     <string name="crash_report_system_info">系统信息</string>
     <string name="crash_report_stack_trace">堆栈信息</string>
-    <string name="crash_report_stack_hint">已记录 %1$d 行堆栈。为便于阅读，默认只显示摘要预览。</string>
+    <plurals name="crash_report_stack_hint">
+        <item quantity="other">已记录 %1$d 行堆栈。为便于阅读，默认只显示摘要预览。</item>
+    </plurals>
     <string name="crash_report_show_full_stack">展开全部</string>
     <string name="crash_report_collapse_stack">收起</string>
     <string name="crash_report_privacy_note">显示或分享报告前，本地路径和内容 URI 会先做脱敏处理。</string>

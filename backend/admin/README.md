@@ -17,4 +17,12 @@ The UI is structured around four operation areas:
 - Core content and telemetry
 - Release and security ops
 
-The dashboard can probe `/api/health` directly. Other admin actions are wired as UI-ready controls and copy/export flows so dedicated admin API endpoints can be connected without replacing the frontend shell.
+The dashboard can probe `/api/health` directly and loads live data from `/api/admin/dashboard` after admin login.
+
+Admin session flow:
+
+- `POST /api/admin/auth/login`
+- `POST /api/admin/auth/refresh`
+- Bearer token for `/api/admin/dashboard` and `/api/admin/actions`
+
+Sensitive actions are recorded through `/api/admin/actions`; supported actions also update MongoDB management collections for manual plan grants, Pro revocation, template dispatch, forced update policy, and security allowlist changes.

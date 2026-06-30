@@ -78,6 +78,133 @@ pub(crate) struct CounterRecord {
     pub value: i64,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminSessionRecord {
+    #[serde(rename = "_id")]
+    pub access_token: String,
+    pub refresh_token: String,
+    pub username: String,
+    pub role: String,
+    pub expires_at: i64,
+    pub refresh_expires_at: i64,
+    pub created_at: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminActionAuditRecord {
+    #[serde(rename = "_id")]
+    pub id: String,
+    pub operator: String,
+    pub action: String,
+    pub payload: Value,
+    pub recorded_at: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminAccessAuditRecord {
+    #[serde(rename = "_id")]
+    pub id: String,
+    pub at: i64,
+    pub user_id: String,
+    pub endpoint: String,
+    pub ip: String,
+    pub geo: String,
+    pub status: u16,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminCrashReportRecord {
+    #[serde(rename = "_id")]
+    pub id: String,
+    pub group_key: String,
+    pub version_code: i64,
+    pub count: i64,
+    pub affected_users: i64,
+    pub risk: String,
+    pub clean_stack: Vec<String>,
+    pub last_seen_at: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminApiMetricRecord {
+    #[serde(rename = "_id")]
+    pub id: String,
+    pub endpoint: String,
+    pub qps: f64,
+    pub p95_ms: i64,
+    pub status_2xx: i64,
+    pub status_4xx: i64,
+    pub status_5xx: i64,
+    pub sampled_at: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminSyncMetricRecord {
+    #[serde(rename = "_id")]
+    pub id: String,
+    pub endpoint: String,
+    pub average_payload_kb: i64,
+    pub largest_payload_kb: i64,
+    pub p95_ms: i64,
+    pub rejected_payloads: i64,
+    pub sampled_at: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminTemplateRecord {
+    #[serde(rename = "_id")]
+    pub id: String,
+    pub name: String,
+    pub tier: String,
+    pub countdown_style: String,
+    pub color: String,
+    pub locales: Vec<String>,
+    pub layout_json: Value,
+    pub updated_at: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminTelemetryRecord {
+    #[serde(rename = "_id")]
+    pub id: String,
+    pub label: String,
+    pub value: f64,
+    pub range_days: i64,
+    pub sampled_at: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminReleaseRecord {
+    #[serde(rename = "_id")]
+    pub id: String,
+    pub version_code: i64,
+    pub version_name: String,
+    pub sha256: String,
+    pub rollout: String,
+    pub force_update: bool,
+    pub created_at: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminSecurityAllowlistRecord {
+    #[serde(rename = "_id")]
+    pub id: String,
+    pub origin: String,
+    pub protocol: String,
+    pub risk: String,
+    pub updated_at: i64,
+}
+
 impl UserRecord {
     pub fn to_dto(&self) -> UserDto {
         UserDto {

@@ -1,3 +1,8 @@
+mod admin_actions;
+mod admin_auth;
+mod admin_audit;
+mod admin_dashboard;
+mod admin_dashboard_ops;
 mod auth;
 mod backups;
 mod documents;
@@ -7,13 +12,17 @@ mod time;
 
 use crate::{config::Config, error::ApiError};
 use documents::{
-    BackupRecord, CounterRecord, EntitlementRecord, PendingLogin, SessionRecord, StoredSyncChange,
+    AdminAccessAuditRecord, AdminActionAuditRecord, AdminApiMetricRecord, AdminCrashReportRecord,
+    AdminReleaseRecord, AdminSecurityAllowlistRecord, AdminSessionRecord, AdminSyncMetricRecord,
+    AdminTelemetryRecord, AdminTemplateRecord, BackupRecord, CounterRecord, EntitlementRecord,
+    PendingLogin, SessionRecord, StoredSyncChange,
 };
 use mongodb::{
     bson::doc,
-    options::{ClientOptions, IndexOptions},
+    options::{ClientOptions, IndexOptions, UpdateOptions},
     Client, Collection, IndexModel,
 };
+use serde_json::json;
 
 pub use documents::UserRecord;
 
@@ -25,6 +34,16 @@ pub struct AppStore {
     pub(crate) sync_changes: Collection<StoredSyncChange>,
     pub(crate) backups: Collection<BackupRecord>,
     pub(crate) counters: Collection<CounterRecord>,
+    pub(crate) admin_sessions: Collection<AdminSessionRecord>,
+    pub(crate) admin_actions: Collection<AdminActionAuditRecord>,
+    pub(crate) admin_access_audit: Collection<AdminAccessAuditRecord>,
+    pub(crate) admin_crash_reports: Collection<AdminCrashReportRecord>,
+    pub(crate) admin_api_metrics: Collection<AdminApiMetricRecord>,
+    pub(crate) admin_sync_metrics: Collection<AdminSyncMetricRecord>,
+    pub(crate) admin_templates: Collection<AdminTemplateRecord>,
+    pub(crate) admin_telemetry: Collection<AdminTelemetryRecord>,
+    pub(crate) admin_releases: Collection<AdminReleaseRecord>,
+    pub(crate) admin_security_allowlist: Collection<AdminSecurityAllowlistRecord>,
 }
 
 impl AppStore {
@@ -42,8 +61,19 @@ impl AppStore {
             sync_changes: database.collection("sync_changes"),
             backups: database.collection("backups"),
             counters: database.collection("counters"),
+            admin_sessions: database.collection("admin_sessions"),
+            admin_actions: database.collection("admin_actions"),
+            admin_access_audit: database.collection("admin_access_audit"),
+            admin_crash_reports: database.collection("admin_crash_reports"),
+            admin_api_metrics: database.collection("admin_api_metrics"),
+            admin_sync_metrics: database.collection("admin_sync_metrics"),
+            admin_templates: database.collection("admin_templates"),
+            admin_telemetry: database.collection("admin_telemetry"),
+            admin_releases: database.collection("admin_releases"),
+            admin_security_allowlist: database.collection("admin_security_allowlist"),
         };
         store.ensure_indexes().await?;
+        store.ensure_admin_defaults().await?;
         Ok(store)
     }
 
@@ -81,6 +111,100 @@ impl AppStore {
                     doc! { "userId": 1, "uploadedAt": -1 },
                 ),
                 None,
+            )
+            .await
+            .map_err(database_error)?;
+        self.admin_sessions
+            .create_index(index("admin_session_expiry", doc! { "expiresAt": 1 }), None)
+            .await
+            .map_err(database_error)?;
+        self.admin_sessions
+            .create_index(
+                unique_index("admin_refresh_unique", doc! { "refreshToken": 1 }),
+                None,
+            )
+            .await
+            .map_err(database_error)?;
+        self.admin_actions
+            .create_index(index("admin_action_recorded", doc! { "recordedAt": -1 }), None)
+            .await
+            .map_err(database_error)?;
+        self.admin_access_audit
+            .create_index(index("admin_access_at", doc! { "at": -1 }), None)
+            .await
+            .map_err(database_error)?;
+        self.admin_crash_reports
+            .create_index(index("admin_crash_last_seen", doc! { "lastSeenAt": -1 }), None)
+            .await
+            .map_err(database_error)?;
+        self.admin_releases
+            .create_index(
+                unique_index("admin_release_version", doc! { "versionCode": 1 }),
+                None,
+            )
+            .await
+            .map_err(database_error)?;
+        self.admin_security_allowlist
+            .create_index(
+                unique_index("admin_allowlist_origin", doc! { "origin": 1, "protocol": 1 }),
+                None,
+            )
+            .await
+            .map_err(database_error)?;
+        Ok(())
+    }
+
+    async fn ensure_admin_defaults(&self) -> Result<(), ApiError> {
+        self.admin_templates
+            .update_one(
+                doc! { "_id": "clear-sky" },
+                doc! {
+                    "$setOnInsert": mongodb::bson::to_document(&AdminTemplateRecord {
+                        id: "clear-sky".to_owned(),
+                        name: "Clear sky".to_owned(),
+                        tier: "PRO".to_owned(),
+                        countdown_style: "circle".to_owned(),
+                        color: "#2563EB".to_owned(),
+                        locales: vec!["en".to_owned(), "zh".to_owned()],
+                        layout_json: json!({ "countdownStyle": "circle", "showSkipButton": true }),
+                        updated_at: 0,
+                    }).map_err(|_| ApiError::Internal)?,
+                },
+                UpdateOptions::builder().upsert(true).build(),
+            )
+            .await
+            .map_err(database_error)?;
+        self.admin_security_allowlist
+            .update_one(
+                doc! { "_id": "eye-http" },
+                doc! {
+                    "$setOnInsert": mongodb::bson::to_document(&AdminSecurityAllowlistRecord {
+                        id: "eye-http".to_owned(),
+                        origin: "eye.chloemlla.com".to_owned(),
+                        protocol: "http".to_owned(),
+                        risk: "temporary".to_owned(),
+                        updated_at: 0,
+                    }).map_err(|_| ApiError::Internal)?,
+                },
+                UpdateOptions::builder().upsert(true).build(),
+            )
+            .await
+            .map_err(database_error)?;
+        self.admin_releases
+            .update_one(
+                doc! { "_id": "bootstrap-release" },
+                doc! {
+                    "$setOnInsert": mongodb::bson::to_document(&AdminReleaseRecord {
+                        id: "bootstrap-release".to_owned(),
+                        version_code: 0,
+                        version_name: "unregistered".to_owned(),
+                        sha256: "pending".to_owned(),
+                        rollout: "blocked".to_owned(),
+                        force_update: false,
+                        created_at: 0,
+                    }).map_err(|_| ApiError::Internal)?,
+                },
+                UpdateOptions::builder().upsert(true).build(),
             )
             .await
             .map_err(database_error)?;

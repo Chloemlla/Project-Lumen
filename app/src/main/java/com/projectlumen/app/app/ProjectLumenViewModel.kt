@@ -6,798 +6,149 @@ import androidx.lifecycle.viewModelScope
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
-import com.projectlumen.app.core.database.entities.EntitlementEntity
-import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
-import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.AppThemeMode
-import com.projectlumen.app.core.enums.PlanTier
-import com.projectlumen.app.core.enums.PremiumFeature
-import com.projectlumen.app.core.enums.ReminderPhase
-import com.projectlumen.app.core.enums.TemplateBackgroundType
-import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
-import com.projectlumen.app.core.repositories.DailyGoalsRepository
-import com.projectlumen.app.core.repositories.EntitlementRepository
-import com.projectlumen.app.core.repositories.ReminderPlansRepository
-import com.projectlumen.app.core.repositories.RuntimeRepository
-import com.projectlumen.app.core.repositories.SettingsRepository
-import com.projectlumen.app.core.repositories.StatisticsRepository
-import com.projectlumen.app.core.repositories.TipTemplateRepository
-import com.projectlumen.app.core.runtime.AudioEvent
-import com.projectlumen.app.core.runtime.PomodoroEngine
-import com.projectlumen.app.core.runtime.ReminderEngine
-import com.projectlumen.app.core.runtime.RuntimeTransition
 import com.projectlumen.app.core.services.AudioService
-import com.projectlumen.app.core.services.BackupImportSummary
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
-import com.projectlumen.app.core.time.QuietHours
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
 
 class ProjectLumenViewModel(
-    private val database: AppDatabase,
-    private val notifications: NotificationService,
-    private val audio: AudioService,
-    private val export: ExportService,
-    private val backup: DataBackupService,
-    private val eyeCarePreferences: EyeCarePreferencesDataStore,
-    private val startTimerService: () -> Unit,
-    private val stopTimerService: () -> Unit,
-    private val scheduleProximityMonitoring: () -> Unit,
-    private val cancelProximityMonitoring: () -> Unit,
-    private val calibrateProximityMonitoring: () -> Unit,
-    private val startLightMonitoring: () -> Unit,
-    private val stopLightMonitoring: () -> Unit,
+    database: AppDatabase,
+    notifications: NotificationService,
+    audio: AudioService,
+    export: ExportService,
+    backup: DataBackupService,
+    eyeCarePreferences: EyeCarePreferencesDataStore,
+    startTimerService: () -> Unit,
+    stopTimerService: () -> Unit,
+    scheduleProximityMonitoring: () -> Unit,
+    cancelProximityMonitoring: () -> Unit,
+    calibrateProximityMonitoring: () -> Unit,
+    startLightMonitoring: () -> Unit,
+    stopLightMonitoring: () -> Unit,
 ) : ViewModel() {
-    private val settingsRepository = SettingsRepository(database.appSettingsDao(), eyeCarePreferences)
-    private val runtimeRepository = RuntimeRepository(database.runtimeStateDao())
-    private val statisticsRepository = StatisticsRepository(
-        database.dailyEyeStatsDao(),
-        database.dailyPomodoroStatsDao(),
-    )
-    private val tipTemplateRepository = TipTemplateRepository(database.tipTemplatesDao())
-    private val dailyGoalsRepository = DailyGoalsRepository(database.dailyGoalsDao())
-    private val entitlementRepository = EntitlementRepository(database.entitlementsDao())
-    private val reminderPlansRepository = ReminderPlansRepository(database.reminderPlansDao())
-    private val reminderEngine = ReminderEngine()
-    private val pomodoroEngine = PomodoroEngine()
+    private val repositories = ProjectLumenRepositories(database, eyeCarePreferences)
     private val now = MutableStateFlow(System.currentTimeMillis())
-    private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    val webPageRequests = _webPageRequests.asSharedFlow()
-    private val _backupImportPreview = MutableStateFlow<BackupImportSummary?>(null)
-    val backupImportPreview = _backupImportPreview
-
-    private val baseDataState = combine(
-        settingsRepository.observe(),
-        runtimeRepository.observe(),
-        statisticsRepository.observeEyeStats(),
-        statisticsRepository.observePomodoroStats(),
-        tipTemplateRepository.observeAll(),
-    ) { settings, runtime, eyeStats, pomodoroStats, templates ->
-        ProjectLumenUiState(
-            settings = settings ?: AppSettingsEntity(),
-            runtime = runtime ?: RuntimeStateEntity(),
-            eyeStats = eyeStats,
-            pomodoroStats = pomodoroStats,
-            templates = templates,
-            isReady = settings != null && runtime != null,
-        )
-    }
-
-    private val dataState = combine(
-        baseDataState,
-        dailyGoalsRepository.observe(),
-        entitlementRepository.observeAll(),
-        reminderPlansRepository.observeActive(),
-    ) { state, dailyGoal, entitlements, reminderPlans ->
-        state.copy(
-            dailyGoal = dailyGoal ?: DailyGoalEntity(),
-            entitlements = entitlements,
-            reminderPlans = reminderPlans,
-            isReady = state.isReady && dailyGoal != null,
-        )
-    }
-
-    val uiState = combine(dataState, now) { state, nowMillis ->
-        state.copy(nowMillis = nowMillis)
-    }.stateIn(
+    private val stateStore = ProjectLumenStateStore(repositories, viewModelScope, now)
+    private val runtimeEntry = ProjectLumenRuntimeFeatureEntry(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = ProjectLumenUiState(),
+        settingsRepository = repositories.settings,
+        runtimeRepository = repositories.runtime,
+        statisticsRepository = repositories.statistics,
+        notifications = notifications,
+        audio = audio,
+        startTimerService = startTimerService,
+        stopTimerService = stopTimerService,
     )
+    private val settingsEntry = ProjectLumenSettingsFeatureEntry(
+        scope = viewModelScope,
+        settingsRepository = repositories.settings,
+        runtimeRepository = repositories.runtime,
+        dailyGoalsRepository = repositories.dailyGoals,
+        runtimeEntry = runtimeEntry,
+        notifications = notifications,
+        stopTimerService = stopTimerService,
+        scheduleProximityMonitoring = scheduleProximityMonitoring,
+        cancelProximityMonitoring = cancelProximityMonitoring,
+        calibrateProximityMonitoring = calibrateProximityMonitoring,
+        startLightMonitoring = startLightMonitoring,
+        stopLightMonitoring = stopLightMonitoring,
+    )
+    private val templatesEntry = ProjectLumenTemplatesFeatureEntry(
+        scope = viewModelScope,
+        settingsRepository = repositories.settings,
+        tipTemplateRepository = repositories.tipTemplates,
+    )
+    private val sharingEntry = ProjectLumenSharingFeatureEntry(
+        export = export,
+        stateProvider = { stateStore.uiState.value },
+    )
+    private val backupEntry = ProjectLumenBackupFeatureEntry(
+        scope = viewModelScope,
+        backup = backup,
+        settingsRepository = repositories.settings,
+        runtimeEntry = runtimeEntry,
+    )
+    private val entitlementEntry = ProjectLumenEntitlementFeatureEntry(
+        scope = viewModelScope,
+        settingsRepository = repositories.settings,
+        entitlementRepository = repositories.entitlements,
+    )
+    private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
+
+    val webPageRequests = _webPageRequests.asSharedFlow()
+    val backupImportPreview = backupEntry.importPreview
+    val uiState = stateStore.uiState
 
     init {
         viewModelScope.launch {
-            settingsRepository.ensureDefault()
-            runtimeRepository.ensureDefault()
-            dailyGoalsRepository.ensureDefault()
-            seedTemplates()
-            restoreFromClock()
-            val settings = settingsRepository.getOrDefault()
-            if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) scheduleProximityMonitoring()
-            if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) startLightMonitoring()
-            refreshActiveNotifications(settings, runtimeRepository.getOrDefault())
+            repositories.settings.ensureDefault()
+            repositories.runtime.ensureDefault()
+            repositories.dailyGoals.ensureDefault()
+            templatesEntry.seedDefaultTemplates()
+            runtimeEntry.restoreFromClock()
+            val settings = repositories.settings.getOrDefault()
+            settingsEntry.applyStartupMonitoring(settings)
+            runtimeEntry.refreshActiveNotifications(settings, repositories.runtime.getOrDefault())
         }
-        viewModelScope.launch {
-            while (true) {
-                val current = System.currentTimeMillis()
-                now.value = current
-                advanceDuePhases(current)
-                delay(1_000)
-            }
-        }
+        runtimeEntry.startClock(now)
     }
 
     fun navigateWebPage(url: String) {
         _webPageRequests.tryEmit(url)
     }
 
-    fun startReminder() {
-        viewModelScope.launch {
-            val settings = settingsRepository.getOrDefault()
-            if (!settings.reminderEnabled) return@launch
-            val nowMillis = System.currentTimeMillis()
-            val state = reminderEngine.newWorkingState(settings, nowMillis)
-            runtimeRepository.upsert(state)
-            refreshActiveNotifications(settings, state)
-        }
-    }
+    fun startReminder() = runtimeEntry.startReminder()
+    fun pauseReminder() = runtimeEntry.pauseReminder()
+    fun pauseForOneHour() = runtimeEntry.pauseForOneHour()
+    fun resumeReminder() = runtimeEntry.resumeReminder()
+    fun stopAll() = runtimeEntry.stopAll()
+    fun startBreak() = runtimeEntry.startBreak()
+    fun skipBreak() = runtimeEntry.skipBreak()
+    fun startPomodoro() = runtimeEntry.startPomodoro()
+    fun stopPomodoro() = runtimeEntry.stopPomodoro()
 
-    fun pauseReminder() {
-        viewModelScope.launch {
-            val state = runtimeRepository.getOrDefault()
-            if (state.activeEngine != ActiveEngine.REMINDER.name || state.reminderPhase == ReminderPhase.IDLE.name) return@launch
-            notifications.cancelAllScheduled()
-            stopTimerService()
-            val nextState = reminderEngine.pause(state, System.currentTimeMillis())
-            runtimeRepository.upsert(nextState)
-            refreshActiveNotifications(settingsRepository.getOrDefault(), nextState)
-        }
-    }
+    fun updateSettings(transform: (AppSettingsEntity) -> AppSettingsEntity) = settingsEntry.updateSettings(transform)
+    fun setReminderEnabled(enabled: Boolean) = settingsEntry.setReminderEnabled(enabled)
+    fun setPomodoroEnabled(enabled: Boolean) = settingsEntry.setPomodoroEnabled(enabled)
+    fun setNotificationsEnabled(enabled: Boolean) = settingsEntry.setNotificationsEnabled(enabled)
+    fun setKeepAliveEnabled(enabled: Boolean) = settingsEntry.setKeepAliveEnabled(enabled)
+    fun setProximityMonitoringEnabled(enabled: Boolean) = settingsEntry.setProximityMonitoringEnabled(enabled)
+    fun setBlinkMonitoringEnabled(enabled: Boolean) = settingsEntry.setBlinkMonitoringEnabled(enabled)
+    fun setAmbientLightMonitoringEnabled(enabled: Boolean) = settingsEntry.setAmbientLightMonitoringEnabled(enabled)
+    fun setAutoBrightnessEnabled(enabled: Boolean) = settingsEntry.setAutoBrightnessEnabled(enabled)
+    fun calibrateProximity() = settingsEntry.calibrateProximity()
+    fun setLanguageCode(languageCode: String) = settingsEntry.setLanguageCode(languageCode)
+    fun setThemeMode(mode: AppThemeMode) = settingsEntry.setThemeMode(mode)
+    fun setAutoUpdateCheckEnabled(enabled: Boolean) = settingsEntry.setAutoUpdateCheckEnabled(enabled)
+    fun updateDailyGoal(transform: (DailyGoalEntity) -> DailyGoalEntity) = settingsEntry.updateDailyGoal(transform)
 
-    fun pauseForOneHour() {
-        viewModelScope.launch {
-            val state = runtimeRepository.getOrDefault()
-            if (state.activeEngine != ActiveEngine.REMINDER.name || state.reminderPhase == ReminderPhase.IDLE.name) return@launch
-            val nowMillis = System.currentTimeMillis()
-            notifications.cancelAllScheduled()
-            val nextState = reminderEngine.pauseForOneHour(state, nowMillis)
-            runtimeRepository.upsert(nextState)
-            refreshActiveNotifications(settingsRepository.getOrDefault(), nextState)
-        }
-    }
-
-    fun resumeReminder() {
-        viewModelScope.launch {
-            val settings = settingsRepository.getOrDefault()
-            if (!settings.reminderEnabled) return@launch
-            val nowMillis = System.currentTimeMillis()
-            val state = reminderEngine.newWorkingState(settings, nowMillis)
-            runtimeRepository.upsert(state)
-            refreshActiveNotifications(settings, state)
-        }
-    }
-
-    fun stopAll() {
-        viewModelScope.launch {
-            runtimeRepository.reset(System.currentTimeMillis())
-            notifications.cancelAllScheduled()
-            notifications.cancelOngoingStatus()
-            stopTimerService()
-        }
-    }
-
-    fun startBreak() {
-        viewModelScope.launch {
-            val settings = settingsRepository.getOrDefault()
-            if (!settings.reminderEnabled) return@launch
-            val state = runtimeRepository.getOrDefault()
-            val nowMillis = System.currentTimeMillis()
-            val transition = reminderEngine.startBreak(settings, state, nowMillis)
-            applyTransition(settings, nowMillis, transition)
-        }
-    }
-
-    fun skipBreak() {
-        viewModelScope.launch {
-            val settings = settingsRepository.getOrDefault()
-            if (!settings.reminderEnabled) return@launch
-            val state = runtimeRepository.getOrDefault()
-            val nowMillis = System.currentTimeMillis()
-            val transition = reminderEngine.skipBreak(settings, state, nowMillis)
-            applyTransition(settings, nowMillis, transition)
-        }
-    }
-
-    fun startPomodoro() {
-        viewModelScope.launch {
-            val settings = settingsRepository.getOrDefault()
-            if (!settings.pomodoroEnabled) return@launch
-            val nowMillis = System.currentTimeMillis()
-            val transition = pomodoroEngine.start(settings, nowMillis)
-            applyTransition(settings, nowMillis, transition)
-        }
-    }
-
-    fun stopPomodoro() {
-        viewModelScope.launch {
-            val settings = settingsRepository.getOrDefault()
-            val state = runtimeRepository.getOrDefault()
-            val nowMillis = System.currentTimeMillis()
-            val transition = pomodoroEngine.stop(state, nowMillis)
-            statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, transition.pomodoroStatsDelta)
-            runtimeRepository.upsert(transition.nextRuntime)
-            notifications.cancelOngoingStatus()
-            stopTimerService()
-        }
-    }
-
-    fun updateSettings(transform: (AppSettingsEntity) -> AppSettingsEntity) {
-        viewModelScope.launch {
-            val current = settingsRepository.getOrDefault()
-            val nowMillis = System.currentTimeMillis()
-            val updated = settingsRepository.update(nowMillis, transform)
-            val shouldRescheduleProximity = (updated.proximityMonitoringEnabled || updated.blinkMonitoringEnabled) && (
-                current.proximityCheckIntervalMinutes != updated.proximityCheckIntervalMinutes ||
-                    current.proximityCaptureSeconds != updated.proximityCaptureSeconds ||
-                    current.proximityDistanceMultiplierPercent != updated.proximityDistanceMultiplierPercent ||
-                    current.proximityFaceThresholdPercent != updated.proximityFaceThresholdPercent ||
-                    current.proximityAlertCooldownSeconds != updated.proximityAlertCooldownSeconds ||
-                    current.blinkMonitoringEnabled != updated.blinkMonitoringEnabled ||
-                    current.blinkNoBlinkThresholdSeconds != updated.blinkNoBlinkThresholdSeconds ||
-                    current.blinkAlertCooldownSeconds != updated.blinkAlertCooldownSeconds
-                )
-            applySettingsToActiveRuntime(updated, nowMillis)
-            if (shouldRescheduleProximity) scheduleProximityMonitoring()
-            applyLightMonitoringSettings(updated)
-        }
-    }
-
-    fun setReminderEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            val nowMillis = System.currentTimeMillis()
-            settingsRepository.update(nowMillis) { it.copy(reminderEnabled = enabled) }
-            val state = runtimeRepository.getOrDefault()
-            if (!enabled && state.activeEngine == ActiveEngine.REMINDER.name) {
-                runtimeRepository.reset(System.currentTimeMillis())
-                notifications.cancelAllScheduled()
-                notifications.cancelOngoingStatus()
-                stopTimerService()
-            }
-        }
-    }
-
-    fun setPomodoroEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            val nowMillis = System.currentTimeMillis()
-            settingsRepository.update(nowMillis) { it.copy(pomodoroEnabled = enabled) }
-            val state = runtimeRepository.getOrDefault()
-            if (!enabled && state.activeEngine == ActiveEngine.POMODORO.name) {
-                runtimeRepository.reset(System.currentTimeMillis())
-                notifications.cancelOngoingStatus()
-                stopTimerService()
-            }
-        }
-    }
-
-    fun setNotificationsEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            val settings = settingsRepository.update { it.copy(notificationEnabled = enabled) }
-            refreshActiveNotifications(settings, runtimeRepository.getOrDefault())
-        }
-    }
-
-    fun setKeepAliveEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            val settings = settingsRepository.update { it.copy(keepAliveEnabled = enabled) }
-            refreshActiveNotifications(settings, runtimeRepository.getOrDefault())
-        }
-    }
-
-    fun setProximityMonitoringEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.update { it.copy(proximityMonitoringEnabled = enabled) }
-            if (enabled) {
-                scheduleProximityMonitoring()
-            } else {
-                val settings = settingsRepository.getOrDefault()
-                if (settings.blinkMonitoringEnabled) {
-                    scheduleProximityMonitoring()
-                } else {
-                    cancelProximityMonitoring()
-                }
-                val state = runtimeRepository.getOrDefault()
-                runtimeRepository.upsert(
-                    state.copy(
-                        proximityMonitoringActive = false,
-                        proximityTooClose = false,
-                        updatedAt = System.currentTimeMillis(),
-                    ),
-                )
-            }
-        }
-    }
-
-    fun setBlinkMonitoringEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            val settings = settingsRepository.update { it.copy(blinkMonitoringEnabled = enabled) }
-            if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) {
-                scheduleProximityMonitoring()
-            } else {
-                cancelProximityMonitoring()
-            }
-        }
-    }
-
-    fun setAmbientLightMonitoringEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            val settings = settingsRepository.update { it.copy(ambientLightMonitoringEnabled = enabled) }
-            applyLightMonitoringSettings(settings)
-        }
-    }
-
-    fun setAutoBrightnessEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            val settings = settingsRepository.update { it.copy(autoBrightnessEnabled = enabled) }
-            applyLightMonitoringSettings(settings)
-        }
-    }
-
-    fun calibrateProximity() {
-        calibrateProximityMonitoring()
-    }
-
-    fun selectTemplate(templateId: Long) {
-        viewModelScope.launch {
-            val settings = settingsRepository.getOrDefault()
-            val template = tipTemplateRepository.get(templateId) ?: return@launch
-            if (template.isPremium && !canUse(settings, PremiumFeature.PRO_TEMPLATES)) return@launch
-            settingsRepository.update { it.copy(activeTipTemplateId = templateId) }
-        }
-    }
-
-    fun setLanguageCode(languageCode: String) {
-        viewModelScope.launch {
-            val normalized = LocaleController.normalize(languageCode)
-            settingsRepository.update { it.copy(languageCode = normalized) }
-        }
-    }
-
-    fun updateTemplateSystemBackground(template: TipTemplateEntity, backgroundValue: String, primaryColor: String) {
-        viewModelScope.launch {
-            tipTemplateRepository.upsert(
-                template.copy(
-                    backgroundType = TemplateBackgroundType.SYSTEM.name,
-                    backgroundValue = backgroundValue,
-                    primaryColor = primaryColor,
-                    updatedAt = System.currentTimeMillis(),
-                ),
-            )
-        }
-    }
-
-    fun updateTemplateImage(template: TipTemplateEntity, imagePath: String) {
-        viewModelScope.launch {
-            tipTemplateRepository.upsert(
-                template.copy(
-                    imagePath = imagePath,
-                    updatedAt = System.currentTimeMillis(),
-                ),
-            )
-        }
-    }
-
+    fun selectTemplate(templateId: Long) = templatesEntry.selectTemplate(templateId)
+    fun updateTemplateSystemBackground(template: TipTemplateEntity, backgroundValue: String, primaryColor: String) =
+        templatesEntry.updateTemplateSystemBackground(template, backgroundValue, primaryColor)
+    fun updateTemplateImage(template: TipTemplateEntity, imagePath: String) = templatesEntry.updateTemplateImage(template, imagePath)
     fun updateTemplateContent(
         template: TipTemplateEntity,
         titleText: String,
         subtitleText: String,
         showSkipButton: Boolean,
-    ) {
-        viewModelScope.launch {
-            tipTemplateRepository.upsert(
-                template.copy(
-                    titleText = titleText,
-                    subtitleText = subtitleText,
-                    showSkipButton = showSkipButton,
-                    updatedAt = System.currentTimeMillis(),
-                ),
-            )
-        }
-    }
+    ) = templatesEntry.updateTemplateContent(template, titleText, subtitleText, showSkipButton)
+    fun updateTemplateCountdownStyle(template: TipTemplateEntity, countdownStyle: String) =
+        templatesEntry.updateTemplateCountdownStyle(template, countdownStyle)
 
-    fun updateTemplateCountdownStyle(template: TipTemplateEntity, countdownStyle: String) {
-        viewModelScope.launch {
-            val layoutJson = runCatching {
-                JSONObject(template.layoutJson.takeIf { it.isNotBlank() } ?: "{}")
-            }.getOrElse { JSONObject() }
-                .put("countdownStyle", countdownStyle)
-                .toString()
-            tipTemplateRepository.upsert(
-                template.copy(
-                    layoutJson = layoutJson,
-                    updatedAt = System.currentTimeMillis(),
-                ),
-            )
-        }
-    }
+    fun shareStatistics() = sharingEntry.shareStatistics()
+    fun shareStatisticsImage() = sharingEntry.shareStatisticsImage()
+    fun shareMonthlyReportPdf() = sharingEntry.shareMonthlyReportPdf()
+    fun shareBackup() = backupEntry.shareBackup()
+    fun previewBackupImport(uri: Uri) = backupEntry.previewBackupImport(uri)
+    fun clearBackupImportPreview() = backupEntry.clearBackupImportPreview()
+    fun importBackup(uri: Uri) = backupEntry.importBackup(uri)
 
-    fun shareStatistics() {
-        val state = uiState.value
-        if (!state.settings.statsEnabled) return
-        export.shareCsv(state.eyeStats, state.pomodoroStats)
-    }
-
-    fun shareStatisticsImage() {
-        val state = uiState.value
-        if (!state.settings.statsEnabled) return
-        export.shareStatsImage(state.eyeStats, state.pomodoroStats)
-    }
-
-    fun shareMonthlyReportPdf() {
-        val state = uiState.value
-        if (!state.settings.statsEnabled) return
-        export.shareMonthlyPdf(state.eyeStats, state.pomodoroStats)
-    }
-
-    fun shareBackup() {
-        viewModelScope.launch {
-            backup.shareBackup()
-        }
-    }
-
-    fun previewBackupImport(uri: Uri) {
-        viewModelScope.launch {
-            _backupImportPreview.value = withContext(Dispatchers.IO) {
-                backup.previewImport(uri)
-            }
-        }
-    }
-
-    fun clearBackupImportPreview() {
-        _backupImportPreview.value = null
-    }
-
-    fun importBackup(uri: Uri) {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                backup.importBackup(uri)
-            }
-            _backupImportPreview.value = null
-            val settings = settingsRepository.getOrDefault()
-            applySettingsToActiveRuntime(settings, System.currentTimeMillis())
-        }
-    }
-
-    fun updateDailyGoal(transform: (DailyGoalEntity) -> DailyGoalEntity) {
-        viewModelScope.launch {
-            dailyGoalsRepository.update(transform = transform)
-        }
-    }
-
-    fun recordManualProEntitlement(productId: String = "manual_pro") {
-        viewModelScope.launch {
-            val nowMillis = System.currentTimeMillis()
-            entitlementRepository.upsert(
-                EntitlementEntity(
-                    source = "manual_license",
-                    productId = productId,
-                    tier = PlanTier.PRO.name,
-                    status = "active",
-                    purchasedAt = nowMillis,
-                    lastVerifiedAt = nowMillis,
-                ),
-            )
-            settingsRepository.update(nowMillis) {
-                it.copy(
-                    planTier = PlanTier.PRO.name,
-                    entitlementExpiresAt = 0L,
-                    lastEntitlementSyncAt = nowMillis,
-                )
-            }
-        }
-    }
-
-    private suspend fun restoreFromClock() {
-        advanceDuePhases(System.currentTimeMillis())
-    }
-
-    private suspend fun advanceDuePhases(nowMillis: Long) {
-        val settings = settingsRepository.get() ?: return
-        val state = runtimeRepository.get() ?: return
-        val transition = when (state.activeEngine) {
-            ActiveEngine.REMINDER.name -> reminderEngine.advance(settings, state, nowMillis)
-            ActiveEngine.POMODORO.name -> pomodoroEngine.advance(settings, state, nowMillis)
-            else -> null
-        } ?: return
-        applyTransition(settings, nowMillis, transition)
-    }
-
-    private suspend fun applyTransition(
-        settings: AppSettingsEntity,
-        nowMillis: Long,
-        transition: RuntimeTransition,
-    ) {
-        statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, transition.eyeStatsDelta)
-        statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, transition.pomodoroStatsDelta)
-        runtimeRepository.upsert(transition.nextRuntime)
-        playAudioEvent(transition.audioEvent)
-        refreshActiveNotifications(settings, transition.nextRuntime)
-    }
-
-    private fun playAudioEvent(event: AudioEvent) {
-        when (event) {
-            AudioEvent.None -> Unit
-            is AudioEvent.ReminderTone -> audio.playReminderTone(
-                enabled = event.enabled,
-                soundPath = event.path,
-                volumePercent = event.volumePercent,
-                vibrate = event.vibrate,
-            )
-        }
-    }
-
-    private fun scheduleActiveNotifications(settings: AppSettingsEntity, state: RuntimeStateEntity) {
-        if (!settings.notificationEnabled) return
-        if (QuietHours.suppressesReminderNotifications(settings, System.currentTimeMillis())) return
-        when (state.activeEngine) {
-            ActiveEngine.REMINDER.name -> when (state.reminderPhase) {
-                ReminderPhase.WORKING.name,
-                ReminderPhase.PRE_ALERT.name,
-                ReminderPhase.AWAITING_ACTION.name -> {
-                    notifications.scheduleReminder(state.nextPreAlertAt, state.nextReminderAt)
-                }
-                ReminderPhase.RESTING.name -> notifications.scheduleBreakDone(state.breakEndAt)
-            }
-        }
-    }
-
-    private suspend fun applySettingsToActiveRuntime(settings: AppSettingsEntity, nowMillis: Long) {
-        val state = runtimeRepository.get() ?: return
-        val adjustedState = adjustRuntimeForSettings(state, settings, nowMillis)
-        if (adjustedState != state) {
-            runtimeRepository.upsert(adjustedState)
-        }
-        advanceDuePhases(nowMillis)
-        refreshActiveNotifications(settings, runtimeRepository.get() ?: adjustedState)
-    }
-
-    private fun adjustRuntimeForSettings(
-        state: RuntimeStateEntity,
-        settings: AppSettingsEntity,
-        nowMillis: Long,
-    ): RuntimeStateEntity {
-        return when (state.activeEngine) {
-            ActiveEngine.REMINDER.name -> reminderEngine.adjustForSettings(state, settings, nowMillis)
-            ActiveEngine.POMODORO.name -> pomodoroEngine.adjustForSettings(state, settings, nowMillis)
-            else -> state
-        }
-    }
-
-    private fun refreshActiveNotifications(settings: AppSettingsEntity, state: RuntimeStateEntity) {
-        notifications.cancelAllScheduled()
-        if (!settings.keepAliveEnabled) stopTimerService()
-        if (!settings.notificationEnabled && !settings.keepAliveEnabled) {
-            notifications.cancelOngoingStatus()
-            return
-        }
-        if (settings.notificationEnabled) scheduleActiveNotifications(settings, state)
-        if (state.activeEngine != ActiveEngine.IDLE.name && settings.keepAliveEnabled) {
-            startTimerService()
-        }
-        if (state.activeEngine != ActiveEngine.IDLE.name && settings.notificationEnabled) {
-            notifications.showOngoingStatus(state)
-        } else if (state.activeEngine == ActiveEngine.IDLE.name || !settings.keepAliveEnabled) {
-            notifications.cancelOngoingStatus()
-            if (!settings.keepAliveEnabled) stopTimerService()
-        }
-    }
-
-    private fun applyLightMonitoringSettings(settings: AppSettingsEntity) {
-        if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) {
-            startLightMonitoring()
-        } else {
-            stopLightMonitoring()
-        }
-    }
-
-    private fun canUse(settings: AppSettingsEntity, feature: PremiumFeature): Boolean {
-        val tier = PlanTier.entries.firstOrNull { it.name == settings.planTier } ?: PlanTier.FREE
-        return when (feature) {
-            PremiumFeature.PRO_TEMPLATES,
-            PremiumFeature.ADVANCED_STATISTICS,
-            PremiumFeature.LOCAL_BACKUP,
-            PremiumFeature.MULTIPLE_REMINDER_PLANS,
-            PremiumFeature.ADVANCED_EXPORT -> tier >= PlanTier.PRO
-            PremiumFeature.CLOUD_SYNC -> tier >= PlanTier.PLUS
-        }
-    }
-
-    private suspend fun seedTemplates() {
-        val nowMillis = System.currentTimeMillis()
-        listOf(
-            TipTemplateEntity(
-                id = 1L,
-                name = "Calm teal",
-                backgroundValue = "#D4F2F0",
-                primaryColor = "#126B66",
-                sortOrder = 0,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 2L,
-                name = "Soft sunrise",
-                backgroundValue = "#FFE0D4",
-                primaryColor = "#B9503E",
-                sortOrder = 1,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 3L,
-                name = "Focus indigo",
-                backgroundValue = "#E0E3FF",
-                primaryColor = "#575EA8",
-                sortOrder = 2,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 4L,
-                name = "System colors",
-                backgroundType = TemplateBackgroundType.SYSTEM.name,
-                backgroundValue = "primaryContainer",
-                primaryColor = "primary",
-                sortOrder = 3,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 5L,
-                name = "Forest glass",
-                backgroundValue = "#DFF7E8",
-                primaryColor = "#1F7A4D",
-                sortOrder = 4,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 6L,
-                name = "Clear sky",
-                backgroundValue = "#DCEBFF",
-                primaryColor = "#2563EB",
-                isPremium = true,
-                sortOrder = 5,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 7L,
-                name = "Rose quartz",
-                backgroundValue = "#FFE1EA",
-                primaryColor = "#BE3455",
-                isPremium = true,
-                sortOrder = 6,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 8L,
-                name = "Deep slate",
-                backgroundValue = "#E9EEF5",
-                primaryColor = "#42526E",
-                isPremium = true,
-                sortOrder = 7,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 9L,
-                name = "Paper mint",
-                backgroundValue = "#F2FFF7",
-                primaryColor = "#26734D",
-                isPremium = true,
-                sortOrder = 8,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 10L,
-                name = "Warm desk",
-                backgroundValue = "#FFF4E6",
-                primaryColor = "#9A5A16",
-                isPremium = true,
-                sortOrder = 9,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 11L,
-                name = "Graphite focus",
-                backgroundValue = "#F1F2F4",
-                primaryColor = "#30343B",
-                isPremium = true,
-                sortOrder = 10,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 12L,
-                name = "Lotus pause",
-                backgroundValue = "#F7E9F2",
-                primaryColor = "#8A3F66",
-                isPremium = true,
-                sortOrder = 11,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 13L,
-                name = "Clinic calm",
-                backgroundValue = "#E8F7FA",
-                primaryColor = "#1D6F7A",
-                isPremium = true,
-                sortOrder = 12,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 14L,
-                name = "Night amber",
-                backgroundValue = "#2C2A26",
-                primaryColor = "#F0B35B",
-                isPremium = true,
-                sortOrder = 13,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-            TipTemplateEntity(
-                id = 15L,
-                name = "Reading green",
-                backgroundValue = "#EEF7DF",
-                primaryColor = "#547325",
-                isPremium = true,
-                sortOrder = 14,
-                createdAt = nowMillis,
-                updatedAt = nowMillis,
-            ),
-        ).forEach { template ->
-            val existing = tipTemplateRepository.get(template.id)
-            if (existing == null) {
-                tipTemplateRepository.upsert(template)
-            } else if (existing.isBuiltin) {
-                tipTemplateRepository.upsert(
-                    existing.copy(
-                        isPremium = template.isPremium,
-                        sortOrder = template.sortOrder,
-                        updatedAt = nowMillis,
-                    ),
-                )
-            }
-        }
-    }
-
-    fun setThemeMode(mode: AppThemeMode) {
-        viewModelScope.launch {
-            settingsRepository.update { it.copy(themeMode = mode.name) }
-        }
-    }
-
-    fun setAutoUpdateCheckEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsRepository.update { it.copy(autoUpdateCheckEnabled = enabled) }
-        }
-    }
+    fun recordManualProEntitlement(productId: String = "manual_pro") = entitlementEntry.recordManualProEntitlement(productId)
 }

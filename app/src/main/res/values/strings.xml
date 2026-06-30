@@ -335,7 +335,10 @@
     <string name="crash_report_exception_type">Exception type</string>
     <string name="crash_report_system_info">System info</string>
     <string name="crash_report_stack_trace">Stack trace</string>
-    <string name="crash_report_stack_hint">%1$d stack lines captured. The preview is shortened for readability.</string>
+    <plurals name="crash_report_stack_hint">
+        <item quantity="one">%1$d stack line captured. The preview is shortened for readability.</item>
+        <item quantity="other">%1$d stack lines captured. The preview is shortened for readability.</item>
+    </plurals>
     <string name="crash_report_show_full_stack">Show full</string>
     <string name="crash_report_collapse_stack">Collapse</string>
     <string name="crash_report_privacy_note">Local paths and content URIs are sanitized before the report is shown or shared.</string>

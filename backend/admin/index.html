@@ -35,10 +35,20 @@
         </div>
         <div class="topbar-actions">
           <label class="token-field">
+            <span>Username</span>
+            <input id="adminUsernameInput" type="text" autocomplete="username" placeholder="admin">
+          </label>
+          <label class="token-field">
+            <span>Password</span>
+            <input id="adminPasswordInput" type="password" autocomplete="current-password" placeholder="Password">
+          </label>
+          <button class="button" id="loginButton" type="button">Login</button>
+          <label class="token-field">
             <span>Admin token</span>
             <input id="adminTokenInput" type="password" autocomplete="off" placeholder="Bearer token">
           </label>
           <button class="button secondary" id="saveTokenButton" type="button">Save</button>
+          <button class="button secondary" id="refreshSessionButton" type="button">Refresh token</button>
           <button class="button" id="refreshButton" type="button">Refresh</button>
         </div>
       </header>

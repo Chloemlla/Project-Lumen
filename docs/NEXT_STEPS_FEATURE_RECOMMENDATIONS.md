@@ -48,7 +48,10 @@
 - [x] GitHub Actions 新增 Rust 后端格式检查与测试任务；本地仍不执行构建、测试、Lint 或安装命令。
 - [x] 后端生产数据存储切换为 MongoDB，覆盖用户、登录请求、会话、权益、同步变更、备份和计数器集合。
 - [x] 新增零构建 Admin Dashboard 静态前端，Rust 服务默认在 `/admin` 托管，前端不依赖 React、npm 或现代构建链。
-- [ ] 后端仍需接入真实邮件发送、Google Play 服务端验签、Admin 专用鉴权 API 和生产 HTTPS 入口。
+- [x] 新增 Admin 专用 API：登录、refresh token、操作者信息、dashboard snapshot、管理操作审计。
+- [x] 新增 Admin MongoDB 管理集合：会话、操作审计、访问审计、崩溃聚合、API/Sync 指标、模板目录、匿名遥测、发布登记和安全白名单。
+- [x] Admin Dashboard 已从 `/api/admin/dashboard` 读取真实 MongoDB 聚合数据，并保留未登录/空库状态下的静态 fallback。
+- [ ] 后端仍需接入真实邮件发送、Google Play 服务端验签、生产 HTTPS 入口和完整地理位置解析。
 
 ## 1. 当前能力盘点
 
