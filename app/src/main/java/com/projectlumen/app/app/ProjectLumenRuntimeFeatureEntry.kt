@@ -13,7 +13,6 @@ import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
 import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.NotificationService
-import com.projectlumen.app.core.time.QuietHours
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -136,6 +135,7 @@ internal class ProjectLumenRuntimeFeatureEntry(
             val transition = pomodoroEngine.stop(state, nowMillis)
             statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, transition.pomodoroStatsDelta)
             runtimeRepository.upsert(transition.nextRuntime)
+            notifications.cancelAllScheduled()
             notifications.cancelOngoingStatus()
             stopTimerService()
         }
@@ -154,6 +154,7 @@ internal class ProjectLumenRuntimeFeatureEntry(
 
     suspend fun stopPomodoroRuntime() {
         runtimeRepository.reset(System.currentTimeMillis())
+        notifications.cancelAllScheduled()
         notifications.cancelOngoingStatus()
         stopTimerService()
     }
@@ -169,13 +170,12 @@ internal class ProjectLumenRuntimeFeatureEntry(
     }
 
     fun refreshActiveNotifications(settings: AppSettingsEntity, state: RuntimeStateEntity) {
-        notifications.cancelAllScheduled()
+        notifications.syncRuntimeAlarms(settings, state)
         if (!settings.keepAliveEnabled) stopTimerService()
         if (!settings.notificationEnabled && !settings.keepAliveEnabled) {
             notifications.cancelOngoingStatus()
             return
         }
-        if (settings.notificationEnabled) scheduleActiveNotifications(settings, state)
         if (state.activeEngine != ActiveEngine.IDLE.name && settings.keepAliveEnabled) {
             startTimerService()
         }
@@ -232,21 +232,6 @@ internal class ProjectLumenRuntimeFeatureEntry(
                 volumePercent = event.volumePercent,
                 vibrate = event.vibrate,
             )
-        }
-    }
-
-    private fun scheduleActiveNotifications(settings: AppSettingsEntity, state: RuntimeStateEntity) {
-        if (!settings.notificationEnabled) return
-        if (QuietHours.suppressesReminderNotifications(settings, System.currentTimeMillis())) return
-        when (state.activeEngine) {
-            ActiveEngine.REMINDER.name -> when (state.reminderPhase) {
-                ReminderPhase.WORKING.name,
-                ReminderPhase.PRE_ALERT.name,
-                ReminderPhase.AWAITING_ACTION.name -> {
-                    notifications.scheduleReminder(state.nextPreAlertAt, state.nextReminderAt)
-                }
-                ReminderPhase.RESTING.name -> notifications.scheduleBreakDone(state.breakEndAt)
-            }
         }
     }
 }

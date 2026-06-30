@@ -1,5 +1,6 @@
 ﻿package com.projectlumen.app.core.services
 
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -15,10 +16,12 @@ import androidx.core.content.ContextCompat
 import com.projectlumen.app.MainActivity
 import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
+import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
+import com.projectlumen.app.core.time.QuietHours
 
 private const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIFICATIONS"
 
@@ -64,6 +67,36 @@ class NotificationService(private val context: Context) {
         if (endAt > System.currentTimeMillis()) {
             schedule(NotificationIds.BREAK_DONE, endAt, AlarmReceiver.ACTION_BREAK_DONE)
         }
+    }
+
+    fun syncRuntimeAlarms(
+        settings: AppSettingsEntity,
+        state: RuntimeStateEntity,
+        nowMillis: Long = System.currentTimeMillis(),
+    ) {
+        cancelAllScheduled()
+        if (!settings.notificationEnabled) return
+        when (state.activeEngine) {
+            ActiveEngine.REMINDER.name -> {
+                if (QuietHours.suppressesReminderNotifications(settings, nowMillis)) return
+                when (state.reminderPhase) {
+                    ReminderPhase.WORKING.name,
+                    ReminderPhase.PRE_ALERT.name,
+                    ReminderPhase.AWAITING_ACTION.name -> scheduleReminder(state.nextPreAlertAt, state.nextReminderAt)
+                    ReminderPhase.RESTING.name -> scheduleBreakDone(state.breakEndAt)
+                }
+            }
+            ActiveEngine.POMODORO.name -> {
+                if (state.pomodoroPhase != PomodoroPhase.IDLE.name && state.pomodoroPhaseEndAt > nowMillis) {
+                    schedule(NotificationIds.POMODORO, state.pomodoroPhaseEndAt, AlarmReceiver.ACTION_POMODORO)
+                }
+            }
+        }
+    }
+
+    fun canScheduleExactAlarms(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        return context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
     }
 
     fun showReminderDue() {
@@ -277,16 +310,19 @@ class NotificationService(private val context: Context) {
         }
     }
 
+    @SuppressLint("ScheduleExactAlarm")
     private fun schedule(id: Int, triggerAtMillis: Long, action: String) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val pendingIntent = scheduledPendingIntent(id, action)
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-        } else if (alarmManager.canScheduleExactAlarms()) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
-        } else {
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+        if (canScheduleExactAlarms()) {
+            try {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
+                return
+            } catch (_: SecurityException) {
+                // Permission can change between the capability check and the scheduling call.
+            }
         }
+        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent)
     }
 
     private fun scheduledPendingIntent(id: Int, action: String): PendingIntent {

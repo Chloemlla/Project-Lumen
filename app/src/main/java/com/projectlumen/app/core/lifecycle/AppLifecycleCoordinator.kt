@@ -35,13 +35,13 @@ class AppLifecycleCoordinator(
                 nowMillis = nowMillis,
                 shouldResumePausedTime = shouldResumePausedTime,
             )
-            runtimeRepository.upsert(
-                foregroundRuntime.copy(
-                    lastForegroundAt = nowMillis,
-                    lastBackgroundAt = if (shouldResumePausedTime) 0L else foregroundRuntime.lastBackgroundAt,
-                    updatedAt = nowMillis,
-                ),
+            val persistedRuntime = foregroundRuntime.copy(
+                lastForegroundAt = nowMillis,
+                lastBackgroundAt = if (shouldResumePausedTime) 0L else foregroundRuntime.lastBackgroundAt,
+                updatedAt = nowMillis,
             )
+            runtimeRepository.upsert(persistedRuntime)
+            app.notifications.syncRuntimeAlarms(settings, persistedRuntime)
             if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) {
                 app.scheduleProximityMonitoring()
             }

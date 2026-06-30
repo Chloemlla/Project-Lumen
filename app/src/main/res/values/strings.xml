@@ -216,7 +216,7 @@
     <string name="notification_permission_needed">Notifications need permission</string>
     <string name="notification_permission_needed_message">Allow system notifications so reminders can appear outside the app.</string>
     <string name="exact_alarm_permission_needed">Improve timing accuracy</string>
-    <string name="exact_alarm_permission_needed_message">Android may delay reminders unless exact alarms are allowed in system settings.</string>
+    <string name="exact_alarm_permission_needed_message">Android may delay eye-break and pomodoro timing unless exact alarms are allowed in system settings.</string>
     <string name="full_screen_intent_permission_needed">Allow full-screen reminders</string>
     <string name="full_screen_intent_permission_needed_message">Android may keep break prompts in the notification shade unless full-screen reminder permission is allowed.</string>
     <string name="export_subject">Project Lumen statistics</string>

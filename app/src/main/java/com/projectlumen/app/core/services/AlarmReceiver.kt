@@ -5,8 +5,16 @@ import android.content.Context
 import android.content.Intent
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.R
+import com.projectlumen.app.core.database.entities.AppSettingsEntity
+import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
 import com.projectlumen.app.core.repositories.SettingsRepository
+import com.projectlumen.app.core.repositories.StatisticsRepository
+import com.projectlumen.app.core.runtime.AudioEvent
+import com.projectlumen.app.core.runtime.PomodoroEngine
+import com.projectlumen.app.core.runtime.ReminderEngine
+import com.projectlumen.app.core.runtime.RuntimeTransition
 import com.projectlumen.app.core.time.QuietHours
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,12 +27,14 @@ class AlarmReceiver : BroadcastReceiver() {
             runCatching {
                 val app = context.applicationContext as ProjectLumenApplication
                 val notifications = NotificationService(context.applicationContext)
-                val settings = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences).get()
-                val suppressReminder = settings != null &&
-                    QuietHours.suppressesReminderNotifications(settings, System.currentTimeMillis()) &&
+                val settings = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences).getOrDefault()
+                val runtime = app.database.runtimeStateDao().get() ?: RuntimeStateEntity()
+                val nowMillis = System.currentTimeMillis()
+                val reconciledRuntime = reconcileRuntime(app, notifications, settings, runtime, nowMillis)
+                val suppressReminder = QuietHours.suppressesReminderNotifications(settings, nowMillis) &&
                     intent.action in setOf(ACTION_PRE_ALERT, ACTION_BREAK_DUE, ACTION_BREAK_DONE)
                 notifications.ensureChannels()
-                if (!suppressReminder) {
+                if (settings.notificationEnabled && !suppressReminder) {
                     when (intent.action) {
                         ACTION_PRE_ALERT -> notifications.showPreAlert()
                         ACTION_BREAK_DUE -> notifications.showReminderDue()
@@ -37,7 +47,8 @@ class AlarmReceiver : BroadcastReceiver() {
                 }
                 if (
                     intent.action == ACTION_BREAK_DUE &&
-                    settings?.globalOverlayEnabled == true &&
+                    settings.notificationEnabled &&
+                    settings.globalOverlayEnabled &&
                     !suppressReminder
                 ) {
                     EyeProtectionOverlayService.show(
@@ -47,8 +58,59 @@ class AlarmReceiver : BroadcastReceiver() {
                         durationSeconds = settings.restDurationSeconds.coerceAtLeast(settings.overlayRestDurationSeconds),
                     )
                 }
+                if (settings.keepAliveEnabled && reconciledRuntime.activeEngine != ActiveEngine.IDLE.name) {
+                    app.startTimerService()
+                }
             }
             pendingResult.finish()
+        }
+    }
+
+    private suspend fun reconcileRuntime(
+        app: ProjectLumenApplication,
+        notifications: NotificationService,
+        settings: AppSettingsEntity,
+        runtime: RuntimeStateEntity,
+        nowMillis: Long,
+    ): RuntimeStateEntity {
+        val transition = when (runtime.activeEngine) {
+            ActiveEngine.REMINDER.name -> ReminderEngine().advance(settings, runtime, nowMillis)
+            ActiveEngine.POMODORO.name -> PomodoroEngine().advance(settings, runtime, nowMillis)
+            else -> null
+        } ?: return runtime.also {
+            notifications.syncRuntimeAlarms(settings, it, nowMillis)
+        }
+        val statisticsRepository = StatisticsRepository(
+            app.database.dailyEyeStatsDao(),
+            app.database.dailyPomodoroStatsDao(),
+        )
+        applyTransition(app, statisticsRepository, settings, nowMillis, transition)
+        notifications.syncRuntimeAlarms(settings, transition.nextRuntime, nowMillis)
+        return transition.nextRuntime
+    }
+
+    private suspend fun applyTransition(
+        app: ProjectLumenApplication,
+        statisticsRepository: StatisticsRepository,
+        settings: AppSettingsEntity,
+        nowMillis: Long,
+        transition: RuntimeTransition,
+    ) {
+        statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, transition.eyeStatsDelta)
+        statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, transition.pomodoroStatsDelta)
+        app.database.runtimeStateDao().upsert(transition.nextRuntime)
+        playAudioEvent(app, transition.audioEvent)
+    }
+
+    private fun playAudioEvent(app: ProjectLumenApplication, event: AudioEvent) {
+        when (event) {
+            AudioEvent.None -> Unit
+            is AudioEvent.ReminderTone -> app.audio.playReminderTone(
+                enabled = event.enabled,
+                soundPath = event.path,
+                volumePercent = event.volumePercent,
+                vibrate = event.vibrate,
+            )
         }
     }
 

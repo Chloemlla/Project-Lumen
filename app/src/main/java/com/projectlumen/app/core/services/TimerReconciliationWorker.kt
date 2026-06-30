@@ -8,7 +8,6 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.enums.ActiveEngine
-import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.repositories.SettingsRepository
 import java.util.concurrent.TimeUnit
 
@@ -24,14 +23,7 @@ class TimerReconciliationWorker(
             ?: return Result.success()
         if (settings.keepAliveEnabled && runtime.activeEngine != ActiveEngine.IDLE.name) {
             app.startTimerService()
-            if (settings.notificationEnabled && runtime.activeEngine == ActiveEngine.REMINDER.name) {
-                when (runtime.reminderPhase) {
-                    ReminderPhase.WORKING.name,
-                    ReminderPhase.PRE_ALERT.name,
-                    ReminderPhase.AWAITING_ACTION.name -> app.notifications.scheduleReminder(runtime.nextPreAlertAt, runtime.nextReminderAt)
-                    ReminderPhase.RESTING.name -> app.notifications.scheduleBreakDone(runtime.breakEndAt)
-                }
-            }
+            app.notifications.syncRuntimeAlarms(settings, runtime)
             enqueue(applicationContext)
         }
         return Result.success()

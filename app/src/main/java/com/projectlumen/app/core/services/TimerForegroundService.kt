@@ -260,18 +260,7 @@ class TimerForegroundService : LifecycleService() {
 
     private fun refreshRuntimeNotifications(settings: AppSettingsEntity, state: RuntimeStateEntity) {
         if (!settings.notificationEnabled) return
-        notifications.cancelAllScheduled()
-        val quietSuppressesReminders = QuietHours.suppressesReminderNotifications(settings, System.currentTimeMillis())
-        if (!quietSuppressesReminders) {
-            when (state.activeEngine) {
-                ActiveEngine.REMINDER.name -> when (state.reminderPhase) {
-                    ReminderPhase.WORKING.name,
-                    ReminderPhase.PRE_ALERT.name,
-                    ReminderPhase.AWAITING_ACTION.name -> notifications.scheduleReminder(state.nextPreAlertAt, state.nextReminderAt)
-                    ReminderPhase.RESTING.name -> notifications.scheduleBreakDone(state.breakEndAt)
-                }
-            }
-        }
+        notifications.syncRuntimeAlarms(settings, state)
         notifications.showOngoingStatus(state)
     }
 

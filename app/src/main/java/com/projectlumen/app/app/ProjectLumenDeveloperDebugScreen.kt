@@ -47,6 +47,7 @@ internal fun DeveloperDebugScreen(
     val settings = uiState.settings
     val runtime = uiState.runtime
     val context = LocalContext.current
+    val permissionRequirements = rememberPermissionRequirements()
     val luxHistory = remember { mutableStateListOf<Float>() }
     LaunchedEffect(runtime.ambientLastLux, uiState.nowMillis) {
         luxHistory += runtime.ambientLastLux.coerceAtLeast(0f)
@@ -56,11 +57,14 @@ internal fun DeveloperDebugScreen(
         SettingsSection(R.string.developer_section_realtime_debug, Icons.Outlined.Visibility) {
             SwitchRow(R.string.developer_overlay_enabled, Icons.Outlined.Visibility, settings.developerDebugOverlayEnabled) {
                 viewModel.updateSettings { current -> current.copy(developerDebugOverlayEnabled = it) }
+                if (it && needsOverlayPermission(context)) {
+                    openOverlaySettings(context)
+                }
             }
             SwitchRow(R.string.developer_preview_enabled, Icons.Outlined.PhotoCamera, settings.developerDebugPreviewEnabled) {
                 viewModel.updateSettings { current -> current.copy(developerDebugPreviewEnabled = it) }
             }
-            if (settings.developerDebugOverlayEnabled && needsOverlayPermission(context)) {
+            if (settings.developerDebugOverlayEnabled && permissionRequirements.overlay) {
                 OutlinedButton(onClick = { openOverlaySettings(context) }) {
                     ButtonLabel(Icons.Outlined.Visibility, R.string.open_system_settings)
                 }

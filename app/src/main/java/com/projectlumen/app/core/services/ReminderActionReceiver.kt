@@ -6,7 +6,6 @@ import android.content.Intent
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
-import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
 import com.projectlumen.app.core.repositories.RuntimeRepository
@@ -14,7 +13,6 @@ import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.repositories.StatisticsRepository
 import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
-import com.projectlumen.app.core.time.QuietHours
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -86,19 +84,8 @@ class ReminderActionReceiver : BroadcastReceiver() {
         runtime: RuntimeStateEntity,
     ) {
         if (settings.keepAliveEnabled) app.startTimerService()
+        app.notifications.syncRuntimeAlarms(settings, runtime)
         if (!settings.notificationEnabled) return
-        if (!QuietHours.suppressesReminderNotifications(settings, System.currentTimeMillis())) {
-            when (runtime.activeEngine) {
-                ActiveEngine.REMINDER.name -> when (runtime.reminderPhase) {
-                    ReminderPhase.WORKING.name,
-                    ReminderPhase.PRE_ALERT.name,
-                    ReminderPhase.AWAITING_ACTION.name -> {
-                        app.notifications.scheduleReminder(runtime.nextPreAlertAt, runtime.nextReminderAt)
-                    }
-                    ReminderPhase.RESTING.name -> app.notifications.scheduleBreakDone(runtime.breakEndAt)
-                }
-            }
-        }
         app.notifications.showOngoingStatus(runtime)
     }
 

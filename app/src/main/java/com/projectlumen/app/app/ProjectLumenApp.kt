@@ -1,6 +1,7 @@
 package com.projectlumen.app.app
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
@@ -223,17 +224,27 @@ fun ProjectLumenApp(
             }
             val navController = rememberNavController()
             val backStackEntry by navController.currentBackStackEntryAsState()
+            val currentDestination = Destination.entries.firstOrNull {
+                it.route == backStackEntry?.destination?.route
+            } ?: Destination.HOME
+            fun navigateBackFromSecondaryPage() {
+                if (!navController.navigateUp()) {
+                    navController.navigate(Destination.SETTINGS.route) {
+                        launchSingleTop = true
+                    }
+                }
+            }
+            BackHandler(enabled = !currentDestination.showInBottomNav) {
+                navigateBackFromSecondaryPage()
+            }
             Scaffold(
                 containerColor = MaterialTheme.colorScheme.background,
                 contentWindowInsets = WindowInsets.safeDrawing,
                 topBar = {
-                    val current = Destination.entries.firstOrNull {
-                        it.route == backStackEntry?.destination?.route
-                    } ?: Destination.HOME
                     LumenTopBar(
-                        title = stringResource(current.labelRes),
-                        onNavigateBack = if (current.showInBottomNav) null else {
-                            { navController.popBackStack() }
+                        title = stringResource(currentDestination.labelRes),
+                        onNavigateBack = if (currentDestination.showInBottomNav) null else {
+                            { navigateBackFromSecondaryPage() }
                         },
                     )
                 },

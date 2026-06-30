@@ -212,12 +212,13 @@ internal fun SettingsScreen(
     val context = LocalContext.current
     val runWithNotificationPermission = rememberNotificationPermissionGate()
     val runWithCameraPermission = rememberCameraPermissionGate()
-    val notificationPermissionNeeded = needsNotificationPermission(context)
-    val cameraPermissionNeeded = needsCameraPermission(context)
-    val exactAlarmSettingsNeeded = needsExactAlarmSettings(context)
-    val fullScreenIntentSettingsNeeded = needsFullScreenIntentSettings(context)
-    val overlayPermissionNeeded = needsOverlayPermission(context)
-    val writeSettingsPermissionNeeded = needsWriteSettingsPermission(context)
+    val permissionRequirements = rememberPermissionRequirements()
+    val notificationPermissionNeeded = permissionRequirements.notification
+    val cameraPermissionNeeded = permissionRequirements.camera
+    val exactAlarmSettingsNeeded = permissionRequirements.exactAlarm
+    val fullScreenIntentSettingsNeeded = permissionRequirements.fullScreenIntent
+    val overlayPermissionNeeded = permissionRequirements.overlay
+    val writeSettingsPermissionNeeded = permissionRequirements.writeSettings
     val backupImportPreview by viewModel.backupImportPreview.collectAsStateWithLifecycle()
     var pendingBackupImportUri by remember { mutableStateOf<Uri?>(null) }
     var showProximityCalibrationDialog by rememberSaveable { mutableStateOf(false) }
@@ -227,6 +228,12 @@ internal fun SettingsScreen(
     fun persistUri(uri: Uri): String {
         persistReadableUri(context, uri)
         return uri.toString()
+    }
+    fun requestReminderTimingPermissions() {
+        when {
+            needsExactAlarmSettings(context) -> openExactAlarmSettings(context)
+            needsFullScreenIntentSettings(context) -> openFullScreenIntentSettings(context)
+        }
     }
     val restSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let {
@@ -383,7 +390,10 @@ internal fun SettingsScreen(
         SettingsSection(R.string.section_notifications, Icons.Outlined.NotificationsActive) {
             SwitchRow(R.string.enable_notifications, Icons.Outlined.NotificationsActive, settings.notificationEnabled) { enabled ->
                 if (enabled) {
-                    runWithNotificationPermission { viewModel.setNotificationsEnabled(true) }
+                    runWithNotificationPermission {
+                        viewModel.setNotificationsEnabled(true)
+                        requestReminderTimingPermissions()
+                    }
                 } else {
                     viewModel.setNotificationsEnabled(false)
                 }
@@ -398,7 +408,12 @@ internal fun SettingsScreen(
                     messageRes = R.string.notification_permission_needed_message,
                     actionLabelRes = R.string.allow_notifications,
                     icon = Icons.Outlined.NotificationsActive,
-                    onClick = { runWithNotificationPermission { viewModel.setNotificationsEnabled(true) } },
+                    onClick = {
+                        runWithNotificationPermission {
+                            viewModel.setNotificationsEnabled(true)
+                            requestReminderTimingPermissions()
+                        }
+                    },
                 )
             }
             AnimatedVisibility(
@@ -587,6 +602,9 @@ internal fun SettingsScreen(
             }
             SwitchRow(R.string.enable_auto_brightness, Icons.Outlined.Style, settings.autoBrightnessEnabled) {
                 viewModel.setAutoBrightnessEnabled(it)
+                if (it && needsWriteSettingsPermission(context)) {
+                    openWriteSettings(context)
+                }
             }
             AnimatedVisibility(
                 visible = settings.autoBrightnessEnabled && writeSettingsPermissionNeeded,
@@ -609,6 +627,9 @@ internal fun SettingsScreen(
             }
             SwitchRow(R.string.enable_global_overlay, Icons.Outlined.NotificationsActive, settings.globalOverlayEnabled) {
                 viewModel.updateSettings { current -> current.copy(globalOverlayEnabled = it) }
+                if (it && needsOverlayPermission(context)) {
+                    openOverlaySettings(context)
+                }
             }
             AnimatedVisibility(
                 visible = settings.globalOverlayEnabled && overlayPermissionNeeded,

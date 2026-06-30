@@ -216,7 +216,7 @@
     <string name="notification_permission_needed">需要通知权限</string>
     <string name="notification_permission_needed_message">允许系统通知后，提醒才能在应用外显示。</string>
     <string name="exact_alarm_permission_needed">提升计时准确性</string>
-    <string name="exact_alarm_permission_needed_message">如果未允许精确闹钟，Android 可能延迟提醒。</string>
+    <string name="exact_alarm_permission_needed_message">如果未允许精确闹钟，Android 可能延迟用眼休息和番茄钟到点提醒。</string>
     <string name="full_screen_intent_permission_needed">允许全屏提醒</string>
     <string name="full_screen_intent_permission_needed_message">如果未允许全屏提醒，Android 可能只把休息提示放在通知栏。</string>
     <string name="export_subject">Project Lumen 统计</string>

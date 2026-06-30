@@ -5,9 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.enums.ActiveEngine
-import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.repositories.SettingsRepository
-import com.projectlumen.app.core.time.QuietHours
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,25 +29,11 @@ class BootReceiver : BroadcastReceiver() {
                 if (settings?.keepAliveEnabled == true && runtime?.activeEngine != ActiveEngine.IDLE.name) {
                     app.startTimerService()
                 }
-                if (
-                    settings?.notificationEnabled == true &&
-                    runtime?.activeEngine == ActiveEngine.REMINDER.name &&
-                    !QuietHours.suppressesReminderNotifications(settings, System.currentTimeMillis())
-                ) {
-                    when (runtime.reminderPhase) {
-                        ReminderPhase.WORKING.name,
-                        ReminderPhase.PRE_ALERT.name,
-                        ReminderPhase.AWAITING_ACTION.name -> {
-                            app.notifications.scheduleReminder(runtime.nextPreAlertAt, runtime.nextReminderAt)
-                            app.startTimerService()
-                            app.notifications.showOngoingStatus(runtime)
-                        }
-
-                        ReminderPhase.RESTING.name -> {
-                            app.notifications.scheduleBreakDone(runtime.breakEndAt)
-                            app.startTimerService()
-                            app.notifications.showOngoingStatus(runtime)
-                        }
+                if (settings != null && runtime != null && runtime.activeEngine != ActiveEngine.IDLE.name) {
+                    app.notifications.syncRuntimeAlarms(settings, runtime)
+                    if (settings.notificationEnabled) {
+                        app.startTimerService()
+                        app.notifications.showOngoingStatus(runtime)
                     }
                 }
             }
