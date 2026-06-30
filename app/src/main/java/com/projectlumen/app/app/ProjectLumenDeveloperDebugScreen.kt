@@ -61,6 +61,11 @@ internal fun DeveloperDebugScreen(
             SwitchRow(R.string.developer_preview_enabled, Icons.Outlined.PhotoCamera, settings.developerDebugPreviewEnabled) {
                 viewModel.updateSettings { current -> current.copy(developerDebugPreviewEnabled = it) }
             }
+            if (settings.developerDebugOverlayEnabled && needsOverlayPermission(context)) {
+                OutlinedButton(onClick = { openOverlaySettings(context) }) {
+                    ButtonLabel(Icons.Outlined.Visibility, R.string.open_system_settings)
+                }
+            }
             Text(stringResource(R.string.developer_privacy_warning), fontWeight = FontWeight.Bold)
             MetricRow(R.string.developer_ai_inference, "${runtime.proximityDebugInferenceMillis} ms")
             MetricRow(R.string.developer_camera_latency, "${runtime.proximityDebugCameraLatencyMillis} ms")

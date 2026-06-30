@@ -74,7 +74,6 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         )
         if (intent?.action == ACTION_SIMULATE_LOW_MEMORY) {
             simulateLowMemory(app)
-            return START_STICKY
         }
         registerSensors()
         if (!overlayTicking) tickOverlay()

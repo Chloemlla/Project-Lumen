@@ -22,7 +22,7 @@ object DeveloperDebugFrameStore {
     fun latest(): DeveloperDebugFrame? = latestFrame.get()
 
     fun clear() {
-        latestFrame.getAndSet(null)?.thumbnail?.recycle()
+        latestFrame.set(null)
     }
 
     fun publish(bitmap: Bitmap?, sample: FaceDistanceSample?) {

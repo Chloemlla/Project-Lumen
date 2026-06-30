@@ -84,20 +84,6 @@ class ProximityDetectionService : Service() {
     override fun onTrimMemory(level: Int) {
         if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
             DeveloperDebugFrameStore.clear()
-            val app = application as? ProjectLumenApplication
-            if (app != null) {
-                scope.launch {
-                    val now = System.currentTimeMillis()
-                    app.database.runtimeStateDao().get()?.let {
-                        app.database.runtimeStateDao().upsert(
-                            it.copy(
-                                developerLastLowMemorySimulatedAt = now,
-                                updatedAt = now,
-                            ),
-                        )
-                    }
-                }
-            }
         }
         super.onTrimMemory(level)
     }
@@ -225,6 +211,7 @@ class ProximityDetectionService : Service() {
             app.database.runtimeStateDao().upsert(
                 it.copy(
                     foregroundServiceStartedAt = nowMillis,
+                    foregroundServiceStoppedAt = 0L,
                     foregroundServiceLastStickyRestartAt = if (restarted) nowMillis else it.foregroundServiceLastStickyRestartAt,
                     updatedAt = nowMillis,
                 ),

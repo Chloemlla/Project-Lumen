@@ -67,7 +67,7 @@ data class AppSettingsEntity(
     val proximityBaselineEyeDistancePx: Float = 0f,
     val proximityBaselineFaceWidthPercent: Int = 0,
     val proximityDistanceMultiplierPercent: Int = 130,
-    val proximityCheckIntervalMinutes: Int = 5,
+    val proximityCheckIntervalMinutes: Int = 3,
     val proximityCaptureSeconds: Int = 2,
     val proximityFaceThresholdPercent: Int = 38,
     val proximityAlertCooldownSeconds: Int = 120,
