@@ -67,7 +67,14 @@ android {
             .orNull
             ?.takeIf { it.isNotBlank() }
         ?: "http://eye.chloemlla.com/api"
-val projectLumenTelemetryAccessToken = providers.environmentVariable("PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN")
+    val projectLumenTranslationApiBaseUrl = providers.environmentVariable("PROJECT_LUMEN_TRANSLATION_API_BASE_URL")
+        .orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: providers.gradleProperty("PROJECT_LUMEN_TRANSLATION_API_BASE_URL")
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+        ?: "https://tts.chloemlla.com"
+    val projectLumenTelemetryAccessToken = providers.environmentVariable("PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN")
         .orNull
         ?.takeIf { it.isNotBlank() }
         ?: providers.gradleProperty("PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN")
@@ -80,6 +87,7 @@ val projectLumenTelemetryAccessToken = providers.environmentVariable("PROJECT_LU
         buildConfigField("String", "COMMIT_HASH", "\"$projectLumenCommitHash\"")
         buildConfigField("String", "SHORT_HASH", "\"$projectLumenShortHash\"")
         buildConfigField("String", "API_BASE_URL", "\"${projectLumenBuildConfigString(projectLumenApiBaseUrl)}\"")
+        buildConfigField("String", "TRANSLATION_API_BASE_URL", "\"${projectLumenBuildConfigString(projectLumenTranslationApiBaseUrl)}\"")
         buildConfigField("String", "TELEMETRY_ACCESS_TOKEN", "\"${projectLumenBuildConfigString(projectLumenTelemetryAccessToken)}\"")
 
         applicationId = "com.projectlumen.app"

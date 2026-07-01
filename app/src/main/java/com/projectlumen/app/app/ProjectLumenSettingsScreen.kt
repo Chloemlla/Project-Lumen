@@ -98,6 +98,7 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -317,6 +318,9 @@ internal fun SettingsScreen(
             }
             SwitchRow(R.string.enable_statistics, Icons.Outlined.BarChart, settings.statsEnabled) {
                 viewModel.updateSettings { current -> current.copy(statsEnabled = it) }
+            }
+            SwitchRow(R.string.translation_entry_enabled, Icons.Outlined.Translate, settings.translationEntryEnabled) {
+                viewModel.updateSettings { current -> current.copy(translationEntryEnabled = it) }
             }
             LumenFlowRow {
                 OutlinedButton(onClick = openTemplates) { ButtonLabel(Icons.Outlined.Style, R.string.nav_templates) }

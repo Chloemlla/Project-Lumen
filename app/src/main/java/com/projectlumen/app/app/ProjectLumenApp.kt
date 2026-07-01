@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -91,6 +92,7 @@ internal enum class Destination(
     POMODORO("pomodoro", R.string.nav_pomodoro, Icons.Outlined.LocalCafe),
     STATS("stats", R.string.nav_stats, Icons.Outlined.BarChart),
     SETTINGS("settings", R.string.nav_settings, Icons.Outlined.Settings),
+    TRANSLATION("translation", R.string.nav_translation, Icons.Outlined.Translate, false),
     TEMPLATES("templates", R.string.nav_templates, Icons.Outlined.Style, false),
     ABOUT("about", R.string.nav_about, Icons.Outlined.Info, false),
     DEVELOPER("developer", R.string.nav_developer, Icons.Outlined.Code, false),
@@ -338,7 +340,13 @@ fun ProjectLumenApp(
                         fadeOut(tween(160)) + slideOutHorizontally(tween(160)) { it / 12 }
                     },
                 ) {
-                    composable(Destination.HOME.route) { HomeScreen(uiState, viewModel) }
+                    composable(Destination.HOME.route) {
+                        HomeScreen(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            openTranslation = { navController.navigate(Destination.TRANSLATION.route) },
+                        )
+                    }
                     composable(Destination.BREAK.route) { BreakScreen(uiState, viewModel) }
                     composable(Destination.POMODORO.route) { PomodoroScreen(uiState, viewModel) }
                     composable(Destination.STATS.route) { StatisticsScreen(uiState, viewModel) }
@@ -353,6 +361,7 @@ fun ProjectLumenApp(
                             openDeveloperOptions = { navController.navigate(Destination.DEVELOPER.route) },
                         )
                     }
+                    composable(Destination.TRANSLATION.route) { TranslationScreen() }
                     composable(Destination.TEMPLATES.route) { TemplatesScreen(uiState, viewModel) }
                     composable(Destination.ABOUT.route) { AboutScreen(viewModel) }
                     composable(Destination.DEVELOPER.route) {

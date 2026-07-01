@@ -92,6 +92,7 @@ data class AppSettingsEntity(
     val shizukuDndGuardEnabled: Boolean = false,
     val shizukuThermalGuardEnabled: Boolean = true,
     val shizukuCameraPrivacyGuardEnabled: Boolean = true,
+    val translationEntryEnabled: Boolean = true,
     val developerModeEnabled: Boolean = false,
     val developerDebugOverlayEnabled: Boolean = false,
     val developerDebugPreviewEnabled: Boolean = false,

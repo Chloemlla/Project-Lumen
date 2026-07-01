@@ -98,6 +98,7 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -198,7 +199,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
+internal fun HomeScreen(
+    uiState: ProjectLumenUiState,
+    viewModel: ProjectLumenViewModel,
+    openTranslation: () -> Unit = {},
+) {
     val runtime = uiState.runtime
     val reminderActive = runtime.activeEngine == ActiveEngine.REMINDER.name &&
         runtime.reminderPhase != ReminderPhase.IDLE.name
@@ -221,6 +226,26 @@ internal fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
         StateCard(uiState.runtime, uiState.nowMillis)
         TodayStatsCard(uiState.eyeStats.firstOrNull())
         GoalProgressCard(uiState)
+        AnimatedVisibility(
+            visible = uiState.settings.translationEntryEnabled,
+            enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+            exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+        ) {
+            ActionCard {
+                SectionHeader(Icons.Outlined.Translate, R.string.nav_translation)
+                Text(
+                    stringResource(R.string.translation_home_entry_message),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = openTranslation,
+                ) {
+                    ButtonLabel(Icons.Outlined.Translate, R.string.translation_open)
+                }
+            }
+        }
         ActionCard {
             SectionHeader(Icons.Outlined.Schedule, R.string.quick_actions)
             when {
