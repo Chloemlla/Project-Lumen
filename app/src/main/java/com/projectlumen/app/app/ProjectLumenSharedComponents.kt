@@ -207,12 +207,13 @@ internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
     val scrollState = LocalLumenPageScrollState.current
     val fadeThresholdPx = with(LocalDensity.current) { 72.dp.toPx() }
     val scrollProgress = ((scrollState?.value ?: 0).toFloat() / fadeThresholdPx).coerceIn(0f, 1f)
-    val titleAlpha by animateFloatAsState(
+    val topBarAlpha by animateFloatAsState(
         targetValue = 1f - scrollProgress,
         animationSpec = tween(160),
-        label = "topBarTitleAlpha",
+        label = "topBarAlpha",
     )
     TopAppBar(
+        modifier = Modifier.graphicsLayer { alpha = topBarAlpha },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.primary,
             navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
@@ -228,7 +229,6 @@ internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
         title = {
             Text(
                 text = title,
-                modifier = Modifier.graphicsLayer { alpha = titleAlpha },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
