@@ -1,18 +1,28 @@
 package com.projectlumen.app.core.api
 
 import android.content.Context
-import android.net.ConnectivityManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import com.projectlumen.app.core.security.ProjectLumenIntegrityProvider
+import com.projectlumen.app.core.security.ProjectLumenRequestSigner
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 class ProjectLumenApiClient(
-    private val context: Context,
+    context: Context,
     private val baseUrl: String = ProjectLumenApiConfig.baseUrl,
+    private val httpClient: OkHttpClient = SecureOkHttpFactory.create(
+        baseUrl = baseUrl,
+        certificatePins = ProjectLumenApiConfig.apiCertificatePins,
+    ),
+    private val integrityProvider: ProjectLumenIntegrityProvider = ProjectLumenIntegrityProvider(context),
 ) {
     suspend fun health(): ApiHealth = request(
         method = "GET",
@@ -37,6 +47,17 @@ class ProjectLumenApiClient(
             .put("email", email)
             .put("requestId", requestId)
             .put("code", code)
+            .put("deviceInstallationId", deviceInstallationId),
+    ) { it.toAuthSession() }
+
+    suspend fun refreshSession(
+        refreshToken: String,
+        deviceInstallationId: String,
+    ): AuthSession = request(
+        method = "POST",
+        path = "v1/auth/session/refresh",
+        body = JSONObject()
+            .put("refreshToken", refreshToken)
             .put("deviceInstallationId", deviceInstallationId),
     ) { it.toAuthSession() }
 
@@ -139,45 +160,44 @@ class ProjectLumenApiClient(
         accessToken: String? = null,
         parse: (JSONObject) -> T,
     ): T = withContext(Dispatchers.IO) {
-        val connection = openHttpConnection(resolveUrl(path)).apply {
-            requestMethod = method
-            connectTimeout = ProjectLumenApiConfig.REQUEST_TIMEOUT_MILLIS
-            readTimeout = ProjectLumenApiConfig.REQUEST_TIMEOUT_MILLIS
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", USER_AGENT)
-            accessToken
+        val url = resolveUrl(path)
+        val bodyText = body?.toString()
+        val requestBody = bodyText?.toRequestBody(JSON_MEDIA_TYPE)
+        val requestBuilder = Request.Builder()
+            .url(url)
+            .method(method, requestBody)
+            .header("Accept", "application/json")
+            .header("User-Agent", USER_AGENT)
+        accessToken
+            ?.takeIf { it.isNotBlank() }
+            ?.let { requestBuilder.header("Authorization", "Bearer $it") }
+        ProjectLumenRequestSigner.headers(method, url, bodyText)
+            .forEach { (name, value) -> requestBuilder.header(name, value) }
+        if (requiresIntegrityToken(path)) {
+            integrityProvider.tokenForRequest(path, bodyText)
                 ?.takeIf { it.isNotBlank() }
-                ?.let { setRequestProperty("Authorization", "Bearer $it") }
-            if (body != null) {
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            }
+                ?.let { requestBuilder.header(ProjectLumenRequestSigner.HEADER_INTEGRITY, it) }
         }
 
-        try {
-            if (body != null) {
-                connection.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
-                    writer.write(body.toString())
-                }
-            }
-            val responseCode = connection.responseCode
-            val responseText = readResponseText(connection, responseCode)
-            if (responseCode !in 200..299) {
-                throw ProjectLumenApiException(responseCode, parseErrorMessage(responseText, responseCode))
+        httpClient.newCall(requestBuilder.build()).execute().use { response ->
+            val responseText = readResponseText(response)
+            if (response.code !in 200..299) {
+                throw ProjectLumenApiException(response.code, parseErrorMessage(responseText, response.code))
             }
             parse(responseText.toJsonObject())
-        } finally {
-            connection.disconnect()
         }
     }
 
-    private fun resolveUrl(path: String): String {
-        return "${baseUrl.trimEnd('/')}/${path.trimStart('/')}"
+    private fun resolveUrl(path: String) = "${baseUrl.trimEnd('/')}/${path.trimStart('/')}".toHttpUrl()
+
+    private fun readResponseText(response: Response): String {
+        return response.body?.string().orEmpty()
     }
 
-    private fun readResponseText(connection: HttpURLConnection, responseCode: Int): String {
-        val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
-        return stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+    private fun requiresIntegrityToken(path: String): Boolean {
+        val normalizedPath = path.substringBefore('?').trimStart('/')
+        return normalizedPath.startsWith("v1/auth/") ||
+            normalizedPath == "v1/purchases/google/verify"
     }
 
     private fun parseErrorMessage(responseText: String, responseCode: Int): String {
@@ -193,14 +213,8 @@ class ProjectLumenApiClient(
             .getOrElse { throw IOException("Project Lumen API returned invalid JSON.") }
     }
 
-    private fun openHttpConnection(url: String): HttpURLConnection {
-        val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
-        val network = connectivityManager?.activeNetwork
-            ?: return URL(url).openConnection() as HttpURLConnection
-        return network.openConnection(URL(url)) as HttpURLConnection
-    }
-
     private companion object {
         private const val USER_AGENT = "Project-Lumen-Android"
+        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }

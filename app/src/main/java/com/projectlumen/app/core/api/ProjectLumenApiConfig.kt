@@ -3,7 +3,7 @@ package com.projectlumen.app.core.api
 import com.projectlumen.app.BuildConfig
 
 object ProjectLumenApiConfig {
-    const val DEFAULT_BASE_URL = "http://eye.chloemlla.com/api"
+    const val DEFAULT_BASE_URL = "https://eye.chloemlla.com/api"
     const val DEFAULT_TRANSLATION_BASE_URL = "https://tts.chloemlla.com"
     const val REQUEST_TIMEOUT_MILLIS = 6_000
 
@@ -15,4 +15,10 @@ object ProjectLumenApiConfig {
 
     val telemetryAccessToken: String
         get() = BuildConfig.TELEMETRY_ACCESS_TOKEN.trim()
+
+    val apiCertificatePins: String
+        get() = BuildConfig.API_CERTIFICATE_PINS.trim()
+
+    val translationCertificatePins: String
+        get() = BuildConfig.TRANSLATION_CERTIFICATE_PINS.trim()
 }

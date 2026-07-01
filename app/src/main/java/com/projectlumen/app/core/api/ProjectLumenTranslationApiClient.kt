@@ -1,13 +1,17 @@
 package com.projectlumen.app.core.api
 
 import android.content.Context
-import android.net.ConnectivityManager
+import com.projectlumen.app.core.security.ProjectLumenRequestSigner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 data class TranslationConfig(
     val enabled: Boolean,
@@ -24,8 +28,13 @@ data class TranslationResult(
 )
 
 class ProjectLumenTranslationApiClient(
-    private val context: Context,
+    context: Context,
     private val baseUrl: String = ProjectLumenApiConfig.translationBaseUrl,
+    private val httpClient: OkHttpClient = SecureOkHttpFactory.create(
+        baseUrl = baseUrl,
+        certificatePins = ProjectLumenApiConfig.translationCertificatePins,
+        requireCertificatePins = false,
+    ),
 ) {
     suspend fun fetchConfig(): TranslationConfig = request(
         method = "GET",
@@ -73,42 +82,30 @@ class ProjectLumenTranslationApiClient(
         body: JSONObject? = null,
         parse: (JSONObject) -> T,
     ): T = withContext(Dispatchers.IO) {
-        val connection = openHttpConnection(resolveUrl(path)).apply {
-            requestMethod = method
-            connectTimeout = ProjectLumenApiConfig.REQUEST_TIMEOUT_MILLIS
-            readTimeout = ProjectLumenApiConfig.REQUEST_TIMEOUT_MILLIS
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", USER_AGENT)
-            if (body != null) {
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            }
-        }
+        val url = resolveUrl(path)
+        val bodyText = body?.toString()
+        val requestBody = bodyText?.toRequestBody(JSON_MEDIA_TYPE)
+        val requestBuilder = Request.Builder()
+            .url(url)
+            .method(method, requestBody)
+            .header("Accept", "application/json")
+            .header("User-Agent", USER_AGENT)
+        ProjectLumenRequestSigner.headers(method, url, bodyText)
+            .forEach { (name, value) -> requestBuilder.header(name, value) }
 
-        try {
-            if (body != null) {
-                connection.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
-                    writer.write(body.toString())
-                }
-            }
-            val responseCode = connection.responseCode
-            val responseText = readResponseText(connection, responseCode)
-            if (responseCode !in 200..299) {
-                throw ProjectLumenApiException(responseCode, parseErrorMessage(responseText, responseCode))
+        httpClient.newCall(requestBuilder.build()).execute().use { response ->
+            val responseText = readResponseText(response)
+            if (response.code !in 200..299) {
+                throw ProjectLumenApiException(response.code, parseErrorMessage(responseText, response.code))
             }
             parse(responseText.toJsonObject())
-        } finally {
-            connection.disconnect()
         }
     }
 
-    private fun resolveUrl(path: String): String {
-        return "${baseUrl.trimEnd('/')}/${path.trimStart('/')}"
-    }
+    private fun resolveUrl(path: String) = "${baseUrl.trimEnd('/')}/${path.trimStart('/')}".toHttpUrl()
 
-    private fun readResponseText(connection: HttpURLConnection, responseCode: Int): String {
-        val stream = if (responseCode in 200..299) connection.inputStream else connection.errorStream
-        return stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+    private fun readResponseText(response: Response): String {
+        return response.body?.string().orEmpty()
     }
 
     private fun parseErrorMessage(responseText: String, responseCode: Int): String {
@@ -130,14 +127,8 @@ class ProjectLumenTranslationApiClient(
             .getOrElse { throw IOException("Translation API returned invalid JSON.") }
     }
 
-    private fun openHttpConnection(url: String): HttpURLConnection {
-        val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
-        val network = connectivityManager?.activeNetwork
-            ?: return URL(url).openConnection() as HttpURLConnection
-        return network.openConnection(URL(url)) as HttpURLConnection
-    }
-
     private companion object {
         private const val USER_AGENT = "Project-Lumen-Android"
+        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }

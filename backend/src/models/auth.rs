@@ -25,11 +25,20 @@ pub struct VerifyEmailRequest {
     pub device_installation_id: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshSessionRequest {
+    pub refresh_token: String,
+    pub device_installation_id: Option<String>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthSessionResponse {
     pub access_token: String,
+    pub refresh_token: String,
     pub token_type: String,
     pub expires_at: i64,
+    pub refresh_expires_at: i64,
     pub user: UserDto,
 }

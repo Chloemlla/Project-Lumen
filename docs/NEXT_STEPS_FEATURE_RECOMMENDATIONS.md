@@ -18,7 +18,7 @@ Project Lumen 当前已经不是单纯的本地倒计时工具，而是一个以
 - Java 21 / Kotlin 2.1.20 / Android Gradle Plugin 8.12.0。
 - `compileSdk = 37`、`targetSdk = 37`、`minSdk = 26`。
 - 当前应用版本来源为 `app/application.version`，现值 `1.0.1`。
-- 通过 `BuildConfig.API_BASE_URL` 默认连接 `http://eye.chloemlla.com/api`。
+- 通过 `BuildConfig.API_BASE_URL` 默认连接 `https://eye.chloemlla.com/api`。
 
 当前后端：
 

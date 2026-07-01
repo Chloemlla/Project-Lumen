@@ -5,7 +5,7 @@ Rust backend API service for Project Lumen client integration.
 Default public base URL:
 
 ```text
-http://eye.chloemlla.com/api
+https://eye.chloemlla.com/api
 ```
 
 The service mounts all routes under `/api` by default.

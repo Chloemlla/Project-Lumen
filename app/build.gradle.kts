@@ -66,7 +66,7 @@ android {
         ?: providers.gradleProperty("PROJECT_LUMEN_API_BASE_URL")
             .orNull
             ?.takeIf { it.isNotBlank() }
-        ?: "http://eye.chloemlla.com/api"
+        ?: "https://eye.chloemlla.com/api"
     val projectLumenTranslationApiBaseUrl = providers.environmentVariable("PROJECT_LUMEN_TRANSLATION_API_BASE_URL")
         .orNull
         ?.takeIf { it.isNotBlank() }
@@ -81,6 +81,41 @@ android {
             .orNull
             ?.takeIf { it.isNotBlank() }
         ?: ""
+    val projectLumenApiCertificatePins = providers.environmentVariable("PROJECT_LUMEN_API_CERTIFICATE_PINS")
+        .orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: providers.gradleProperty("PROJECT_LUMEN_API_CERTIFICATE_PINS")
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+        ?: ""
+    val projectLumenTranslationCertificatePins = providers.environmentVariable("PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS")
+        .orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: providers.gradleProperty("PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS")
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+        ?: ""
+    val projectLumenPlayIntegrityCloudProjectNumber = providers.environmentVariable("PROJECT_LUMEN_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
+        .orNull
+        ?.toLongOrNull()
+        ?: providers.gradleProperty("PROJECT_LUMEN_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
+            .orNull
+            ?.toLongOrNull()
+        ?: 0L
+    val projectLumenRequestSigningSecret = providers.environmentVariable("PROJECT_LUMEN_REQUEST_SIGNING_SECRET")
+        .orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: providers.gradleProperty("PROJECT_LUMEN_REQUEST_SIGNING_SECRET")
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+        ?: "project-lumen-local-request-signing-key"
+    val projectLumenReleaseCertSha256 = providers.environmentVariable("PROJECT_LUMEN_RELEASE_CERT_SHA256")
+        .orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: providers.gradleProperty("PROJECT_LUMEN_RELEASE_CERT_SHA256")
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+        ?: ""
 
     defaultConfig {
         buildConfigField("long", "BUILD_TIME_UTC_MILLIS", "${projectLumenBuildTimeUtcMillis}L")
@@ -89,6 +124,9 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"${projectLumenBuildConfigString(projectLumenApiBaseUrl)}\"")
         buildConfigField("String", "TRANSLATION_API_BASE_URL", "\"${projectLumenBuildConfigString(projectLumenTranslationApiBaseUrl)}\"")
         buildConfigField("String", "TELEMETRY_ACCESS_TOKEN", "\"${projectLumenBuildConfigString(projectLumenTelemetryAccessToken)}\"")
+        buildConfigField("String", "API_CERTIFICATE_PINS", "\"${projectLumenBuildConfigString(projectLumenApiCertificatePins)}\"")
+        buildConfigField("String", "TRANSLATION_CERTIFICATE_PINS", "\"${projectLumenBuildConfigString(projectLumenTranslationCertificatePins)}\"")
+        buildConfigField("long", "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER", "${projectLumenPlayIntegrityCloudProjectNumber}L")
 
         applicationId = "com.projectlumen.app"
         minSdk = 26
@@ -97,6 +135,16 @@ android {
         versionName = projectLumenVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        externalNativeBuild {
+            cmake {
+                arguments += listOf(
+                    "-DLUMEN_REQUEST_SIGNING_SECRET=${projectLumenBuildConfigString(projectLumenRequestSigningSecret)}",
+                    "-DLUMEN_RELEASE_CERT_SHA256=${projectLumenBuildConfigString(projectLumenReleaseCertSha256)}",
+                    "-DLUMEN_EXPECTED_PACKAGE=${projectLumenBuildConfigString("com.projectlumen.app")}",
+                )
+            }
+        }
     }
 
     signingConfigs {
@@ -143,6 +191,13 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     lint {
@@ -196,6 +251,7 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout-compose:1.1.1")
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("androidx.datastore:datastore-preferences:1.2.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
@@ -207,6 +263,8 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.4")
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
+    implementation("com.google.android.play:integrity:1.4.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("com.google.mlkit:face-detection:16.1.7")

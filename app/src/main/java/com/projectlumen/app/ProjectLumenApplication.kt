@@ -11,6 +11,8 @@ import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.debug.DeveloperDebugOverlayService
 import com.projectlumen.app.core.lifecycle.AppLifecycleCoordinator
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
+import com.projectlumen.app.core.security.AppIntegrityGuard
+import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
@@ -33,12 +35,24 @@ class ProjectLumenApplication : Application() {
     val backup: DataBackupService by lazy { DataBackupService(this, database, eyeCarePreferences) }
     val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient(this) }
     val crashReports: CrashReportStore by lazy { CrashReportStore(this) }
-    val telemetry: EyeCareTelemetryReporter by lazy { EyeCareTelemetryReporter(this, database, apiClient) }
+    val secureCredentials: SecureCredentialStore by lazy { SecureCredentialStore(this) }
+    val telemetry: EyeCareTelemetryReporter by lazy {
+        EyeCareTelemetryReporter(
+            context = this,
+            database = database,
+            apiClient = apiClient,
+            accessTokenProvider = {
+                secureCredentials.load()?.accessToken
+                    ?: com.projectlumen.app.core.api.ProjectLumenApiConfig.telemetryAccessToken.takeIf { it.isNotBlank() }
+            },
+        )
+    }
     val shizuku: ShizukuCapabilityManager by lazy { ShizukuCapabilityManager(this) }
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
 
     override fun onCreate() {
         super.onCreate()
+        AppIntegrityGuard.enforce(this)
         val defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             runCatching { crashReports.save(CrashReport.fromThrowable(throwable)) }

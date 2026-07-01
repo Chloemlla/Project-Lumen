@@ -158,10 +158,14 @@ class UpdateChecker(
     }
 
     private fun openHttpConnection(url: String): HttpURLConnection {
+        val parsedUrl = URL(url)
+        if (parsedUrl.protocol != "https") {
+            throw IOException("Update endpoints must use HTTPS.")
+        }
         val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
         val network = connectivityManager?.activeNetwork
-            ?: return URL(url).openConnection() as HttpURLConnection
-        return network.openConnection(URL(url)) as HttpURLConnection
+            ?: return parsedUrl.openConnection() as HttpURLConnection
+        return network.openConnection(parsedUrl) as HttpURLConnection
     }
 
     private fun compareReleaseVersion(remoteTagName: String, localVersion: VersionDescriptor): Int {

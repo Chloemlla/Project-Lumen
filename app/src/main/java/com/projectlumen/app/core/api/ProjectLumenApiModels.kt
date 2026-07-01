@@ -24,8 +24,10 @@ data class ProjectLumenApiUser(
 
 data class AuthSession(
     val accessToken: String,
+    val refreshToken: String,
     val tokenType: String,
     val expiresAt: Long,
+    val refreshExpiresAt: Long,
     val user: ProjectLumenApiUser,
 )
 

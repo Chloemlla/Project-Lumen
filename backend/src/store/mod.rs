@@ -16,8 +16,8 @@ use crate::{config::Config, error::ApiError};
 use documents::{
     AdminAccessAuditRecord, AdminActionAuditRecord, AdminApiMetricRecord, AdminCrashReportRecord,
     AdminReleaseRecord, AdminSecurityAllowlistRecord, AdminSessionRecord, AdminSyncMetricRecord,
-    AdminTelemetryRecord, AdminTemplateRecord, BackupRecord, CounterRecord, EntitlementRecord,
-    PendingLogin, SessionRecord, StoredSyncChange,
+    AdminTelemetryRecord, AdminTemplateRecord, ApiNonceRecord, BackupRecord, CounterRecord,
+    EntitlementRecord, PendingLogin, SessionRecord, StoredSyncChange,
 };
 use face_analysis::FaceAnalysisFrameRecord;
 use mongodb::{
@@ -27,6 +27,7 @@ use mongodb::{
 };
 use serde_json::json;
 use telemetry::TelemetryUploadRecord;
+use std::time::Duration;
 
 pub use documents::UserRecord;
 
@@ -34,6 +35,7 @@ pub struct AppStore {
     pub(crate) users: Collection<UserRecord>,
     pub(crate) login_requests: Collection<PendingLogin>,
     pub(crate) sessions: Collection<SessionRecord>,
+    pub(crate) api_nonces: Collection<ApiNonceRecord>,
     pub(crate) entitlements: Collection<EntitlementRecord>,
     pub(crate) sync_changes: Collection<StoredSyncChange>,
     pub(crate) telemetry_uploads: Collection<TelemetryUploadRecord>,
@@ -63,6 +65,7 @@ impl AppStore {
             users: database.collection("users"),
             login_requests: database.collection("login_requests"),
             sessions: database.collection("sessions"),
+            api_nonces: database.collection("api_nonces"),
             entitlements: database.collection("entitlements"),
             sync_changes: database.collection("sync_changes"),
             telemetry_uploads: database.collection("telemetry_uploads"),
@@ -92,6 +95,17 @@ impl AppStore {
             .map_err(database_error)?;
         self.sessions
             .create_index(index("session_expiry", doc! { "expiresAt": 1 }), None)
+            .await
+            .map_err(database_error)?;
+        self.sessions
+            .create_index(
+                sparse_unique_index("session_refresh_unique", doc! { "refreshToken": 1 }),
+                None,
+            )
+            .await
+            .map_err(database_error)?;
+        self.api_nonces
+            .create_index(ttl_index("api_nonce_expiry", doc! { "expiresAt": 1 }), None)
             .await
             .map_err(database_error)?;
         self.login_requests
@@ -213,13 +227,13 @@ impl AppStore {
             .map_err(database_error)?;
         self.admin_security_allowlist
             .update_one(
-                doc! { "_id": "eye-http" },
+                doc! { "_id": "eye-https" },
                 doc! {
                     "$setOnInsert": mongodb::bson::to_document(&AdminSecurityAllowlistRecord {
-                        id: "eye-http".to_owned(),
+                        id: "eye-https".to_owned(),
                         origin: "eye.chloemlla.com".to_owned(),
-                        protocol: "http".to_owned(),
-                        risk: "temporary".to_owned(),
+                        protocol: "https".to_owned(),
+                        risk: "approved".to_owned(),
                         updated_at: 0,
                     }).map_err(|_| ApiError::Internal)?,
                 },
@@ -268,6 +282,31 @@ fn unique_index(name: &str, keys: mongodb::bson::Document) -> IndexModel {
             IndexOptions::builder()
                 .name(name.to_owned())
                 .unique(true)
+                .build(),
+        )
+        .build()
+}
+
+fn sparse_unique_index(name: &str, keys: mongodb::bson::Document) -> IndexModel {
+    IndexModel::builder()
+        .keys(keys)
+        .options(
+            IndexOptions::builder()
+                .name(name.to_owned())
+                .unique(true)
+                .sparse(true)
+                .build(),
+        )
+        .build()
+}
+
+fn ttl_index(name: &str, keys: mongodb::bson::Document) -> IndexModel {
+    IndexModel::builder()
+        .keys(keys)
+        .options(
+            IndexOptions::builder()
+                .name(name.to_owned())
+                .expire_after(Duration::from_secs(0))
                 .build(),
         )
         .build()

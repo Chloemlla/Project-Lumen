@@ -18,8 +18,10 @@ internal fun JSONObject.toEmailLoginStart(): EmailLoginStart = EmailLoginStart(
 
 internal fun JSONObject.toAuthSession(): AuthSession = AuthSession(
     accessToken = optString("accessToken"),
+    refreshToken = optString("refreshToken"),
     tokenType = optString("tokenType", "Bearer"),
     expiresAt = optLong("expiresAt"),
+    refreshExpiresAt = optLong("refreshExpiresAt"),
     user = getJSONObject("user").toApiUser(),
 )
 

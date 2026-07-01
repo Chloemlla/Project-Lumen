@@ -314,9 +314,11 @@ internal fun WebViewScreen(
                 factory = {
                     WebView(it).apply {
                         webView = this
-                        addJavascriptInterface(ProjectLumenWebViewJsApi(it.applicationContext), "projectLumen")
+                        if (BuildConfig.DEBUG) {
+                            addJavascriptInterface(ProjectLumenWebViewJsApi(it.applicationContext), "projectLumen")
+                        }
                         @SuppressLint("SetJavaScriptEnabled")
-                        settings.javaScriptEnabled = true
+                        settings.javaScriptEnabled = BuildConfig.DEBUG
                         settings.domStorageEnabled = true
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                             settings.setAlgorithmicDarkeningAllowed(false)
@@ -376,6 +378,7 @@ internal class ProjectLumenWebViewClient(
 }
 
 internal fun isProjectLumenRepoUrl(uri: Uri): Boolean {
+    if (uri.scheme != "https") return false
     val url = uri.toString()
     return url == PROJECT_LUMEN_REPO_URL ||
         url.startsWith("$PROJECT_LUMEN_REPO_URL/") ||

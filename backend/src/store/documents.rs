@@ -27,7 +27,19 @@ pub(crate) struct PendingLogin {
 pub(crate) struct SessionRecord {
     #[serde(rename = "_id")]
     pub token: String,
+    #[serde(default)]
+    pub refresh_token: String,
     pub user_id: String,
+    pub expires_at: i64,
+    #[serde(default)]
+    pub refresh_expires_at: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ApiNonceRecord {
+    #[serde(rename = "_id")]
+    pub nonce: String,
     pub expires_at: i64,
 }
 
