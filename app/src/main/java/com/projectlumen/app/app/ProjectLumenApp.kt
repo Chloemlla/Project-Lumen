@@ -2,6 +2,7 @@ package com.projectlumen.app.app
 
 import android.content.Context
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
@@ -240,7 +241,7 @@ fun ProjectLumenApp(
     }
     val activeThemeTemplate = if (uiState.settings.useDynamicColors) null else activeTemplate(uiState)
 
-    CompositionLocalProvider(LocalContext provides localizedContext) {
+    LocalizedContextProvider(localizedContext) {
         ProjectLumenTheme(
             themeMode = themeMode,
             useDynamicColors = uiState.settings.useDynamicColors,
@@ -436,5 +437,25 @@ fun ProjectLumenApp(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun LocalizedContextProvider(
+    localizedContext: Context,
+    content: @Composable () -> Unit,
+) {
+    val activityResultRegistryOwner = LocalActivityResultRegistryOwner.current
+    if (activityResultRegistryOwner != null) {
+        CompositionLocalProvider(
+            LocalContext provides localizedContext,
+            LocalActivityResultRegistryOwner provides activityResultRegistryOwner,
+            content = content,
+        )
+    } else {
+        CompositionLocalProvider(
+            LocalContext provides localizedContext,
+            content = content,
+        )
     }
 }

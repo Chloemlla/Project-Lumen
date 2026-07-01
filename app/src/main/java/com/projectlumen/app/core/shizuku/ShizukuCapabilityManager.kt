@@ -3,13 +3,18 @@ package com.projectlumen.app.core.shizuku
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.BatteryManager
 import android.os.Build
+import android.os.IBinder
+import android.os.Parcel
 import android.os.PowerManager
+import android.os.SystemClock
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -24,6 +29,24 @@ class ShizukuCapabilityManager(
 ) {
     private val _state = MutableStateFlow(ShizukuCapabilityState())
     val state = _state.asStateFlow()
+    private val shellServiceLock = Object()
+    @Volatile
+    private var shellServiceBinder: IBinder? = null
+    private val shellServiceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            synchronized(shellServiceLock) {
+                shellServiceBinder = service
+                shellServiceLock.notifyAll()
+            }
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) {
+            synchronized(shellServiceLock) {
+                shellServiceBinder = null
+                shellServiceLock.notifyAll()
+            }
+        }
+    }
     private val permissionResultListener = Shizuku.OnRequestPermissionResultListener { requestCode, _ ->
         if (requestCode == PERMISSION_REQUEST_CODE) {
             refreshState()
@@ -352,24 +375,67 @@ class ShizukuCapabilityManager(
         return result.output.trim().toIntOrNull() ?: fallback
     }
 
-    @Suppress("DEPRECATION")
     private fun executeShellCommand(command: String): ShellCommandResult {
+        val binder = shellServiceBinder()
+            ?: return ShellCommandResult(
+                exitCode = -1,
+                output = "",
+                error = "Shizuku shell user service is unavailable.",
+            )
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
         return runCatching {
-            val process = Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
-            val exitCode = process.waitFor()
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            val error = process.errorStream.bufferedReader().use { it.readText() }
+            data.writeInterfaceToken(ShizukuShellUserService.DESCRIPTOR)
+            data.writeString(command)
+            val transacted = binder.transact(ShizukuShellUserService.TRANSACTION_EXEC, data, reply, 0)
+            if (!transacted) {
+                error("Shizuku shell user service rejected the command.")
+            }
+            reply.readException()
             ShellCommandResult(
-                exitCode = exitCode,
-                output = output,
-                error = error,
+                exitCode = reply.readInt(),
+                output = reply.readString().orEmpty(),
+                error = reply.readString().orEmpty(),
             )
         }.getOrElse { throwable ->
+            shellServiceBinder = null
             ShellCommandResult(
                 exitCode = -1,
                 output = "",
                 error = throwable.message.orEmpty().ifBlank { throwable.javaClass.simpleName },
             )
+        }.also {
+            data.recycle()
+            reply.recycle()
+        }
+    }
+
+    private fun shellServiceBinder(): IBinder? {
+        shellServiceBinder?.takeIf { it.isBinderAlive }?.let { return it }
+        synchronized(shellServiceLock) {
+            shellServiceBinder?.takeIf { it.isBinderAlive }?.let { return it }
+            shellServiceBinder = null
+            val bound = runCatching {
+                Shizuku.bindUserService(
+                    Shizuku.UserServiceArgs(
+                        ComponentName(context.packageName, ShizukuShellUserService::class.java.name),
+                    )
+                        .daemon(false)
+                        .processNameSuffix("shizuku-shell")
+                        .tag(SHIZUKU_SHELL_SERVICE_TAG)
+                        .version(SHIZUKU_SHELL_SERVICE_VERSION),
+                    shellServiceConnection,
+                )
+            }.isSuccess
+            if (!bound) return null
+
+            val deadline = SystemClock.uptimeMillis() + SHELL_SERVICE_BIND_TIMEOUT_MILLIS
+            while (shellServiceBinder == null && SystemClock.uptimeMillis() < deadline) {
+                runCatching {
+                    shellServiceLock.wait(deadline - SystemClock.uptimeMillis())
+                }
+            }
+            return shellServiceBinder?.takeIf { it.isBinderAlive }
         }
     }
 
@@ -532,6 +598,9 @@ class ShizukuCapabilityManager(
         private const val MAX_COLOR_TEMPERATURE_KELVIN = 6500
         private const val SMOOTH_TRANSITION_MILLIS = 5_000L
         private const val SMOOTH_TRANSITION_STEPS = 10
+        private const val SHELL_SERVICE_BIND_TIMEOUT_MILLIS = 5_000L
+        private const val SHIZUKU_SHELL_SERVICE_TAG = "project_lumen_shell_v1"
+        private const val SHIZUKU_SHELL_SERVICE_VERSION = 1
 
         private val sensitiveCameraHints = listOf("camera", "camerax", "scanner", "barcode", "qr")
         private val sensitiveCallHints = listOf("call", "voip", "meeting", "conference", "telecom", "zoom", "meet")

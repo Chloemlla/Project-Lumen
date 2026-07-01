@@ -1,54 +1,57 @@
- 安卓商业应用与后端 API 通信安全需求文档 (SRD)
-## 1. 传输层安全需求 (Transport Layer Security)
-### 1.1 全站 HTTPS 强制性
- * **需求描述：** 应用与后端服务之间的所有网络通信必须强制使用 HTTPS 协议，严禁使用 HTTP 明文传输。
- * **客户端实现：** * 在 res/xml/network_security_config.xml 中配置 cleartextTrafficPermitted="false"，全局禁用明文流量。
-   * 线上生产环境包必须关闭 WebView 的脚本注入漏洞，且不允许加载任何非全站 HTTPS 的网页。
- * **后端实现：** 服务器必须禁用 TLS 1.0 和 TLS 1.1，仅支持 **TLS 1.2 和 TLS 1.3**，并配置强加密套件（如支持前向保密 PFS 的 ECDHE 套件）。
-### 1.2 SSL 证书绑定 (Certificate Pinning)
- * **需求描述：** 为防止中间人攻击（MITM）及伪造证书授信，App 必须对后端 API 域名的公钥哈希进行绑定。
- * **验收标准：** * 使用 OkHttp 的 CertificatePinner 或安卓原生网络安全配置绑定主流证书及**至少一个备用证书（Backup Pin）**的公钥哈希。
-   * 使用 Charles、Burp Suite 等抓包工具在未安装合规代理证书的测试机上测试，App 必须直接阻断连接并提示网络异常。
-## 2. 身份认证与凭证管理需求 (Authentication & Credentials)
-### 2.1 令牌化身份验证机制
- * **需求描述：** 采用基于 Token 的认证机制（推荐 OAuth 2.0 / JWT），避免在网络中频繁传输或在本地存储用户的明文密码。
- * **设计规范：**
-   * **Access Token（访问令牌）：** 有效期不得超过 2 小时，随 HTTP 请求头（Authorization: Bearer <Token>）传输。
-   * **Refresh Token（刷新令牌）：** 有效期不超过 30 天，仅用于换取新的 Access Token。
-### 2.2 本地凭证安全存储
- * **需求描述：** 任何敏感凭证（如 Access Token、Refresh Token、用户个人隐私数据）绝不允许明文保存在系统公共目录或普通 SharedPreferences 中。
- * **技术要求：** * 必须使用 Android Jetpack 提供的 **EncryptedSharedPreferences**。
-   * 加解密密钥必须托管于 **Android Keystore System**，确保密钥由硬件芯片（TEE/SE）隔离保护，不可被外部读取。
-## 3. API 防护与防篡改需求 (API Protection)
-### 3.1 请求签名校验机制 (Request Signing)
- * **需求描述：** API 请求必须具备防篡改能力，确保前端发送的数据在传输过程中未被中途修改。
- * **实现算法：**
-   * 客户端将 请求参数(Body/Query) + 时间戳(Timestamp) + 随机字符串(Nonce) 按照字母序排列。
-   * 结合客户端与后端约定的特殊 Key，使用 **HMAC-SHA256** 算法计算出签名（Sign），放入 HTTP Header。
-   * 后端收到请求后用相同逻辑验签，不一致则直接返回 403 Forbidden。
-### 3.2 防重放攻击 (Anti-Replay)
- * **需求描述：** 防止黑客截获合法的 API 请求包并重复向服务器发送（如重复提交订单、重复消费）。
- * **实现规范：**
-   * 每个请求 Header 必须包含 **Timestamp（时间戳）** 和 **Nonce（唯一随机数）**。
-   * 后端服务校验：
-     1. 检查服务器当前时间与请求时间戳的差值，超过 5 分钟（300秒）的请求直接丢弃。
-     2. 将接收到的 Nonce 存入 Redis 缓存，设置 5 分钟过期时间。若在有效期内收到重复的 Nonce，直接拒绝请求。
-## 4. 客户端应用完整性与自防卫 (Client Self-Defense)
-### 4.1 环境安全能力监测 (Play Integrity)
- * **需求描述：** App 需具备运行时环境检测能力，严禁在不安全、被篡改的环境中执行敏感业务 API。
- * **集成要求：**
-   * 集成谷歌官方 **Play Integrity API**（或国内主流厂商的设备指纹 SDK）。
-   * 在关键业务接口（如注册、登录、支付）发起前，向后端发送 Integrity Token。后端调用谷歌服务器进行强验证，确保当前 App 是从未被二次打包的正版官方应用，且设备未被 Root 或处于模拟器中。
-### 4.2 代码混淆与逆向防护
- * **需求描述：** 提高 App 被反编译和静态分析的成本，防止加解密逻辑和 API 结构轻易泄露。
- * **技术要求：**
-   * 生产环境构建（Release Build）必须开启 **R8/ProGuard** 混淆，对所有的 Java/Kotlin 类名、方法名进行混淆。
-   * 敏感的核心加解密算法、Key 拼接逻辑、签名盐值（Salt）**严禁以明文硬编码在 Java 资源中**。必须下沉到 C/C++ 层编写（利用 NDK 编译为 .so 文件），并在 C 层加入运行时包名与签名证书哈希的二次校验。
-   * 加入基础反调试代码，检测到 android.os.Debug.isDebuggerConnected() 为 True 时或检测到 Frida/Xposed 框架特征时，应用应主动终止进程。
+引入 **Shizuku** 后，安卓端护眼软件的实现将迎来**质的飞跃**。
+传统的“悬浮窗遮罩”方案只是在屏幕上贴了一层半透明黄膜，不仅**无法真正减少蓝光发射**（屏幕背光里的蓝光依然在穿透黄膜），还会导致屏幕发灰、对比度雪崩，且截图会变黄。
+利用 **Shizuku** 获得 ADB 级别的高级系统权限后，我们能够直接调用 Android 系统的**色彩矩阵（Color Matrix）**和**系统无障碍滤镜（Accessibility Display Adjustment）**。这类似于 PC 端修改硬件 Gamma 查找表，从而在系统底层真正实现亮度和蓝光的独立调节。
+## 一、 基于 Shizuku 的原生防蓝光软件需求（PRD）
+### 1. 核心功能需求
+ * **硬件级无损独立色温（防蓝光）：** 拖动色温滑块时，直接修改底层色彩转换矩阵（Color Transform Matrix），直接削减硬件发光中的物理蓝光成分。屏幕变黄的同时，画面依旧清晰，**且系统截图、录屏完全不受影响，色彩依然纯净**。
+ * **物理背光级独立亮度（突破下限）：**
+   * 正常范围内，通过 Shizuku 直接改写系统亮度配置项。
+   * 关灯后，一键开启“夜间夜视仪”模式，结合 Shizuku 的系统级 Extra Dim（格外暗）接口，在不伤眼的前提下让背光降到硬件物理极限以下。
+ * **自动化无感过渡：** 设定好时间后，系统在后台悄悄更改矩阵参数，无需拉起悬浮窗或任何前台动画，5秒内平滑过渡。
+### 2. 非功能需求
+ * **免 Root、无悬浮窗：** 仅依赖 Shizuku 授权，不需要用户开启臃肿且容易被杀的“悬浮窗”和“无障碍服务”。
+ * **极致保活与极低功耗：** 由于调用的是系统原生接口，App 本身不需要实时绘制画面。参数修改后，App 可以完全转入休眠，耗电量为 **0%**。
+## 二、 Shizuku 原生应用的具体技术实现要求
+在原生安卓开发（Kotlin）中，调用 Shizuku 执行底层接口主要通过两种方式：直接反射/绑定系统服务（如 IWallpaperManager、IDisplayManager），或者执行高效的 settings 命令行。
+### 1. 技术选型
+ * **开发框架：** Kotlin + Shizuku API 核心库。
+ * **运行机制：** 软件不需要常驻前台服务，只需通过 Shizuku Binder 临时向系统服务注入参数。
+### 2. 底层技术实现要求（核心关键点）
+#### A. 色温（蓝光）控制：借助色彩矩阵（Color Matrix）
+Android 系统在底层（SurfaceFlinger 合成层）拥有一个处理屏幕颜色调整的隐藏服务。使用 Shizuku，我们可以向系统注入一个排除蓝光的 **4 \times 4 色彩矩阵**。
+ * **实现原理：** 削减 RGB 中的 B（Blue）通道。当用户调整色温滑块时，软件计算对应的 RGB 系数（例如 R=1.0, G=0.85, B=0.4），然后通过 Shizuku 代理执行系统隐藏的 accessibility 命令或直接调用 IDisplayManager：
+   ```bash
+   # 示例：通过 Shizuku 运行 shell 命令直接修改系统色彩矩阵（以实现纯硬件级滤镜）
+   settings put secure accessibility_display_magnification_navbar_enabled 0
+   # 在某些 AOSP 变体中，可以通过改变系统色彩校正配置（Color Correction）来注入自定义黄色矩阵
+   
+   ```
+ * **高级首选（如果目标设备支持）：** 调用 Android 原生的 ColorDisplayManager（夜间模式底层）。通过 Shizuku 提升权限后，直接调用隐藏的 setNightDisplayColorTemperature(int temperature) 接口，直接使用系统最高效的硬件级去蓝光算法。
+#### B. 亮度控制：硬件背光 + Extra Dim 双轨制
+ * **10% - 100% 亮度：**
+   通过 Shizuku 代理写入系统 system 表。
+   ```kotlin
+   // 通过 Shizuku 运行 ADB 级别的 settings 写入
+   // 独立于色温，直接修改屏幕物理背光
+   "settings put system screen_brightness $brightnessValue"
+   
+   ```
+ * **0% - 10%（超低亮度）：**
+   调用 Android 12 及以上原生引入的 **Extra Dim（格外暗）** 系统核心接口。通过 Shizuku 动态改变系统内置的超暗滤镜强度，从而在硬件背光极低的情况下，再进行一层无损的像素亮度衰减。
+   ```bash
+   # 调整系统 Extra Dim 的暗度百分比（0-100）
+   settings put secure accessibility_display_inversion_enabled 0 
+   # 注：具体键值通常为 secure 表中的 accessibility_intensity 或厂商特有键
+   
+   ```
+### 3. 兼容性与边界处理指标
 
-## 5. 代码落地记录
- * **HTTPS 与证书绑定：** Android 默认 API 已切换为 `https://eye.chloemlla.com/api`，`AndroidManifest.xml` 与 `network_security_config.xml` 已全局禁止明文流量；移动端后端 API 请求统一通过 OkHttp，并在 Release 构建要求配置主证书与备用证书 Pin（`PROJECT_LUMEN_API_CERTIFICATE_PINS`）。翻译 API 保持 HTTPS 强制校验，`PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS` 有配置时启用证书绑定，未配置时不改变现有翻译接入。
- * **Token 与安全存储：** 后端 Access Token 默认 TTL 调整为 7200 秒，Refresh Token 默认 TTL 为 30 天；客户端新增 `SecureCredentialStore`，使用 Android Keystore + `EncryptedSharedPreferences` 保存访问凭证。
- * **请求签名与防重放：** Android API 请求统一加入 `X-Lumen-Timestamp`、`X-Lumen-Nonce`、`X-Lumen-Signature`；后端 `/api/v1` 安全中间件使用 HMAC-SHA256 验签，校验 300 秒时间窗，并将 Nonce 写入 MongoDB TTL 集合防重放。
- * **Integrity 与关键接口：** 客户端集成 Play Integrity Token 获取能力，登录与 Google 购买校验请求会携带 `X-Lumen-Integrity`；后端可通过 `LUMEN_REQUIRE_PLAY_INTEGRITY=true` 对关键接口强制要求 Integrity Token。
- * **自防卫与混淆：** Release 构建保持 R8/资源收缩开启，已移除全包 keep 规则；签名密钥读取、包名/证书哈希校验、反调试与 Frida/Xposed 基础检测下沉到 NDK `lumen_security`。
+| 场景 / 维度 | 传统悬浮窗方案 | Shizuku 原生方案（实现要求） |
+| :--- | :--- | :--- |
+| **系统截图/录屏** | 截图是一团焦黄，发给别人看不清。 | **截图完全正常（原色）**。因为色彩矩阵只作用于最终的屏幕物理输出，不污染系统缓冲区。 |
+| **UAC与系统弹窗** | 遇到输入密码、安装输入法时，遮罩层往往被系统强行置顶失效或引发安全警告。 | **全场景完美覆盖**。由于是系统级滤镜，无论是锁屏、指纹解锁、安全密码界面，全部能维持舒适的偏黄低亮状态。 |
+| **多窗与游戏兼容** | 全屏游戏或看视频时，悬浮窗容易掉帧或被系统杀掉。 | **零性能损耗**。SurfaceFlinger 硬件合成，不占用 CPU，游戏完全不掉帧。 |
+| **断电/重启恢复** | 手机重启后必须手动重新打开 App 才能加载遮罩。 | **开机自加载**。通过注册 BOOT_COMPLETED 广播，在开机瞬间通过 Shizuku 自动恢复上一次的色温配置，用户毫无感知。 |
+
+> “我们需要开发一款利用 **Shizuku** 提权的安卓原生护眼软件。拒绝使用悬浮窗（TYPE_APPLICATION_OVERLAY）方案。**必须通过 Shizuku 获得 ADB 权限，色温调节通过修改系统底层色彩转换矩阵（或反射调用 ColorDisplayManager）来实现；亮度调节通过直接改写 settings 亮度值，并在极低亮度下联动激活系统的 Extra Dim（格外暗）特性**，从而实现彻底不污染截图、全场景覆盖且绝对不占内存和额外电量的原生双轴护眼效果。”
+>
