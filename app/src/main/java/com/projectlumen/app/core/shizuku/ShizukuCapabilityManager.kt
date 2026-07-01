@@ -2,15 +2,21 @@ package com.projectlumen.app.core.shizuku
 
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
+import android.app.NotificationManager
+import android.hardware.SensorPrivacyManager
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.BatteryManager
+import android.os.Build
+import android.os.PowerManager
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
-import java.util.concurrent.TimeUnit
 
 class ShizukuCapabilityManager(
     private val context: Context,
@@ -169,13 +175,13 @@ class ShizukuCapabilityManager(
     }
 
     private fun latestSystemContext(settings: AppSettingsEntity): ShizukuSystemContext {
-        val deviceInteractive = parseDeviceInteractive(runPrivilegedShell("dumpsys power"))
-        val batterySnapshot = parseBatterySnapshot(runPrivilegedShell("dumpsys battery"))
-        val powerSaveActive = readSettingsInt("global", "low_power") == 1 ||
-            parseEnabledSignal(runPrivilegedShell("cmd power get-mode"))
-        val dndActive = (readSettingsInt("global", "zen_mode") ?: 0) > 0
-        val thermalStatus = parseThermalStatus(runPrivilegedShell("dumpsys thermalservice"))
-        val cameraPrivacyEnabled = parseEnabledSignal(runPrivilegedShell("cmd sensorprivacy is-enabled camera"))
+        val powerManager = context.getSystemService(PowerManager::class.java)
+        val deviceInteractive = powerManager?.isInteractive ?: true
+        val batterySnapshot = latestBatterySnapshot()
+        val powerSaveActive = powerManager?.isPowerSaveMode == true
+        val dndActive = latestDndActive()
+        val thermalStatus = latestThermalStatus(powerManager)
+        val cameraPrivacyEnabled = latestCameraPrivacyEnabled()
         val shouldDeferSampling =
             (settings.shizukuScreenOffGuardEnabled && !deviceInteractive) ||
                 (settings.shizukuLowBatteryGuardEnabled && batterySnapshot.lowBatteryActive) ||
@@ -195,84 +201,53 @@ class ShizukuCapabilityManager(
         )
     }
 
-    private fun readSettingsInt(namespace: String, key: String): Int? {
-        return runPrivilegedShell("settings get $namespace $key")
-            ?.lineSequence()
-            ?.map { it.trim() }
-            ?.firstOrNull { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
-            ?.toIntOrNull()
-    }
-
-    private fun runPrivilegedShell(command: String): String? {
-        return runCatching {
-            val process = Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
-            val completed = process.waitFor(COMMAND_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)
-            if (!completed) process.destroy()
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            val error = process.errorStream.bufferedReader().use { it.readText() }
-            "$output\n$error".trim().take(MAX_COMMAND_OUTPUT_CHARS)
+    private fun latestBatterySnapshot(): BatterySnapshot {
+        val intent = runCatching {
+            context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         }.getOrNull()
-    }
-
-    private fun parseDeviceInteractive(output: String?): Boolean {
-        val value = output.orEmpty().lowercase()
-        return when {
-            "mwakefulness=asleep" in value -> false
-            "mwakefulness=dozing" in value -> false
-            "display power: state=off" in value -> false
-            "minteractive=false" in value -> false
-            "mwakefulness=awake" in value -> true
-            "display power: state=on" in value -> true
-            "minteractive=true" in value -> true
-            else -> true
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val levelPercent = if (level >= 0 && scale > 0) {
+            ((level * 100f) / scale).toInt().coerceIn(0, 100)
+        } else {
+            -1
         }
-    }
-
-    private fun parseBatterySnapshot(output: String?): BatterySnapshot {
-        val value = output.orEmpty()
-        val level = Regex("""level:\s*(\d+)""")
-            .find(value)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.toIntOrNull()
-            ?: -1
-        val lower = value.lowercase()
-        val powered = "ac powered: true" in lower ||
-            "usb powered: true" in lower ||
-            "wireless powered: true" in lower ||
-            "dock powered: true" in lower
+        val plugged = intent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
+            ?: BatteryManager.BATTERY_STATUS_UNKNOWN
+        val powered = plugged != 0 ||
+            status == BatteryManager.BATTERY_STATUS_CHARGING ||
+            status == BatteryManager.BATTERY_STATUS_FULL
         return BatterySnapshot(
-            levelPercent = level,
-            lowBatteryActive = level in 0..LOW_BATTERY_THRESHOLD_PERCENT && !powered,
+            levelPercent = levelPercent,
+            lowBatteryActive = levelPercent in 0..LOW_BATTERY_THRESHOLD_PERCENT && !powered,
         )
     }
 
-    private fun parseThermalStatus(output: String?): Int {
-        val value = output.orEmpty()
-        val numericStatus = listOf(
-            Regex("""mStatus\s*=\s*(\d+)"""),
-            Regex("""Thermal Status:\s*(\d+)""", RegexOption.IGNORE_CASE),
-            Regex("""status\s*=\s*(\d+)""", RegexOption.IGNORE_CASE),
-        ).firstNotNullOfOrNull { regex ->
-            regex.find(value)?.groupValues?.getOrNull(1)?.toIntOrNull()
-        }
-        if (numericStatus != null) return numericStatus
-        val lower = value.lowercase()
-        return when {
-            "critical" in lower -> 4
-            "severe" in lower -> 3
-            "moderate" in lower -> 2
-            "light" in lower -> 1
-            else -> 0
+    private fun latestDndActive(): Boolean {
+        val notificationManager = context.getSystemService(NotificationManager::class.java) ?: return false
+        return runCatching {
+            val filter = notificationManager.currentInterruptionFilter
+            filter == NotificationManager.INTERRUPTION_FILTER_PRIORITY ||
+                filter == NotificationManager.INTERRUPTION_FILTER_ALARMS ||
+                filter == NotificationManager.INTERRUPTION_FILTER_NONE
+        }.getOrDefault(false)
+    }
+
+    private fun latestThermalStatus(powerManager: PowerManager?): Int {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            powerManager?.currentThermalStatus ?: 0
+        } else {
+            0
         }
     }
 
-    private fun parseEnabledSignal(output: String?): Boolean {
-        val value = output.orEmpty().lowercase()
-        if (value.isBlank()) return false
-        if ("unknown" in value || "unsupported" in value || "usage:" in value || "error" in value) return false
-        if (Regex("""\bfalse\b|\bdisabled\b|\boff\b""").containsMatchIn(value)) return false
-        return Regex("""\btrue\b|\benabled\b|\b1\b""").containsMatchIn(value)
+    private fun latestCameraPrivacyEnabled(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        val sensorPrivacy = context.getSystemService(SensorPrivacyManager::class.java) ?: return false
+        return runCatching {
+            sensorPrivacy.isSensorPrivacyEnabled(SensorPrivacyManager.Sensors.CAMERA)
+        }.getOrDefault(false)
     }
 
     private data class BatterySnapshot(
@@ -300,8 +275,6 @@ class ShizukuCapabilityManager(
         private const val CATEGORY_COMMUNICATION = "communication"
         private const val CATEGORY_MEDIA = "media"
         private const val CATEGORY_GAME = "game"
-        private const val COMMAND_TIMEOUT_MILLIS = 1_500L
-        private const val MAX_COMMAND_OUTPUT_CHARS = 16_384
         private const val LOW_BATTERY_THRESHOLD_PERCENT = 15
         private const val THERMAL_STATUS_MODERATE = 2
 
