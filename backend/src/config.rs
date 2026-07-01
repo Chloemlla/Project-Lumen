@@ -39,13 +39,9 @@ impl Config {
             ),
             login_code: env_value("LUMEN_DEV_LOGIN_CODE", "000000"),
             login_ttl_seconds: env_u64("LUMEN_LOGIN_TTL_SECONDS", 600),
-            access_token_ttl_seconds: env_u64("LUMEN_ACCESS_TOKEN_TTL_SECONDS", 7_200)
-                .min(7_200),
-            refresh_token_ttl_seconds: env_u64(
-                "LUMEN_REFRESH_TOKEN_TTL_SECONDS",
-                2_592_000,
-            )
-            .min(2_592_000),
+            access_token_ttl_seconds: env_u64("LUMEN_ACCESS_TOKEN_TTL_SECONDS", 7_200).min(7_200),
+            refresh_token_ttl_seconds: env_u64("LUMEN_REFRESH_TOKEN_TTL_SECONDS", 2_592_000)
+                .min(2_592_000),
             request_signing_secret: env_value(
                 "LUMEN_REQUEST_SIGNING_SECRET",
                 "project-lumen-local-request-signing-key",

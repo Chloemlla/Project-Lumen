@@ -56,12 +56,14 @@ pub async fn enforce_api_security(
         );
         validate_signature(&state.config.request_signing_secret, &canonical, signature)?;
 
-        let expires_at = now_millis()
-            + (state.config.request_timestamp_skew_seconds as i64 * 1_000);
+        let expires_at =
+            now_millis() + (state.config.request_timestamp_skew_seconds as i64 * 1_000);
         state.store.remember_api_nonce(nonce, expires_at).await?;
     }
 
-    Ok(next.run(Request::from_parts(parts, Body::from(body_bytes))).await)
+    Ok(next
+        .run(Request::from_parts(parts, Body::from(body_bytes)))
+        .await)
 }
 
 fn required_header<'a>(headers: &'a HeaderMap, name: &str) -> Result<&'a str, ApiError> {

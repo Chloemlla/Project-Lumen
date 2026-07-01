@@ -26,8 +26,8 @@ use mongodb::{
     Client, Collection, IndexModel,
 };
 use serde_json::json;
-use telemetry::TelemetryUploadRecord;
 use std::time::Duration;
+use telemetry::TelemetryUploadRecord;
 
 pub use documents::UserRecord;
 

@@ -18,10 +18,10 @@ pub mod health;
 pub mod me;
 #[path = "routes/purchases.rs"]
 pub mod purchases;
-#[path = "routes/session.rs"]
-pub mod session;
 #[path = "routes/security.rs"]
 pub mod security;
+#[path = "routes/session.rs"]
+pub mod session;
 #[path = "routes/sync.rs"]
 pub mod sync;
 #[path = "routes/telemetry.rs"]
