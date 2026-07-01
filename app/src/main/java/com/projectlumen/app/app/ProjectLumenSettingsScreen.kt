@@ -297,6 +297,8 @@ internal fun SettingsScreen(
             viewModel.refreshShizukuState()
         }
     }
+    val templateAppearanceEnabled = !settings.useDynamicColors
+    val autoDarkWindowEnabled = settings.useAutoDarkWindow && !templateAppearanceEnabled
     LumenPage {
         PageIntro(
             icon = Icons.Outlined.Settings,
@@ -312,9 +314,9 @@ internal fun SettingsScreen(
             }
             Text(stringResource(R.string.theme), style = MaterialTheme.typography.titleSmall)
             LumenFlowRow {
-                ThemeChip(R.string.theme_system, AppThemeMode.SYSTEM, settings, viewModel)
+                ThemeChip(R.string.theme_system, AppThemeMode.SYSTEM, settings, viewModel, enabled = !templateAppearanceEnabled)
                 ThemeChip(R.string.theme_light, AppThemeMode.LIGHT, settings, viewModel)
-                ThemeChip(R.string.theme_dark, AppThemeMode.DARK, settings, viewModel)
+                ThemeChip(R.string.theme_dark, AppThemeMode.DARK, settings, viewModel, enabled = !templateAppearanceEnabled)
             }
             SwitchRow(R.string.enable_statistics, Icons.Outlined.BarChart, settings.statsEnabled) {
                 viewModel.updateSettings { current -> current.copy(statsEnabled = it) }
@@ -326,11 +328,16 @@ internal fun SettingsScreen(
                 OutlinedButton(onClick = openTemplates) { ButtonLabel(Icons.Outlined.Style, R.string.nav_templates) }
                 OutlinedButton(onClick = openAbout) { ButtonLabel(Icons.Outlined.Info, R.string.nav_about) }
             }
-            SwitchRow(R.string.auto_dark_window, Icons.Outlined.Style, settings.useAutoDarkWindow) {
+            SwitchRow(
+                R.string.auto_dark_window,
+                Icons.Outlined.Style,
+                autoDarkWindowEnabled,
+                enabled = !templateAppearanceEnabled,
+            ) {
                 viewModel.updateSettings { current -> current.copy(useAutoDarkWindow = it) }
             }
             AnimatedVisibility(
-                visible = settings.useAutoDarkWindow,
+                visible = autoDarkWindowEnabled,
                 enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
                 exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
             ) {
@@ -834,7 +841,17 @@ internal fun SettingsScreen(
         SettingsSection(R.string.section_appearance, Icons.Outlined.Style) {
             val proEnabled = planTier(settings) >= PlanTier.PRO
             SwitchRow(R.string.use_wallpaper_colors, Icons.Outlined.Style, settings.useDynamicColors) {
-                viewModel.updateSettings { current -> current.copy(useDynamicColors = it) }
+                viewModel.updateSettings { current ->
+                    if (it) {
+                        current.copy(useDynamicColors = true)
+                    } else {
+                        current.copy(
+                            useDynamicColors = false,
+                            themeMode = AppThemeMode.LIGHT.name,
+                            useAutoDarkWindow = false,
+                        )
+                    }
+                }
             }
             Text(
                 stringResource(

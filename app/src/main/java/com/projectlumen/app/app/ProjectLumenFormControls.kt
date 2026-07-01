@@ -201,9 +201,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun SwitchRow(@StringRes labelRes: Int, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+internal fun SwitchRow(
+    @StringRes labelRes: Int,
+    icon: ImageVector,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit,
+) {
     val haptic = LocalHapticFeedback.current
     fun toggle(next: Boolean) {
+        if (!enabled) return
         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         onCheckedChange(next)
     }
@@ -213,14 +220,15 @@ internal fun SwitchRow(@StringRes labelRes: Int, icon: ImageVector, checked: Boo
             .clip(LumenCardShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f))
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
-            .clickable { toggle(!checked) }
+            .clickable(enabled = enabled) { toggle(!checked) }
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .graphicsLayer { alpha = if (enabled) 1f else 0.52f }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LabelWithIcon(icon, labelRes, Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = { toggle(it) })
+        Switch(checked = checked, enabled = enabled, onCheckedChange = { toggle(it) })
     }
 }
 
@@ -306,8 +314,15 @@ internal fun LanguageChip(@StringRes labelRes: Int, code: String, settings: AppS
 }
 
 @Composable
-internal fun ThemeChip(@StringRes labelRes: Int, mode: AppThemeMode, settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
+internal fun ThemeChip(
+    @StringRes labelRes: Int,
+    mode: AppThemeMode,
+    settings: AppSettingsEntity,
+    viewModel: ProjectLumenViewModel,
+    enabled: Boolean = true,
+) {
     FilterChip(
+        enabled = enabled,
         selected = settings.themeMode == mode.name,
         onClick = { viewModel.setThemeMode(mode) },
         label = { Text(stringResource(labelRes)) },

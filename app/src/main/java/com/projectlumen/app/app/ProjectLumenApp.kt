@@ -108,17 +108,16 @@ fun ProjectLumenApp(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val configuredThemeMode = runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }
         .getOrDefault(AppThemeMode.SYSTEM)
-    val themeMode = if (
+    val templateAppearanceEnabled = !uiState.settings.useDynamicColors
+    val themeMode = when {
+        templateAppearanceEnabled -> AppThemeMode.LIGHT
         uiState.settings.useAutoDarkWindow &&
-        isAutoDarkActive(
-            nowMillis = uiState.nowMillis,
-            startMinute = uiState.settings.autoDarkStartMinute,
-            endMinute = uiState.settings.autoDarkEndMinute,
-        )
-    ) {
-        AppThemeMode.DARK
-    } else {
-        configuredThemeMode
+            isAutoDarkActive(
+                nowMillis = uiState.nowMillis,
+                startMinute = uiState.settings.autoDarkStartMinute,
+                endMinute = uiState.settings.autoDarkEndMinute,
+            ) -> AppThemeMode.DARK
+        else -> configuredThemeMode
     }
     val baseContext = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -203,6 +202,25 @@ fun ProjectLumenApp(
 
     LaunchedEffect(uiState.settings.languageCode) {
         LocaleController.apply(uiState.settings.languageCode)
+    }
+    LaunchedEffect(
+        uiState.isReady,
+        templateAppearanceEnabled,
+        uiState.settings.themeMode,
+        uiState.settings.useAutoDarkWindow,
+    ) {
+        if (
+            uiState.isReady &&
+            templateAppearanceEnabled &&
+            (uiState.settings.themeMode != AppThemeMode.LIGHT.name || uiState.settings.useAutoDarkWindow)
+        ) {
+            viewModel.updateSettings { current ->
+                current.copy(
+                    themeMode = AppThemeMode.LIGHT.name,
+                    useAutoDarkWindow = false,
+                )
+            }
+        }
     }
     LaunchedEffect(viewModel) {
         viewModel.webPageRequests.collect { url ->
