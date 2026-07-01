@@ -212,7 +212,7 @@ fun ProjectLumenApp(
         }
     }
     val localizedContext = baseContext
-    val activeThemeTemplate = activeTemplate(uiState)
+    val activeThemeTemplate = if (uiState.settings.useDynamicColors) null else activeTemplate(uiState)
 
     CompositionLocalProvider(LocalContext provides localizedContext) {
         ProjectLumenTheme(

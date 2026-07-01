@@ -843,24 +843,32 @@ internal fun SettingsScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TemplatePreviewCard(template)
-            LumenFlowRow {
-                uiState.templates.filter { !it.isPremium || proEnabled }.forEach { template ->
-                    val selected = settings.activeTipTemplateId == template.id
-                    FilterChip(
-                        selected = selected,
-                        onClick = { viewModel.selectTemplate(template.id) },
-                        label = { Text(templateDisplayName(template)) },
-                        leadingIcon = {
-                            AnimatedVisibility(
-                                visible = selected,
-                                enter = scaleIn(tween(120)) + fadeIn(tween(120)),
-                                exit = scaleOut(tween(90)) + fadeOut(tween(90)),
-                            ) {
-                                Icon(Icons.Outlined.CheckCircle, contentDescription = null)
-                            }
-                        },
-                    )
+            AnimatedVisibility(
+                visible = !settings.useDynamicColors,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TemplatePreviewCard(template)
+                    LumenFlowRow {
+                        uiState.templates.filter { !it.isPremium || proEnabled }.forEach { template ->
+                            val selected = settings.activeTipTemplateId == template.id
+                            FilterChip(
+                                selected = selected,
+                                onClick = { viewModel.selectTemplate(template.id) },
+                                label = { Text(templateDisplayName(template)) },
+                                leadingIcon = {
+                                    AnimatedVisibility(
+                                        visible = selected,
+                                        enter = scaleIn(tween(120)) + fadeIn(tween(120)),
+                                        exit = scaleOut(tween(90)) + fadeOut(tween(90)),
+                                    ) {
+                                        Icon(Icons.Outlined.CheckCircle, contentDescription = null)
+                                    }
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }

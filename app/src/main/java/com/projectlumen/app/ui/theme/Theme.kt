@@ -78,11 +78,15 @@ fun ProjectLumenTheme(
         darkTheme -> DarkColors
         else -> LightColors
     }
-    val colorScheme = baseColorScheme.applyTemplatePalette(
-        primaryHex = themePrimaryColor,
-        backgroundHex = themeBackgroundColor,
-        darkTheme = darkTheme,
-    )
+    val colorScheme = if (useDynamicColors) {
+        baseColorScheme
+    } else {
+        baseColorScheme.applyTemplatePalette(
+            primaryHex = themePrimaryColor,
+            backgroundHex = themeBackgroundColor,
+            darkTheme = darkTheme,
+        )
+    }
     MaterialTheme(
         colorScheme = colorScheme,
         typography = LumenTypography,
