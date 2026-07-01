@@ -245,9 +245,21 @@ class ShizukuCapabilityManager(
     private fun latestCameraPrivacyEnabled(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
         val sensorPrivacy = context.getSystemService(SensorPrivacyManager::class.java) ?: return false
-        return runCatching {
-            sensorPrivacy.isSensorPrivacyEnabled(SensorPrivacyManager.Sensors.CAMERA)
-        }.getOrDefault(false)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            listOf(1, 2).any { toggleType ->
+                runCatching {
+                    sensorPrivacy.javaClass
+                        .getMethod("isSensorPrivacyEnabled", Integer.TYPE, Integer.TYPE)
+                        .invoke(sensorPrivacy, toggleType, SensorPrivacyManager.Sensors.CAMERA) as? Boolean
+                }.getOrNull() == true
+            }
+        } else {
+            runCatching {
+                sensorPrivacy.javaClass
+                    .getMethod("isSensorPrivacyEnabled", Integer.TYPE)
+                    .invoke(sensorPrivacy, SensorPrivacyManager.Sensors.CAMERA) as? Boolean
+            }.getOrNull() == true
+        }
     }
 
     private data class BatterySnapshot(
