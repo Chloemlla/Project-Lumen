@@ -230,13 +230,9 @@ internal fun WebViewScreen(
         AlertDialog(
             onDismissRequest = { showCompatibilityDialog = false },
             icon = { Icon(Icons.Outlined.WarningAmber, contentDescription = null) },
-            title = { Text("兼容性提示") },
+            title = { Text(stringResource(R.string.webview_compatibility_title)) },
             text = {
-                Text(
-                    "检测到您的系统内置浏览器版本($chromeVersion)过低, 可能无法正常浏览网页文档\n\n" +
-                        "建议自行升级版本后重启 Project Lumen 再查看文档, 或点击右上角后在外部浏览器打开查阅\n\n" +
-                        "若能正常浏览文档请忽略此项提示",
-                )
+                Text(stringResource(R.string.webview_compatibility_message, chromeVersion))
             },
             confirmButton = {
                 OutlinedButton(onClick = { showCompatibilityDialog = false }) {
@@ -252,7 +248,7 @@ internal fun WebViewScreen(
             TopAppBar(
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
                     }
                 },
                 title = {
@@ -270,11 +266,11 @@ internal fun WebViewScreen(
                 actions = {
                     if (chromeVersion in 1 until MINI_CHROME_VERSION) {
                         IconButton(onClick = { showCompatibilityDialog = true }) {
-                            Icon(Icons.Outlined.WarningAmber, contentDescription = null)
+                            Icon(Icons.Outlined.WarningAmber, contentDescription = stringResource(R.string.webview_compatibility_action))
                         }
                     }
                     IconButton(onClick = { expanded = true }) {
-                        Icon(Icons.Outlined.MoreVert, contentDescription = null)
+                        Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.webview_more_options))
                     }
                     Box(modifier = Modifier.wrapContentSize(Alignment.TopStart)) {
                         DropdownMenu(
@@ -283,7 +279,7 @@ internal fun WebViewScreen(
                         ) {
                             if (!isLoading) {
                                 DropdownMenuItem(
-                                    text = { Text("刷新页面") },
+                                    text = { Text(stringResource(R.string.webview_refresh)) },
                                     onClick = {
                                         expanded = false
                                         webView?.reload()
@@ -291,14 +287,14 @@ internal fun WebViewScreen(
                                 )
                             }
                             DropdownMenuItem(
-                                text = { Text("复制链接") },
+                                text = { Text(stringResource(R.string.webview_copy_link)) },
                                 onClick = {
                                     expanded = false
                                     copyWebPageUrl(context, currentPageUrl)
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("外部打开") },
+                                text = { Text(stringResource(R.string.webview_open_external)) },
                                 onClick = {
                                     expanded = false
                                     openUri(context, currentPageUrl.toUri())
@@ -411,13 +407,13 @@ internal fun copyWebPageUrl(context: Context, url: String) {
     context.getSystemService<ClipboardManager>()?.setPrimaryClip(
         ClipData.newPlainText(context.packageName, url),
     )
-    Toast.makeText(context, "复制成功", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, context.getString(R.string.webview_link_copied), Toast.LENGTH_SHORT).show()
 }
 
 internal fun openUri(context: Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     runCatching { context.startActivity(intent) }
-        .onFailure { Toast.makeText(context, "无法打开链接", Toast.LENGTH_SHORT).show() }
+        .onFailure { Toast.makeText(context, context.getString(R.string.webview_open_failed), Toast.LENGTH_SHORT).show() }
 }
 
 @Suppress("DEPRECATION")

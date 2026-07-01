@@ -203,6 +203,7 @@ internal fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
     val reminderActive = runtime.activeEngine == ActiveEngine.REMINDER.name &&
         runtime.reminderPhase != ReminderPhase.IDLE.name
     val reminderPaused = reminderActive && runtime.reminderPhase == ReminderPhase.PAUSED.name
+    val timerActive = runtime.activeEngine != ActiveEngine.IDLE.name
     val canStartReminder = uiState.settings.reminderEnabled && runtime.activeEngine == ActiveEngine.IDLE.name
     val canPauseReminder = reminderActive && !reminderPaused
     val canResumeReminder = uiState.settings.reminderEnabled && reminderPaused
@@ -223,8 +224,16 @@ internal fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
         ActionCard {
             SectionHeader(Icons.Outlined.Schedule, R.string.quick_actions)
             when {
-                !uiState.settings.reminderEnabled -> EmptyStateMessage(R.string.reminder_disabled_hint)
-                !reminderActive && runtime.activeEngine != ActiveEngine.IDLE.name -> EmptyStateMessage(R.string.other_timer_running_hint)
+                !uiState.settings.reminderEnabled && !timerActive -> EmptyStateMessage(R.string.reminder_disabled_hint)
+                !reminderActive && timerActive -> {
+                    EmptyStateMessage(R.string.other_timer_running_hint)
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::stopAll,
+                    ) {
+                        ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
+                    }
+                }
                 canStartReminder -> {
                     Button(
                         modifier = Modifier.fillMaxWidth(),
@@ -248,6 +257,12 @@ internal fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
                             ButtonLabel(Icons.Outlined.Schedule, R.string.silent_until)
                         }
                     }
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::stopAll,
+                    ) {
+                        ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
+                    }
                 }
                 canResumeReminder -> {
                     Button(
@@ -255,6 +270,20 @@ internal fun HomeScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVie
                         onClick = { runReminderAction(viewModel::resumeReminder) },
                     ) {
                         ButtonLabel(Icons.Outlined.Refresh, R.string.resume_now)
+                    }
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::stopAll,
+                    ) {
+                        ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
+                    }
+                }
+                timerActive -> {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::stopAll,
+                    ) {
+                        ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }
                 }
                 else -> EmptyStateMessage(R.string.reminder_idle_hint)

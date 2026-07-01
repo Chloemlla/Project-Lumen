@@ -148,7 +148,9 @@ fun ProjectLumenApp(
                 if (!manual) autoCheckStarted = true
             }.onFailure { throwable ->
                 if (manual) {
-                    updateDialogState = UpdateDialogState.Error(throwable.message ?: "Update check failed.")
+                    updateDialogState = UpdateDialogState.Error(
+                        throwable.message ?: baseContext.getString(R.string.about_update_failed_title),
+                    )
                 }
                 if (!manual) autoCheckStarted = true
             }
@@ -159,7 +161,11 @@ fun ProjectLumenApp(
         if (updateInstaller.canInstallPackages()) {
             runCatching { updateInstaller.installApk(file) }
                 .onSuccess { updateDialogState = UpdateDialogState.Hidden }
-                .onFailure { updateDialogState = UpdateDialogState.Error(it.message ?: "Unable to open installer.") }
+                .onFailure {
+                    updateDialogState = UpdateDialogState.Error(
+                        it.message ?: baseContext.getString(R.string.about_update_open_installer_failed),
+                    )
+                }
             return
         }
         updateDialogState = UpdateDialogState.InstallAuthorization(candidate, file)
@@ -185,7 +191,9 @@ fun ProjectLumenApp(
             result.onSuccess { file ->
                 startInstallIfAllowed(candidate, file)
             }.onFailure { throwable ->
-                updateDialogState = UpdateDialogState.Error(throwable.message ?: "Update download failed.")
+                updateDialogState = UpdateDialogState.Error(
+                    throwable.message ?: baseContext.getString(R.string.about_update_download_failed),
+                )
             }
         }
     }

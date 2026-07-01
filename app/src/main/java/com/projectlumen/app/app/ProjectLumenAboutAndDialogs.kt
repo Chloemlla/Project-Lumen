@@ -555,7 +555,11 @@ internal fun UpdateDialog(
                             onInstallDownloadedApk(candidate, currentState.file)
                         } else {
                             runCatching { context.startActivity(updateInstaller.createInstallPermissionIntent()) }
-                                .onFailure { onError(it.message ?: "Unable to open install settings.") }
+                                .onFailure {
+                                    onError(
+                                        it.message ?: context.getString(R.string.about_update_open_install_settings_failed),
+                                    )
+                                }
                         }
                     }) {
                         ButtonLabel(

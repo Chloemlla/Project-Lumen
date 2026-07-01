@@ -204,7 +204,11 @@ internal fun rememberNotificationPermissionGate(): ((() -> Unit) -> Unit) {
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val action = pendingAction
         pendingAction = null
-        if (granted) action?.invoke()
+        if (granted) {
+            action?.invoke()
+        } else {
+            Toast.makeText(context, context.getString(R.string.notification_permission_denied_message), Toast.LENGTH_LONG).show()
+        }
     }
     return { action ->
         if (needsNotificationPermission(context)) {
@@ -223,7 +227,11 @@ internal fun rememberCameraPermissionGate(): ((() -> Unit) -> Unit) {
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val action = pendingAction
         pendingAction = null
-        if (granted) action?.invoke()
+        if (granted) {
+            action?.invoke()
+        } else {
+            Toast.makeText(context, context.getString(R.string.camera_permission_denied_message), Toast.LENGTH_LONG).show()
+        }
     }
     return { action ->
         if (needsCameraPermission(context)) {

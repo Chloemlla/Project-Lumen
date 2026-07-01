@@ -82,6 +82,9 @@
     <string name="about_update_downloading">正在下载更新…</string>
     <string name="about_update_downloading_progress">正在下载更新… %1$d%%</string>
     <string name="about_update_failed_title">检查更新失败</string>
+    <string name="about_update_download_failed">下载更新失败。</string>
+    <string name="about_update_open_installer_failed">无法打开安装器。</string>
+    <string name="about_update_open_install_settings_failed">无法打开安装权限设置。</string>
     <string name="about_external_link_prompt_title">打开外部链接？</string>
     <string name="about_external_link_prompt_message">这将打开浏览器并跳转到外部网站。</string>
     <string name="about_install_permission_prompt_title">允许安装应用？</string>
@@ -186,6 +189,7 @@
     <string name="overlay_strict_distance">严重近距离遮罩阈值</string>
     <string name="camera_permission_needed">需要摄像头权限</string>
     <string name="camera_permission_needed_message">摄像头仅用于本地人脸距离测算，图像不会上传。</string>
+    <string name="camera_permission_denied_message">未允许摄像头权限，无法启动距离和眨眼检测。</string>
     <string name="allow_camera">允许摄像头</string>
     <string name="proximity_calibration_title">记录安全阅读距离</string>
     <string name="proximity_calibration_message">请把手机放在你觉得舒适健康的阅读距离，保持正常坐姿，然后记录一次本地摄像头采样。Project Lumen 只保存人脸测量值，不保存照片。</string>
@@ -254,6 +258,7 @@
     <string name="allow_notifications">允许通知</string>
     <string name="notification_permission_needed">需要通知权限</string>
     <string name="notification_permission_needed_message">允许系统通知后，提醒才能在应用外显示。</string>
+    <string name="notification_permission_denied_message">未允许通知权限，计时提醒将只在应用内显示。</string>
     <string name="exact_alarm_permission_needed">提升计时准确性</string>
     <string name="exact_alarm_permission_needed_message">如果未允许精确闹钟，Android 可能延迟用眼休息和番茄钟到点提醒。</string>
     <string name="full_screen_intent_permission_needed">允许全屏提醒</string>
@@ -437,4 +442,13 @@
     <string name="developer_acceleration">加速度模长</string>
     <string name="developer_crash_preview_message">使用一份本地模拟报告打开崩溃报告 UI，不会让应用真实崩溃，也不会保存真实报告。</string>
     <string name="developer_preview_crash_page">预览崩溃页面</string>
+    <string name="webview_compatibility_title">兼容性提示</string>
+    <string name="webview_compatibility_message">检测到系统 WebView 版本（%1$d）较低，可能无法正常显示文档。\n\n建议更新 Android System WebView，或从外部浏览器打开此页面。\n\n如果页面显示正常，可以忽略此提示。</string>
+    <string name="webview_compatibility_action">兼容性提示</string>
+    <string name="webview_more_options">更多操作</string>
+    <string name="webview_refresh">刷新页面</string>
+    <string name="webview_copy_link">复制链接</string>
+    <string name="webview_open_external">外部打开</string>
+    <string name="webview_link_copied">链接已复制。</string>
+    <string name="webview_open_failed">无法打开链接。</string>
 </resources>

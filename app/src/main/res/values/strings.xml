@@ -82,6 +82,9 @@
     <string name="about_update_downloading">Downloading update…</string>
     <string name="about_update_downloading_progress">Downloading update… %1$d%%</string>
     <string name="about_update_failed_title">Update check failed</string>
+    <string name="about_update_download_failed">Update download failed.</string>
+    <string name="about_update_open_installer_failed">Unable to open installer.</string>
+    <string name="about_update_open_install_settings_failed">Unable to open install settings.</string>
     <string name="about_external_link_prompt_title">Open external link?</string>
     <string name="about_external_link_prompt_message">This will open your browser to an external website.</string>
     <string name="about_install_permission_prompt_title">Allow app installs?</string>
@@ -186,6 +189,7 @@
     <string name="overlay_strict_distance">Strict distance overlay threshold</string>
     <string name="camera_permission_needed">Camera permission needed</string>
     <string name="camera_permission_needed_message">The camera is used only for local face-distance checks and images are not uploaded.</string>
+    <string name="camera_permission_denied_message">Camera permission was not allowed, so distance and blink checks cannot start.</string>
     <string name="allow_camera">Allow camera</string>
     <string name="proximity_calibration_title">Record a safe reading distance</string>
     <string name="proximity_calibration_message">Hold the phone at your comfortable healthy reading distance, keep your normal posture, then record one local camera sample. Project Lumen stores only face measurements, not the image.</string>
@@ -254,6 +258,7 @@
     <string name="allow_notifications">Allow notifications</string>
     <string name="notification_permission_needed">Notifications need permission</string>
     <string name="notification_permission_needed_message">Allow system notifications so reminders can appear outside the app.</string>
+    <string name="notification_permission_denied_message">Notifications were not allowed. Timer alerts will stay inside the app.</string>
     <string name="exact_alarm_permission_needed">Improve timing accuracy</string>
     <string name="exact_alarm_permission_needed_message">Android may delay eye-break and pomodoro timing unless exact alarms are allowed in system settings.</string>
     <string name="full_screen_intent_permission_needed">Allow full-screen reminders</string>
@@ -439,4 +444,13 @@
     <string name="developer_acceleration">Acceleration magnitude</string>
     <string name="developer_crash_preview_message">Open the crash report UI with a simulated local report. This does not crash the app or save a real report.</string>
     <string name="developer_preview_crash_page">Preview crash page</string>
+    <string name="webview_compatibility_title">Compatibility notice</string>
+    <string name="webview_compatibility_message">The system WebView version (%1$d) is old and may not display documentation correctly.\n\nUpdate Android System WebView or open this page in an external browser.\n\nIgnore this notice if the page looks normal.</string>
+    <string name="webview_compatibility_action">Compatibility notice</string>
+    <string name="webview_more_options">More options</string>
+    <string name="webview_refresh">Refresh page</string>
+    <string name="webview_copy_link">Copy link</string>
+    <string name="webview_open_external">Open externally</string>
+    <string name="webview_link_copied">Link copied.</string>
+    <string name="webview_open_failed">Unable to open link.</string>
 </resources>
