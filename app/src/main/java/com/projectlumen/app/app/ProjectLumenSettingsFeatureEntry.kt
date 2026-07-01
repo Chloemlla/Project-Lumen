@@ -37,10 +37,12 @@ internal class ProjectLumenSettingsFeatureEntry(
         applyShizukuResilienceSettings(settings)
     }
 
-    fun updateSettings(transform: (AppSettingsEntity) -> AppSettingsEntity) {
+    fun updateSettings(
+        transform: (AppSettingsEntity) -> AppSettingsEntity,
+        nowMillis: Long = System.currentTimeMillis(),
+    ) {
         scope.launch {
             val current = settingsRepository.getOrDefault()
-            val nowMillis = System.currentTimeMillis()
             val updated = settingsRepository.update(nowMillis, transform)
             val shouldRescheduleProximity = (updated.proximityMonitoringEnabled || updated.blinkMonitoringEnabled) && (
                 current.proximityCheckIntervalMinutes != updated.proximityCheckIntervalMinutes ||
@@ -65,9 +67,8 @@ internal class ProjectLumenSettingsFeatureEntry(
         }
     }
 
-    fun setReminderEnabled(enabled: Boolean) {
+    fun setReminderEnabled(enabled: Boolean, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            val nowMillis = System.currentTimeMillis()
             settingsRepository.update(nowMillis) { it.copy(reminderEnabled = enabled) }
             val state = runtimeRepository.getOrDefault()
             if (!enabled && state.activeEngine == ActiveEngine.REMINDER.name) {
@@ -76,9 +77,8 @@ internal class ProjectLumenSettingsFeatureEntry(
         }
     }
 
-    fun setPomodoroEnabled(enabled: Boolean) {
+    fun setPomodoroEnabled(enabled: Boolean, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            val nowMillis = System.currentTimeMillis()
             settingsRepository.update(nowMillis) { it.copy(pomodoroEnabled = enabled) }
             val state = runtimeRepository.getOrDefault()
             if (!enabled && state.activeEngine == ActiveEngine.POMODORO.name) {
@@ -87,23 +87,23 @@ internal class ProjectLumenSettingsFeatureEntry(
         }
     }
 
-    fun setNotificationsEnabled(enabled: Boolean) {
+    fun setNotificationsEnabled(enabled: Boolean, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            val settings = settingsRepository.update { it.copy(notificationEnabled = enabled) }
+            val settings = settingsRepository.update(nowMillis) { it.copy(notificationEnabled = enabled) }
             runtimeEntry.refreshActiveNotifications(settings, runtimeRepository.getOrDefault())
         }
     }
 
-    fun setKeepAliveEnabled(enabled: Boolean) {
+    fun setKeepAliveEnabled(enabled: Boolean, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            val settings = settingsRepository.update { it.copy(keepAliveEnabled = enabled) }
+            val settings = settingsRepository.update(nowMillis) { it.copy(keepAliveEnabled = enabled) }
             runtimeEntry.refreshActiveNotifications(settings, runtimeRepository.getOrDefault())
         }
     }
 
-    fun setProximityMonitoringEnabled(enabled: Boolean) {
+    fun setProximityMonitoringEnabled(enabled: Boolean, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            settingsRepository.update { it.copy(proximityMonitoringEnabled = enabled) }
+            settingsRepository.update(nowMillis) { it.copy(proximityMonitoringEnabled = enabled) }
             if (enabled) {
                 scheduleProximityMonitoring()
             } else {
@@ -125,9 +125,9 @@ internal class ProjectLumenSettingsFeatureEntry(
         }
     }
 
-    fun setBlinkMonitoringEnabled(enabled: Boolean) {
+    fun setBlinkMonitoringEnabled(enabled: Boolean, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            val settings = settingsRepository.update { it.copy(blinkMonitoringEnabled = enabled) }
+            val settings = settingsRepository.update(nowMillis) { it.copy(blinkMonitoringEnabled = enabled) }
             if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) {
                 scheduleProximityMonitoring()
             } else {
@@ -136,16 +136,16 @@ internal class ProjectLumenSettingsFeatureEntry(
         }
     }
 
-    fun setAmbientLightMonitoringEnabled(enabled: Boolean) {
+    fun setAmbientLightMonitoringEnabled(enabled: Boolean, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            val settings = settingsRepository.update { it.copy(ambientLightMonitoringEnabled = enabled) }
+            val settings = settingsRepository.update(nowMillis) { it.copy(ambientLightMonitoringEnabled = enabled) }
             applyLightMonitoringSettings(settings)
         }
     }
 
-    fun setAutoBrightnessEnabled(enabled: Boolean) {
+    fun setAutoBrightnessEnabled(enabled: Boolean, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            val settings = settingsRepository.update { it.copy(autoBrightnessEnabled = enabled) }
+            val settings = settingsRepository.update(nowMillis) { it.copy(autoBrightnessEnabled = enabled) }
             applyLightMonitoringSettings(settings)
         }
     }
@@ -154,22 +154,22 @@ internal class ProjectLumenSettingsFeatureEntry(
         calibrateProximityMonitoring()
     }
 
-    fun setLanguageCode(languageCode: String) {
+    fun setLanguageCode(languageCode: String, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
             val normalized = LocaleController.normalize(languageCode)
-            settingsRepository.update { it.copy(languageCode = normalized) }
+            settingsRepository.update(nowMillis) { it.copy(languageCode = normalized) }
         }
     }
 
-    fun setThemeMode(mode: AppThemeMode) {
+    fun setThemeMode(mode: AppThemeMode, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            settingsRepository.update { it.copy(themeMode = mode.name) }
+            settingsRepository.update(nowMillis) { it.copy(themeMode = mode.name) }
         }
     }
 
-    fun setAutoUpdateCheckEnabled(enabled: Boolean) {
+    fun setAutoUpdateCheckEnabled(enabled: Boolean, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            settingsRepository.update { it.copy(autoUpdateCheckEnabled = enabled) }
+            settingsRepository.update(nowMillis) { it.copy(autoUpdateCheckEnabled = enabled) }
         }
     }
 

@@ -16,12 +16,12 @@ internal class ProjectLumenTemplatesFeatureEntry(
     private val settingsRepository: SettingsRepository,
     private val tipTemplateRepository: TipTemplateRepository,
 ) {
-    fun selectTemplate(templateId: Long) {
+    fun selectTemplate(templateId: Long, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
             val settings = settingsRepository.getOrDefault()
             val template = tipTemplateRepository.get(templateId) ?: return@launch
             if (template.isPremium && !canUse(settings, PremiumFeature.PRO_TEMPLATES)) return@launch
-            settingsRepository.update { it.copy(activeTipTemplateId = templateId) }
+            settingsRepository.update(nowMillis) { it.copy(activeTipTemplateId = templateId) }
         }
     }
 

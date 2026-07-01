@@ -8,6 +8,8 @@ import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.projectlumen.app.core.enums.AppThemeMode
+import com.projectlumen.app.core.enums.PlanTier
+import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.DataBackupService
@@ -129,19 +131,81 @@ class ProjectLumenViewModel(
     fun startPomodoro() = runtimeEntry.startPomodoro()
     fun stopPomodoro() = runtimeEntry.stopPomodoro()
 
-    fun updateSettings(transform: (AppSettingsEntity) -> AppSettingsEntity) = settingsEntry.updateSettings(transform)
-    fun setReminderEnabled(enabled: Boolean) = settingsEntry.setReminderEnabled(enabled)
-    fun setPomodoroEnabled(enabled: Boolean) = settingsEntry.setPomodoroEnabled(enabled)
-    fun setNotificationsEnabled(enabled: Boolean) = settingsEntry.setNotificationsEnabled(enabled)
-    fun setKeepAliveEnabled(enabled: Boolean) = settingsEntry.setKeepAliveEnabled(enabled)
-    fun setProximityMonitoringEnabled(enabled: Boolean) = settingsEntry.setProximityMonitoringEnabled(enabled)
-    fun setBlinkMonitoringEnabled(enabled: Boolean) = settingsEntry.setBlinkMonitoringEnabled(enabled)
-    fun setAmbientLightMonitoringEnabled(enabled: Boolean) = settingsEntry.setAmbientLightMonitoringEnabled(enabled)
-    fun setAutoBrightnessEnabled(enabled: Boolean) = settingsEntry.setAutoBrightnessEnabled(enabled)
+    fun updateSettings(transform: (AppSettingsEntity) -> AppSettingsEntity) {
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis, transform)
+        settingsEntry.updateSettings(transform, nowMillis)
+    }
+
+    fun setReminderEnabled(enabled: Boolean) {
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis) { it.copy(reminderEnabled = enabled) }
+        settingsEntry.setReminderEnabled(enabled, nowMillis)
+    }
+
+    fun setPomodoroEnabled(enabled: Boolean) {
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis) { it.copy(pomodoroEnabled = enabled) }
+        settingsEntry.setPomodoroEnabled(enabled, nowMillis)
+    }
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis) { it.copy(notificationEnabled = enabled) }
+        settingsEntry.setNotificationsEnabled(enabled, nowMillis)
+    }
+
+    fun setKeepAliveEnabled(enabled: Boolean) {
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis) { it.copy(keepAliveEnabled = enabled) }
+        settingsEntry.setKeepAliveEnabled(enabled, nowMillis)
+    }
+
+    fun setProximityMonitoringEnabled(enabled: Boolean) {
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis) { it.copy(proximityMonitoringEnabled = enabled) }
+        settingsEntry.setProximityMonitoringEnabled(enabled, nowMillis)
+    }
+
+    fun setBlinkMonitoringEnabled(enabled: Boolean) {
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis) { it.copy(blinkMonitoringEnabled = enabled) }
+        settingsEntry.setBlinkMonitoringEnabled(enabled, nowMillis)
+    }
+
+    fun setAmbientLightMonitoringEnabled(enabled: Boolean) {
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis) { it.copy(ambientLightMonitoringEnabled = enabled) }
+        settingsEntry.setAmbientLightMonitoringEnabled(enabled, nowMillis)
+    }
+
+    fun setAutoBrightnessEnabled(enabled: Boolean) {
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis) { it.copy(autoBrightnessEnabled = enabled) }
+        settingsEntry.setAutoBrightnessEnabled(enabled, nowMillis)
+    }
+
     fun calibrateProximity() = settingsEntry.calibrateProximity()
-    fun setLanguageCode(languageCode: String) = settingsEntry.setLanguageCode(languageCode)
-    fun setThemeMode(mode: AppThemeMode) = settingsEntry.setThemeMode(mode)
-    fun setAutoUpdateCheckEnabled(enabled: Boolean) = settingsEntry.setAutoUpdateCheckEnabled(enabled)
+
+    fun setLanguageCode(languageCode: String) {
+        val nowMillis = System.currentTimeMillis()
+        val normalized = LocaleController.normalize(languageCode)
+        previewSettings(nowMillis) { it.copy(languageCode = normalized) }
+        settingsEntry.setLanguageCode(languageCode, nowMillis)
+    }
+
+    fun setThemeMode(mode: AppThemeMode) {
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis) { it.copy(themeMode = mode.name) }
+        settingsEntry.setThemeMode(mode, nowMillis)
+    }
+
+    fun setAutoUpdateCheckEnabled(enabled: Boolean) {
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis) { it.copy(autoUpdateCheckEnabled = enabled) }
+        settingsEntry.setAutoUpdateCheckEnabled(enabled, nowMillis)
+    }
+
     fun updateDailyGoal(transform: (DailyGoalEntity) -> DailyGoalEntity) = settingsEntry.updateDailyGoal(transform)
     fun simulateLowMemory() = simulateDeveloperLowMemory()
     fun refreshShizukuState() {
@@ -154,7 +218,15 @@ class ProjectLumenViewModel(
     }
     fun requestShizukuAuthorization() = shizuku.requestPermission()
 
-    fun selectTemplate(templateId: Long) = templatesEntry.selectTemplate(templateId)
+    fun selectTemplate(templateId: Long) {
+        val state = stateStore.uiState.value
+        val template = state.templates.firstOrNull { it.id == templateId } ?: return
+        if (template.isPremium && planTier(state.settings) < PlanTier.PRO) return
+
+        val nowMillis = System.currentTimeMillis()
+        previewSettings(nowMillis) { it.copy(activeTipTemplateId = templateId) }
+        templatesEntry.selectTemplate(templateId, nowMillis)
+    }
     fun updateTemplateSystemBackground(template: TipTemplateEntity, backgroundValue: String, primaryColor: String) =
         templatesEntry.updateTemplateSystemBackground(template, backgroundValue, primaryColor)
     fun updateTemplateImage(template: TipTemplateEntity, imagePath: String) = templatesEntry.updateTemplateImage(template, imagePath)
@@ -176,4 +248,12 @@ class ProjectLumenViewModel(
     fun importBackup(uri: Uri) = backupEntry.importBackup(uri)
 
     fun recordManualProEntitlement(productId: String = "manual_pro") = entitlementEntry.recordManualProEntitlement(productId)
+
+    private fun previewSettings(
+        nowMillis: Long,
+        transform: (AppSettingsEntity) -> AppSettingsEntity,
+    ) {
+        val current = stateStore.uiState.value.settings
+        stateStore.previewSettings(transform(current).copy(id = 1, updatedAt = nowMillis))
+    }
 }
