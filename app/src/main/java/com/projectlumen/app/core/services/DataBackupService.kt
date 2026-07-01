@@ -187,6 +187,26 @@ class DataBackupService(
             shizukuDndGuardEnabled = json.optBoolean("shizukuDndGuardEnabled", current.shizukuDndGuardEnabled),
             shizukuThermalGuardEnabled = json.optBoolean("shizukuThermalGuardEnabled", current.shizukuThermalGuardEnabled),
             shizukuCameraPrivacyGuardEnabled = json.optBoolean("shizukuCameraPrivacyGuardEnabled", current.shizukuCameraPrivacyGuardEnabled),
+            shizukuNativeEyeProtectionEnabled = json.optBoolean(
+                "shizukuNativeEyeProtectionEnabled",
+                current.shizukuNativeEyeProtectionEnabled,
+            ),
+            shizukuNativeColorTemperatureKelvin = json.optInt(
+                "shizukuNativeColorTemperatureKelvin",
+                current.shizukuNativeColorTemperatureKelvin,
+            ),
+            shizukuNativeBrightnessPercent = json.optInt(
+                "shizukuNativeBrightnessPercent",
+                current.shizukuNativeBrightnessPercent,
+            ),
+            shizukuNativeExtraDimEnabled = json.optBoolean(
+                "shizukuNativeExtraDimEnabled",
+                current.shizukuNativeExtraDimEnabled,
+            ),
+            shizukuNativeExtraDimPercent = json.optInt(
+                "shizukuNativeExtraDimPercent",
+                current.shizukuNativeExtraDimPercent,
+            ),
             autoUpdateCheckEnabled = json.optBoolean("autoUpdateCheckEnabled", current.autoUpdateCheckEnabled),
             updatedAt = System.currentTimeMillis(),
         )
@@ -370,6 +390,11 @@ class DataBackupService(
         .put("shizukuDndGuardEnabled", shizukuDndGuardEnabled)
         .put("shizukuThermalGuardEnabled", shizukuThermalGuardEnabled)
         .put("shizukuCameraPrivacyGuardEnabled", shizukuCameraPrivacyGuardEnabled)
+        .put("shizukuNativeEyeProtectionEnabled", shizukuNativeEyeProtectionEnabled)
+        .put("shizukuNativeColorTemperatureKelvin", shizukuNativeColorTemperatureKelvin)
+        .put("shizukuNativeBrightnessPercent", shizukuNativeBrightnessPercent)
+        .put("shizukuNativeExtraDimEnabled", shizukuNativeExtraDimEnabled)
+        .put("shizukuNativeExtraDimPercent", shizukuNativeExtraDimPercent)
         .put("autoUpdateCheckEnabled", autoUpdateCheckEnabled)
 
     private fun DailyGoalEntity.toJson(): JSONObject = JSONObject()

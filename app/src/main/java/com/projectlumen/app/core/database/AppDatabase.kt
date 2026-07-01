@@ -38,7 +38,7 @@ import com.projectlumen.app.BuildConfig
         EntitlementEntity::class,
         ReminderPlanEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -176,6 +176,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                migrateShizukuNativeEyeProtection(db)
+            }
+        }
+
         private fun migrateEyeProtection(db: SupportSQLiteDatabase) {
             addColumnIfMissing(db, "app_settings", "blinkMonitoringEnabled", "INTEGER NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "app_settings", "blinkNoBlinkThresholdSeconds", "INTEGER NOT NULL DEFAULT 10")
@@ -238,6 +244,14 @@ abstract class AppDatabase : RoomDatabase() {
 
         private fun migrateTranslationEntry(db: SupportSQLiteDatabase) {
             addColumnIfMissing(db, "app_settings", "translationEntryEnabled", "INTEGER NOT NULL DEFAULT 1")
+        }
+
+        private fun migrateShizukuNativeEyeProtection(db: SupportSQLiteDatabase) {
+            addColumnIfMissing(db, "app_settings", "shizukuNativeEyeProtectionEnabled", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "app_settings", "shizukuNativeColorTemperatureKelvin", "INTEGER NOT NULL DEFAULT 4200")
+            addColumnIfMissing(db, "app_settings", "shizukuNativeBrightnessPercent", "INTEGER NOT NULL DEFAULT 35")
+            addColumnIfMissing(db, "app_settings", "shizukuNativeExtraDimEnabled", "INTEGER NOT NULL DEFAULT 0")
+            addColumnIfMissing(db, "app_settings", "shizukuNativeExtraDimPercent", "INTEGER NOT NULL DEFAULT 25")
         }
 
         private fun migrateDynamicAppearance(db: SupportSQLiteDatabase) {
@@ -365,6 +379,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_11_12,
                     MIGRATION_12_13,
                     MIGRATION_13_14,
+                    MIGRATION_14_15,
                 )
             if (BuildConfig.DEBUG) {
                 builder.fallbackToDestructiveMigration(dropAllTables = true)

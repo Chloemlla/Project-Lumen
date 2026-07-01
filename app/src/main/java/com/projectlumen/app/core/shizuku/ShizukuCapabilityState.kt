@@ -18,6 +18,11 @@ data class ShizukuCapabilityState(
     val thermalStatus: Int = 0,
     val cameraPrivacyEnabled: Boolean = false,
     val systemShouldDeferSampling: Boolean = false,
+    val nativeEyeProtectionApplied: Boolean = false,
+    val nativeColorTemperatureKelvin: Int = 0,
+    val nativeBrightnessPercent: Int = 0,
+    val nativeExtraDimEnabled: Boolean = false,
+    val nativeExtraDimPercent: Int = 0,
     val lastCheckedAt: Long = 0L,
     val lastError: String = "",
 ) {

@@ -221,6 +221,7 @@ internal fun SettingsScreen(
     val fullScreenIntentSettingsNeeded = permissionRequirements.fullScreenIntent
     val overlayPermissionNeeded = permissionRequirements.overlay
     val writeSettingsPermissionNeeded = permissionRequirements.writeSettings
+    val shizukuNativeBrightnessEnabled = settings.shizukuAdvancedModeEnabled && settings.shizukuNativeEyeProtectionEnabled
     val backupImportPreview by viewModel.backupImportPreview.collectAsStateWithLifecycle()
     val shizukuState by viewModel.shizukuState.collectAsStateWithLifecycle()
     var pendingBackupImportUri by remember { mutableStateOf<Uri?>(null) }
@@ -493,6 +494,17 @@ internal fun SettingsScreen(
             if (shizukuState.ready) {
                 StatusLine(Icons.Outlined.Settings, shizukuSystemGuardLabel(settings, shizukuState))
             }
+            if (shizukuState.nativeEyeProtectionApplied) {
+                StatusLine(
+                    Icons.Outlined.Style,
+                    stringResource(
+                        R.string.shizuku_native_eye_protection_applied,
+                        shizukuState.nativeColorTemperatureKelvin,
+                        shizukuState.nativeBrightnessPercent,
+                        shizukuState.nativeExtraDimPercent,
+                    ),
+                )
+            }
             SwitchRow(R.string.enable_shizuku_advanced_mode, Icons.Outlined.Lock, settings.shizukuAdvancedModeEnabled) { enabled ->
                 viewModel.updateSettings { current ->
                     current.copy(shizukuAdvancedModeEnabled = enabled)
@@ -513,6 +525,81 @@ internal fun SettingsScreen(
                             Button(onClick = viewModel::requestShizukuAuthorization) {
                                 ButtonLabel(Icons.Outlined.Lock, R.string.shizuku_authorize)
                             }
+                        }
+                    }
+                    SwitchRow(
+                        R.string.enable_shizuku_native_eye_protection,
+                        Icons.Outlined.Style,
+                        settings.shizukuNativeEyeProtectionEnabled,
+                    ) { enabled ->
+                        viewModel.updateSettings { current -> current.copy(shizukuNativeEyeProtectionEnabled = enabled) }
+                        if (enabled) viewModel.requestShizukuAuthorization()
+                    }
+                    AnimatedVisibility(
+                        visible = settings.shizukuNativeEyeProtectionEnabled,
+                        enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                        exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                stringResource(R.string.shizuku_native_eye_protection_summary),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            NumberSlider(
+                                R.string.shizuku_native_color_temperature,
+                                Icons.Outlined.Style,
+                                settings.shizukuNativeColorTemperatureKelvin,
+                                1800f..6500f,
+                                46,
+                                stringResource(R.string.kelvin_value, settings.shizukuNativeColorTemperatureKelvin),
+                            ) {
+                                viewModel.updateSettings { current ->
+                                    current.copy(shizukuNativeColorTemperatureKelvin = it)
+                                }
+                            }
+                            NumberSlider(
+                                R.string.shizuku_native_brightness,
+                                Icons.Outlined.Settings,
+                                settings.shizukuNativeBrightnessPercent,
+                                1f..100f,
+                                98,
+                                stringResource(R.string.percent_value, settings.shizukuNativeBrightnessPercent),
+                            ) {
+                                viewModel.updateSettings { current ->
+                                    current.copy(shizukuNativeBrightnessPercent = it)
+                                }
+                            }
+                            SwitchRow(
+                                R.string.shizuku_native_extra_dim,
+                                Icons.Outlined.WarningAmber,
+                                settings.shizukuNativeExtraDimEnabled,
+                            ) {
+                                viewModel.updateSettings { current -> current.copy(shizukuNativeExtraDimEnabled = it) }
+                            }
+                            AnimatedVisibility(
+                                visible = settings.shizukuNativeExtraDimEnabled,
+                                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+                            ) {
+                                NumberSlider(
+                                    R.string.shizuku_native_extra_dim_intensity,
+                                    Icons.Outlined.WarningAmber,
+                                    settings.shizukuNativeExtraDimPercent,
+                                    1f..100f,
+                                    98,
+                                    stringResource(R.string.percent_value, settings.shizukuNativeExtraDimPercent),
+                                ) {
+                                    viewModel.updateSettings { current ->
+                                        current.copy(shizukuNativeExtraDimPercent = it)
+                                    }
+                                }
+                            }
+                            Text(
+                                stringResource(R.string.shizuku_native_boundary),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                     SwitchRow(
@@ -726,12 +813,12 @@ internal fun SettingsScreen(
             }
             SwitchRow(R.string.enable_auto_brightness, Icons.Outlined.Style, settings.autoBrightnessEnabled) {
                 viewModel.setAutoBrightnessEnabled(it)
-                if (it && needsWriteSettingsPermission(context)) {
+                if (it && needsWriteSettingsPermission(context) && !shizukuNativeBrightnessEnabled) {
                     openWriteSettings(context)
                 }
             }
             AnimatedVisibility(
-                visible = settings.autoBrightnessEnabled && writeSettingsPermissionNeeded,
+                visible = settings.autoBrightnessEnabled && writeSettingsPermissionNeeded && !shizukuNativeBrightnessEnabled,
                 enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
                 exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
             ) {

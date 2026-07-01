@@ -12,10 +12,12 @@ import android.os.Build
 import android.os.PowerManager
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
+import kotlin.math.roundToInt
 
 class ShizukuCapabilityManager(
     private val context: Context,
@@ -100,6 +102,86 @@ class ShizukuCapabilityManager(
         return shouldDefer
     }
 
+    suspend fun applyNativeEyeProtection(settings: AppSettingsEntity, smooth: Boolean = true): Boolean = withContext(Dispatchers.IO) {
+        val currentState = queryState()
+        val shouldEnable = settings.shizukuAdvancedModeEnabled && settings.shizukuNativeEyeProtectionEnabled
+        if (!shouldEnable) {
+            if (!_state.value.nativeEyeProtectionApplied) {
+                _state.value = currentState.copy(
+                    nativeEyeProtectionApplied = false,
+                    lastError = "",
+                )
+                return@withContext true
+            }
+            if (!currentState.ready) {
+                _state.value = currentState.copy(
+                    lastError = "Shizuku authorization is required to disable native eye protection.",
+                )
+                return@withContext false
+            }
+            val cleared = clearNativeDisplayAdjustments()
+            _state.value = queryState(if (cleared) "" else "Unable to disable every native eye protection setting.").copy(
+                nativeEyeProtectionApplied = false,
+                nativeColorTemperatureKelvin = 0,
+                nativeBrightnessPercent = 0,
+                nativeExtraDimEnabled = false,
+                nativeExtraDimPercent = 0,
+            )
+            return@withContext cleared
+        }
+
+        if (!currentState.ready) {
+            _state.value = currentState.copy(
+                lastError = "Shizuku authorization is required for native eye protection.",
+            )
+            return@withContext false
+        }
+
+        val target = NativeEyeProtectionTarget(
+            colorTemperatureKelvin = settings.shizukuNativeColorTemperatureKelvin.coerceIn(
+                MIN_COLOR_TEMPERATURE_KELVIN,
+                MAX_COLOR_TEMPERATURE_KELVIN,
+            ),
+            brightnessPercent = settings.shizukuNativeBrightnessPercent.coerceIn(1, 100),
+            extraDimEnabled = settings.shizukuNativeExtraDimEnabled,
+            extraDimPercent = settings.shizukuNativeExtraDimPercent.coerceIn(0, 100),
+        )
+        val applied = applyNativeEyeProtectionTarget(target, smooth)
+        _state.value = queryState(if (applied) "" else "Some native display settings were not accepted by this device.").copy(
+            nativeEyeProtectionApplied = applied,
+            nativeColorTemperatureKelvin = if (applied) target.colorTemperatureKelvin else _state.value.nativeColorTemperatureKelvin,
+            nativeBrightnessPercent = if (applied) target.brightnessPercent else _state.value.nativeBrightnessPercent,
+            nativeExtraDimEnabled = applied && target.extraDimEnabled,
+            nativeExtraDimPercent = if (applied && target.extraDimEnabled) target.extraDimPercent else 0,
+        )
+        applied
+    }
+
+    suspend fun applySystemBrightness(percent: Int): Boolean = withContext(Dispatchers.IO) {
+        val currentState = queryState()
+        if (!currentState.ready) {
+            _state.value = currentState.copy(
+                lastError = "Shizuku authorization is required to adjust system brightness.",
+            )
+            return@withContext false
+        }
+        val normalizedPercent = percent.coerceIn(1, 100)
+        val brightness = percentToSystemBrightness(normalizedPercent)
+        val modeResult = executeShellCommand("settings put system screen_brightness_mode 0")
+        val brightnessResult = executeShellCommand("settings put system screen_brightness $brightness")
+        val applied = brightnessResult.success
+        _state.value = queryState(
+            if (applied) "" else brightnessResult.error.ifBlank { modeResult.error.ifBlank { "System brightness command failed." } },
+        ).copy(
+            nativeEyeProtectionApplied = _state.value.nativeEyeProtectionApplied,
+            nativeColorTemperatureKelvin = _state.value.nativeColorTemperatureKelvin,
+            nativeBrightnessPercent = if (applied) normalizedPercent else _state.value.nativeBrightnessPercent,
+            nativeExtraDimEnabled = _state.value.nativeExtraDimEnabled,
+            nativeExtraDimPercent = _state.value.nativeExtraDimPercent,
+        )
+        applied
+    }
+
     fun isReady(): Boolean {
         val current = queryState()
         _state.value = current
@@ -140,9 +222,167 @@ class ShizukuCapabilityManager(
             thermalStatus = _state.value.thermalStatus,
             cameraPrivacyEnabled = _state.value.cameraPrivacyEnabled,
             systemShouldDeferSampling = _state.value.systemShouldDeferSampling,
+            nativeEyeProtectionApplied = _state.value.nativeEyeProtectionApplied,
+            nativeColorTemperatureKelvin = _state.value.nativeColorTemperatureKelvin,
+            nativeBrightnessPercent = _state.value.nativeBrightnessPercent,
+            nativeExtraDimEnabled = _state.value.nativeExtraDimEnabled,
+            nativeExtraDimPercent = _state.value.nativeExtraDimPercent,
             lastCheckedAt = System.currentTimeMillis(),
             lastError = error,
         )
+    }
+
+    private suspend fun applyNativeEyeProtectionTarget(target: NativeEyeProtectionTarget, smooth: Boolean): Boolean {
+        val start = if (smooth) readCurrentNativeEyeProtectionTarget(target) else target
+        val steps = if (smooth) SMOOTH_TRANSITION_STEPS else 1
+        var lastFrameApplied = false
+        for (step in 1..steps) {
+            val fraction = step / steps.toFloat()
+            val frame = NativeEyeProtectionTarget(
+                colorTemperatureKelvin = interpolate(start.colorTemperatureKelvin, target.colorTemperatureKelvin, fraction),
+                brightnessPercent = interpolate(start.brightnessPercent, target.brightnessPercent, fraction),
+                extraDimEnabled = target.extraDimEnabled || start.extraDimEnabled,
+                extraDimPercent = interpolate(
+                    if (start.extraDimEnabled) start.extraDimPercent else 0,
+                    if (target.extraDimEnabled) target.extraDimPercent else 0,
+                    fraction,
+                ),
+            )
+            val nightDisplayApplied = setNightDisplay(frame.colorTemperatureKelvin)
+            val brightnessApplied = setSystemBrightness(frame.brightnessPercent)
+            val extraDimApplied = setExtraDim(
+                enabled = frame.extraDimEnabled && frame.extraDimPercent > 0,
+                percent = frame.extraDimPercent,
+            )
+            lastFrameApplied = nightDisplayApplied && brightnessApplied && extraDimApplied
+            if (step < steps) {
+                delay(SMOOTH_TRANSITION_MILLIS / steps)
+            }
+        }
+        return lastFrameApplied
+    }
+
+    private fun readCurrentNativeEyeProtectionTarget(fallback: NativeEyeProtectionTarget): NativeEyeProtectionTarget {
+        val currentState = _state.value
+        if (currentState.nativeEyeProtectionApplied) {
+            return NativeEyeProtectionTarget(
+                colorTemperatureKelvin = currentState.nativeColorTemperatureKelvin
+                    .takeIf { it > 0 }
+                    ?: fallback.colorTemperatureKelvin,
+                brightnessPercent = currentState.nativeBrightnessPercent
+                    .takeIf { it > 0 }
+                    ?: fallback.brightnessPercent,
+                extraDimEnabled = currentState.nativeExtraDimEnabled,
+                extraDimPercent = currentState.nativeExtraDimPercent,
+            )
+        }
+        val nightDisplayActive = readIntSetting("secure", "night_display_activated", 0) == 1
+        val currentColorTemperature = if (nightDisplayActive) {
+            readIntSetting("secure", "night_display_color_temperature", MAX_COLOR_TEMPERATURE_KELVIN)
+        } else {
+            MAX_COLOR_TEMPERATURE_KELVIN
+        }.coerceIn(MIN_COLOR_TEMPERATURE_KELVIN, MAX_COLOR_TEMPERATURE_KELVIN)
+        val currentBrightness = systemBrightnessToPercent(
+            readIntSetting("system", "screen_brightness", percentToSystemBrightness(fallback.brightnessPercent)),
+        )
+        val extraDimActive = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            readIntSetting("secure", "reduce_bright_colors_activated", 0) == 1
+        val extraDimLevel = if (extraDimActive) {
+            readIntSetting("secure", "reduce_bright_colors_level", fallback.extraDimPercent).coerceIn(0, 100)
+        } else {
+            0
+        }
+        return NativeEyeProtectionTarget(
+            colorTemperatureKelvin = currentColorTemperature,
+            brightnessPercent = currentBrightness,
+            extraDimEnabled = extraDimActive,
+            extraDimPercent = extraDimLevel,
+        )
+    }
+
+    private fun clearNativeDisplayAdjustments(): Boolean {
+        val nightDisplayApplied = listOf(
+            executeShellCommand("cmd color_display set-night-display-activated false"),
+            executeShellCommand("settings put secure night_display_activated 0"),
+        ).any { it.success }
+        val extraDimApplied = setExtraDim(enabled = false, percent = 0)
+        return nightDisplayApplied && extraDimApplied
+    }
+
+    private fun setNightDisplay(colorTemperatureKelvin: Int): Boolean {
+        val normalizedTemperature = colorTemperatureKelvin.coerceIn(
+            MIN_COLOR_TEMPERATURE_KELVIN,
+            MAX_COLOR_TEMPERATURE_KELVIN,
+        )
+        val temperatureApplied = listOf(
+            executeShellCommand("cmd color_display set-night-display-color-temperature $normalizedTemperature"),
+            executeShellCommand("settings put secure night_display_color_temperature $normalizedTemperature"),
+        ).any { it.success }
+        val activationApplied = listOf(
+            executeShellCommand("cmd color_display set-night-display-activated true"),
+            executeShellCommand("settings put secure night_display_activated 1"),
+        ).any { it.success }
+        return temperatureApplied && activationApplied
+    }
+
+    private fun setSystemBrightness(percent: Int): Boolean {
+        val normalizedPercent = percent.coerceIn(1, 100)
+        val brightness = percentToSystemBrightness(normalizedPercent)
+        executeShellCommand("settings put system screen_brightness_mode 0")
+        return executeShellCommand("settings put system screen_brightness $brightness").success
+    }
+
+    private fun setExtraDim(enabled: Boolean, percent: Int): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return !enabled
+        }
+        val normalizedPercent = if (enabled) percent.coerceIn(1, 100) else 0
+        val levelApplied = executeShellCommand("settings put secure reduce_bright_colors_level $normalizedPercent").success
+        val activationApplied = executeShellCommand(
+            "settings put secure reduce_bright_colors_activated ${if (enabled) 1 else 0}",
+        ).success
+        if (enabled) {
+            executeShellCommand("settings put secure reduce_bright_colors_persist_across_reboots 1")
+        }
+        return activationApplied && (!enabled || levelApplied)
+    }
+
+    private fun readIntSetting(namespace: String, key: String, fallback: Int): Int {
+        val result = executeShellCommand("settings get $namespace $key")
+        return result.output.trim().toIntOrNull() ?: fallback
+    }
+
+    @Suppress("DEPRECATION")
+    private fun executeShellCommand(command: String): ShellCommandResult {
+        return runCatching {
+            val process = Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
+            val exitCode = process.waitFor()
+            val output = process.inputStream.bufferedReader().use { it.readText() }
+            val error = process.errorStream.bufferedReader().use { it.readText() }
+            ShellCommandResult(
+                exitCode = exitCode,
+                output = output,
+                error = error,
+            )
+        }.getOrElse { throwable ->
+            ShellCommandResult(
+                exitCode = -1,
+                output = "",
+                error = throwable.message.orEmpty().ifBlank { throwable.javaClass.simpleName },
+            )
+        }
+    }
+
+    private fun interpolate(start: Int, end: Int, fraction: Float): Int {
+        return (start + (end - start) * fraction).roundToInt()
+    }
+
+    private fun percentToSystemBrightness(percent: Int): Int {
+        return ((percent.coerceIn(1, 100) / 100f) * 255f).roundToInt().coerceIn(1, 255)
+    }
+
+    private fun systemBrightnessToPercent(brightness: Int): Int {
+        return ((brightness.coerceIn(1, 255) / 255f) * 100f).roundToInt().coerceIn(1, 100)
     }
 
     private fun latestForegroundContext(): ShizukuForegroundContext? {
@@ -250,6 +490,22 @@ class ShizukuCapabilityManager(
         val lowBatteryActive: Boolean,
     )
 
+    private data class NativeEyeProtectionTarget(
+        val colorTemperatureKelvin: Int,
+        val brightnessPercent: Int,
+        val extraDimEnabled: Boolean,
+        val extraDimPercent: Int,
+    )
+
+    private data class ShellCommandResult(
+        val exitCode: Int,
+        val output: String,
+        val error: String,
+    ) {
+        val success: Boolean
+            get() = exitCode == 0
+    }
+
     private fun classifyForegroundContext(packageName: String, activityName: String): String {
         val combined = "$packageName $activityName".lowercase()
         return when {
@@ -272,6 +528,10 @@ class ShizukuCapabilityManager(
         private const val CATEGORY_GAME = "game"
         private const val LOW_BATTERY_THRESHOLD_PERCENT = 15
         private const val THERMAL_STATUS_MODERATE = 2
+        private const val MIN_COLOR_TEMPERATURE_KELVIN = 1800
+        private const val MAX_COLOR_TEMPERATURE_KELVIN = 6500
+        private const val SMOOTH_TRANSITION_MILLIS = 5_000L
+        private const val SMOOTH_TRANSITION_STEPS = 10
 
         private val sensitiveCameraHints = listOf("camera", "camerax", "scanner", "barcode", "qr")
         private val sensitiveCallHints = listOf("call", "voip", "meeting", "conference", "telecom", "zoom", "meet")

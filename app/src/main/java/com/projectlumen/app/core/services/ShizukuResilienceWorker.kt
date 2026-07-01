@@ -22,28 +22,39 @@ class ShizukuResilienceWorker(
         val app = applicationContext as ProjectLumenApplication
         val settings = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences).get()
             ?: return Result.success()
-        if (!settings.shizukuAdvancedModeEnabled || !settings.shizukuServiceRecoveryEnabled) {
+        val shouldRun = settings.shizukuAdvancedModeEnabled &&
+            (settings.shizukuServiceRecoveryEnabled || settings.shizukuNativeEyeProtectionEnabled)
+        if (!shouldRun) {
             cancel(applicationContext)
             return Result.success()
         }
         if (!app.shizuku.isReady()) {
-            enqueue(applicationContext)
+            enqueue(
+                context = applicationContext,
+                delayMinutes = if (settings.shizukuNativeEyeProtectionEnabled) 1L else 15L,
+            )
             return Result.success()
         }
 
-        val runtime = app.database.runtimeStateDao().get()
-        if (settings.keepAliveEnabled && runtime != null && runtime.activeEngine != ActiveEngine.IDLE.name) {
-            app.startTimerService()
-            app.notifications.syncRuntimeAlarms(settings, runtime)
-            if (settings.notificationEnabled) {
-                app.notifications.showOngoingStatus(runtime)
+        if (settings.shizukuNativeEyeProtectionEnabled) {
+            app.shizuku.applyNativeEyeProtection(settings, smooth = false)
+        }
+
+        if (settings.shizukuServiceRecoveryEnabled) {
+            val runtime = app.database.runtimeStateDao().get()
+            if (settings.keepAliveEnabled && runtime != null && runtime.activeEngine != ActiveEngine.IDLE.name) {
+                app.startTimerService()
+                app.notifications.syncRuntimeAlarms(settings, runtime)
+                if (settings.notificationEnabled) {
+                    app.notifications.showOngoingStatus(runtime)
+                }
             }
-        }
-        if (hasCameraPermission(applicationContext) && (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled)) {
-            app.scheduleProximityMonitoring()
-        }
-        if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) {
-            app.startLightMonitoring()
+            if (hasCameraPermission(applicationContext) && (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled)) {
+                app.scheduleProximityMonitoring()
+            }
+            if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) {
+                app.startLightMonitoring()
+            }
         }
         enqueue(applicationContext)
         return Result.success()
@@ -54,7 +65,7 @@ class ShizukuResilienceWorker(
 
         fun enqueue(context: Context, delayMinutes: Long = 15L) {
             val request = OneTimeWorkRequestBuilder<ShizukuResilienceWorker>()
-                .setInitialDelay(delayMinutes.coerceAtLeast(1L), TimeUnit.MINUTES)
+                .setInitialDelay(delayMinutes.coerceAtLeast(0L), TimeUnit.MINUTES)
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
                 UNIQUE_WORK,

@@ -1,6 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Project Lumen</string>
+    <string name="permission_access_lumen_core_label">Access Project Lumen core</string>
+    <string name="permission_access_lumen_core_description">Allows approved apps to view Project Lumen health status and control focus sessions.</string>
+    <string name="permission_trigger_lumen_control_label">Trigger Project Lumen controls</string>
+    <string name="permission_trigger_lumen_control_description">Allows same-signature apps to start Project Lumen rest protection controls.</string>
     <string name="toast_title_info">Lumen signal</string>
     <string name="toast_title_warning">Attention required</string>
     <string name="toast_title_timer">Timer signal</string>
@@ -161,6 +165,14 @@
     <string name="shizuku_dnd_guard">Defer during do-not-disturb</string>
     <string name="shizuku_thermal_guard">Defer when device is hot</string>
     <string name="shizuku_camera_privacy_guard">Defer when camera privacy is enabled</string>
+    <string name="enable_shizuku_native_eye_protection">Use Shizuku native eye shield</string>
+    <string name="shizuku_native_eye_protection_summary">Applies system Night Light, screen brightness, and Extra Dim through Shizuku settings commands, so the eye shield is handled by Android instead of a drawing overlay.</string>
+    <string name="shizuku_native_color_temperature">Native color temperature</string>
+    <string name="shizuku_native_brightness">Native screen brightness</string>
+    <string name="shizuku_native_extra_dim">Use system Extra Dim</string>
+    <string name="shizuku_native_extra_dim_intensity">Extra Dim intensity</string>
+    <string name="shizuku_native_boundary">Availability depends on Android version and vendor support for Night Light and Extra Dim secure settings. If Shizuku is unavailable, reminders and monitoring continue without crashing.</string>
+    <string name="shizuku_native_eye_protection_applied">Native eye shield: %1$d K, %2$d%% brightness, %3$d%% Extra Dim</string>
     <string name="shizuku_authorize">Authorize Shizuku</string>
     <string name="shizuku_refresh_status">Refresh status</string>
     <string name="shizuku_status">Shizuku status</string>
@@ -246,6 +258,7 @@
     <string name="minutes_value">%1$d min</string>
     <string name="seconds_value">%1$d s</string>
     <string name="percent_value">%1$d%%</string>
+    <string name="kelvin_value">%1$d K</string>
     <string name="hours_short">%1$.1f h</string>
     <string name="minutes_short">%1$d m</string>
     <string name="not_set">Not set</string>

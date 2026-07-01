@@ -15,6 +15,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.constants.NotificationIds
+import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.time.todayKey
 import kotlinx.coroutines.CoroutineScope
@@ -88,7 +89,7 @@ class LightMonitorService : Service(), SensorEventListener {
             tooDark &&
             nowMillis - (runtime?.ambientLastWarningAt ?: 0L) >= LOW_LIGHT_COOLDOWN_MILLIS
         if (settings.autoBrightnessEnabled) {
-            applyBrightness(lux, settings.autoBrightnessMinPercent, settings.autoBrightnessMaxPercent)
+            applyBrightness(lux, settings)
         }
         if (shouldWarn) {
             app.notifications.showLowLightWarning(lux)
@@ -109,12 +110,20 @@ class LightMonitorService : Service(), SensorEventListener {
         }
     }
 
-    private fun applyBrightness(lux: Float, minPercent: Int, maxPercent: Int) {
-        if (!Settings.System.canWrite(this)) return
-        val min = minPercent.coerceIn(5, 100)
-        val max = maxPercent.coerceIn(min, 100)
+    private suspend fun applyBrightness(lux: Float, settings: AppSettingsEntity) {
+        val min = settings.autoBrightnessMinPercent.coerceIn(5, 100)
+        val max = settings.autoBrightnessMaxPercent.coerceIn(min, 100)
         val ratio = (lux.coerceIn(0f, 500f) / 500f)
         val percent = (min + (max - min) * ratio).roundToInt().coerceIn(5, 100)
+        val app = application as ProjectLumenApplication
+        if (
+            settings.shizukuAdvancedModeEnabled &&
+            settings.shizukuNativeEyeProtectionEnabled &&
+            app.shizuku.applySystemBrightness(percent)
+        ) {
+            return
+        }
+        if (!Settings.System.canWrite(this)) return
         val brightness = ((percent / 100f) * 255f).roundToInt().coerceIn(1, 255)
         runCatching {
             Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)

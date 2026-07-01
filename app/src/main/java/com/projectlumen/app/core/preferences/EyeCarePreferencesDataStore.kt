@@ -62,6 +62,11 @@ data class EyeCarePreferences(
     val shizukuDndGuardEnabled: Boolean = false,
     val shizukuThermalGuardEnabled: Boolean = true,
     val shizukuCameraPrivacyGuardEnabled: Boolean = true,
+    val shizukuNativeEyeProtectionEnabled: Boolean = false,
+    val shizukuNativeColorTemperatureKelvin: Int = 4200,
+    val shizukuNativeBrightnessPercent: Int = 35,
+    val shizukuNativeExtraDimEnabled: Boolean = false,
+    val shizukuNativeExtraDimPercent: Int = 25,
 )
 
 class EyeCarePreferencesDataStore(context: Context) {
@@ -123,6 +128,11 @@ class EyeCarePreferencesDataStore(context: Context) {
             preferences[Keys.SHIZUKU_DND_GUARD_ENABLED] = settings.shizukuDndGuardEnabled
             preferences[Keys.SHIZUKU_THERMAL_GUARD_ENABLED] = settings.shizukuThermalGuardEnabled
             preferences[Keys.SHIZUKU_CAMERA_PRIVACY_GUARD_ENABLED] = settings.shizukuCameraPrivacyGuardEnabled
+            preferences[Keys.SHIZUKU_NATIVE_EYE_PROTECTION_ENABLED] = settings.shizukuNativeEyeProtectionEnabled
+            preferences[Keys.SHIZUKU_NATIVE_COLOR_TEMPERATURE_KELVIN] = settings.shizukuNativeColorTemperatureKelvin
+            preferences[Keys.SHIZUKU_NATIVE_BRIGHTNESS_PERCENT] = settings.shizukuNativeBrightnessPercent
+            preferences[Keys.SHIZUKU_NATIVE_EXTRA_DIM_ENABLED] = settings.shizukuNativeExtraDimEnabled
+            preferences[Keys.SHIZUKU_NATIVE_EXTRA_DIM_PERCENT] = settings.shizukuNativeExtraDimPercent
         }
     }
 
@@ -169,6 +179,11 @@ class EyeCarePreferencesDataStore(context: Context) {
             shizukuDndGuardEnabled = preferences[Keys.SHIZUKU_DND_GUARD_ENABLED] ?: false,
             shizukuThermalGuardEnabled = preferences[Keys.SHIZUKU_THERMAL_GUARD_ENABLED] ?: true,
             shizukuCameraPrivacyGuardEnabled = preferences[Keys.SHIZUKU_CAMERA_PRIVACY_GUARD_ENABLED] ?: true,
+            shizukuNativeEyeProtectionEnabled = preferences[Keys.SHIZUKU_NATIVE_EYE_PROTECTION_ENABLED] ?: false,
+            shizukuNativeColorTemperatureKelvin = preferences[Keys.SHIZUKU_NATIVE_COLOR_TEMPERATURE_KELVIN] ?: 4200,
+            shizukuNativeBrightnessPercent = preferences[Keys.SHIZUKU_NATIVE_BRIGHTNESS_PERCENT] ?: 35,
+            shizukuNativeExtraDimEnabled = preferences[Keys.SHIZUKU_NATIVE_EXTRA_DIM_ENABLED] ?: false,
+            shizukuNativeExtraDimPercent = preferences[Keys.SHIZUKU_NATIVE_EXTRA_DIM_PERCENT] ?: 25,
         )
     }
 
@@ -213,6 +228,11 @@ class EyeCarePreferencesDataStore(context: Context) {
         val SHIZUKU_DND_GUARD_ENABLED = booleanPreferencesKey("shizuku_dnd_guard_enabled")
         val SHIZUKU_THERMAL_GUARD_ENABLED = booleanPreferencesKey("shizuku_thermal_guard_enabled")
         val SHIZUKU_CAMERA_PRIVACY_GUARD_ENABLED = booleanPreferencesKey("shizuku_camera_privacy_guard_enabled")
+        val SHIZUKU_NATIVE_EYE_PROTECTION_ENABLED = booleanPreferencesKey("shizuku_native_eye_protection_enabled")
+        val SHIZUKU_NATIVE_COLOR_TEMPERATURE_KELVIN = intPreferencesKey("shizuku_native_color_temperature_kelvin")
+        val SHIZUKU_NATIVE_BRIGHTNESS_PERCENT = intPreferencesKey("shizuku_native_brightness_percent")
+        val SHIZUKU_NATIVE_EXTRA_DIM_ENABLED = booleanPreferencesKey("shizuku_native_extra_dim_enabled")
+        val SHIZUKU_NATIVE_EXTRA_DIM_PERCENT = intPreferencesKey("shizuku_native_extra_dim_percent")
     }
 }
 
@@ -259,5 +279,10 @@ fun AppSettingsEntity.withEyeCarePreferences(preferences: EyeCarePreferences): A
         shizukuDndGuardEnabled = preferences.shizukuDndGuardEnabled,
         shizukuThermalGuardEnabled = preferences.shizukuThermalGuardEnabled,
         shizukuCameraPrivacyGuardEnabled = preferences.shizukuCameraPrivacyGuardEnabled,
+        shizukuNativeEyeProtectionEnabled = preferences.shizukuNativeEyeProtectionEnabled,
+        shizukuNativeColorTemperatureKelvin = preferences.shizukuNativeColorTemperatureKelvin,
+        shizukuNativeBrightnessPercent = preferences.shizukuNativeBrightnessPercent,
+        shizukuNativeExtraDimEnabled = preferences.shizukuNativeExtraDimEnabled,
+        shizukuNativeExtraDimPercent = preferences.shizukuNativeExtraDimPercent,
     )
 }

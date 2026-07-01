@@ -74,6 +74,7 @@ class ProjectLumenViewModel(
         stopDeveloperDebugService = stopDeveloperDebugService,
         startShizukuResilience = startShizukuResilience,
         stopShizukuResilience = stopShizukuResilience,
+        shizuku = shizuku,
     )
     private val templatesEntry = ProjectLumenTemplatesFeatureEntry(
         scope = viewModelScope,

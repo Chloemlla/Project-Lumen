@@ -9,6 +9,7 @@ import com.projectlumen.app.core.repositories.DailyGoalsRepository
 import com.projectlumen.app.core.repositories.RuntimeRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.services.NotificationService
+import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -29,12 +30,14 @@ internal class ProjectLumenSettingsFeatureEntry(
     private val stopDeveloperDebugService: () -> Unit,
     private val startShizukuResilience: () -> Unit,
     private val stopShizukuResilience: () -> Unit,
+    private val shizuku: ShizukuCapabilityManager,
 ) {
     fun applyStartupMonitoring(settings: AppSettingsEntity) {
         if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) scheduleProximityMonitoring()
         applyLightMonitoringSettings(settings)
         applyDeveloperDebugSettings(settings)
         applyShizukuResilienceSettings(settings)
+        applyShizukuNativeEyeProtectionSettings(settings, smooth = false)
     }
 
     fun updateSettings(
@@ -66,6 +69,9 @@ internal class ProjectLumenSettingsFeatureEntry(
             applyLightMonitoringSettings(updated)
             applyDeveloperDebugSettings(updated)
             applyShizukuResilienceSettings(updated)
+            if (current.hasShizukuNativeEyeProtectionChange(updated)) {
+                applyShizukuNativeEyeProtectionSettings(updated, smooth = true)
+            }
         }
     }
 
@@ -200,11 +206,27 @@ internal class ProjectLumenSettingsFeatureEntry(
     }
 
     private fun applyShizukuResilienceSettings(settings: AppSettingsEntity) {
-        if (settings.shizukuAdvancedModeEnabled && settings.shizukuServiceRecoveryEnabled) {
+        if (settings.shizukuAdvancedModeEnabled && (settings.shizukuServiceRecoveryEnabled || settings.shizukuNativeEyeProtectionEnabled)) {
             startShizukuResilience()
         } else {
             stopShizukuResilience()
         }
+    }
+
+    private fun applyShizukuNativeEyeProtectionSettings(settings: AppSettingsEntity, smooth: Boolean) {
+        if (!settings.shizukuNativeEyeProtectionEnabled && !shizuku.state.value.nativeEyeProtectionApplied) return
+        scope.launch {
+            shizuku.applyNativeEyeProtection(settings, smooth)
+        }
+    }
+
+    private fun AppSettingsEntity.hasShizukuNativeEyeProtectionChange(updated: AppSettingsEntity): Boolean {
+        return shizukuAdvancedModeEnabled != updated.shizukuAdvancedModeEnabled ||
+            shizukuNativeEyeProtectionEnabled != updated.shizukuNativeEyeProtectionEnabled ||
+            shizukuNativeColorTemperatureKelvin != updated.shizukuNativeColorTemperatureKelvin ||
+            shizukuNativeBrightnessPercent != updated.shizukuNativeBrightnessPercent ||
+            shizukuNativeExtraDimEnabled != updated.shizukuNativeExtraDimEnabled ||
+            shizukuNativeExtraDimPercent != updated.shizukuNativeExtraDimPercent
     }
 
     private fun normalizeTemplateAppearanceSettings(settings: AppSettingsEntity): AppSettingsEntity {

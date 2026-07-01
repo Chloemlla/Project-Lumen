@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Project Lumen</string>
+    <string name="permission_access_lumen_core_label">访问 Project Lumen 核心能力</string>
+    <string name="permission_access_lumen_core_description">允许获准应用查看 Project Lumen 健康状态并控制专注会话。</string>
+    <string name="permission_trigger_lumen_control_label">触发 Project Lumen 控制能力</string>
+    <string name="permission_trigger_lumen_control_description">允许同签名应用启动 Project Lumen 休息防护控制。</string>
     <string name="toast_title_info">Lumen 信号</string>
     <string name="toast_title_warning">需要注意</string>
     <string name="toast_title_timer">计时信号</string>
@@ -161,6 +165,14 @@
     <string name="shizuku_dnd_guard">勿扰模式中延后检测</string>
     <string name="shizuku_thermal_guard">设备发热时延后检测</string>
     <string name="shizuku_camera_privacy_guard">相机隐私开关启用时延后检测</string>
+    <string name="enable_shizuku_native_eye_protection">使用 Shizuku 原生护眼</string>
+    <string name="shizuku_native_eye_protection_summary">通过 Shizuku settings 命令应用系统夜间护眼、屏幕亮度和 Extra Dim，由 Android 系统处理护眼效果，而不是绘制悬浮遮罩。</string>
+    <string name="shizuku_native_color_temperature">原生色温</string>
+    <string name="shizuku_native_brightness">原生屏幕亮度</string>
+    <string name="shizuku_native_extra_dim">使用系统 Extra Dim</string>
+    <string name="shizuku_native_extra_dim_intensity">Extra Dim 强度</string>
+    <string name="shizuku_native_boundary">可用性取决于 Android 版本和厂商 ROM 对夜间护眼、Extra Dim secure settings 的支持。Shizuku 不可用时，提醒和监测会继续运行，不会导致崩溃。</string>
+    <string name="shizuku_native_eye_protection_applied">原生护眼：%1$d K，%2$d%% 亮度，%3$d%% Extra Dim</string>
     <string name="shizuku_authorize">授权 Shizuku</string>
     <string name="shizuku_refresh_status">刷新状态</string>
     <string name="shizuku_status">Shizuku 状态</string>
@@ -246,6 +258,7 @@
     <string name="minutes_value">%1$d 分钟</string>
     <string name="seconds_value">%1$d 秒</string>
     <string name="percent_value">%1$d%%</string>
+    <string name="kelvin_value">%1$d K</string>
     <string name="hours_short">%1$.1f 小时</string>
     <string name="minutes_short">%1$d 分钟</string>
     <string name="not_set">未设置</string>

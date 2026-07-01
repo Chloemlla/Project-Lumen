@@ -48,7 +48,13 @@ class AppLifecycleCoordinator(
             if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) {
                 app.startLightMonitoring()
             }
-            if (settings.shizukuAdvancedModeEnabled && settings.shizukuServiceRecoveryEnabled) {
+            if (settings.shizukuAdvancedModeEnabled && settings.shizukuNativeEyeProtectionEnabled) {
+                app.shizuku.applyNativeEyeProtection(settings, smooth = false)
+            }
+            if (
+                settings.shizukuAdvancedModeEnabled &&
+                (settings.shizukuServiceRecoveryEnabled || settings.shizukuNativeEyeProtectionEnabled)
+            ) {
                 app.startShizukuResilience()
             }
             if (foregroundRuntime.activeEngine != ActiveEngine.IDLE.name && settings.keepAliveEnabled) {

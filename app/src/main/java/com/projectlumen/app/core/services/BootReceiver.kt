@@ -26,8 +26,14 @@ class BootReceiver : BroadcastReceiver() {
                 if (settings?.ambientLightMonitoringEnabled == true || settings?.autoBrightnessEnabled == true) {
                     app.startLightMonitoring()
                 }
-                if (settings?.shizukuAdvancedModeEnabled == true && settings.shizukuServiceRecoveryEnabled) {
-                    app.startShizukuResilience()
+                if (
+                    settings?.shizukuAdvancedModeEnabled == true &&
+                    (settings.shizukuServiceRecoveryEnabled || settings.shizukuNativeEyeProtectionEnabled)
+                ) {
+                    ShizukuResilienceWorker.enqueue(
+                        context = app,
+                        delayMinutes = if (settings.shizukuNativeEyeProtectionEnabled) 0L else 15L,
+                    )
                 }
                 if (settings?.keepAliveEnabled == true && runtime?.activeEngine != ActiveEngine.IDLE.name) {
                     app.startTimerService()
