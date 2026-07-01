@@ -205,6 +205,8 @@ internal fun AboutScreen(viewModel: ProjectLumenViewModel) {
     val versionLabel = rememberBuildVersionLabel()
     val context = LocalContext.current
     var versionTapCount by rememberSaveable { mutableIntStateOf(0) }
+    val fallbackScrollState = rememberScrollState()
+    val scrollState = LocalLumenPageScrollState.current ?: fallbackScrollState
     fun handleDeveloperTap() {
         versionTapCount += 1
         when {
@@ -241,7 +243,7 @@ internal fun AboutScreen(viewModel: ProjectLumenViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 720.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 84.dp)),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {

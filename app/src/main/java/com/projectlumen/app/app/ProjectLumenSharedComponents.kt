@@ -145,6 +145,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -203,6 +204,14 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
+    val scrollState = LocalLumenPageScrollState.current
+    val fadeThresholdPx = with(LocalDensity.current) { 72.dp.toPx() }
+    val scrollProgress = ((scrollState?.value ?: 0).toFloat() / fadeThresholdPx).coerceIn(0f, 1f)
+    val titleAlpha by animateFloatAsState(
+        targetValue = 1f - scrollProgress,
+        animationSpec = tween(160),
+        label = "topBarTitleAlpha",
+    )
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.primary,
@@ -219,6 +228,7 @@ internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
         title = {
             Text(
                 text = title,
+                modifier = Modifier.graphicsLayer { alpha = titleAlpha },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,

@@ -215,9 +215,6 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
     LumenPage {
         SectionHeader(Icons.Outlined.Style, R.string.template_preview)
         TemplatePreviewCard(activeTemplate)
-        if (activeTemplate != null) {
-            SystemBackgroundPicker(activeTemplate, viewModel)
-        }
         uiState.templates.forEach { template ->
             val selected = template.id == uiState.settings.activeTipTemplateId
             val locked = template.isPremium && !proEnabled

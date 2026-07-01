@@ -85,6 +85,7 @@ internal class ProjectLumenTemplatesFeatureEntry(
 
     suspend fun seedDefaultTemplates() {
         val nowMillis = System.currentTimeMillis()
+        tipTemplateRepository.softDeleteObsoleteBuiltinTemplates(DefaultTipTemplates.builtinIds, nowMillis)
         DefaultTipTemplates.create(nowMillis).forEach { template ->
             val existing = tipTemplateRepository.get(template.id)
             if (existing == null) {
@@ -92,13 +93,37 @@ internal class ProjectLumenTemplatesFeatureEntry(
             } else if (existing.isBuiltin) {
                 tipTemplateRepository.upsert(
                     existing.copy(
+                        name = template.name,
+                        backgroundType = template.backgroundType,
+                        backgroundValue = template.backgroundValue,
+                        primaryColor = template.primaryColor,
+                        layoutJson = mergeTemplateLayout(existing.layoutJson, template.layoutJson),
                         isPremium = template.isPremium,
                         sortOrder = template.sortOrder,
                         updatedAt = nowMillis,
+                        deletedAt = 0L,
                     ),
                 )
             }
         }
+        val settings = settingsRepository.getOrDefault()
+        if (tipTemplateRepository.get(settings.activeTipTemplateId) == null) {
+            settingsRepository.update(nowMillis) { it.copy(activeTipTemplateId = 1L) }
+        }
+    }
+
+    private fun mergeTemplateLayout(existingLayoutJson: String, templateLayoutJson: String): String {
+        val updated = runCatching { JSONObject(templateLayoutJson.takeIf { it.isNotBlank() } ?: "{}") }
+            .getOrElse { JSONObject() }
+        val existing = runCatching { JSONObject(existingLayoutJson.takeIf { it.isNotBlank() } ?: "{}") }
+            .getOrNull()
+        val countdownStyle = existing
+            ?.optString("countdownStyle")
+            ?.takeIf { it == COUNTDOWN_STYLE_CIRCLE || it == COUNTDOWN_STYLE_BAR || it == COUNTDOWN_STYLE_NUMBER }
+        if (countdownStyle != null) {
+            updated.put("countdownStyle", countdownStyle)
+        }
+        return updated.toString()
     }
 
     private fun canUse(settings: AppSettingsEntity, feature: PremiumFeature): Boolean {

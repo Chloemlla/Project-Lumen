@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BatterySaver
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Schedule
@@ -35,7 +36,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.projectlumen.app.BuildConfig
+import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.R
+import com.projectlumen.app.core.api.ProjectLumenApiConfig
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
@@ -131,6 +135,46 @@ internal fun DeveloperDebugScreen(
             }
         }
 
+        SettingsSection(R.string.developer_section_api_security, Icons.Outlined.Lock) {
+            MetricRow(R.string.developer_security_api_base, ProjectLumenApiConfig.baseUrl)
+            MetricRow(R.string.developer_security_cleartext, stringResource(R.string.developer_security_cleartext_blocked))
+            MetricRow(
+                R.string.developer_security_api_pins,
+                securityPinStatus(
+                    pinCount = configuredPinCount(ProjectLumenApiConfig.apiCertificatePins),
+                    required = !BuildConfig.DEBUG,
+                    optional = false,
+                ),
+            )
+            MetricRow(R.string.developer_security_translation_base, ProjectLumenApiConfig.translationBaseUrl)
+            MetricRow(
+                R.string.developer_security_translation_pins,
+                securityPinStatus(
+                    pinCount = configuredPinCount(ProjectLumenApiConfig.translationCertificatePins),
+                    required = false,
+                    optional = true,
+                ),
+            )
+            MetricRow(R.string.developer_security_request_signing, stringResource(R.string.developer_security_request_signing_enabled))
+            MetricRow(
+                R.string.developer_security_play_integrity,
+                if (BuildConfig.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER > 0L) {
+                    stringResource(R.string.developer_security_play_integrity_configured)
+                } else {
+                    stringResource(R.string.developer_security_play_integrity_disabled)
+                },
+            )
+            MetricRow(R.string.developer_security_credentials, secureCredentialStatus(context))
+            MetricRow(
+                R.string.developer_security_webview_bridge,
+                if (BuildConfig.DEBUG) {
+                    stringResource(R.string.developer_security_webview_debug_only)
+                } else {
+                    stringResource(R.string.developer_security_webview_disabled)
+                },
+            )
+        }
+
         SettingsSection(R.string.developer_section_raw_sensors, Icons.Outlined.Sensors) {
             MetricRow(R.string.developer_lux, "%.1f lux".format(runtime.ambientLastLux))
             LuxCurve(luxHistory)
@@ -158,6 +202,37 @@ internal fun DeveloperDebugScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun securityPinStatus(pinCount: Int, required: Boolean, optional: Boolean): String {
+    return when {
+        pinCount >= 2 -> stringResource(R.string.developer_security_pins_ready, pinCount)
+        pinCount > 0 -> stringResource(R.string.developer_security_pins_partial, pinCount)
+        optional -> stringResource(R.string.developer_security_pins_optional)
+        required -> stringResource(R.string.developer_security_pins_missing)
+        else -> stringResource(R.string.developer_security_pins_debug_missing)
+    }
+}
+
+private fun configuredPinCount(pins: String): Int {
+    return pins
+        .split(',', ';', '\n')
+        .count { it.trim().isNotBlank() }
+}
+
+@Composable
+private fun secureCredentialStatus(context: Context): String {
+    val hasAccessToken = remember(context) {
+        val application = context.applicationContext as? ProjectLumenApplication
+        val session = runCatching { application?.secureCredentials?.load() }.getOrNull()
+        session?.accessToken?.isNotBlank() == true
+    }
+    return if (hasAccessToken) {
+        stringResource(R.string.developer_security_credentials_present)
+    } else {
+        stringResource(R.string.developer_security_credentials_empty)
     }
 }
 

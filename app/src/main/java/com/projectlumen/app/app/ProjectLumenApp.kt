@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -222,6 +223,7 @@ fun ProjectLumenApp(
             useDynamicColors = uiState.settings.useDynamicColors,
             themePrimaryColor = activeThemeTemplate?.primaryColor,
             themeBackgroundColor = activeThemeTemplate?.backgroundValue,
+            themePaletteJson = activeThemeTemplate?.layoutJson,
         ) {
             activeCrashReport?.let { report ->
                 CrashReportScreen(
@@ -243,6 +245,12 @@ fun ProjectLumenApp(
             val currentDestination = Destination.entries.firstOrNull {
                 it.route == backStackEntry?.destination?.route
             } ?: Destination.HOME
+            val topBarScrollState = rememberSaveable(
+                currentDestination.route,
+                saver = ScrollState.Saver,
+            ) {
+                ScrollState(0)
+            }
             fun navigateBackFromSecondaryPage() {
                 if (!navController.navigateUp()) {
                     navController.navigate(Destination.SETTINGS.route) {
@@ -253,126 +261,128 @@ fun ProjectLumenApp(
             BackHandler(enabled = !currentDestination.showInBottomNav) {
                 navigateBackFromSecondaryPage()
             }
-            Scaffold(
-                containerColor = MaterialTheme.colorScheme.background,
-                contentWindowInsets = WindowInsets.safeDrawing,
-                topBar = {
-                    LumenTopBar(
-                        title = stringResource(currentDestination.labelRes),
-                        onNavigateBack = if (currentDestination.showInBottomNav) null else {
-                            { navigateBackFromSecondaryPage() }
-                        },
-                    )
-                },
-                bottomBar = {
-                    NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        tonalElevation = 3.dp,
-                    ) {
-                        Destination.entries.filter { it.showInBottomNav }.forEach { destination ->
-                            val selected = backStackEntry?.destination?.hierarchy?.any {
-                                it.route == destination.route
-                            } == true
-                            NavigationBarItem(
-                                selected = selected,
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                ),
-                                onClick = {
-                                    navController.navigate(destination.route) {
-                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                                icon = {
-                                    val scale by animateFloatAsState(
-                                        targetValue = if (selected) 1.12f else 1f,
-                                        animationSpec = spring(stiffness = 600f, dampingRatio = 0.72f),
-                                        label = "bottomNavIconScale",
-                                    )
-                                    Icon(
-                                        destination.icon,
-                                        contentDescription = stringResource(destination.labelRes),
-                                        modifier = Modifier.graphicsLayer {
-                                            scaleX = scale
-                                            scaleY = scale
-                                        },
-                                    )
-                                },
-                                label = {
-                                    AnimatedContent(
-                                        targetState = selected,
-                                        transitionSpec = {
-                                            fadeIn(tween(120)) togetherWith fadeOut(tween(90))
-                                        },
-                                        label = "bottomNavLabel",
-                                    ) { isSelected ->
-                                        Text(
-                                            text = stringResource(destination.labelRes),
-                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            CompositionLocalProvider(LocalLumenPageScrollState provides topBarScrollState) {
+                Scaffold(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentWindowInsets = WindowInsets.safeDrawing,
+                    topBar = {
+                        LumenTopBar(
+                            title = stringResource(currentDestination.labelRes),
+                            onNavigateBack = if (currentDestination.showInBottomNav) null else {
+                                { navigateBackFromSecondaryPage() }
+                            },
+                        )
+                    },
+                    bottomBar = {
+                        NavigationBar(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            tonalElevation = 3.dp,
+                        ) {
+                            Destination.entries.filter { it.showInBottomNav }.forEach { destination ->
+                                val selected = backStackEntry?.destination?.hierarchy?.any {
+                                    it.route == destination.route
+                                } == true
+                                NavigationBarItem(
+                                    selected = selected,
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    ),
+                                    onClick = {
+                                        navController.navigate(destination.route) {
+                                            popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    },
+                                    icon = {
+                                        val scale by animateFloatAsState(
+                                            targetValue = if (selected) 1.12f else 1f,
+                                            animationSpec = spring(stiffness = 600f, dampingRatio = 0.72f),
+                                            label = "bottomNavIconScale",
                                         )
-                                    }
+                                        Icon(
+                                            destination.icon,
+                                            contentDescription = stringResource(destination.labelRes),
+                                            modifier = Modifier.graphicsLayer {
+                                                scaleX = scale
+                                                scaleY = scale
+                                            },
+                                        )
+                                    },
+                                    label = {
+                                        AnimatedContent(
+                                            targetState = selected,
+                                            transitionSpec = {
+                                                fadeIn(tween(120)) togetherWith fadeOut(tween(90))
+                                            },
+                                            label = "bottomNavLabel",
+                                        ) { isSelected ->
+                                            Text(
+                                                text = stringResource(destination.labelRes),
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                            )
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    },
+                ) { padding ->
+                    NavHost(
+                        navController = navController,
+                        startDestination = Destination.HOME.route,
+                        modifier = Modifier.padding(padding),
+                        enterTransition = {
+                            fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 10 }
+                        },
+                        exitTransition = {
+                            fadeOut(tween(160)) + slideOutHorizontally(tween(160)) { -it / 12 }
+                        },
+                        popEnterTransition = {
+                            fadeIn(tween(220)) + slideInHorizontally(tween(220)) { -it / 10 }
+                        },
+                        popExitTransition = {
+                            fadeOut(tween(160)) + slideOutHorizontally(tween(160)) { it / 12 }
+                        },
+                    ) {
+                        composable(Destination.HOME.route) {
+                            HomeScreen(
+                                uiState = uiState,
+                                viewModel = viewModel,
+                                openTranslation = { navController.navigate(Destination.TRANSLATION.route) },
+                            )
+                        }
+                        composable(Destination.BREAK.route) { BreakScreen(uiState, viewModel) }
+                        composable(Destination.POMODORO.route) { PomodoroScreen(uiState, viewModel) }
+                        composable(Destination.STATS.route) { StatisticsScreen(uiState, viewModel) }
+                        composable(Destination.SETTINGS.route) {
+                            SettingsScreen(
+                                uiState = uiState,
+                                viewModel = viewModel,
+                                checkingUpdate = updateDialogState is UpdateDialogState.Checking,
+                                onManualUpdateCheck = { triggerUpdateCheck(manual = true) },
+                                openTemplates = { navController.navigate(Destination.TEMPLATES.route) },
+                                openAbout = { navController.navigate(Destination.ABOUT.route) },
+                                openDeveloperOptions = { navController.navigate(Destination.DEVELOPER.route) },
+                            )
+                        }
+                        composable(Destination.TRANSLATION.route) { TranslationScreen() }
+                        composable(Destination.TEMPLATES.route) { TemplatesScreen(uiState, viewModel) }
+                        composable(Destination.ABOUT.route) { AboutScreen(viewModel) }
+                        composable(Destination.DEVELOPER.route) {
+                            DeveloperDebugScreen(
+                                uiState = uiState,
+                                viewModel = viewModel,
+                                onPreviewCrashReport = { report ->
+                                    activeCrashReportClearsStore = false
+                                    activeCrashReport = report
                                 },
                             )
                         }
-                    }
-                },
-            ) { padding ->
-                NavHost(
-                    navController = navController,
-                    startDestination = Destination.HOME.route,
-                    modifier = Modifier.padding(padding),
-                    enterTransition = {
-                        fadeIn(tween(220)) + slideInHorizontally(tween(220)) { it / 10 }
-                    },
-                    exitTransition = {
-                        fadeOut(tween(160)) + slideOutHorizontally(tween(160)) { -it / 12 }
-                    },
-                    popEnterTransition = {
-                        fadeIn(tween(220)) + slideInHorizontally(tween(220)) { -it / 10 }
-                    },
-                    popExitTransition = {
-                        fadeOut(tween(160)) + slideOutHorizontally(tween(160)) { it / 12 }
-                    },
-                ) {
-                    composable(Destination.HOME.route) {
-                        HomeScreen(
-                            uiState = uiState,
-                            viewModel = viewModel,
-                            openTranslation = { navController.navigate(Destination.TRANSLATION.route) },
-                        )
-                    }
-                    composable(Destination.BREAK.route) { BreakScreen(uiState, viewModel) }
-                    composable(Destination.POMODORO.route) { PomodoroScreen(uiState, viewModel) }
-                    composable(Destination.STATS.route) { StatisticsScreen(uiState, viewModel) }
-                    composable(Destination.SETTINGS.route) {
-                        SettingsScreen(
-                            uiState = uiState,
-                            viewModel = viewModel,
-                            checkingUpdate = updateDialogState is UpdateDialogState.Checking,
-                            onManualUpdateCheck = { triggerUpdateCheck(manual = true) },
-                            openTemplates = { navController.navigate(Destination.TEMPLATES.route) },
-                            openAbout = { navController.navigate(Destination.ABOUT.route) },
-                            openDeveloperOptions = { navController.navigate(Destination.DEVELOPER.route) },
-                        )
-                    }
-                    composable(Destination.TRANSLATION.route) { TranslationScreen() }
-                    composable(Destination.TEMPLATES.route) { TemplatesScreen(uiState, viewModel) }
-                    composable(Destination.ABOUT.route) { AboutScreen(viewModel) }
-                    composable(Destination.DEVELOPER.route) {
-                        DeveloperDebugScreen(
-                            uiState = uiState,
-                            viewModel = viewModel,
-                            onPreviewCrashReport = { report ->
-                                activeCrashReportClearsStore = false
-                                activeCrashReport = report
-                            },
-                        )
                     }
                 }
             }

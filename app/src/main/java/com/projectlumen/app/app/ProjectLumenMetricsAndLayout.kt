@@ -47,6 +47,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -133,6 +134,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -196,6 +198,8 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+
+internal val LocalLumenPageScrollState = staticCompositionLocalOf<ScrollState?> { null }
 
 @Composable
 internal fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
@@ -298,6 +302,8 @@ internal fun TemplateColorSwatch(template: TipTemplateEntity) {
 
 @Composable
 internal fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Start, content: @Composable ColumnScope.() -> Unit) {
+    val fallbackScrollState = rememberScrollState()
+    val scrollState = LocalLumenPageScrollState.current ?: fallbackScrollState
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -308,7 +314,7 @@ internal fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Sta
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 720.dp)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
                 .padding(PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 18.dp)),
             horizontalAlignment = horizontalAlignment,

@@ -253,43 +253,25 @@ internal fun isAutoDarkActive(nowMillis: Long, startMinute: Int, endMinute: Int)
 @Composable
 internal fun templateDisplayName(template: TipTemplateEntity?): String {
     return when (template?.id) {
-        1L -> stringResource(R.string.template_calm_teal)
-        2L -> stringResource(R.string.template_soft_sunrise)
-        3L -> stringResource(R.string.template_focus_indigo)
-        4L -> stringResource(R.string.template_system_colors)
-        5L -> stringResource(R.string.template_forest_glass)
-        6L -> stringResource(R.string.template_clear_sky)
-        7L -> stringResource(R.string.template_rose_quartz)
-        8L -> stringResource(R.string.template_deep_slate)
-        9L -> stringResource(R.string.template_paper_mint)
-        10L -> stringResource(R.string.template_warm_desk)
-        11L -> stringResource(R.string.template_graphite_focus)
-        12L -> stringResource(R.string.template_lotus_pause)
-        13L -> stringResource(R.string.template_clinic_calm)
-        14L -> stringResource(R.string.template_night_amber)
-        15L -> stringResource(R.string.template_reading_green)
-        else -> template?.name ?: stringResource(R.string.template_calm_teal)
+        1L -> stringResource(R.string.template_electric_city_nights)
+        2L -> stringResource(R.string.template_white_with_blue)
+        3L -> stringResource(R.string.template_turquoise)
+        4L -> stringResource(R.string.template_de283b)
+        5L -> stringResource(R.string.template_dance_network)
+        6L -> stringResource(R.string.template_orange_flat_shadow)
+        else -> template?.name ?: stringResource(R.string.template_electric_city_nights)
     }
 }
 
 @Composable
 internal fun templateSubtitle(template: TipTemplateEntity?): String {
     return when (template?.id) {
-        1L -> stringResource(R.string.template_calm_teal_subtitle)
-        2L -> stringResource(R.string.template_soft_sunrise_subtitle)
-        3L -> stringResource(R.string.template_focus_indigo_subtitle)
-        4L -> stringResource(R.string.template_system_colors_subtitle)
-        5L -> stringResource(R.string.template_forest_glass_subtitle)
-        6L -> stringResource(R.string.template_clear_sky_subtitle)
-        7L -> stringResource(R.string.template_rose_quartz_subtitle)
-        8L -> stringResource(R.string.template_deep_slate_subtitle)
-        9L -> stringResource(R.string.template_paper_mint_subtitle)
-        10L -> stringResource(R.string.template_warm_desk_subtitle)
-        11L -> stringResource(R.string.template_graphite_focus_subtitle)
-        12L -> stringResource(R.string.template_lotus_pause_subtitle)
-        13L -> stringResource(R.string.template_clinic_calm_subtitle)
-        14L -> stringResource(R.string.template_night_amber_subtitle)
-        15L -> stringResource(R.string.template_reading_green_subtitle)
+        1L -> stringResource(R.string.template_electric_city_nights_subtitle)
+        2L -> stringResource(R.string.template_white_with_blue_subtitle)
+        3L -> stringResource(R.string.template_turquoise_subtitle)
+        4L -> stringResource(R.string.template_de283b_subtitle)
+        5L -> stringResource(R.string.template_dance_network_subtitle)
+        6L -> stringResource(R.string.template_orange_flat_shadow_subtitle)
         else -> template?.subtitleText ?: stringResource(R.string.break_message)
     }
 }

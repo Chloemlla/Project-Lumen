@@ -12,4 +12,8 @@ class TipTemplateRepository(private val dao: TipTemplatesDao) {
     suspend fun upsert(template: TipTemplateEntity) {
         dao.upsert(template)
     }
+
+    suspend fun softDeleteObsoleteBuiltinTemplates(retainedIds: List<Long>, deletedAt: Long) {
+        dao.softDeleteObsoleteBuiltinTemplates(retainedIds, deletedAt)
+    }
 }

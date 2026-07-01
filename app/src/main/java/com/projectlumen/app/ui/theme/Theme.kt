@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import com.projectlumen.app.core.enums.AppThemeMode
+import org.json.JSONObject
 
 private val LightColors = lightColorScheme(
     primary = LumenTeal,
@@ -63,6 +64,7 @@ fun ProjectLumenTheme(
     useDynamicColors: Boolean = true,
     themePrimaryColor: String? = null,
     themeBackgroundColor: String? = null,
+    themePaletteJson: String? = null,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = when (themeMode) {
@@ -84,7 +86,7 @@ fun ProjectLumenTheme(
         baseColorScheme.applyTemplatePalette(
             primaryHex = themePrimaryColor,
             backgroundHex = themeBackgroundColor,
-            darkTheme = darkTheme,
+            paletteJson = themePaletteJson,
         )
     }
     MaterialTheme(
@@ -97,10 +99,37 @@ fun ProjectLumenTheme(
 private fun ColorScheme.applyTemplatePalette(
     primaryHex: String?,
     backgroundHex: String?,
-    darkTheme: Boolean,
+    paletteJson: String?,
 ): ColorScheme {
+    parseTemplatePalette(paletteJson)?.let { palette ->
+        return copy(
+            primary = palette.primary100,
+            onPrimary = palette.primary100.contentColor(),
+            primaryContainer = palette.primary300,
+            onPrimaryContainer = palette.primary300.contentColor(),
+            secondary = palette.accent100,
+            onSecondary = palette.accent100.contentColor(),
+            secondaryContainer = palette.accent200,
+            onSecondaryContainer = palette.accent200.contentColor(),
+            tertiary = palette.primary200,
+            onTertiary = palette.primary200.contentColor(),
+            tertiaryContainer = palette.primary300,
+            onTertiaryContainer = palette.primary300.contentColor(),
+            surface = palette.bg100,
+            onSurface = palette.text100,
+            surfaceVariant = palette.bg300,
+            onSurfaceVariant = palette.text200,
+            surfaceContainer = palette.bg200,
+            background = palette.bg100,
+            onBackground = palette.text100,
+            outline = palette.text200,
+            outlineVariant = palette.bg300,
+        )
+    }
+
     val primarySeed = parseTemplateColor(primaryHex) ?: return this
     val backgroundSeed = parseTemplateColor(backgroundHex) ?: primarySeed
+    val darkTheme = backgroundSeed.luminance() < 0.42f
 
     val primary = if (darkTheme) {
         primarySeed.blend(Color.White, 0.28f)
@@ -153,6 +182,42 @@ private fun ColorScheme.applyTemplatePalette(
 private fun parseTemplateColor(hex: String?): Color? {
     if (hex.isNullOrBlank() || !hex.trim().startsWith("#")) return null
     return runCatching { Color(AndroidColor.parseColor(hex.trim())) }.getOrNull()
+}
+
+private data class TemplatePalette(
+    val primary100: Color,
+    val primary200: Color,
+    val primary300: Color,
+    val accent100: Color,
+    val accent200: Color,
+    val text100: Color,
+    val text200: Color,
+    val bg100: Color,
+    val bg200: Color,
+    val bg300: Color,
+)
+
+private fun parseTemplatePalette(json: String?): TemplatePalette? {
+    if (json.isNullOrBlank()) return null
+    return runCatching {
+        val palette = JSONObject(json).optJSONObject("palette") ?: return null
+        TemplatePalette(
+            primary100 = palette.getTemplateColor("primary-100"),
+            primary200 = palette.getTemplateColor("primary-200"),
+            primary300 = palette.getTemplateColor("primary-300"),
+            accent100 = palette.getTemplateColor("accent-100"),
+            accent200 = palette.getTemplateColor("accent-200"),
+            text100 = palette.getTemplateColor("text-100"),
+            text200 = palette.getTemplateColor("text-200"),
+            bg100 = palette.getTemplateColor("bg-100"),
+            bg200 = palette.getTemplateColor("bg-200"),
+            bg300 = palette.getTemplateColor("bg-300"),
+        )
+    }.getOrNull()
+}
+
+private fun JSONObject.getTemplateColor(key: String): Color {
+    return parseTemplateColor(getString(key)) ?: error("Invalid template color: $key")
 }
 
 private fun Color.blend(target: Color, fraction: Float): Color {
