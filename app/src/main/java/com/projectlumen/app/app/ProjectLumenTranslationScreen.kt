@@ -1,5 +1,6 @@
 package com.projectlumen.app.app
 
+import android.content.ClipData
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -34,10 +35,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
@@ -69,7 +70,7 @@ private val targetLanguageOptions = listOf(
 @Composable
 internal fun TranslationScreen() {
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val api = remember(context) { ProjectLumenTranslationApiClient(context.applicationContext) }
     var sourceText by rememberSaveable { mutableStateOf("") }
@@ -224,7 +225,15 @@ internal fun TranslationScreen() {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     OutlinedButton(
-                        onClick = { clipboard.setText(AnnotatedString(translation.translatedText)) },
+                        onClick = {
+                            scope.launch {
+                                clipboard.setClipEntry(
+                                    ClipEntry(
+                                        ClipData.newPlainText("translation", translation.translatedText),
+                                    ),
+                                )
+                            }
+                        },
                     ) {
                         ButtonLabel(Icons.Outlined.ContentCopy, R.string.translation_copy_result)
                     }
