@@ -65,8 +65,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
@@ -140,6 +142,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -205,38 +208,58 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
     val scrollState = LocalLumenPageScrollState.current
-    val fadeThresholdPx = with(LocalDensity.current) { 72.dp.toPx() }
-    val scrollProgress = ((scrollState?.value ?: 0).toFloat() / fadeThresholdPx).coerceIn(0f, 1f)
-    val topBarAlpha by animateFloatAsState(
-        targetValue = 1f - scrollProgress,
+    val density = LocalDensity.current
+    val topInsetHeight = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
+    val expandedTopBarHeight = topInsetHeight + 64.dp
+    val collapseThresholdPx = with(density) { 72.dp.toPx() }
+    val scrollProgress = ((scrollState?.value ?: 0).toFloat() / collapseThresholdPx).coerceIn(0f, 1f)
+    val collapseProgress by animateFloatAsState(
+        targetValue = scrollProgress,
         animationSpec = tween(160),
-        label = "topBarAlpha",
+        label = "topBarCollapseProgress",
     )
-    TopAppBar(
-        modifier = Modifier.graphicsLayer { alpha = topBarAlpha },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-            titleContentColor = MaterialTheme.colorScheme.onPrimary,
-        ),
-        navigationIcon = {
-            if (onNavigateBack != null) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
+    val topBarAlpha = 1f - collapseProgress
+    val visibleTopBarHeight = expandedTopBarHeight * topBarAlpha
+    val topBarOffsetY = with(density) { -expandedTopBarHeight.toPx() * collapseProgress }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(visibleTopBarHeight)
+            .clipToBounds(),
+    ) {
+        TopAppBar(
+            modifier = Modifier
+                .requiredHeight(expandedTopBarHeight)
+                .graphicsLayer {
+                    alpha = topBarAlpha
+                    translationY = topBarOffsetY
+                },
+            windowInsets = WindowInsets.statusBars,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+                titleContentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+            navigationIcon = {
+                if (onNavigateBack != null) {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
+                    }
                 }
-            }
-        },
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-    )
+            },
+            title = {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+        )
+    }
 }
 
 @Composable
