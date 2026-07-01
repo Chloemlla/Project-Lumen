@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Project Lumen</string>
+    <string name="toast_title_info">Lumen 信号</string>
+    <string name="toast_title_warning">需要注意</string>
+    <string name="toast_title_timer">计时信号</string>
+    <string name="toast_title_success">已解锁</string>
     <string name="nav_home">首页</string>
     <string name="nav_break">休息</string>
     <string name="nav_pomodoro">番茄钟</string>
@@ -56,6 +60,7 @@
     <string name="active_template">当前模板</string>
     <string name="use_template">使用模板</string>
     <string name="about_body">Project Lumen 用于安排用眼休息、番茄专注和本地使用统计。</string>
+    <string name="about_powered_by">Powered by</string>
     <string name="about_links">开源</string>
     <string name="about_source_code">源代码</string>
     <string name="about_latest_release">最新发布</string>
@@ -395,7 +400,7 @@
     <plurals name="developer_unlock_steps">
         <item quantity="other">还差 %1$d 步即可开启开发者模式</item>
     </plurals>
-    <string name="developer_unlocked">您已进入开发者模式</string>
+    <string name="developer_unlocked">您已进入极客开发者世界</string>
     <string name="developer_mode_enabled">开发者模式</string>
     <string name="developer_debug_running_title">开发者调试已开启</string>
     <string name="developer_debug_running_message">本地诊断悬浮窗和传感器透传正在运行。</string>

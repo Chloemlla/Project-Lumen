@@ -1,6 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Project Lumen</string>
+    <string name="toast_title_info">Lumen signal</string>
+    <string name="toast_title_warning">Attention required</string>
+    <string name="toast_title_timer">Timer signal</string>
+    <string name="toast_title_success">Unlocked</string>
     <string name="nav_home">Home</string>
     <string name="nav_break">Break</string>
     <string name="nav_pomodoro">Pomodoro</string>
@@ -56,6 +60,7 @@
     <string name="active_template">Active template</string>
     <string name="use_template">Use template</string>
     <string name="about_body">Project Lumen helps schedule eye breaks, pomodoro focus sessions, and local usage statistics.</string>
+    <string name="about_powered_by">Powered by</string>
     <string name="about_links">Open source</string>
     <string name="about_source_code">Source code</string>
     <string name="about_latest_release">Latest release</string>
@@ -397,7 +402,7 @@
         <item quantity="one">You are %1$d step away from developer mode.</item>
         <item quantity="other">You are %1$d steps away from developer mode.</item>
     </plurals>
-    <string name="developer_unlocked">You have entered developer mode.</string>
+    <string name="developer_unlocked">You have entered the geek developer world.</string>
     <string name="developer_mode_enabled">Developer mode</string>
     <string name="developer_debug_running_title">Developer debug is active</string>
     <string name="developer_debug_running_message">Local diagnostics overlay and sensor streaming are running.</string>

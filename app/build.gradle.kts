@@ -67,7 +67,7 @@ android {
             .orNull
             ?.takeIf { it.isNotBlank() }
         ?: "http://eye.chloemlla.com/api"
-    val projectLumenTelemetryAccessToken = providers.environmentVariable("PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN")
+val projectLumenTelemetryAccessToken = providers.environmentVariable("PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN")
         .orNull
         ?.takeIf { it.isNotBlank() }
         ?: providers.gradleProperty("PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN")
@@ -140,6 +140,25 @@ android {
     lint {
         disable += "GradleDependency"
     }
+
+}
+
+val validateJetBrainsMonoSubset by tasks.registering {
+    val subsetFont = layout.projectDirectory.file("src/main/res/font/jetbrains_mono_lumen_subset.ttf")
+    inputs.file(subsetFont)
+    doLast {
+        val fontFile = subsetFont.asFile
+        require(fontFile.exists()) {
+            "JetBrains Mono subset font is missing. Generate it with pyftsubset before building."
+        }
+        require(fontFile.length() <= 20_000L) {
+            "JetBrains Mono subset must stay below 20 KB; current size is ${fontFile.length()} bytes."
+        }
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn(validateJetBrainsMonoSubset)
 }
 
 kotlin {
@@ -166,6 +185,7 @@ dependencies {
     implementation("androidx.compose.animation:animation-graphics")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.constraintlayout:constraintlayout-compose:1.1.1")
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")

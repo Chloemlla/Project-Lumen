@@ -21,6 +21,9 @@ import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
+import com.projectlumen.app.core.toast.LumenToast
+import com.projectlumen.app.core.toast.LumenToastKind
+import com.projectlumen.app.core.toast.showLumenToast
 import com.projectlumen.app.core.time.QuietHours
 
 private const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIFICATIONS"
@@ -248,11 +251,21 @@ class NotificationService(private val context: Context) {
     }
 
     fun showProximityWarning(ratioPercent: Int) {
+        val message = context.getString(R.string.proximity_warning_message, ratioPercent)
+        context.showLumenToast(
+            message = LumenToast.richMessage(
+                text = message,
+                keyword = "$ratioPercent%",
+                color = LumenToastKind.WARNING.accentColor,
+            ),
+            kind = LumenToastKind.WARNING,
+            long = true,
+        )
         show(
             id = NotificationIds.PROXIMITY_WARNING,
             channel = NotificationChannels.PROXIMITY,
             title = context.getString(R.string.proximity_warning_title),
-            message = context.getString(R.string.proximity_warning_message, ratioPercent),
+            message = message,
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = true,
             fullScreen = true,
@@ -260,6 +273,12 @@ class NotificationService(private val context: Context) {
     }
 
     fun showEyeDryWarning() {
+        context.showLumenToast(
+            message = context.getString(R.string.eye_dry_warning_message),
+            kind = LumenToastKind.TIMER,
+            long = true,
+            trailingIcon = true,
+        )
         show(
             id = NotificationIds.EYE_DRY_WARNING,
             channel = NotificationChannels.PROXIMITY,
@@ -272,11 +291,21 @@ class NotificationService(private val context: Context) {
     }
 
     fun showLowLightWarning(lux: Float) {
+        val message = context.getString(R.string.low_light_warning_message, lux)
+        context.showLumenToast(
+            message = LumenToast.richMessage(
+                text = message,
+                keyword = String.format("%.1f", lux),
+                color = LumenToastKind.WARNING.accentColor,
+            ),
+            kind = LumenToastKind.WARNING,
+            long = true,
+        )
         show(
             id = NotificationIds.LOW_LIGHT_WARNING,
             channel = NotificationChannels.PROXIMITY,
             title = context.getString(R.string.low_light_warning_title),
-            message = context.getString(R.string.low_light_warning_message, lux),
+            message = message,
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = false,
         )

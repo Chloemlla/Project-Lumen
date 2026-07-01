@@ -20,7 +20,6 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageView
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -151,6 +150,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.core.graphics.toColorInt
@@ -178,6 +178,8 @@ import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.services.BackupImportSummary
+import com.projectlumen.app.core.toast.LumenToastKind
+import com.projectlumen.app.core.toast.showLumenToast
 import com.projectlumen.app.core.update.BuildMetadata
 import com.projectlumen.app.core.update.ReleaseAsset
 import com.projectlumen.app.core.update.ReleaseInfo
@@ -203,34 +205,92 @@ internal fun AboutScreen(viewModel: ProjectLumenViewModel) {
     val versionLabel = rememberBuildVersionLabel()
     val context = LocalContext.current
     var versionTapCount by rememberSaveable { mutableIntStateOf(0) }
+    fun handleDeveloperTap() {
+        versionTapCount += 1
+        when {
+            versionTapCount in 3..6 -> {
+                val remainingSteps = 7 - versionTapCount
+                context.showLumenToast(
+                    context.resources.getQuantityString(
+                        R.plurals.developer_unlock_steps,
+                        remainingSteps,
+                        remainingSteps,
+                    ),
+                    kind = LumenToastKind.TIMER,
+                )
+            }
+            versionTapCount >= 7 -> {
+                viewModel.updateSettings { current -> current.copy(developerModeEnabled = true) }
+                context.showLumenToast(
+                    context.getString(R.string.developer_unlocked),
+                    kind = LumenToastKind.SUCCESS,
+                    long = true,
+                )
+                versionTapCount = 0
+            }
+        }
+    }
 
-    LumenPage {
-        AboutHeroCard(
-            versionLabel = versionLabel,
-            onVersionClick = {
-                versionTapCount += 1
-                when {
-                    versionTapCount in 3..6 -> {
-                        val remainingSteps = 7 - versionTapCount
-                        Toast.makeText(
-                            context,
-                            context.resources.getQuantityString(
-                                R.plurals.developer_unlock_steps,
-                                remainingSteps,
-                                remainingSteps,
-                            ),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
-                    versionTapCount >= 7 -> {
-                        viewModel.updateSettings { current -> current.copy(developerModeEnabled = true) }
-                        Toast.makeText(context, context.getString(R.string.developer_unlocked), Toast.LENGTH_SHORT).show()
-                        versionTapCount = 0
-                    }
-                }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 720.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 84.dp)),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            AboutHeroCard(
+                versionLabel = versionLabel,
+                onVersionClick = { handleDeveloperTap() },
+            )
+            AboutLinksCard(viewModel)
+        }
+        AboutFooter(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
+            onClick = { handleDeveloperTap() },
+        )
+    }
+}
+
+@Composable
+internal fun AboutFooter(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    ConstraintLayout(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.94f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        val (poweredBy, brand) = createRefs()
+        Text(
+            text = stringResource(R.string.about_powered_by),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.constrainAs(poweredBy) {
+                start.linkTo(parent.start)
+                end.linkTo(brand.start, margin = 6.dp)
+                top.linkTo(parent.top)
+                bottom.linkTo(parent.bottom)
             },
         )
-        AboutLinksCard(viewModel)
+        Text(
+            text = stringResource(R.string.app_name),
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.constrainAs(brand) {
+                start.linkTo(poweredBy.end, margin = 6.dp)
+                top.linkTo(poweredBy.top)
+                bottom.linkTo(poweredBy.bottom)
+            },
+        )
     }
 }
 
@@ -243,6 +303,7 @@ internal fun AboutHeroCard(versionLabel: String, onVersionClick: () -> Unit) {
             shape = LumenCardShape,
             colors = lumenCardColors(),
             elevation = lumenCardElevation(),
+            border = lumenCardBorder(),
         ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(Icons.Outlined.Info, R.string.app_name)
@@ -263,7 +324,7 @@ internal fun AboutHeroCard(versionLabel: String, onVersionClick: () -> Unit) {
 
 @Composable
 internal fun AboutLinksCard(viewModel: ProjectLumenViewModel) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = lumenCardColors(), elevation = lumenCardElevation()) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = lumenCardColors(), elevation = lumenCardElevation(), border = lumenCardBorder()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL, viewModel)
@@ -540,6 +601,7 @@ internal fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
             shape = LumenCardShape,
             colors = lumenCardColors(),
             elevation = lumenCardElevation(),
+            border = lumenCardBorder(),
         ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.NotificationsActive, R.string.current_state)

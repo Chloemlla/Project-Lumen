@@ -22,6 +22,7 @@ import com.projectlumen.app.core.light.LightMonitorService
 import com.projectlumen.app.core.proximity.ProximityDetectionWorker
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.telemetry.EyeCareTelemetryReporter
+import com.projectlumen.app.core.toast.LumenToast
 
 class ProjectLumenApplication : Application() {
     val database: AppDatabase by lazy { AppDatabase.create(this) }
@@ -49,6 +50,7 @@ class ProjectLumenApplication : Application() {
             }
         }
         notifications.ensureChannels()
+        LumenToast.install(this)
         ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)
     }
 
