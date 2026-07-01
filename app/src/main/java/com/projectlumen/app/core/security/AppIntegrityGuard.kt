@@ -38,11 +38,11 @@ object AppIntegrityGuard {
             context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
         }
 
-        val signatureBytes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            packageInfo.signingInfo.apkContentsSigners.firstOrNull()?.toByteArray()
+        val signatureBytes = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray()
         } else {
-            packageInfo.signatures.firstOrNull()?.toByteArray()
-        }.orEmpty()
+            packageInfo.signatures?.firstOrNull()?.toByteArray()
+        }) ?: ByteArray(0)
         return MessageDigest.getInstance("SHA-256")
             .digest(signatureBytes)
             .joinToString(separator = "") { "%02X".format(it) }
