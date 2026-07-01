@@ -263,16 +263,16 @@ internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
+                        .height(contentHeight),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onPrimary,
-                        maxLines = 1,
-                        softWrap = false,
+                        maxLines = 2,
+                        softWrap = true,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }

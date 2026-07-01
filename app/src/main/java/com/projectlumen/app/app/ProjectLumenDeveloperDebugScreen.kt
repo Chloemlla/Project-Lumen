@@ -5,11 +5,22 @@ import android.content.Context
 import android.content.Intent
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.annotation.StringRes
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BatterySaver
 import androidx.compose.material.icons.outlined.BugReport
@@ -22,17 +33,24 @@ import androidx.compose.material.icons.outlined.Sensors
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,24 +81,37 @@ internal fun DeveloperDebugScreen(
     }
     LumenPage {
         SettingsSection(R.string.developer_section_realtime_debug, Icons.Outlined.Visibility) {
-            SwitchRow(R.string.developer_overlay_enabled, Icons.Outlined.Visibility, settings.developerDebugOverlayEnabled) {
+            SwitchRow(
+                R.string.developer_overlay_enabled,
+                Icons.Outlined.Visibility,
+                settings.developerDebugOverlayEnabled,
+                labelMaxLines = Int.MAX_VALUE,
+            ) {
                 viewModel.updateSettings { current -> current.copy(developerDebugOverlayEnabled = it) }
                 if (it && needsOverlayPermission(context)) {
                     openOverlaySettings(context)
                 }
             }
-            SwitchRow(R.string.developer_preview_enabled, Icons.Outlined.PhotoCamera, settings.developerDebugPreviewEnabled) {
+            SwitchRow(
+                R.string.developer_preview_enabled,
+                Icons.Outlined.PhotoCamera,
+                settings.developerDebugPreviewEnabled,
+                labelMaxLines = Int.MAX_VALUE,
+            ) {
                 viewModel.updateSettings { current -> current.copy(developerDebugPreviewEnabled = it) }
             }
             if (settings.developerDebugOverlayEnabled && permissionRequirements.overlay) {
-                OutlinedButton(onClick = { openOverlaySettings(context) }) {
-                    ButtonLabel(Icons.Outlined.Visibility, R.string.open_system_settings)
+                OutlinedButton(
+                    onClick = { openOverlaySettings(context) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    DeveloperButtonLabel(Icons.Outlined.Visibility, R.string.open_system_settings)
                 }
             }
-            MetricRow(R.string.developer_ai_inference, "${runtime.proximityDebugInferenceMillis} ms")
-            MetricRow(R.string.developer_camera_latency, "${runtime.proximityDebugCameraLatencyMillis} ms")
-            MetricRow(R.string.developer_face_width, "${runtime.proximityDebugFaceWidthPx} px")
-            MetricRow(R.string.developer_face_ratio, "${runtime.proximityLastRatioPercent}%")
+            DeveloperMetricRow(R.string.developer_ai_inference, "${runtime.proximityDebugInferenceMillis} ms")
+            DeveloperMetricRow(R.string.developer_camera_latency, "${runtime.proximityDebugCameraLatencyMillis} ms")
+            DeveloperMetricRow(R.string.developer_face_width, "${runtime.proximityDebugFaceWidthPx} px")
+            DeveloperMetricRow(R.string.developer_face_ratio, "${runtime.proximityLastRatioPercent}%")
         }
 
         SettingsSection(R.string.developer_section_triggers, Icons.Outlined.Schedule) {
@@ -91,25 +122,46 @@ internal fun DeveloperDebugScreen(
                 10f..1800f,
                 178,
                 developerIntervalLabel(settings.developerTickIntervalSeconds),
+                labelMaxLines = Int.MAX_VALUE,
             ) {
                 viewModel.updateSettings { current -> current.copy(developerTickIntervalSeconds = it.coerceIn(10, 1800)) }
             }
-            SwitchRow(R.string.developer_time_trigger, Icons.Outlined.Schedule, settings.developerTimeTriggerEnabled) {
+            SwitchRow(
+                R.string.developer_time_trigger,
+                Icons.Outlined.Schedule,
+                settings.developerTimeTriggerEnabled,
+                labelMaxLines = Int.MAX_VALUE,
+            ) {
                 viewModel.updateSettings { current -> current.copy(developerTimeTriggerEnabled = it) }
             }
-            SwitchRow(R.string.developer_unlock_trigger, Icons.Outlined.Settings, settings.developerUnlockTriggerEnabled) {
+            SwitchRow(
+                R.string.developer_unlock_trigger,
+                Icons.Outlined.Settings,
+                settings.developerUnlockTriggerEnabled,
+                labelMaxLines = Int.MAX_VALUE,
+            ) {
                 viewModel.updateSettings { current -> current.copy(developerUnlockTriggerEnabled = it) }
             }
-            SwitchRow(R.string.developer_stillness_trigger, Icons.Outlined.Sensors, settings.developerStillnessTriggerEnabled) {
+            SwitchRow(
+                R.string.developer_stillness_trigger,
+                Icons.Outlined.Sensors,
+                settings.developerStillnessTriggerEnabled,
+                labelMaxLines = Int.MAX_VALUE,
+            ) {
                 viewModel.updateSettings { current -> current.copy(developerStillnessTriggerEnabled = it) }
             }
-            SwitchRow(R.string.developer_shake_suppression, Icons.Outlined.Sensors, settings.developerShakeSuppressionEnabled) {
+            SwitchRow(
+                R.string.developer_shake_suppression,
+                Icons.Outlined.Sensors,
+                settings.developerShakeSuppressionEnabled,
+                labelMaxLines = Int.MAX_VALUE,
+            ) {
                 viewModel.updateSettings { current -> current.copy(developerShakeSuppressionEnabled = it) }
             }
         }
 
         SettingsSection(R.string.developer_section_system, Icons.Outlined.BatterySaver) {
-            MetricRow(
+            DeveloperMetricRow(
                 R.string.developer_battery_optimization,
                 if (isIgnoringBatteryOptimizations(context)) {
                     stringResource(R.string.developer_battery_whitelisted)
@@ -117,28 +169,37 @@ internal fun DeveloperDebugScreen(
                     stringResource(R.string.developer_battery_limited)
                 },
             )
-            OutlinedButton(onClick = { openBatteryOptimizationSettings(context) }) {
-                ButtonLabel(Icons.Outlined.BatterySaver, R.string.developer_open_battery_settings)
+            OutlinedButton(
+                onClick = { openBatteryOptimizationSettings(context) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                DeveloperButtonLabel(Icons.Outlined.BatterySaver, R.string.developer_open_battery_settings)
             }
-            MetricRow(R.string.developer_service_uptime, serviceUptimeLabel(runtime.foregroundServiceStartedAt, runtime.foregroundServiceStoppedAt, uiState.nowMillis))
-            MetricRow(R.string.developer_service_last_restart, timestampLabel(runtime.foregroundServiceLastStickyRestartAt))
-            MetricRow(R.string.developer_service_task_removed, timestampLabel(runtime.foregroundServiceLastTaskRemovedAt))
-            MetricRow(R.string.shizuku_status, developerShizukuStatusLabel(shizukuState))
-            MetricRow(R.string.shizuku_foreground_context, developerShizukuContextLabel(shizukuState))
-            MetricRow(R.string.shizuku_system_guards, developerShizukuSystemGuardLabel(settings, shizukuState))
-            OutlinedButton(onClick = viewModel::refreshShizukuState) {
-                ButtonLabel(Icons.Outlined.Settings, R.string.shizuku_refresh_status)
+            DeveloperMetricRow(R.string.developer_service_uptime, serviceUptimeLabel(runtime.foregroundServiceStartedAt, runtime.foregroundServiceStoppedAt, uiState.nowMillis))
+            DeveloperMetricRow(R.string.developer_service_last_restart, timestampLabel(runtime.foregroundServiceLastStickyRestartAt))
+            DeveloperMetricRow(R.string.developer_service_task_removed, timestampLabel(runtime.foregroundServiceLastTaskRemovedAt))
+            DeveloperMetricRow(R.string.shizuku_status, developerShizukuStatusLabel(shizukuState))
+            DeveloperMetricRow(R.string.shizuku_foreground_context, developerShizukuContextLabel(shizukuState))
+            DeveloperMetricRow(R.string.shizuku_system_guards, developerShizukuSystemGuardLabel(settings, shizukuState))
+            OutlinedButton(
+                onClick = viewModel::refreshShizukuState,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                DeveloperButtonLabel(Icons.Outlined.Settings, R.string.shizuku_refresh_status)
             }
-            MetricRow(R.string.developer_low_memory_last, timestampLabel(runtime.developerLastLowMemorySimulatedAt))
-            Button(onClick = viewModel::simulateLowMemory) {
-                ButtonLabel(Icons.Outlined.Memory, R.string.developer_simulate_low_memory)
+            DeveloperMetricRow(R.string.developer_low_memory_last, timestampLabel(runtime.developerLastLowMemorySimulatedAt))
+            Button(
+                onClick = viewModel::simulateLowMemory,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                DeveloperButtonLabel(Icons.Outlined.Memory, R.string.developer_simulate_low_memory)
             }
         }
 
         SettingsSection(R.string.developer_section_api_security, Icons.Outlined.Lock) {
-            MetricRow(R.string.developer_security_api_base, ProjectLumenApiConfig.baseUrl)
-            MetricRow(R.string.developer_security_cleartext, stringResource(R.string.developer_security_cleartext_blocked))
-            MetricRow(
+            DeveloperMetricRow(R.string.developer_security_api_base, ProjectLumenApiConfig.baseUrl)
+            DeveloperMetricRow(R.string.developer_security_cleartext, stringResource(R.string.developer_security_cleartext_blocked))
+            DeveloperMetricRow(
                 R.string.developer_security_api_pins,
                 securityPinStatus(
                     pinCount = configuredPinCount(ProjectLumenApiConfig.apiCertificatePins),
@@ -146,8 +207,8 @@ internal fun DeveloperDebugScreen(
                     optional = false,
                 ),
             )
-            MetricRow(R.string.developer_security_translation_base, ProjectLumenApiConfig.translationBaseUrl)
-            MetricRow(
+            DeveloperMetricRow(R.string.developer_security_translation_base, ProjectLumenApiConfig.translationBaseUrl)
+            DeveloperMetricRow(
                 R.string.developer_security_translation_pins,
                 securityPinStatus(
                     pinCount = configuredPinCount(ProjectLumenApiConfig.translationCertificatePins),
@@ -155,8 +216,8 @@ internal fun DeveloperDebugScreen(
                     optional = true,
                 ),
             )
-            MetricRow(R.string.developer_security_request_signing, stringResource(R.string.developer_security_request_signing_enabled))
-            MetricRow(
+            DeveloperMetricRow(R.string.developer_security_request_signing, stringResource(R.string.developer_security_request_signing_enabled))
+            DeveloperMetricRow(
                 R.string.developer_security_play_integrity,
                 if (BuildConfig.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER > 0L) {
                     stringResource(R.string.developer_security_play_integrity_configured)
@@ -164,8 +225,8 @@ internal fun DeveloperDebugScreen(
                     stringResource(R.string.developer_security_play_integrity_disabled)
                 },
             )
-            MetricRow(R.string.developer_security_credentials, secureCredentialStatus(context))
-            MetricRow(
+            DeveloperMetricRow(R.string.developer_security_credentials, secureCredentialStatus(context))
+            DeveloperMetricRow(
                 R.string.developer_security_webview_bridge,
                 if (BuildConfig.DEBUG) {
                     stringResource(R.string.developer_security_webview_debug_only)
@@ -176,23 +237,31 @@ internal fun DeveloperDebugScreen(
         }
 
         SettingsSection(R.string.developer_section_raw_sensors, Icons.Outlined.Sensors) {
-            MetricRow(R.string.developer_lux, "%.1f lux".format(runtime.ambientLastLux))
+            DeveloperMetricRow(R.string.developer_lux, "%.1f lux".format(runtime.ambientLastLux))
             LuxCurve(luxHistory)
-            MetricRow(R.string.developer_pitch, "${runtime.sensorPitchDegrees.roundToInt()} deg")
-            MetricRow(R.string.developer_roll, "${runtime.sensorRollDegrees.roundToInt()} deg")
-            MetricRow(R.string.developer_yaw, "${runtime.sensorYawDegrees.roundToInt()} deg")
-            MetricRow(R.string.developer_acceleration, "%.2f m/s2".format(runtime.sensorLastAccelerationMagnitude))
+            DeveloperMetricRow(R.string.developer_pitch, "${runtime.sensorPitchDegrees.roundToInt()} deg")
+            DeveloperMetricRow(R.string.developer_roll, "${runtime.sensorRollDegrees.roundToInt()} deg")
+            DeveloperMetricRow(R.string.developer_yaw, "${runtime.sensorYawDegrees.roundToInt()} deg")
+            DeveloperMetricRow(R.string.developer_acceleration, "%.2f m/s2".format(runtime.sensorLastAccelerationMagnitude))
         }
 
         SettingsSection(R.string.developer_section_crash, Icons.Outlined.BugReport) {
-            Text(stringResource(R.string.developer_crash_preview_message))
-            Button(onClick = { onPreviewCrashReport(createDeveloperCrashPreview()) }) {
-                ButtonLabel(Icons.Outlined.BugReport, R.string.developer_preview_crash_page)
+            DeveloperNote(stringResource(R.string.developer_crash_preview_message))
+            Button(
+                onClick = { onPreviewCrashReport(createDeveloperCrashPreview()) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                DeveloperButtonLabel(Icons.Outlined.BugReport, R.string.developer_preview_crash_page)
             }
         }
 
         SettingsSection(R.string.developer_section_mode, Icons.Outlined.Code) {
-            SwitchRow(R.string.developer_mode_enabled, Icons.Outlined.Code, settings.developerModeEnabled) {
+            SwitchRow(
+                R.string.developer_mode_enabled,
+                Icons.Outlined.Code,
+                settings.developerModeEnabled,
+                labelMaxLines = Int.MAX_VALUE,
+            ) {
                 viewModel.updateSettings { current ->
                     current.copy(
                         developerModeEnabled = it,
@@ -203,6 +272,108 @@ internal fun DeveloperDebugScreen(
             }
         }
     }
+}
+
+@Composable
+private fun DeveloperMetricRow(@StringRes labelRes: Int, value: String) {
+    DeveloperMetricRow(label = stringResource(labelRes), value = value)
+}
+
+@Composable
+private fun DeveloperMetricRow(label: String, value: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+            softWrap = true,
+        )
+        SelectionContainer {
+            Text(
+                text = smartWrapDebugText(value),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                softWrap = true,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeveloperNote(message: String) {
+    Text(
+        text = message,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        softWrap = true,
+    )
+}
+
+@Composable
+private fun DeveloperButtonLabel(icon: ImageVector, @StringRes labelRes: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = stringResource(labelRes),
+            modifier = Modifier.weight(1f),
+            textAlign = TextAlign.Center,
+            softWrap = true,
+        )
+    }
+}
+
+private fun smartWrapDebugText(value: String): String {
+    val normalized = value.trim().ifBlank { "-" }
+    if (normalized.length <= DEBUG_WRAP_COLUMN) return normalized
+    val separated = normalized
+        .replace("://", "://\n")
+        .lineSequence()
+        .joinToString("\n") { segment ->
+            if (segment.endsWith("://")) {
+                segment
+            } else {
+                segment
+                    .replace("/", "/\n")
+                    .replace("?", "?\n")
+                    .replace("&", "&\n")
+                    .replace(", ", ",\n")
+                    .replace("; ", ";\n")
+                    .replace(" | ", "\n")
+            }
+        }
+    return separated
+        .lineSequence()
+        .flatMap { line ->
+            if (line.length <= DEBUG_WRAP_COLUMN) {
+                sequenceOf(line)
+            } else {
+                line.chunked(DEBUG_WRAP_COLUMN).asSequence()
+            }
+        }
+        .joinToString("\n")
 }
 
 @Composable
@@ -358,3 +529,5 @@ private fun createDeveloperCrashPreview(): CrashReport {
         ),
     )
 }
+
+private const val DEBUG_WRAP_COLUMN = 36

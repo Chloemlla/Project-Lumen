@@ -206,6 +206,7 @@ internal fun SwitchRow(
     icon: ImageVector,
     checked: Boolean,
     enabled: Boolean = true,
+    labelMaxLines: Int = 2,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -227,7 +228,7 @@ internal fun SwitchRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LabelWithIcon(icon, labelRes, Modifier.weight(1f))
+        LabelWithIcon(icon, labelRes, Modifier.weight(1f), maxLines = labelMaxLines)
         Switch(checked = checked, enabled = enabled, onCheckedChange = { toggle(it) })
     }
 }
@@ -240,6 +241,7 @@ internal fun NumberSlider(
     range: ClosedFloatingPointRange<Float>,
     steps: Int,
     valueLabel: String,
+    labelMaxLines: Int = 2,
     onValueChange: (Int) -> Unit,
 ) {
     var sliderValue by remember(value, range) { mutableFloatStateOf(value.toFloat().coerceIn(range.start, range.endInclusive)) }
@@ -255,7 +257,7 @@ internal fun NumberSlider(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            LabelWithIcon(icon, labelRes, Modifier.weight(1f))
+            LabelWithIcon(icon, labelRes, Modifier.weight(1f), maxLines = labelMaxLines)
             AnimatedContent(
                 targetState = liveLabel,
                 transitionSpec = {
@@ -281,14 +283,20 @@ internal fun NumberSlider(
 }
 
 @Composable
-internal fun LabelWithIcon(icon: ImageVector, @StringRes labelRes: Int, modifier: Modifier = Modifier) {
+internal fun LabelWithIcon(
+    icon: ImageVector,
+    @StringRes labelRes: Int,
+    modifier: Modifier = Modifier,
+    maxLines: Int = 2,
+) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Text(
             stringResource(labelRes),
+            modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyLarge,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+            maxLines = maxLines,
+            overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis,
         )
     }
 }
