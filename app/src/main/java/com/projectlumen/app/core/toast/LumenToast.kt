@@ -249,7 +249,7 @@ object LumenToast {
             setTextColor(Color.rgb(244, 247, 251))
             maxLines = 3
             includeFontPadding = true
-            lineSpacing = 1.5f * density, 1.0f
+            setLineSpacing(1.5f * density, 1.0f)
         }
         textColumn.addView(titleView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         textColumn.addView(textView, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
