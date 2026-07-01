@@ -110,7 +110,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -124,8 +123,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -204,13 +201,15 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
     val scrollState = LocalLumenPageScrollState.current
     val density = LocalDensity.current
     val topInsetHeight = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
-    val expandedTopBarHeight = topInsetHeight + 64.dp
+    val contentTopGap = 8.dp
+    val contentHeight = 56.dp
+    val contentBottomGap = 8.dp
+    val expandedTopBarHeight = topInsetHeight + contentTopGap + contentHeight + contentBottomGap
     val collapseThresholdPx = with(density) { 72.dp.toPx() }
     val scrollProgress = ((scrollState?.value ?: 0).toFloat() / collapseThresholdPx).coerceIn(0f, 1f)
     val collapseProgress by animateFloatAsState(
@@ -228,37 +227,57 @@ internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
             .height(visibleTopBarHeight)
             .clipToBounds(),
     ) {
-        TopAppBar(
+        Box(
             modifier = Modifier
+                .fillMaxWidth()
                 .requiredHeight(expandedTopBarHeight)
+                .background(MaterialTheme.colorScheme.primary)
                 .graphicsLayer {
                     alpha = topBarAlpha
                     translationY = topBarOffsetY
                 },
-            windowInsets = WindowInsets.statusBars,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                titleContentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-            navigationIcon = {
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = 8.dp,
+                        top = topInsetHeight + contentTopGap,
+                        end = 16.dp,
+                    )
+                    .height(contentHeight),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 if (onNavigateBack != null) {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
+                    IconButton(
+                        onClick = onNavigateBack,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = stringResource(R.string.navigate_back),
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                        )
                     }
                 }
-            },
-            title = {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            },
-        )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
 }
 
