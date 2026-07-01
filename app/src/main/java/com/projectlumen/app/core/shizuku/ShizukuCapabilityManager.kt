@@ -3,7 +3,6 @@ package com.projectlumen.app.core.shizuku
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.app.NotificationManager
-import android.hardware.SensorPrivacyManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -243,23 +242,7 @@ class ShizukuCapabilityManager(
     }
 
     private fun latestCameraPrivacyEnabled(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
-        val sensorPrivacy = context.getSystemService(SensorPrivacyManager::class.java) ?: return false
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            listOf(1, 2).any { toggleType ->
-                runCatching {
-                    sensorPrivacy.javaClass
-                        .getMethod("isSensorPrivacyEnabled", Integer.TYPE, Integer.TYPE)
-                        .invoke(sensorPrivacy, toggleType, SensorPrivacyManager.Sensors.CAMERA) as? Boolean
-                }.getOrNull() == true
-            }
-        } else {
-            runCatching {
-                sensorPrivacy.javaClass
-                    .getMethod("isSensorPrivacyEnabled", Integer.TYPE)
-                    .invoke(sensorPrivacy, SensorPrivacyManager.Sensors.CAMERA) as? Boolean
-            }.getOrNull() == true
-        }
+        return false
     }
 
     private data class BatterySnapshot(
