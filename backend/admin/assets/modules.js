@@ -211,7 +211,13 @@ window.LumenAdminModules = (() => {
   function renderTelemetry() {
     return `
       <canvas class="mini-chart" data-chart="telemetry" width="540" height="180"></canvas>
-      <div class="list-stack">${data.telemetry.map((item) => row(item.label, `${item.value}% of anonymous aggregate cohort`, tag(`${item.value}%`, "info"))).join("")}</div>
+      <div class="list-stack">${data.telemetry.map((item) => {
+        const externalSource = item.label.startsWith("External SDK source:");
+        const detail = externalSource
+          ? `${item.value} calls in last ${item.rangeDays || 7}d`
+          : `${item.value}% of anonymous aggregate cohort`;
+        return row(item.label, detail, tag(externalSource ? String(item.value) : `${item.value}%`, "info"));
+      }).join("")}</div>
     `;
   }
 

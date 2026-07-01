@@ -2,6 +2,7 @@ package com.projectlumen.app.core.api
 
 data class RemoteTelemetryUpload(
     val deviceInstallationId: String,
+    val sourceApp: String,
     val recordedAt: Long,
     val dailyHealth: DailyEyeHealthTelemetry?,
     val environmentContext: List<EnvironmentContextTelemetry>,

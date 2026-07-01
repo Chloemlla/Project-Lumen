@@ -62,6 +62,8 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.i18n.LocaleController
+import com.projectlumen.app.openapi.LumenOpenLaunchRequest
+import com.projectlumen.app.openapi.LumenOpenLaunchTarget
 import com.projectlumen.app.core.update.ReleaseAsset
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
@@ -104,6 +106,7 @@ internal enum class Destination(
 fun ProjectLumenApp(
     viewModel: ProjectLumenViewModel,
     crashReport: CrashReport?,
+    openLaunchRequest: LumenOpenLaunchRequest? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val configuredThemeMode = runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }
@@ -280,6 +283,18 @@ fun ProjectLumenApp(
             }
             BackHandler(enabled = !currentDestination.showInBottomNav) {
                 navigateBackFromSecondaryPage()
+            }
+            LaunchedEffect(openLaunchRequest?.id) {
+                val request = openLaunchRequest ?: return@LaunchedEffect
+                val destination = when (request.target) {
+                    LumenOpenLaunchTarget.DASHBOARD -> Destination.STATS
+                    LumenOpenLaunchTarget.REST -> Destination.BREAK
+                    LumenOpenLaunchTarget.VISUAL_MONITOR -> Destination.DEVELOPER
+                }
+                navController.navigate(destination.route) {
+                    launchSingleTop = true
+                    restoreState = true
+                }
             }
             CompositionLocalProvider(LocalLumenPageScrollState provides topBarScrollState) {
                 Scaffold(

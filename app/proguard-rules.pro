@@ -49,6 +49,11 @@
     native <methods>;
 }
 
+# Public AIDL and Open API entry points must keep stable names for third-party callers.
+-keep class com.project.lumen.open.** { *; }
+-keep interface com.project.lumen.open.** { *; }
+-keep,allowoptimization class com.projectlumen.app.openapi.** { *; }
+
 -dontwarn androidx.compose.**
 -dontwarn androidx.lifecycle.**
 -dontwarn androidx.navigation.**

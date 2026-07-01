@@ -26,6 +26,7 @@ import com.projectlumen.app.core.proximity.ProximityDetectionWorker
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.telemetry.EyeCareTelemetryReporter
 import com.projectlumen.app.core.toast.LumenToast
+import com.projectlumen.app.openapi.LumenOpenRuntimeController
 
 class ProjectLumenApplication : Application() {
     val database: AppDatabase by lazy { AppDatabase.create(this) }
@@ -37,6 +38,7 @@ class ProjectLumenApplication : Application() {
     val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient(this) }
     val crashReports: CrashReportStore by lazy { CrashReportStore(this) }
     val secureCredentials: SecureCredentialStore by lazy { SecureCredentialStore(this) }
+    val openApiController: LumenOpenRuntimeController by lazy { LumenOpenRuntimeController(this) }
     val telemetry: EyeCareTelemetryReporter by lazy {
         EyeCareTelemetryReporter(
             context = this,

@@ -27,6 +27,8 @@ import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.time.todayKey
+import com.projectlumen.app.openapi.LumenOpenContracts
+import com.projectlumen.app.openapi.sanitizeLumenOpenSourceApp
 import java.time.Instant
 import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicLong
@@ -47,12 +49,14 @@ class EyeCareTelemetryReporter(
         distanceViolation: DistanceViolationTelemetry? = null,
         averageBlinksPerMinute: Double? = null,
         force: Boolean = false,
+        sourceApp: String = LumenOpenContracts.SOURCE_APP_PROJECT_LUMEN,
     ): RemoteTelemetryUploadResult? {
         return runCatching {
             uploadCurrentSnapshotUnchecked(
                 distanceViolation = distanceViolation,
                 averageBlinksPerMinute = averageBlinksPerMinute,
                 force = force,
+                sourceApp = sourceApp,
             )
         }.getOrNull()
     }
@@ -61,6 +65,7 @@ class EyeCareTelemetryReporter(
         distanceViolation: DistanceViolationTelemetry? = null,
         averageBlinksPerMinute: Double? = null,
         force: Boolean = false,
+        sourceApp: String = LumenOpenContracts.SOURCE_APP_PROJECT_LUMEN,
     ): RemoteTelemetryUploadResult? {
         val accessToken = accessTokenProvider()?.trim()?.takeIf { it.isNotBlank() } ?: return null
         val nowMillis = System.currentTimeMillis()
@@ -71,6 +76,7 @@ class EyeCareTelemetryReporter(
         val stats = database.dailyEyeStatsDao().get(todayKey(nowMillis)) ?: DailyEyeStatsEntity(statDate = todayKey(nowMillis))
         val upload = RemoteTelemetryUpload(
             deviceInstallationId = settings.deviceInstallationId,
+            sourceApp = sanitizeLumenOpenSourceApp(sourceApp),
             recordedAt = nowMillis,
             dailyHealth = stats.toDailyHealthTelemetry(runtime, distanceViolation, averageBlinksPerMinute),
             environmentContext = listOf(runtime.toEnvironmentContext(settings, nowMillis)),

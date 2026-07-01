@@ -2,6 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <permission
+        android:name="com.project.lumen.permission.ACCESS_LUMEN_CORE"
+        android:description="@string/permission_access_lumen_core_description"
+        android:label="@string/permission_access_lumen_core_label"
+        android:protectionLevel="dangerous" />
+    <permission
+        android:name="com.project.lumen.permission.TRIGGER_LUMEN_CONTROL"
+        android:description="@string/permission_trigger_lumen_control_description"
+        android:label="@string/permission_trigger_lumen_control_label"
+        android:protectionLevel="signature" />
+
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.CAMERA" />
@@ -46,6 +57,39 @@
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".openapi.DashboardActivity"
+            android:exported="true"
+            android:permission="com.project.lumen.permission.ACCESS_LUMEN_CORE"
+            android:resizeableActivity="true"
+            android:theme="@style/Theme.ProjectLumen">
+            <intent-filter>
+                <action android:name="com.project.lumen.action.VIEW_DASHBOARD" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".openapi.RestOverlayActivity"
+            android:exported="true"
+            android:permission="com.project.lumen.permission.TRIGGER_LUMEN_CONTROL"
+            android:resizeableActivity="true"
+            android:theme="@style/Theme.Lumen.TransparentOverlay">
+            <intent-filter>
+                <action android:name="com.project.lumen.action.TRIGGER_REST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".openapi.VisualMonitorActivity"
+            android:exported="true"
+            android:permission="com.project.lumen.permission.ACCESS_LUMEN_CORE"
+            android:resizeableActivity="true"
+            android:theme="@style/Theme.ProjectLumen">
+            <intent-filter>
+                <action android:name="com.project.lumen.action.START_VISUAL_MONITOR" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
@@ -121,6 +165,15 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Shows local-only developer diagnostics for camera, sensors, and foreground service health." />
+        </service>
+
+        <service
+            android:name=".openapi.LumenOpenService"
+            android:exported="true"
+            android:permission="com.project.lumen.permission.ACCESS_LUMEN_CORE">
+            <intent-filter>
+                <action android:name="com.project.lumen.action.BIND_OPEN_API" />
+            </intent-filter>
         </service>
 
         <provider

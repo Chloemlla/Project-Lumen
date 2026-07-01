@@ -116,6 +116,13 @@ android {
             .orNull
             ?.takeIf { it.isNotBlank() }
         ?: ""
+    val projectLumenOpenApiTrustedSignatureSha256 = providers.environmentVariable("PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256")
+        .orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: providers.gradleProperty("PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256")
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+        ?: ""
 
     defaultConfig {
         buildConfigField("long", "BUILD_TIME_UTC_MILLIS", "${projectLumenBuildTimeUtcMillis}L")
@@ -128,6 +135,7 @@ android {
         buildConfigField("String", "TRANSLATION_CERTIFICATE_PINS", "\"${projectLumenBuildConfigString(projectLumenTranslationCertificatePins)}\"")
         buildConfigField("long", "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER", "${projectLumenPlayIntegrityCloudProjectNumber}L")
         buildConfigField("boolean", "APP_INTEGRITY_ENFORCEMENT_ENABLED", projectLumenReleaseCertSha256.isNotBlank().toString())
+        buildConfigField("String", "OPEN_API_TRUSTED_SIGNATURE_SHA256", "\"${projectLumenBuildConfigString(projectLumenOpenApiTrustedSignatureSha256)}\"")
 
         applicationId = "com.projectlumen.app"
         minSdk = 26
@@ -190,6 +198,7 @@ android {
     }
 
     buildFeatures {
+        aidl = true
         compose = true
         buildConfig = true
     }

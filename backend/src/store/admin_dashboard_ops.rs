@@ -1,4 +1,4 @@
-use super::{database_error, AppStore};
+use super::{database_error, time::now_millis, AppStore};
 use crate::{
     error::ApiError,
     models::{
@@ -7,7 +7,10 @@ use crate::{
     },
 };
 use futures_util::TryStreamExt;
-use mongodb::{bson::doc, options::FindOptions};
+use mongodb::{
+    bson::{doc, Bson},
+    options::FindOptions,
+};
 
 impl AppStore {
     pub(crate) async fn crash_groups(&self) -> Result<Vec<AdminCrashGroup>, ApiError> {
@@ -114,7 +117,8 @@ impl AppStore {
             .sort(doc! { "sampledAt": -1 })
             .limit(25)
             .build();
-        self.admin_telemetry
+        let mut items: Vec<AdminTelemetryItem> = self
+            .admin_telemetry
             .find(doc! {}, options)
             .await
             .map_err(database_error)?
@@ -126,7 +130,52 @@ impl AppStore {
             })
             .try_collect()
             .await
-            .map_err(database_error)
+            .map_err(database_error)?;
+
+        let now = now_millis();
+        let since = now - 7 * 24 * 60 * 60 * 1000;
+        let pipeline = vec![
+            doc! {
+                "$match": {
+                    "receivedAt": { "$gte": since },
+                    "payload.sourceApp": {
+                        "$exists": true,
+                        "$nin": ["project_lumen", ""],
+                    },
+                }
+            },
+            doc! {
+                "$group": {
+                    "_id": "$payload.sourceApp",
+                    "count": { "$sum": 1 },
+                }
+            },
+            doc! { "$sort": { "count": -1 } },
+            doc! { "$limit": 10 },
+        ];
+        let mut cursor = self
+            .telemetry_uploads
+            .aggregate(pipeline, None)
+            .await
+            .map_err(database_error)?;
+        while let Some(row) = cursor.try_next().await.map_err(database_error)? {
+            let source_app = row.get_str("_id").unwrap_or("unknown");
+            let count = match row.get("count") {
+                Some(Bson::Int32(value)) => *value as i64,
+                Some(Bson::Int64(value)) => *value,
+                Some(Bson::Double(value)) => *value as i64,
+                _ => 0,
+            };
+            if count > 0 {
+                items.push(AdminTelemetryItem {
+                    label: format!("External SDK source: {source_app}"),
+                    value: count as f64,
+                    range_days: 7,
+                    sampled_at: now,
+                });
+            }
+        }
+        Ok(items)
     }
 
     pub(crate) async fn releases(&self) -> Result<Vec<AdminReleaseItem>, ApiError> {

@@ -5,6 +5,7 @@ import org.json.JSONObject
 
 internal fun RemoteTelemetryUpload.toJson(): JSONObject = JSONObject()
     .put("deviceInstallationId", deviceInstallationId)
+    .put("sourceApp", sourceApp)
     .put("recordedAt", recordedAt)
     .putNullable("dailyHealth", dailyHealth?.toJson())
     .put("environmentContext", JSONArray(environmentContext.map { it.toJson() }))

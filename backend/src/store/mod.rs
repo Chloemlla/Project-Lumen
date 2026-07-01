@@ -136,6 +136,16 @@ impl AppStore {
             )
             .await
             .map_err(database_error)?;
+        self.telemetry_uploads
+            .create_index(
+                index(
+                    "telemetry_source_received",
+                    doc! { "payload.sourceApp": 1, "receivedAt": -1 },
+                ),
+                None,
+            )
+            .await
+            .map_err(database_error)?;
         self.face_analysis_frames
             .create_index(
                 index(

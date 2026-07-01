@@ -1,0 +1,181 @@
+以下是针对该需求的详细化更改方案与技术设计文档：
+## 二、 开放能力改造详细设计 (System Open-API Extension)
+### 1. 开放架构设计原则
+ * **最小暴露原则**：仅暴露必要的控制与展示页面，敏感页面（如用户隐私设置、云同步凭证管理）保持私有。
+ * **安全可控**：引入自定义权限（Custom Permission）与签名校验，防止恶意软件仿冒调用或劫持生命周期。
+ * **松耦合调用**：利用 Android 标准的 Intent 机制（显式/隐式）与 AIDL（远程服务接口）实现跨进程通信（IPC）。
+### 2. Activity 页面开放清单与配置 (Manifest Exports)
+需要将以下核心 Activity 页面对外开放，允许第三方应用（如：背单词软件、数字阅读器、IDE 移动端、考研专注 App）直接拉起或嵌入。
+#### A. 护眼/专注看板页面 (DashboardActivity)
+ * **功能描述**：允许第三方应用直接展示用户今日的用眼时长、疲劳度指数和专注报告。
+ * **修改方案**：在 AndroidManifest.xml 中配置 <intent-filter> 增加隐式启动支持。
+```xml
+<activity
+    android:name=".ui.dashboard.DashboardActivity"
+    android:exported="true"
+    android:permission="com.project.lumen.permission.ACCESS_LUMEN_CORE">
+    <intent-filter>
+        <action android:name="com.project.lumen.action.VIEW_DASHBOARD" />
+        <category android:name="android.intent.category.DEFAULT" />
+    </intent-filter>
+</activity>
+
+```
+#### B. 强制休息拦截屏 (RestOverlayActivity)
+ * **功能描述**：第三方应用在检测到自身用户已连续使用 20 分钟后，可手动触发拉起 Project Lumen 的护眼拦截动态屏（基于 20-20-20 法则），强制引导用户远眺。
+ * **修改方案**：支持传递第三方应用的包名，以便在休息结束后能精准跳回。
+```xml
+<activity
+    android:name=".ui.rest.RestOverlayActivity"
+    android:exported="true"
+    android:theme="@style/Theme.Lumen.TransparentOverlay"
+    android:permission="com.project.lumen.permission.TRIGGER_LUMEN_CONTROL">
+    <intent-filter>
+        <action android:name="com.project.lumen.action.TRIGGER_REST" />
+        <category android:name="android.intent.category.DEFAULT" />
+    </intent-filter>
+</activity>
+
+```
+#### C. 环境光与人脸距离检测实时调试页 (VisualMonitorActivity)
+ * **功能描述**：向第三方健康或教育类应用提供现场演示/测试能力，展示 ML Kit 驱动的人脸网格与低光实时监控 UI。
+```xml
+<activity
+    android:name=".ui.monitor.VisualMonitorActivity"
+    android:exported="true"
+    android:permission="com.project.lumen.permission.ACCESS_LUMEN_CORE">
+    <intent-filter>
+        <action android:name="com.project.lumen.action.START_VISUAL_MONITOR" />
+        <category android:name="android.intent.category.DEFAULT" />
+    </intent-filter>
+</activity>
+
+```
+### 3. 开放接口设计 (API & IPC Services)
+除了直接拉起页面，第三方应用通常需要**静默查询状态**或**控制计时引擎**。为此，项目将构建基于 Bound Service + AIDL 的跨进程公共 API。
+#### A. 定义 AIDL 核心开放接口 (ILumenOpenApi.aidl)
+在项目 src/main/aidl 下新建接口文件，对外暴露核心控制逻辑：
+```aidl
+package com.project.lumen.open;
+
+interface ILumenOpenApi {
+    // ---- 状态获取 ----
+    int getEyeFatigueLevel();       // 获取当前疲劳度（0-100）
+    long getContinuousScreenTime(); // 获取当前连续用眼时长（毫秒）
+    boolean isRestingNow();         // 当前是否处于强制休息拦截中
+
+    // ---- 引擎控制 ----
+    void startFocusSession(String tag, long durationMs); // 由第三方发起一个专注任务
+    void stopFocusSession();                             // 停止当前专注
+    void triggerEyeRelaxation();                         // 立即触发一次远眺提醒
+}
+
+```
+#### B. API 调用的 Binder 安全校验机制
+在后端的 LumenOpenService 中，必须对绑定该服务的第三方 App 进行权限和签名安全双重校验：
+```kotlin
+class LumenOpenService : Service() {
+
+    private val binder = object : ILumenOpenApi.Stub() {
+
+        override fun getEyeFatigueLevel(): Int {
+            checkCallingPermissionOrThrow()
+            // 业务逻辑：从 Room 数据库或内存状态机中读取
+            return EyeHealthTracker.getCurrentFatigue()
+        }
+
+        override fun startFocusSession(tag: String?, durationMs: Long) {
+            checkCallingPermissionOrThrow()
+            // 业务逻辑：驱动本地前台服务与精确闹钟启动专注
+            FocusEngine.startSessionFromExternal(tag ?: "ExternalApp", durationMs)
+        }
+
+        // ... 其他方法实现
+    }
+
+    override fun onBind(intent: Intent?): IBinder? {
+        return binder
+    }
+
+    private fun checkCallingPermissionOrThrow() {
+        // 1. 验证调用方是否声明了自定义权限
+        val permissionResult = checkCallingPermission("com.project.lumen.permission.ACCESS_LUMEN_CORE")
+        if (permissionResult != PackageManager.PERMISSION_GRANTED) {
+            throw SecurityException("Unauthorized access: Requires com.project.lumen.permission.ACCESS_LUMEN_CORE")
+        }
+
+        // 2. 进阶安全：校验调用方的 App 签名是否在白名单中（可选，防止权限被滥用）
+        val callingUid = Binder.getCallingUid()
+        val callingPackage = packageManager.getNameForUid(callingUid)
+        // verifyPackageSignature(callingPackage)
+    }
+}
+
+```
+### 4. 权限与安全机制升级 (Security & ProGuard)
+既然页面和接口被公开，安全防护的策略必须同步跟进，防止被逆向或滥用。
+ * **自定义安全权限定义**：
+   在 Project Lumen 的 AndroidManifest.xml 中声明两个级别的权限：
+   ```xml
+   <permission
+       android:name="com.project.lumen.permission.ACCESS_LUMEN_CORE"
+       android:protectionLevel="dangerous" /> <permission
+       android:name="com.project.lumen.permission.TRIGGER_LUMEN_CONTROL"
+       android:protectionLevel="signature" /> ```
+
+
+   ```
+ * **对外开放的数据脱敏**：
+   通过开放 API 传输数据时，禁止返回敏感的摄像头原始人脸网格坐标或位置传感器裸数据，仅返回封装后的安全计算指标（如 FatigueLevel 或 DistanceStatus）。
+ * **混淆策略与防自防卫修正 (proguard-rules.pro)**：
+   由于第三方应用需要调用 AIDL 生成的 Stub 类，所以**公开接口的包名、方法名以及传递的序列化实体类绝对不能被混淆**。
+   ```pro
+   # 保持 AIDL 编译生成的接口不被混淆
+   -keep class com.project.lumen.open.** { *; }
+   -keep interface com.project.lumen.open.** { *; }
+
+   ```
+## 三、 对接方（第三方应用）调用示例
+为了保证需求的落地可行性，以下提供**第三方应用**如何对接 Project Lumen 的标准伪代码示例：
+### 1. 第三方拉起 Lumen 强制休息页面并传递上下文
+```kotlin
+val intent = Intent("com.project.lumen.action.TRIGGER_REST").apply {
+    putExtra("EXTRA_CALLER_PACKAGE", context.packageName)
+    putExtra("EXTRA_REST_DURATION_MIN", 5) // 建议强制休息5分钟
+    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+}
+if (context.packageManager.resolveActivity(intent, 0) != null) {
+    context.startActivity(intent)
+} else {
+    Toast.makeText(context, "请先下载并安装 Project Lumen 护眼助手", Toast.LENGTH_SHORT).show()
+}
+
+```
+### 2. 第三方绑定 AIDL 接口进行静默控制
+```kotlin
+private var lumenApi: ILumenOpenApi? = null
+
+private val connection = object : ServiceConnection {
+    override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+        lumenApi = ILumenOpenApi.Stub.asInterface(service)
+        // 绑定成功后，查询当前连续用眼时间
+        val screenTime = lumenApi?.continuousScreenTime ?: 0L
+        if (screenTime > 1800000) { // 超过 30 分钟
+            showInternalEyeCareTip() // 第三方应用内弹出气泡提示
+        }
+    }
+
+    override fun onServiceDisconnected(name: ComponentName?) {
+        lumenApi = null
+    }
+}
+
+// 绑定操作
+val intent = Intent()
+intent.component = ComponentName("com.project.lumen", "com.project.lumen.open.LumenOpenService")
+bindService(intent, connection, Context.BIND_AUTO_CREATE)
+
+```
+## 四、 需求变更对后端的连锁反应说明
+ * **设备激活与 SDK 授权统计（Rust 后端扩展）**：
+   随着开放能力的建设，Admin Dashboard 需要对“由第三方拉起的活跃度/调用次数”进行全景监控。客户端在上传同步统计数据（MongoDB）时，需增加 source_app 字段，用于区分是用户在 Lumen 自主专注，还是在外部合作 App 中触发的护眼机制。这为后续“服务可运营、商业化可闭环”提供了强有力的数据支撑（例如：向合作的教育类 App 收取 B 端 SDK 接入授权费）。

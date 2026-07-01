@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct TelemetryUploadRequest {
     pub device_installation_id: String,
+    #[serde(default = "default_source_app")]
+    pub source_app: String,
     pub recorded_at: i64,
     pub daily_health: Option<DailyEyeHealthTelemetry>,
     #[serde(default)]
@@ -126,4 +128,8 @@ pub struct TelemetryUploadResponse {
     pub accepted: bool,
     pub id: String,
     pub received_at: i64,
+}
+
+fn default_source_app() -> String {
+    "project_lumen".to_owned()
 }
