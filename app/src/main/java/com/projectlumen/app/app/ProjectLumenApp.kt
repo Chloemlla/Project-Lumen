@@ -120,6 +120,9 @@ fun ProjectLumenApp(
         else -> configuredThemeMode
     }
     val baseContext = LocalContext.current
+    val localizedContext = remember(baseContext, uiState.settings.languageCode) {
+        LocaleController.wrap(baseContext, uiState.settings.languageCode)
+    }
     val coroutineScope = rememberCoroutineScope()
     val updateChecker = remember(baseContext) { UpdateChecker(baseContext, PROJECT_LUMEN_RELEASE_API) }
     val updateInstaller = remember { UpdateInstaller(baseContext) }
@@ -151,7 +154,7 @@ fun ProjectLumenApp(
             }.onFailure { throwable ->
                 if (manual) {
                     updateDialogState = UpdateDialogState.Error(
-                        throwable.message ?: baseContext.getString(R.string.about_update_failed_title),
+                        throwable.message ?: localizedContext.getString(R.string.about_update_failed_title),
                     )
                 }
                 if (!manual) autoCheckStarted = true
@@ -165,7 +168,7 @@ fun ProjectLumenApp(
                 .onSuccess { updateDialogState = UpdateDialogState.Hidden }
                 .onFailure {
                     updateDialogState = UpdateDialogState.Error(
-                        it.message ?: baseContext.getString(R.string.about_update_open_installer_failed),
+                        it.message ?: localizedContext.getString(R.string.about_update_open_installer_failed),
                     )
                 }
             return
@@ -194,7 +197,7 @@ fun ProjectLumenApp(
                 startInstallIfAllowed(candidate, file)
             }.onFailure { throwable ->
                 updateDialogState = UpdateDialogState.Error(
-                    throwable.message ?: baseContext.getString(R.string.about_update_download_failed),
+                    throwable.message ?: localizedContext.getString(R.string.about_update_download_failed),
                 )
             }
         }
@@ -232,7 +235,6 @@ fun ProjectLumenApp(
             triggerUpdateCheck(manual = false)
         }
     }
-    val localizedContext = baseContext
     val activeThemeTemplate = if (uiState.settings.useDynamicColors) null else activeTemplate(uiState)
 
     CompositionLocalProvider(LocalContext provides localizedContext) {

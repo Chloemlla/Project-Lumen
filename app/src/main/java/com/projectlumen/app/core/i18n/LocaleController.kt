@@ -1,6 +1,8 @@
 ﻿package com.projectlumen.app.core.i18n
 
 import android.content.Context
+import android.content.res.Configuration
+import android.os.LocaleList
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import java.util.Locale
@@ -17,7 +19,15 @@ object LocaleController {
     }
 
     fun wrap(base: Context, languageCode: String): Context {
-        return base
+        val normalized = normalize(languageCode)
+        if (normalized == SYSTEM) return base
+
+        val locale = Locale.forLanguageTag(normalized)
+        val configuration = Configuration(base.resources.configuration).apply {
+            setLocales(LocaleList(locale))
+            setLayoutDirection(locale)
+        }
+        return base.createConfigurationContext(configuration)
     }
 
     fun normalize(languageCode: String?): String {
