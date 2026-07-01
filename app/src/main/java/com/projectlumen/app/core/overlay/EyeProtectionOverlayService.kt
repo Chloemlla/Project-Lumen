@@ -13,14 +13,13 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
@@ -80,7 +79,6 @@ class EyeProtectionOverlayService : Service() {
             setBackgroundColor(Color.argb(232, 20, 24, 28))
             isClickable = true
             isFocusable = true
-            systemUiVisibility = immersiveSystemUiFlags()
             addView(TextView(context).apply {
                 text = title
                 textSize = 28f
@@ -100,12 +98,7 @@ class EyeProtectionOverlayService : Service() {
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+            overlayWindowFlags(),
             PixelFormat.TRANSLUCENT,
         )
         windowManager.addView(view, params)
@@ -114,16 +107,39 @@ class EyeProtectionOverlayService : Service() {
         tickCountdown()
     }
 
-    private fun forceImmersive(view: View) {
-        view.systemUiVisibility = immersiveSystemUiFlags()
-        ViewCompat.getWindowInsetsController(view)?.let { controller ->
-            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            controller.hide(WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.navigationBars())
+    private fun overlayWindowFlags(): Int {
+        val modernFlags =
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            modernFlags
+        } else {
+            modernFlags or legacyFullscreenWindowFlags()
         }
     }
 
-    private fun immersiveSystemUiFlags(): Int {
-        return View.SYSTEM_UI_FLAG_FULLSCREEN or
+    @Suppress("DEPRECATION")
+    private fun legacyFullscreenWindowFlags(): Int {
+        return WindowManager.LayoutParams.FLAG_FULLSCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR
+    }
+
+    private fun forceImmersive(view: View) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            view.windowInsetsController?.let { controller ->
+                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+            }
+        } else {
+            applyLegacyImmersiveFlags(view)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun applyLegacyImmersiveFlags(view: View) {
+        view.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
             View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
