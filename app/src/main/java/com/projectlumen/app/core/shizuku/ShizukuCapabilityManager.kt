@@ -29,7 +29,7 @@ class ShizukuCapabilityManager(
 ) {
     private val _state = MutableStateFlow(ShizukuCapabilityState())
     val state = _state.asStateFlow()
-    private val shellServiceLock = Object()
+    private val shellServiceLock = java.lang.Object()
     @Volatile
     private var shellServiceBinder: IBinder? = null
     private val shellServiceConnection = object : ServiceConnection {
@@ -431,8 +431,9 @@ class ShizukuCapabilityManager(
 
             val deadline = SystemClock.uptimeMillis() + SHELL_SERVICE_BIND_TIMEOUT_MILLIS
             while (shellServiceBinder == null && SystemClock.uptimeMillis() < deadline) {
-                runCatching {
-                    shellServiceLock.wait(deadline - SystemClock.uptimeMillis())
+                val remaining = deadline - SystemClock.uptimeMillis()
+                if (remaining > 0) {
+                    runCatching { shellServiceLock.wait(remaining) }
                 }
             }
             return shellServiceBinder?.takeIf { it.isBinderAlive }
