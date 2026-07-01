@@ -205,8 +205,9 @@ import kotlinx.coroutines.launch
 internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            containerColor = MaterialTheme.colorScheme.primary,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+            titleContentColor = MaterialTheme.colorScheme.onPrimary,
         ),
         navigationIcon = {
             if (onNavigateBack != null) {
