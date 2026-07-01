@@ -146,7 +146,11 @@ class ProjectLumenViewModel(
     fun simulateLowMemory() = simulateDeveloperLowMemory()
     fun refreshShizukuState() {
         shizuku.refreshState()
-        viewModelScope.launch { shizuku.refreshForegroundContext() }
+        viewModelScope.launch {
+            val settings = stateStore.uiState.value.settings
+            shizuku.refreshForegroundContext()
+            shizuku.refreshSystemContext(settings)
+        }
     }
     fun requestShizukuAuthorization() = shizuku.requestPermission()
 

@@ -479,6 +479,9 @@ internal fun SettingsScreen(
                     },
                 )
             }
+            if (shizukuState.ready) {
+                StatusLine(Icons.Outlined.Settings, shizukuSystemGuardLabel(settings, shizukuState))
+            }
             SwitchRow(R.string.enable_shizuku_advanced_mode, Icons.Outlined.Lock, settings.shizukuAdvancedModeEnabled) { enabled ->
                 viewModel.updateSettings { current ->
                     current.copy(shizukuAdvancedModeEnabled = enabled)
@@ -514,6 +517,48 @@ internal fun SettingsScreen(
                         settings.shizukuServiceRecoveryEnabled,
                     ) {
                         viewModel.updateSettings { current -> current.copy(shizukuServiceRecoveryEnabled = it) }
+                    }
+                    SwitchRow(
+                        R.string.shizuku_screen_off_guard,
+                        Icons.Outlined.Lock,
+                        settings.shizukuScreenOffGuardEnabled,
+                    ) {
+                        viewModel.updateSettings { current -> current.copy(shizukuScreenOffGuardEnabled = it) }
+                    }
+                    SwitchRow(
+                        R.string.shizuku_low_battery_guard,
+                        Icons.Outlined.WarningAmber,
+                        settings.shizukuLowBatteryGuardEnabled,
+                    ) {
+                        viewModel.updateSettings { current -> current.copy(shizukuLowBatteryGuardEnabled = it) }
+                    }
+                    SwitchRow(
+                        R.string.shizuku_power_save_guard,
+                        Icons.Outlined.Schedule,
+                        settings.shizukuPowerSaveGuardEnabled,
+                    ) {
+                        viewModel.updateSettings { current -> current.copy(shizukuPowerSaveGuardEnabled = it) }
+                    }
+                    SwitchRow(
+                        R.string.shizuku_dnd_guard,
+                        Icons.Outlined.NotificationsActive,
+                        settings.shizukuDndGuardEnabled,
+                    ) {
+                        viewModel.updateSettings { current -> current.copy(shizukuDndGuardEnabled = it) }
+                    }
+                    SwitchRow(
+                        R.string.shizuku_thermal_guard,
+                        Icons.Outlined.WarningAmber,
+                        settings.shizukuThermalGuardEnabled,
+                    ) {
+                        viewModel.updateSettings { current -> current.copy(shizukuThermalGuardEnabled = it) }
+                    }
+                    SwitchRow(
+                        R.string.shizuku_camera_privacy_guard,
+                        Icons.Outlined.PhotoCamera,
+                        settings.shizukuCameraPrivacyGuardEnabled,
+                    ) {
+                        viewModel.updateSettings { current -> current.copy(shizukuCameraPrivacyGuardEnabled = it) }
                     }
                     Text(
                         stringResource(R.string.shizuku_privacy_boundary),
@@ -887,6 +932,40 @@ internal fun SettingsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun shizukuSystemGuardLabel(settings: AppSettingsEntity, state: ShizukuCapabilityState): String {
+    val reasons = shizukuSystemGuardReasons(settings, state)
+    return if (reasons.isEmpty()) {
+        stringResource(R.string.shizuku_system_normal)
+    } else {
+        stringResource(R.string.shizuku_system_deferred, reasons.joinToString(", "))
+    }
+}
+
+@Composable
+private fun shizukuSystemGuardReasons(settings: AppSettingsEntity, state: ShizukuCapabilityState): List<String> {
+    val reasons = mutableListOf<String>()
+    if (settings.shizukuScreenOffGuardEnabled && !state.deviceInteractive) {
+        reasons += stringResource(R.string.shizuku_guard_reason_screen_off)
+    }
+    if (settings.shizukuLowBatteryGuardEnabled && state.lowBatteryActive) {
+        reasons += stringResource(R.string.shizuku_guard_reason_low_battery)
+    }
+    if (settings.shizukuPowerSaveGuardEnabled && state.powerSaveActive) {
+        reasons += stringResource(R.string.shizuku_guard_reason_power_save)
+    }
+    if (settings.shizukuDndGuardEnabled && state.dndActive) {
+        reasons += stringResource(R.string.shizuku_guard_reason_dnd)
+    }
+    if (settings.shizukuThermalGuardEnabled && state.thermalStatus >= 2) {
+        reasons += stringResource(R.string.shizuku_guard_reason_thermal, state.thermalStatus)
+    }
+    if (settings.shizukuCameraPrivacyGuardEnabled && state.cameraPrivacyEnabled) {
+        reasons += stringResource(R.string.shizuku_guard_reason_camera_privacy)
+    }
+    return reasons
 }
 
 @Composable

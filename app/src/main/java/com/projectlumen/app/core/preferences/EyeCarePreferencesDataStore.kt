@@ -56,6 +56,12 @@ data class EyeCarePreferences(
     val shizukuAdvancedModeEnabled: Boolean = false,
     val shizukuContextAwareSamplingEnabled: Boolean = true,
     val shizukuServiceRecoveryEnabled: Boolean = true,
+    val shizukuScreenOffGuardEnabled: Boolean = true,
+    val shizukuLowBatteryGuardEnabled: Boolean = true,
+    val shizukuPowerSaveGuardEnabled: Boolean = true,
+    val shizukuDndGuardEnabled: Boolean = false,
+    val shizukuThermalGuardEnabled: Boolean = true,
+    val shizukuCameraPrivacyGuardEnabled: Boolean = true,
 )
 
 class EyeCarePreferencesDataStore(context: Context) {
@@ -111,6 +117,12 @@ class EyeCarePreferencesDataStore(context: Context) {
             preferences[Keys.SHIZUKU_ADVANCED_MODE_ENABLED] = settings.shizukuAdvancedModeEnabled
             preferences[Keys.SHIZUKU_CONTEXT_AWARE_SAMPLING_ENABLED] = settings.shizukuContextAwareSamplingEnabled
             preferences[Keys.SHIZUKU_SERVICE_RECOVERY_ENABLED] = settings.shizukuServiceRecoveryEnabled
+            preferences[Keys.SHIZUKU_SCREEN_OFF_GUARD_ENABLED] = settings.shizukuScreenOffGuardEnabled
+            preferences[Keys.SHIZUKU_LOW_BATTERY_GUARD_ENABLED] = settings.shizukuLowBatteryGuardEnabled
+            preferences[Keys.SHIZUKU_POWER_SAVE_GUARD_ENABLED] = settings.shizukuPowerSaveGuardEnabled
+            preferences[Keys.SHIZUKU_DND_GUARD_ENABLED] = settings.shizukuDndGuardEnabled
+            preferences[Keys.SHIZUKU_THERMAL_GUARD_ENABLED] = settings.shizukuThermalGuardEnabled
+            preferences[Keys.SHIZUKU_CAMERA_PRIVACY_GUARD_ENABLED] = settings.shizukuCameraPrivacyGuardEnabled
         }
     }
 
@@ -151,6 +163,12 @@ class EyeCarePreferencesDataStore(context: Context) {
             shizukuAdvancedModeEnabled = preferences[Keys.SHIZUKU_ADVANCED_MODE_ENABLED] ?: false,
             shizukuContextAwareSamplingEnabled = preferences[Keys.SHIZUKU_CONTEXT_AWARE_SAMPLING_ENABLED] ?: true,
             shizukuServiceRecoveryEnabled = preferences[Keys.SHIZUKU_SERVICE_RECOVERY_ENABLED] ?: true,
+            shizukuScreenOffGuardEnabled = preferences[Keys.SHIZUKU_SCREEN_OFF_GUARD_ENABLED] ?: true,
+            shizukuLowBatteryGuardEnabled = preferences[Keys.SHIZUKU_LOW_BATTERY_GUARD_ENABLED] ?: true,
+            shizukuPowerSaveGuardEnabled = preferences[Keys.SHIZUKU_POWER_SAVE_GUARD_ENABLED] ?: true,
+            shizukuDndGuardEnabled = preferences[Keys.SHIZUKU_DND_GUARD_ENABLED] ?: false,
+            shizukuThermalGuardEnabled = preferences[Keys.SHIZUKU_THERMAL_GUARD_ENABLED] ?: true,
+            shizukuCameraPrivacyGuardEnabled = preferences[Keys.SHIZUKU_CAMERA_PRIVACY_GUARD_ENABLED] ?: true,
         )
     }
 
@@ -189,6 +207,12 @@ class EyeCarePreferencesDataStore(context: Context) {
         val SHIZUKU_ADVANCED_MODE_ENABLED = booleanPreferencesKey("shizuku_advanced_mode_enabled")
         val SHIZUKU_CONTEXT_AWARE_SAMPLING_ENABLED = booleanPreferencesKey("shizuku_context_aware_sampling_enabled")
         val SHIZUKU_SERVICE_RECOVERY_ENABLED = booleanPreferencesKey("shizuku_service_recovery_enabled")
+        val SHIZUKU_SCREEN_OFF_GUARD_ENABLED = booleanPreferencesKey("shizuku_screen_off_guard_enabled")
+        val SHIZUKU_LOW_BATTERY_GUARD_ENABLED = booleanPreferencesKey("shizuku_low_battery_guard_enabled")
+        val SHIZUKU_POWER_SAVE_GUARD_ENABLED = booleanPreferencesKey("shizuku_power_save_guard_enabled")
+        val SHIZUKU_DND_GUARD_ENABLED = booleanPreferencesKey("shizuku_dnd_guard_enabled")
+        val SHIZUKU_THERMAL_GUARD_ENABLED = booleanPreferencesKey("shizuku_thermal_guard_enabled")
+        val SHIZUKU_CAMERA_PRIVACY_GUARD_ENABLED = booleanPreferencesKey("shizuku_camera_privacy_guard_enabled")
     }
 }
 
@@ -229,5 +253,11 @@ fun AppSettingsEntity.withEyeCarePreferences(preferences: EyeCarePreferences): A
         shizukuAdvancedModeEnabled = preferences.shizukuAdvancedModeEnabled,
         shizukuContextAwareSamplingEnabled = preferences.shizukuContextAwareSamplingEnabled,
         shizukuServiceRecoveryEnabled = preferences.shizukuServiceRecoveryEnabled,
+        shizukuScreenOffGuardEnabled = preferences.shizukuScreenOffGuardEnabled,
+        shizukuLowBatteryGuardEnabled = preferences.shizukuLowBatteryGuardEnabled,
+        shizukuPowerSaveGuardEnabled = preferences.shizukuPowerSaveGuardEnabled,
+        shizukuDndGuardEnabled = preferences.shizukuDndGuardEnabled,
+        shizukuThermalGuardEnabled = preferences.shizukuThermalGuardEnabled,
+        shizukuCameraPrivacyGuardEnabled = preferences.shizukuCameraPrivacyGuardEnabled,
     )
 }

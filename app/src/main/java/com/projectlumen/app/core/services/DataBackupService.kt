@@ -181,6 +181,12 @@ class DataBackupService(
             shizukuAdvancedModeEnabled = json.optBoolean("shizukuAdvancedModeEnabled", current.shizukuAdvancedModeEnabled),
             shizukuContextAwareSamplingEnabled = json.optBoolean("shizukuContextAwareSamplingEnabled", current.shizukuContextAwareSamplingEnabled),
             shizukuServiceRecoveryEnabled = json.optBoolean("shizukuServiceRecoveryEnabled", current.shizukuServiceRecoveryEnabled),
+            shizukuScreenOffGuardEnabled = json.optBoolean("shizukuScreenOffGuardEnabled", current.shizukuScreenOffGuardEnabled),
+            shizukuLowBatteryGuardEnabled = json.optBoolean("shizukuLowBatteryGuardEnabled", current.shizukuLowBatteryGuardEnabled),
+            shizukuPowerSaveGuardEnabled = json.optBoolean("shizukuPowerSaveGuardEnabled", current.shizukuPowerSaveGuardEnabled),
+            shizukuDndGuardEnabled = json.optBoolean("shizukuDndGuardEnabled", current.shizukuDndGuardEnabled),
+            shizukuThermalGuardEnabled = json.optBoolean("shizukuThermalGuardEnabled", current.shizukuThermalGuardEnabled),
+            shizukuCameraPrivacyGuardEnabled = json.optBoolean("shizukuCameraPrivacyGuardEnabled", current.shizukuCameraPrivacyGuardEnabled),
             autoUpdateCheckEnabled = json.optBoolean("autoUpdateCheckEnabled", current.autoUpdateCheckEnabled),
             updatedAt = System.currentTimeMillis(),
         )
@@ -358,6 +364,12 @@ class DataBackupService(
         .put("shizukuAdvancedModeEnabled", shizukuAdvancedModeEnabled)
         .put("shizukuContextAwareSamplingEnabled", shizukuContextAwareSamplingEnabled)
         .put("shizukuServiceRecoveryEnabled", shizukuServiceRecoveryEnabled)
+        .put("shizukuScreenOffGuardEnabled", shizukuScreenOffGuardEnabled)
+        .put("shizukuLowBatteryGuardEnabled", shizukuLowBatteryGuardEnabled)
+        .put("shizukuPowerSaveGuardEnabled", shizukuPowerSaveGuardEnabled)
+        .put("shizukuDndGuardEnabled", shizukuDndGuardEnabled)
+        .put("shizukuThermalGuardEnabled", shizukuThermalGuardEnabled)
+        .put("shizukuCameraPrivacyGuardEnabled", shizukuCameraPrivacyGuardEnabled)
         .put("autoUpdateCheckEnabled", autoUpdateCheckEnabled)
 
     private fun DailyGoalEntity.toJson(): JSONObject = JSONObject()

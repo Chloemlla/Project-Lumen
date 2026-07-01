@@ -10,6 +10,14 @@ data class ShizukuCapabilityState(
     val foregroundActivity: String = "",
     val foregroundCategory: String = "",
     val foregroundShouldDeferSampling: Boolean = false,
+    val deviceInteractive: Boolean = true,
+    val batteryLevelPercent: Int = -1,
+    val lowBatteryActive: Boolean = false,
+    val powerSaveActive: Boolean = false,
+    val dndActive: Boolean = false,
+    val thermalStatus: Int = 0,
+    val cameraPrivacyEnabled: Boolean = false,
+    val systemShouldDeferSampling: Boolean = false,
     val lastCheckedAt: Long = 0L,
     val lastError: String = "",
 ) {
@@ -21,5 +29,16 @@ data class ShizukuForegroundContext(
     val packageName: String,
     val activityName: String,
     val category: String,
+    val shouldDeferSampling: Boolean,
+)
+
+data class ShizukuSystemContext(
+    val deviceInteractive: Boolean,
+    val batteryLevelPercent: Int,
+    val lowBatteryActive: Boolean,
+    val powerSaveActive: Boolean,
+    val dndActive: Boolean,
+    val thermalStatus: Int,
+    val cameraPrivacyEnabled: Boolean,
     val shouldDeferSampling: Boolean,
 )

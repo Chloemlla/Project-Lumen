@@ -37,6 +37,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.projectlumen.app.R
 import com.projectlumen.app.core.crash.CrashReport
+import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
 import kotlin.math.roundToInt
 
@@ -120,6 +121,7 @@ internal fun DeveloperDebugScreen(
             MetricRow(R.string.developer_service_task_removed, timestampLabel(runtime.foregroundServiceLastTaskRemovedAt))
             MetricRow(R.string.shizuku_status, developerShizukuStatusLabel(shizukuState))
             MetricRow(R.string.shizuku_foreground_context, developerShizukuContextLabel(shizukuState))
+            MetricRow(R.string.shizuku_system_guards, developerShizukuSystemGuardLabel(settings, shizukuState))
             OutlinedButton(onClick = viewModel::refreshShizukuState) {
                 ButtonLabel(Icons.Outlined.Settings, R.string.shizuku_refresh_status)
             }
@@ -227,6 +229,34 @@ private fun developerShizukuContextLabel(state: ShizukuCapabilityState): String 
         stringResource(R.string.shizuku_context_deferred, state.foregroundCategory)
     } else {
         "${state.foregroundPackage}/${state.foregroundActivity.substringAfterLast('.')}"
+    }
+}
+
+@Composable
+private fun developerShizukuSystemGuardLabel(settings: AppSettingsEntity, state: ShizukuCapabilityState): String {
+    val reasons = mutableListOf<String>()
+    if (settings.shizukuScreenOffGuardEnabled && !state.deviceInteractive) {
+        reasons += stringResource(R.string.shizuku_guard_reason_screen_off)
+    }
+    if (settings.shizukuLowBatteryGuardEnabled && state.lowBatteryActive) {
+        reasons += stringResource(R.string.shizuku_guard_reason_low_battery)
+    }
+    if (settings.shizukuPowerSaveGuardEnabled && state.powerSaveActive) {
+        reasons += stringResource(R.string.shizuku_guard_reason_power_save)
+    }
+    if (settings.shizukuDndGuardEnabled && state.dndActive) {
+        reasons += stringResource(R.string.shizuku_guard_reason_dnd)
+    }
+    if (settings.shizukuThermalGuardEnabled && state.thermalStatus >= 2) {
+        reasons += stringResource(R.string.shizuku_guard_reason_thermal, state.thermalStatus)
+    }
+    if (settings.shizukuCameraPrivacyGuardEnabled && state.cameraPrivacyEnabled) {
+        reasons += stringResource(R.string.shizuku_guard_reason_camera_privacy)
+    }
+    return if (reasons.isEmpty()) {
+        stringResource(R.string.shizuku_system_normal)
+    } else {
+        stringResource(R.string.shizuku_system_deferred, reasons.joinToString(", "))
     }
 }
 
