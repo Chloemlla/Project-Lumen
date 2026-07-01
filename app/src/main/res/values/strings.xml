@@ -104,7 +104,6 @@
     <string name="about_update_build_time">Build time: %1$s</string>
     <string name="about_update_publish_time">Published: %1$s</string>
     <string name="about_update_release_notes">Release notes: %1$s</string>
-    <string name="about_update_time_fallback">This release is newer by published time even if the version string looks lower.</string>
     <string name="about_update_downloading_title">Downloading update</string>
     <string name="about_update_downloading">Downloading update…</string>
     <string name="about_update_downloading_progress">Downloading update… %1$d%%</string>

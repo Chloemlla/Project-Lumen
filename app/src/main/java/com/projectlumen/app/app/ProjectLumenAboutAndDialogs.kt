@@ -444,9 +444,6 @@ internal fun UpdateDialog(
             Text(stringResource(R.string.about_update_current_version, current.versionName, current.shortHash))
             Text(stringResource(R.string.about_update_build_time, buildTime))
             Text(stringResource(R.string.about_update_publish_time, publishTime))
-            if (candidate?.isTimeFallback == true) {
-                Text(stringResource(R.string.about_update_time_fallback), color = MaterialTheme.colorScheme.primary)
-            }
             if (release.body.isNotBlank()) {
                 Text(release.body)
             }
@@ -628,5 +625,3 @@ internal fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
         }
     }
 }
-
-
