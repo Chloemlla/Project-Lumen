@@ -3,8 +3,10 @@ package com.projectlumen.app.core.toast
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -30,6 +32,8 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.services.NotificationChannels
 import java.lang.ref.WeakReference
+
+private const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIFICATIONS"
 
 enum class LumenToastKind(
     val icon: String,
@@ -272,6 +276,7 @@ object LumenToast {
     }
 
     private fun showFallbackNotification(context: Context, message: CharSequence, kind: LumenToastKind) {
+        if (!canPostNotifications(context)) return
         val notification = NotificationCompat.Builder(context, NotificationChannels.PROXIMITY)
             .setSmallIcon(R.drawable.ic_notification_lumen)
             .setContentTitle(context.getString(R.string.app_name))
@@ -281,9 +286,16 @@ object LumenToast {
             .setPriority(if (kind == LumenToastKind.WARNING) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
-        runCatching {
+        try {
             NotificationManagerCompat.from(context).notify(NotificationIds.GLOBAL_TOAST, notification)
+        } catch (_: SecurityException) {
+            return
         }
+    }
+
+    private fun canPostNotifications(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(context, POST_NOTIFICATIONS_PERMISSION) == PackageManager.PERMISSION_GRANTED
     }
 }
 
