@@ -56,7 +56,7 @@ jobs:
           PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
           PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
           PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
-        run: gradle testDebugUnitTest --no-daemon
+        run: gradle testDebugUnitTest --no-daemon --warning-mode all
 
       - name: Run Android lint
         env:
@@ -65,7 +65,7 @@ jobs:
           PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
           PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
           PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
-        run: gradle lintDebug --no-daemon
+        run: gradle lintDebug --no-daemon --warning-mode all
 
       - name: Upload verification reports
         if: always()
@@ -76,6 +76,7 @@ jobs:
             app/build/reports/tests/**
             app/build/reports/lint-results-debug.html
             app/build/reports/lint-results-debug.xml
+            build/reports/problems/**
           retention-days: 14
 
       - name: Write signing config
@@ -116,7 +117,7 @@ jobs:
           PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
           PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
           PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
-        run: gradle assembleRelease --no-daemon
+        run: gradle assembleRelease --no-daemon --warning-mode all
 
       - name: Prepare release assets
         run: |
