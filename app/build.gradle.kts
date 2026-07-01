@@ -127,6 +127,7 @@ android {
         buildConfigField("String", "API_CERTIFICATE_PINS", "\"${projectLumenBuildConfigString(projectLumenApiCertificatePins)}\"")
         buildConfigField("String", "TRANSLATION_CERTIFICATE_PINS", "\"${projectLumenBuildConfigString(projectLumenTranslationCertificatePins)}\"")
         buildConfigField("long", "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER", "${projectLumenPlayIntegrityCloudProjectNumber}L")
+        buildConfigField("boolean", "APP_INTEGRITY_ENFORCEMENT_ENABLED", projectLumenReleaseCertSha256.isNotBlank().toString())
 
         applicationId = "com.projectlumen.app"
         minSdk = 26

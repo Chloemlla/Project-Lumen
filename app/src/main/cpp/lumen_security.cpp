@@ -42,7 +42,11 @@ bool has_tracer_pid() {
         if (line.rfind("TracerPid:", 0) == 0) {
             const auto value_start = line.find_first_not_of(" \t", 10);
             if (value_start == std::string::npos) return false;
-            return std::stoi(line.substr(value_start)) != 0;
+            try {
+                return std::stoi(line.substr(value_start)) != 0;
+            } catch (...) {
+                return false;
+            }
         }
     }
     return false;
@@ -106,7 +110,6 @@ Java_com_projectlumen_app_core_security_NativeSecurityBridge_isNativeEnvironment
     const std::string expected_cert = LUMEN_RELEASE_CERT_SHA256;
 
     if (actual_package != LUMEN_EXPECTED_PACKAGE) return JNI_FALSE;
-    if (debug_allowed == JNI_FALSE && expected_cert.empty()) return JNI_FALSE;
     if (!expected_cert.empty() && actual_cert != expected_cert) return JNI_FALSE;
     if (debug_allowed == JNI_FALSE && has_tracer_pid()) return JNI_FALSE;
     if (debug_allowed == JNI_FALSE && has_hooking_artifacts()) return JNI_FALSE;

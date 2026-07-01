@@ -1,6 +1,7 @@
 ﻿package com.projectlumen.app
 
 import android.app.Application
+import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -49,23 +50,40 @@ class ProjectLumenApplication : Application() {
     }
     val shizuku: ShizukuCapabilityManager by lazy { ShizukuCapabilityManager(this) }
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
+    private var crashExceptionHandler: Thread.UncaughtExceptionHandler? = null
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        installCrashReporter()
+    }
 
     override fun onCreate() {
         super.onCreate()
+        installCrashReporter()
         AppIntegrityGuard.enforce(this)
+        notifications.ensureChannels()
+        LumenToast.install(this)
+        ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)
+    }
+
+    private fun installCrashReporter() {
         val defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            runCatching { crashReports.save(CrashReport.fromThrowable(throwable)) }
-            if (defaultExceptionHandler != null) {
+        if (defaultExceptionHandler === crashExceptionHandler) return
+
+        lateinit var handler: Thread.UncaughtExceptionHandler
+        handler = Thread.UncaughtExceptionHandler { thread, throwable ->
+            val report = runCatching { CrashReport.fromThrowable(throwable) }
+                .getOrElse { CrashReport.fromThrowableFallback(throwable, it) }
+            runCatching { crashReports.save(report) }
+            if (defaultExceptionHandler != null && defaultExceptionHandler !== handler) {
                 defaultExceptionHandler.uncaughtException(thread, throwable)
             } else {
                 android.os.Process.killProcess(android.os.Process.myPid())
                 kotlin.system.exitProcess(10)
             }
         }
-        notifications.ensureChannels()
-        LumenToast.install(this)
-        ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)
+        crashExceptionHandler = handler
+        Thread.setDefaultUncaughtExceptionHandler(handler)
     }
 
     fun startTimerService() {

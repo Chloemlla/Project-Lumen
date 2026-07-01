@@ -42,6 +42,18 @@ data class CrashReport(
             )
         }
 
+        fun fromThrowableFallback(throwable: Throwable, reportFailure: Throwable): CrashReport {
+            val nowMillis = System.currentTimeMillis()
+            return CrashReport(
+                crashedAtMillis = nowMillis,
+                crashedAtText = nowMillis.toString(),
+                exceptionType = throwable::class.java.name,
+                rootCause = throwable.message?.takeIf { it.isNotBlank() } ?: throwable::class.java.name,
+                systemInfo = "Crash report construction failed: ${reportFailure::class.java.name}",
+                stackTrace = throwable.stackTraceToString(),
+            )
+        }
+
         private fun buildSystemInfo(): String = listOf(
             "App version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
             "Device: ${Build.MANUFACTURER} ${Build.MODEL}",

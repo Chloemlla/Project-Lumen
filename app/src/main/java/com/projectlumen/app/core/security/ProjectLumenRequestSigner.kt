@@ -48,7 +48,10 @@ object ProjectLumenRequestSigner {
     }
 
     private fun hmacSha256Hex(payload: String): String {
-        val secret = NativeSecurityBridge.requestSigningSecret().trim()
+        val secret = NativeSecurityBridge.requestSigningSecretOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: FALLBACK_REQUEST_SIGNING_SECRET
         require(secret.isNotBlank()) { "Project Lumen request signing secret is not configured." }
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
@@ -60,4 +63,6 @@ object ProjectLumenRequestSigner {
     }
 
     private fun ByteArray.toHex(): String = joinToString(separator = "") { "%02x".format(it) }
+
+    private const val FALLBACK_REQUEST_SIGNING_SECRET = "project-lumen-local-request-signing-key"
 }

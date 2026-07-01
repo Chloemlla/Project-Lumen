@@ -112,7 +112,7 @@ class ProjectLumenViewModel(
             val settings = repositories.settings.getOrDefault()
             settingsEntry.applyStartupMonitoring(settings)
             runtimeEntry.refreshActiveNotifications(settings, repositories.runtime.getOrDefault())
-            uploadTelemetrySnapshot()
+            runCatching { uploadTelemetrySnapshot() }
         }
         runtimeEntry.startClock(now)
     }

@@ -6,24 +6,26 @@ import android.os.Build
 import android.os.Debug
 import com.projectlumen.app.BuildConfig
 import java.security.MessageDigest
-import kotlin.system.exitProcess
 
 object AppIntegrityGuard {
     fun enforce(context: Context) {
-        val appContext = context.applicationContext
-        val debugAllowed = BuildConfig.DEBUG
-        val javaDebugDetected = Debug.isDebuggerConnected() || Debug.waitingForDebugger()
-        val nativeAllowed = runCatching {
-            NativeSecurityBridge.isNativeEnvironmentAllowed(
-                packageName = appContext.packageName,
-                signingCertSha256 = signingCertificateSha256(appContext),
-                debugAllowed = debugAllowed,
-            )
-        }.getOrDefault(false)
+        if (BuildConfig.DEBUG || !BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED) return
 
-        if (!debugAllowed && (javaDebugDetected || !nativeAllowed || hasRuntimeHookingClasses())) {
-            android.os.Process.killProcess(android.os.Process.myPid())
-            exitProcess(10)
+        val appContext = context.applicationContext
+        val javaDebugDetected = Debug.isDebuggerConnected() || Debug.waitingForDebugger()
+        val nativeAllowed = NativeSecurityBridge.isNativeEnvironmentAllowedOrNull(
+            packageName = appContext.packageName,
+            signingCertSha256 = signingCertificateSha256(appContext),
+            debugAllowed = false,
+        ) ?: throw SecurityException("Project Lumen native integrity bridge is unavailable.")
+
+        val failureReasons = buildList {
+            if (javaDebugDetected) add("debugger")
+            if (!nativeAllowed) add("native")
+            if (hasRuntimeHookingClasses()) add("runtime-hook")
+        }
+        if (failureReasons.isNotEmpty()) {
+            throw SecurityException("Project Lumen integrity check failed: ${failureReasons.joinToString()}.")
         }
     }
 

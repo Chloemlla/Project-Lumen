@@ -3,21 +3,56 @@ package com.projectlumen.app.core.crash
 import android.content.Context
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 
 class CrashReportStore(context: Context) {
-    private val file = File(context.filesDir, FILE_NAME)
+    private val files = listOf(
+        File(context.filesDir, FILE_NAME),
+        File(context.noBackupFilesDir, FILE_NAME),
+        File(context.cacheDir, FILE_NAME),
+    )
 
     fun save(report: CrashReport) {
-        file.writeText(report.toJson().toString())
+        val payload = report.toJson().toString()
+        val failures = mutableListOf<Throwable>()
+        var saved = false
+        files.forEach { file ->
+            runCatching {
+                file.writeAtomically(payload)
+                saved = true
+            }.onFailure(failures::add)
+        }
+        if (saved) return
+        throw IOException("Unable to persist crash report.", failures.firstOrNull())
     }
 
     fun load(): CrashReport? {
-        if (!file.exists()) return null
-        return runCatching { crashReportFromJson(JSONObject(file.readText())) }.getOrNull()
+        return files.firstNotNullOfOrNull { file ->
+            if (!file.exists()) {
+                null
+            } else {
+                runCatching { crashReportFromJson(JSONObject(file.readText(Charsets.UTF_8))) }.getOrNull()
+            }
+        }
     }
 
     fun clear() {
-        if (file.exists()) file.delete()
+        files.forEach { file ->
+            if (file.exists()) file.delete()
+        }
+    }
+
+    private fun File.writeAtomically(payload: String) {
+        parentFile?.mkdirs()
+        val tempFile = File(parentFile, "$name.tmp")
+        tempFile.writeText(payload, Charsets.UTF_8)
+        if (exists() && !delete()) {
+            throw IOException("Unable to replace existing crash report at $absolutePath.")
+        }
+        if (!tempFile.renameTo(this)) {
+            tempFile.delete()
+            writeText(payload, Charsets.UTF_8)
+        }
     }
 
     private fun CrashReport.toJson(): JSONObject = JSONObject().apply {

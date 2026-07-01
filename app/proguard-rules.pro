@@ -1,5 +1,6 @@
 -keepattributes *Annotation*, InnerClasses, EnclosingMethod, Signature
 
+-keep class com.projectlumen.app.** { *; }
 -keep class androidx.room.** { *; }
 -keep @androidx.room.* class * { *; }
 -keep class * extends androidx.room.RoomDatabase
