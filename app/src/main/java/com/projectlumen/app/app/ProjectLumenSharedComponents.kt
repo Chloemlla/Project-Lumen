@@ -205,7 +205,7 @@ import kotlinx.coroutines.launch
 internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
         ),
         navigationIcon = {
@@ -239,23 +239,25 @@ internal fun PageIntroText(icon: ImageVector, title: String, message: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(16.dp),
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .padding(18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(48.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text(message, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -275,7 +277,20 @@ internal fun SectionHeader(icon: ImageVector, @StringRes titleRes: Int) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(18.dp),
+            )
+        }
         Text(
             stringResource(titleRes),
             modifier = Modifier.weight(1f),
@@ -305,14 +320,16 @@ internal fun SettingsSection(
         shape = LumenCardShape,
         colors = lumenCardColors(),
         elevation = lumenCardElevation(),
+        border = lumenCardBorder(),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(LumenCardShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
                     .clickable { expanded = !expanded }
-                    .padding(vertical = 2.dp),
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -350,9 +367,10 @@ internal fun ActionCard(content: @Composable ColumnScope.() -> Unit) {
         shape = LumenCardShape,
         colors = lumenCardColors(),
         elevation = lumenCardElevation(),
+        border = lumenCardBorder(),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             content = content,
         )
@@ -366,8 +384,9 @@ internal fun EmptyStateMessage(@StringRes messageRes: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(12.dp),
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .padding(14.dp),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
@@ -380,13 +399,32 @@ internal fun StatusLine(icon: ImageVector, text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Text(
+            text,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -472,7 +510,8 @@ internal fun NotificationRequirementCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -493,7 +532,11 @@ internal fun NotificationRequirementCard(
 internal fun ButtonLabel(icon: ImageVector, @StringRes labelRes: Int) {
     Icon(icon, contentDescription = null)
     Spacer(Modifier.width(8.dp))
-    Text(stringResource(labelRes))
+    Text(
+        stringResource(labelRes),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 

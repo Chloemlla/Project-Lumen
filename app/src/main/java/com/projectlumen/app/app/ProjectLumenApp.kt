@@ -253,8 +253,8 @@ fun ProjectLumenApp(
                 },
                 bottomBar = {
                     NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 0.dp,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        tonalElevation = 3.dp,
                     ) {
                         Destination.entries.filter { it.showInBottomNav }.forEach { destination ->
                             val selected = backStackEntry?.destination?.hierarchy?.any {

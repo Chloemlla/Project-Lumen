@@ -203,34 +203,37 @@ internal fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
         modifier = Modifier
             .weight(1f)
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f))
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
-            .padding(12.dp),
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        Text(
+            stringResource(labelRes),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        AnimatedContent(
+            targetState = value,
+            transitionSpec = {
+                (fadeIn(tween(150)) + slideInVertically(tween(150)) { it / 2 }) togetherWith
+                    (fadeOut(tween(100)) + slideOutVertically(tween(100)) { -it / 2 })
+            },
+            label = "metricValue",
+        ) { metricValue ->
             Text(
-                stringResource(labelRes),
-                style = MaterialTheme.typography.labelLarge,
+                metricValue,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            AnimatedContent(
-                targetState = value,
-                transitionSpec = {
-                    (fadeIn(tween(150)) + slideInVertically(tween(150)) { it / 2 }) togetherWith
-                        (fadeOut(tween(100)) + slideOutVertically(tween(100)) { -it / 2 })
-                },
-                label = "metricValue",
-            ) { metricValue ->
-                Text(
-                    metricValue,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
         }
+    }
 }
 
 @Composable
@@ -240,7 +243,16 @@ internal fun MetricRow(@StringRes labelRes: Int, value: String) {
 
 @Composable
 internal fun MetricRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(
             label,
             modifier = Modifier.weight(1f),
@@ -259,6 +271,7 @@ internal fun MetricRow(label: String, value: String) {
             Text(
                 metricValue,
                 style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -297,9 +310,9 @@ internal fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Sta
                 .widthIn(max = 720.dp)
                 .verticalScroll(rememberScrollState())
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
-                .padding(PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 24.dp)),
+                .padding(PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 18.dp)),
             horizontalAlignment = horizontalAlignment,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             content = content,
         )
     }

@@ -143,11 +143,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -200,18 +202,25 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun SwitchRow(@StringRes labelRes: Int, icon: ImageVector, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val haptic = LocalHapticFeedback.current
+    fun toggle(next: Boolean) {
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        onCheckedChange(next)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .clickable { onCheckedChange(!checked) }
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .clickable { toggle(!checked) }
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
-            .padding(vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LabelWithIcon(icon, labelRes, Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = { toggle(it) })
     }
 }
 
@@ -228,7 +237,15 @@ internal fun NumberSlider(
     var sliderValue by remember(value, range) { mutableFloatStateOf(value.toFloat().coerceIn(range.start, range.endInclusive)) }
     val liveValue = sliderValue.roundToInt()
     val liveLabel = if (liveValue == value) valueLabel else liveValue.toString()
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             LabelWithIcon(icon, labelRes, Modifier.weight(1f))
             AnimatedContent(
@@ -259,7 +276,12 @@ internal fun NumberSlider(
 internal fun LabelWithIcon(icon: ImageVector, @StringRes labelRes: Int, modifier: Modifier = Modifier) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(stringResource(labelRes), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            stringResource(labelRes),
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -267,6 +289,7 @@ internal fun LabelWithIcon(icon: ImageVector, @StringRes labelRes: Int, modifier
 @Composable
 internal fun LumenFlowRow(content: @Composable () -> Unit) {
     FlowRow(
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
         content = { content() },

@@ -46,6 +46,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -227,17 +228,24 @@ internal enum class SystemBackgroundColor(
 internal val LumenCardShape = RoundedCornerShape(8.dp)
 @Composable
 internal fun lumenCardElevation() = CardDefaults.cardElevation(
-    defaultElevation = 1.dp,
+    defaultElevation = 2.dp,
     pressedElevation = 0.dp,
-    focusedElevation = 1.dp,
-    hoveredElevation = 2.dp,
-    draggedElevation = 3.dp,
+    focusedElevation = 2.dp,
+    hoveredElevation = 3.dp,
+    draggedElevation = 4.dp,
     disabledElevation = 0.dp,
 )
 
 @Composable
 internal fun lumenCardColors() = CardDefaults.cardColors(
     containerColor = MaterialTheme.colorScheme.surfaceContainer,
+    contentColor = MaterialTheme.colorScheme.onSurface,
+)
+
+@Composable
+internal fun lumenCardBorder() = BorderStroke(
+    width = 1.dp,
+    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
 )
 
 

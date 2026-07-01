@@ -285,7 +285,11 @@ internal fun GoalLine(label: String, value: String, progress: Float) {
         }
         LinearProgressIndicator(
             progress = { progress.coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(CircleShape),
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
         )
     }
 }
@@ -322,13 +326,30 @@ internal fun TimerCard(
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
         colors = lumenCardColors(),
+        elevation = lumenCardElevation(),
     ) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(label, style = MaterialTheme.typography.titleMedium)
+            Text(
+                label,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.SemiBold,
+            )
             when (countdownStyle) {
                 COUNTDOWN_STYLE_BAR -> {
                     AnimatedTimerText(timerText, Modifier.padding(vertical = 40.dp))
-                    LinearProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxWidth())
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(CircleShape),
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
                 }
                 COUNTDOWN_STYLE_NUMBER -> {
                     AnimatedTimerText(
@@ -344,7 +365,7 @@ internal fun TimerCard(
                 else -> {
                     Box(
                         modifier = Modifier
-                            .size(220.dp)
+                            .size(210.dp)
                             .graphicsLayer {
                                 scaleX = pulse
                                 scaleY = pulse
@@ -354,12 +375,19 @@ internal fun TimerCard(
                         CircularProgressIndicator(
                             progress = { animatedProgress },
                             modifier = Modifier.fillMaxSize(),
-                            strokeWidth = 10.dp,
+                            strokeWidth = 12.dp,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant,
                         )
                         AnimatedTimerText(timerText)
                     }
-                    LinearProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxWidth())
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(CircleShape),
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
                 }
             }
         }
@@ -380,7 +408,14 @@ internal fun AnimatedTimerText(timerText: String, modifier: Modifier = Modifier)
         },
         label = "timerText",
     ) { text ->
-        Text(text, style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold)
+        Text(
+            text,
+            style = MaterialTheme.typography.displayMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -397,6 +432,7 @@ internal fun TemplatePreviewCard(template: TipTemplateEntity?) {
         shape = LumenCardShape,
         colors = CardDefaults.cardColors(containerColor = animatedBackground),
         elevation = lumenCardElevation(),
+        border = lumenCardBorder(),
     ) {
         Row(
             modifier = Modifier
