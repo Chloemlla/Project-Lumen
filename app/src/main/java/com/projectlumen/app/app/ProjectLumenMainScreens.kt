@@ -269,6 +269,7 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
     val template = activeTemplate(uiState)
     val reminderActive = runtime.activeEngine == ActiveEngine.REMINDER.name &&
         runtime.reminderPhase != ReminderPhase.IDLE.name
+    val timerActive = runtime.activeEngine != ActiveEngine.IDLE.name
     val isResting = runtime.reminderPhase == ReminderPhase.RESTING.name
     val canStartBreak = uiState.settings.reminderEnabled &&
         reminderActive &&
@@ -298,16 +299,16 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
             message = if (isResting) templateBreakSubtitle(template) else stringResource(R.string.break_waiting_message),
         )
         TimerCard(
-            label = stringResource(if (isResting) R.string.remaining else R.string.current_state),
-            seconds = if (isResting) remainingSeconds(runtime.breakEndAt, uiState.nowMillis) else 0,
-            progress = if (isResting) progress(runtime.breakStartedAt, runtime.breakEndAt, uiState.nowMillis) else 0f,
+            label = if (timerActive) statusLabel(runtime) else stringResource(R.string.current_state),
+            seconds = activeTimerRemainingSeconds(runtime, uiState.nowMillis),
+            progress = activeTimerProgress(runtime, uiState.nowMillis),
             fallbackText = statusLabel(runtime),
             countdownStyle = templateCountdownStyle(template),
         )
         ActionCard {
             SectionHeader(Icons.Outlined.Spa, R.string.quick_actions)
             when {
-                !uiState.settings.reminderEnabled -> EmptyStateMessage(R.string.reminder_disabled_hint)
+                !uiState.settings.reminderEnabled && !timerActive -> EmptyStateMessage(R.string.reminder_disabled_hint)
                 canStartBreak && canSkip -> {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
@@ -323,6 +324,12 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                             ButtonLabel(Icons.Outlined.SkipNext, R.string.skip_break)
                         }
                     }
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::stopAll,
+                    ) {
+                        ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
+                    }
                 }
                 canStartBreak -> {
                     Button(
@@ -330,6 +337,12 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                         onClick = viewModel::startBreak,
                     ) {
                         ButtonLabel(Icons.Outlined.Spa, R.string.start_break)
+                    }
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::stopAll,
+                    ) {
+                        ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }
                 }
                 canSkip -> {
@@ -339,6 +352,12 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                     ) {
                         ButtonLabel(Icons.Outlined.SkipNext, R.string.skip_break)
                     }
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::stopAll,
+                    ) {
+                        ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
+                    }
                 }
                 !reminderActive && runtime.activeEngine == ActiveEngine.IDLE.name -> {
                     Button(
@@ -346,6 +365,14 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                         onClick = { runReminderAction(viewModel::startReminder) },
                     ) {
                         ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_reminder)
+                    }
+                }
+                timerActive -> {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::stopAll,
+                    ) {
+                        ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }
                 }
                 else -> EmptyStateMessage(R.string.break_action_unavailable)
@@ -359,6 +386,7 @@ internal fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
     val runtime = uiState.runtime
     val running = runtime.activeEngine == ActiveEngine.POMODORO.name && runtime.pomodoroPhase != PomodoroPhase.IDLE.name
     val canStartPomodoro = uiState.settings.pomodoroEnabled && runtime.activeEngine == ActiveEngine.IDLE.name
+    val timerActive = runtime.activeEngine != ActiveEngine.IDLE.name
     val runWithNotificationPermission = rememberNotificationPermissionGate()
     fun runPomodoroAction(action: () -> Unit) {
         if (uiState.settings.notificationEnabled) runWithNotificationPermission(action) else action()
@@ -370,14 +398,14 @@ internal fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
         )
         TimerCard(
             label = statusLabel(runtime),
-            seconds = if (running) remainingSeconds(runtime.pomodoroPhaseEndAt, uiState.nowMillis) else 0,
-            progress = if (running) progress(runtime.pomodoroPhaseStartedAt, runtime.pomodoroPhaseEndAt, uiState.nowMillis) else 0f,
-            fallbackText = stringResource(R.string.status_ready),
+            seconds = activeTimerRemainingSeconds(runtime, uiState.nowMillis),
+            progress = activeTimerProgress(runtime, uiState.nowMillis),
+            fallbackText = statusLabel(runtime),
         )
         ActionCard {
             SectionHeader(Icons.Outlined.LocalCafe, R.string.quick_actions)
             when {
-                !uiState.settings.pomodoroEnabled -> EmptyStateMessage(R.string.pomodoro_disabled_hint)
+                !uiState.settings.pomodoroEnabled && !timerActive -> EmptyStateMessage(R.string.pomodoro_disabled_hint)
                 running -> {
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
@@ -394,9 +422,54 @@ internal fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                         ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_pomodoro)
                     }
                 }
+                timerActive -> {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = viewModel::stopAll,
+                    ) {
+                        ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
+                    }
+                }
                 else -> EmptyStateMessage(R.string.other_timer_running_hint)
             }
         }
+    }
+}
+
+private fun activeTimerRemainingSeconds(runtime: RuntimeStateEntity, nowMillis: Long): Long {
+    return when (runtime.activeEngine) {
+        ActiveEngine.REMINDER.name -> when (runtime.reminderPhase) {
+            ReminderPhase.WORKING.name,
+            ReminderPhase.PRE_ALERT.name -> remainingSeconds(runtime.nextReminderAt, nowMillis)
+            ReminderPhase.RESTING.name -> remainingSeconds(runtime.breakEndAt, nowMillis)
+            else -> 0L
+        }
+        ActiveEngine.POMODORO.name -> when (runtime.pomodoroPhase) {
+            PomodoroPhase.FOCUS.name,
+            PomodoroPhase.SHORT_BREAK.name,
+            PomodoroPhase.LONG_BREAK.name -> remainingSeconds(runtime.pomodoroPhaseEndAt, nowMillis)
+            else -> 0L
+        }
+        else -> 0L
+    }
+}
+
+private fun activeTimerProgress(runtime: RuntimeStateEntity, nowMillis: Long): Float {
+    return when (runtime.activeEngine) {
+        ActiveEngine.REMINDER.name -> when (runtime.reminderPhase) {
+            ReminderPhase.WORKING.name,
+            ReminderPhase.PRE_ALERT.name,
+            ReminderPhase.AWAITING_ACTION.name -> progress(runtime.reminderStartedAt, runtime.nextReminderAt, nowMillis)
+            ReminderPhase.RESTING.name -> progress(runtime.breakStartedAt, runtime.breakEndAt, nowMillis)
+            else -> 0f
+        }
+        ActiveEngine.POMODORO.name -> when (runtime.pomodoroPhase) {
+            PomodoroPhase.FOCUS.name,
+            PomodoroPhase.SHORT_BREAK.name,
+            PomodoroPhase.LONG_BREAK.name -> progress(runtime.pomodoroPhaseStartedAt, runtime.pomodoroPhaseEndAt, nowMillis)
+            else -> 0f
+        }
+        else -> 0f
     }
 }
 

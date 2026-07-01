@@ -78,10 +78,17 @@ class NotificationService(private val context: Context) {
         nowMillis: Long = System.currentTimeMillis(),
     ) {
         cancelAllScheduled()
-        if (!settings.notificationEnabled) return
+        if (!settings.notificationEnabled) {
+            dismissTimerNotifications(allTimerNotificationIds)
+            return
+        }
+        dismissStaleTimerNotifications(state)
         when (state.activeEngine) {
             ActiveEngine.REMINDER.name -> {
-                if (QuietHours.suppressesReminderNotifications(settings, nowMillis)) return
+                if (QuietHours.suppressesReminderNotifications(settings, nowMillis)) {
+                    dismissTimerNotifications(reminderNotificationIds)
+                    return
+                }
                 when (state.reminderPhase) {
                     ReminderPhase.WORKING.name,
                     ReminderPhase.PRE_ALERT.name,
@@ -416,6 +423,52 @@ class NotificationService(private val context: Context) {
         }
     }
 
+    private fun dismissStaleTimerNotifications(state: RuntimeStateEntity) {
+        val idsToCancel = when (state.activeEngine) {
+            ActiveEngine.REMINDER.name -> when (state.reminderPhase) {
+                ReminderPhase.PRE_ALERT.name -> listOf(
+                    NotificationIds.BREAK_DUE,
+                    NotificationIds.BREAK_DONE,
+                    NotificationIds.POMODORO,
+                )
+                ReminderPhase.AWAITING_ACTION.name -> listOf(
+                    NotificationIds.PRE_ALERT,
+                    NotificationIds.BREAK_DONE,
+                    NotificationIds.POMODORO,
+                )
+                ReminderPhase.RESTING.name -> listOf(
+                    NotificationIds.PRE_ALERT,
+                    NotificationIds.BREAK_DUE,
+                    NotificationIds.BREAK_DONE,
+                    NotificationIds.POMODORO,
+                )
+                else -> listOf(
+                    NotificationIds.PRE_ALERT,
+                    NotificationIds.BREAK_DUE,
+                    NotificationIds.BREAK_DONE,
+                    NotificationIds.POMODORO,
+                )
+            }
+            ActiveEngine.POMODORO.name -> listOf(
+                NotificationIds.PRE_ALERT,
+                NotificationIds.BREAK_DUE,
+                NotificationIds.BREAK_DONE,
+            )
+            else -> listOf(
+                NotificationIds.PRE_ALERT,
+                NotificationIds.BREAK_DUE,
+                NotificationIds.BREAK_DONE,
+                NotificationIds.POMODORO,
+            )
+        }
+        dismissTimerNotifications(idsToCancel)
+    }
+
+    private fun dismissTimerNotifications(ids: List<Int>) {
+        val manager = NotificationManagerCompat.from(context)
+        ids.forEach { id -> manager.cancel(id) }
+    }
+
     private fun canPostNotifications(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
         return ContextCompat.checkSelfPermission(context, POST_NOTIFICATIONS_PERMISSION) ==
@@ -484,6 +537,20 @@ class NotificationService(private val context: Context) {
         return Intent(context, receiverClass)
             .setAction(action)
             .setPackage(context.packageName)
+    }
+
+    private companion object {
+        val reminderNotificationIds = listOf(
+            NotificationIds.PRE_ALERT,
+            NotificationIds.BREAK_DUE,
+            NotificationIds.BREAK_DONE,
+        )
+        val allTimerNotificationIds = listOf(
+            NotificationIds.PRE_ALERT,
+            NotificationIds.BREAK_DUE,
+            NotificationIds.BREAK_DONE,
+            NotificationIds.POMODORO,
+        )
     }
 
 }

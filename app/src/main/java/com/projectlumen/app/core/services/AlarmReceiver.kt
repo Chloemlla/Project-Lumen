@@ -8,6 +8,7 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
+import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
 import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.repositories.StatisticsRepository
@@ -36,13 +37,29 @@ class AlarmReceiver : BroadcastReceiver() {
                 notifications.ensureChannels()
                 if (settings.notificationEnabled && !suppressReminder) {
                     when (intent.action) {
-                        ACTION_PRE_ALERT -> notifications.showPreAlert()
-                        ACTION_BREAK_DUE -> notifications.showReminderDue()
-                        ACTION_BREAK_DONE -> notifications.showBreakDone()
-                        ACTION_POMODORO -> notifications.showPomodoro(
-                            context.getString(com.projectlumen.app.R.string.pomodoro_title),
-                            context.getString(com.projectlumen.app.R.string.pomodoro_notification_message),
-                        )
+                        ACTION_PRE_ALERT -> {
+                            if (reconciledRuntime.reminderPhase == ReminderPhase.PRE_ALERT.name) {
+                                notifications.showPreAlert()
+                            }
+                        }
+                        ACTION_BREAK_DUE -> {
+                            if (reconciledRuntime.reminderPhase == ReminderPhase.AWAITING_ACTION.name) {
+                                notifications.showReminderDue()
+                            }
+                        }
+                        ACTION_BREAK_DONE -> {
+                            if (reconciledRuntime.reminderPhase == ReminderPhase.WORKING.name) {
+                                notifications.showBreakDone()
+                            }
+                        }
+                        ACTION_POMODORO -> {
+                            if (reconciledRuntime.activeEngine == ActiveEngine.POMODORO.name) {
+                                notifications.showPomodoro(
+                                    context.getString(com.projectlumen.app.R.string.pomodoro_title),
+                                    context.getString(com.projectlumen.app.R.string.pomodoro_notification_message),
+                                )
+                            }
+                        }
                     }
                 }
                 if (
