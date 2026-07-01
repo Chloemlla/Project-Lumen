@@ -1,866 +1,1068 @@
-# Project Lumen 下一步功能与商业化实现建议
+# Project Lumen 商业化发布下一步功能与技术路线图
 
-本文档基于当前仓库状态整理，面向后续产品规划、功能拆分、商业化落地和技术实现。当前项目已经是 Android 原生 Kotlin 应用，核心栈包括 Jetpack Compose、Room、AlarmManager、前台服务、本地通知、CSV/图片分享、模板配置、崩溃报告和 GitHub Release 更新检测。
+本文档针对当前 `Project-Lumen` 仓库状态重写，用于规划下一阶段商业化发布、功能分层、技术落点、后端生产化、发布渠道和验证目标。
 
-> 仓库约束：实际构建、测试、Lint、安装相关命令只允许在 GitHub Actions 工作流中执行；本地只做代码与文档修改。
+> 仓库执行约束：实际构建、测试、Lint、安装和依赖安装命令只能在 GitHub Actions 工作流中执行；本地只做代码和文档修改。本文所有验证项默认进入 GitHub workflow，不要求本地执行。
 
-## 0. 2026-06-30 实施进度归档
+## 1. 当前项目状态
 
-本次归档以当前 Android 仓库可直接落地的客户端功能为边界；涉及 Google Play 后台、服务端、账号、云同步、团队后台、Web 仪表盘和真实支付校验的事项已保留客户端模型或接口，但不标记为完全完成。
+### 1.1 产品形态
 
-### 0.1 已完成
+Project Lumen 当前已经不是单纯的本地倒计时工具，而是一个以“用眼休息、专注计时、护眼检测、数据统计、个性化模板、商业权益、后端同步”为核心的 Android + Rust 服务端产品。
 
-- [x] `SettingsRepository`、`RuntimeRepository`、`StatisticsRepository`、`TipTemplateRepository`、`ReminderEngine`、`PomodoroEngine` 已接入主流程。
-- [x] 核心状态机 JVM 测试已纳入 GitHub Actions，新增静默时段与最大连续工作统计用例。
-- [x] Room 正式版不再使用破坏性迁移兜底；新增版本 9 迁移，包含权益、目标、静默时段、模板同步字段、feature flags、提醒计划、护眼增强和统计字段。
-- [x] GitHub Actions 增加远端 `lintDebug` 和测试/lint 报告上传；本地仍不执行构建、测试、安装。
-- [x] 启动、前台服务、通知动作和闹钟触发路径已接入静默时段判断。
-- [x] 新增静默时段：`pause_timer`、`silent_notifications`、`record_only`，支持跨午夜。
-- [x] 新增今日目标：每日休息次数、最大连续工作时长、每日番茄数、每周活跃天数，并在首页展示进度。
-- [x] 统计页升级：最近 7 天、30 天、本月筛选，展示总工作/休息、休息完成率、跳过率、平均连续工作、番茄数。
-- [x] 本地规则个性化建议：根据近 14 天跳过率、连续工作、低光照和眨眼提醒生成非医疗化习惯建议。
-- [x] 模板系统增强：免费/Pro 模板分层，内置 Pro 模板扩展到 10 个以上，Pro 模板入口已做本地权益 gating。
-- [x] 模板编辑增强：支持休息标题、副标题、跳过按钮显示和圆环/进度条/数字倒计时样式配置。
-- [x] 音频与触觉增强：休息开始音、休息结束音、预提醒音、番茄开始/结束音量分别配置，支持震动反馈和自定义音频 URI 持久化。
-- [x] 崩溃报告增强：复制、分享、基础路径/URI 脱敏。
-- [x] 本地 JSON 备份/恢复：导出设置、目标、模板、统计、权益、feature flags、提醒计划；导入前展示摘要，导入时覆盖设置并合并统计。
-- [x] 高级导出：支持 CSV、统计图片和本地 PDF 月报分享。
-- [x] 本地权益模型：`planTier`、`entitlements`、`EntitlementChecker`、`PremiumFeature`、Pro 模板 gating。
-- [x] 更新完整性校验：Release `checksums.txt` 生成、客户端 SHA256 解析与下载后比对已存在。
-- [x] 版本号策略：workflow 使用 `GITHUB_RUN_NUMBER` 作为单调递增 `versionCode`。
-- [x] 护眼增强能力已接入设置入口：近距离、眨眼、低光照、自动亮度、强提醒遮罩。
+当前 Android 端：
 
-### 0.2 已建模但仍需外部系统
+- 原生 Kotlin Android 应用。
+- Jetpack Compose Material 3 UI。
+- Room 数据库，当前 `AppDatabase` 版本为 `13`，`exportSchema = true`。
+- Java 21 / Kotlin 2.1.20 / Android Gradle Plugin 8.12.0。
+- `compileSdk = 37`、`targetSdk = 37`、`minSdk = 26`。
+- 当前应用版本来源为 `app/application.version`，现值 `1.0.1`。
+- 通过 `BuildConfig.API_BASE_URL` 默认连接 `http://eye.chloemlla.com/api`。
 
-- [ ] Google Play Billing / 国内渠道支付：客户端已有权益表和 gating，真实购买、恢复购买、退款/撤销校验需要支付 SDK 与服务端或渠道后台。
-- [ ] 服务端权益校验：客户端可缓存权益，但 token 校验、宽限期策略和撤销状态需要服务端 API。
-- [ ] 账号系统、云同步、云备份、多设备同步：当前仅有本地 JSON 备份和可同步字段；服务端、鉴权和冲突合并 API 仍未实现。
-- [ ] 服务端 AI 个性化建议：本地规则建议已完成；如后续接入服务端 AI，仍需服务端、鉴权、隐私策略和聚合统计 API。
-- [ ] 团队版/企业版/Web 仪表盘：属于后续外部产品与后端范围，本仓库未实现。
+当前后端：
 
-### 0.3 2026-06-30 后端 API 与客户端接入进度
+- Rust API 服务，`backend/` 下使用 Axum 风格路由拆分。
+- MongoDB 存储用户、会话、权益、同步变更、备份、Admin 数据和遥测数据。
+- 默认 API 前缀 `/api`。
+- 静态 Admin Dashboard 默认托管在 `/admin`。
+- Dockerfile 与 GHCR 镜像 workflow 已存在。
 
-- [x] 新增 `backend/` Rust API 服务工程，`main.rs` 仅作为启动入口，配置、状态、存储、模型和路由均已拆分。
-- [x] 后端默认挂载 `/api` 前缀，匹配客户端 base URL：`http://eye.chloemlla.com/api`。
-- [x] 已提供健康检查、邮箱登录起始/验证、用户信息、权益快照、Google 购买校验入口、同步 changes/push、本地备份上传和最新备份读取 API。
-- [x] Android 端新增轻量 `ProjectLumenApiClient`，沿用 `HttpURLConnection`，通过 `BuildConfig.API_BASE_URL` 默认接入 `http://eye.chloemlla.com/api`。
-- [x] Android 网络安全配置已针对 `eye.chloemlla.com` 允许 HTTP 明文访问，适配当前 API base URL。
-- [x] GitHub Actions 新增 Rust 后端格式检查与测试任务；本地仍不执行构建、测试、Lint 或安装命令。
-- [x] 后端生产数据存储切换为 MongoDB，覆盖用户、登录请求、会话、权益、同步变更、备份和计数器集合。
-- [x] 新增零构建 Admin Dashboard 静态前端，Rust 服务默认在 `/admin` 托管，前端不依赖 React、npm 或现代构建链。
-- [x] 新增 Admin 专用 API：登录、refresh token、操作者信息、dashboard snapshot、管理操作审计。
-- [x] 新增 Admin MongoDB 管理集合：会话、操作审计、访问审计、崩溃聚合、API/Sync 指标、模板目录、匿名遥测、发布登记和安全白名单。
-- [x] Admin Dashboard 已从 `/api/admin/dashboard` 读取真实 MongoDB 聚合数据，并保留未登录/空库状态下的静态 fallback。
-- [ ] 后端仍需接入真实邮件发送、Google Play 服务端验签、生产 HTTPS 入口和完整地理位置解析。
+当前 CI/CD：
 
-## 1. 当前能力盘点
+- `.github/workflows/build.yml` 覆盖 Android 单元测试、Android Lint、Release APK 构建、Release assets、SHA256 checksum、自动 GitHub Release，以及 Rust 后端格式检查和测试。
+- `.github/workflows/release.yml` 覆盖 tag 或手动触发的 Android Release APK 构建和 GitHub Release。
+- `.github/workflows/build-artifacts.yml` 覆盖 GHCR 镜像构建与可选远程部署。
+- `.github/workflows/codeql.yml` 覆盖 Java/Kotlin 与 GitHub Actions CodeQL。
 
-### 1.1 已有产品功能
+## 2. 已添加功能归档
 
-- 用眼提醒：支持工作计时、预提醒、正式提醒、开始休息、跳过休息、暂停 1 小时、手动恢复、停止。
-- 休息页：支持模板背景、主色、文案、倒计时展示、开始休息/跳过交互。
-- 番茄钟：支持专注、短休息、长休息、轮次推进、开始/停止。
-- 统计：支持用眼统计、番茄统计、近 7/30 天与月度筛选、关键指标、CSV 分享、统计图片分享。
-- 设置：支持语言、主题、提醒间隔、休息时长、预提醒、静默时段、目标、声音、震动、自定义音频路径、通知开关、自动更新检查、备份恢复。
-- 模板：支持内置模板、系统主题色模板、自定义图片路径、免费/Pro 分层。
-- 通知：支持通知渠道、精确闹钟能力检测、Android 13+ 通知权限引导、前台服务常驻状态通知。
-- 更新：支持 GitHub Release 最新版本检测、语义版本与发布时间双判定、ABI APK 选择、下载进度、未知来源安装授权跳转。
-- 崩溃报告：本地保存崩溃信息，启动后展示崩溃详情页，支持复制、分享和基础脱敏。
-- 数据备份：支持本地 JSON 备份导出/导入，导入前展示摘要，统计按日期合并。
-- 护眼增强：支持近距离、眨眼、低光照、自动亮度和严格遮罩提醒。
-- 国际化：已有中文、英文和系统语言逻辑。
+本节作为商业化路线图的基础盘点，后续规划不再重复把这些内容当作从零实现项。
 
-### 1.2 已有技术结构
+### 2.1 免费核心体验已具备
 
-- `ProjectLumenViewModel` 当前承担主要状态机、设置写入、统计聚合、通知刷新和导出入口。
-- `AppDatabase` 使用 Room，当前版本为 9，包含设置、运行态、用眼统计、番茄统计、模板、目标、权益、feature flags、提醒计划表。
-- `RuntimeStateEntity` 是计时恢复真相来源，包含普通提醒和番茄钟阶段时间戳。
-- `NotificationService` 负责闹钟调度、通知展示、通知动作和前台服务通知构建。
-- `ExportService` 负责 CSV 与 Canvas 统计图分享。
-- `UpdateChecker` 与 `UpdateInstaller` 负责更新检测和 APK 下载/安装。
-- GitHub Actions 已有 `build.yml`、`release.yml`、`codeql.yml`。
+- 用眼提醒：工作计时、预提醒、正式提醒、等待操作、休息、跳过、暂停、恢复、停止。
+- 番茄钟：专注、短休息、长休息、轮次推进、停止和统计。
+- 通知系统：通知渠道、前台服务通知、闹钟触发、通知动作、Android 13+ 通知权限引导。
+- 后台可靠性：`AlarmManager`、前台服务、开机恢复、运行态持久化、恢复协调。
+- 基础统计：用眼统计、番茄统计、休息完成、跳过、最大连续工作、近 7/30 天/月度筛选。
+- 目标体系：每日休息次数、最大连续工作时长、每日番茄数、每周活跃天数。
+- 静默时段：`PAUSE_TIMER`、`SILENT_NOTIFICATIONS`、`RECORD_ONLY`，支持跨午夜。
+- 模板系统：内置模板、系统色模板、背景色、图片路径、标题、副标题、跳过按钮、倒计时样式。
+- 数据导出：CSV、统计图片、PDF 月报。
+- 本地 JSON 备份/恢复：设置、目标、模板、统计、权益、feature flags、提醒计划。
+- 崩溃报告：本地保存、启动提示、复制、分享、基础脱敏。
+- 更新检测：GitHub Release 检测、ABI APK 选择、下载进度、SHA256 校验、未知来源安装授权跳转。
+- 国际化：系统语言、中文、英文。
 
-## 2. 产品定位建议
+### 2.2 护眼增强能力已具备
 
-Project Lumen 适合定位为“轻量但可靠的数字健康与专注辅助工具”，核心卖点不应只是倒计时，而是：
+- 近距离检测：前置相机采样、ML Kit 人脸检测、人脸宽度/眼距基准、近距离阈值、冷却时间。
+- 眨眼提醒：基于眼睛打开概率和无眨眼时间阈值的干眼风险提醒。
+- 低光照提醒：环境光检测、低亮度阈值、低光统计。
+- 自动亮度：最低/最高亮度百分比配置。
+- 强提醒遮罩：全屏休息遮罩、严格距离触发、休息时长配置。
+- Shizuku 高级模式：上下文感知采样、服务恢复、息屏/低电量/省电/勿扰/温控/相机隐私保护条件。
+- 开发调试：本地调试遮罩、实时预览、低内存模拟、传感器和前台服务诊断字段。
 
-- 低干扰的用眼健康提醒。
-- 可证明可靠的后台计时与恢复。
-- 可视化习惯数据。
-- 个人工作流可定制。
-- 面向长期使用的无广告体验。
+### 2.3 商业化基础已具备
 
-优先级上，先把“可靠计时 + 统计可信 + 设置完整 + 更新稳定”打磨成基础口碑，再接商业化。过早加入复杂账号、云同步或订阅墙，会增加维护成本并稀释核心体验。
+- 本地权益层：
+  - `PlanTier`: `FREE`、`PRO`、`PLUS`、`TEAM`。
+  - `PremiumFeature`: `PRO_TEMPLATES`、`ADVANCED_STATISTICS`、`LOCAL_BACKUP`、`MULTIPLE_REMINDER_PLANS`、`ADVANCED_EXPORT`、`CLOUD_SYNC`。
+  - `EntitlementEntity` 与 `entitlements` 表。
+  - `LocalEntitlementChecker` 本地 gating。
+  - `recordManualProEntitlement()` 手动 Pro 授权入口，适合作为开发、内测或企业人工授权工具，不应作为公开商业授权主路径。
+- Pro 模板基础：
+  - 内置免费模板 6 个。
+  - 内置 Pro 模板 10 个。
+  - Pro 模板选择已在客户端做本地权益拦截。
+- 提醒计划基础：
+  - `ReminderPlanEntity` 和 `reminder_plans` 表已存在。
+  - 已具备多计划商业化的模型基础。
+- Feature flags 基础：
+  - `FeatureFlagEntity` 与 `feature_flags` 表已存在。
+  - 可承接远端开关、灰度、渠道能力差异和付费能力开关。
 
-## 3. 下一步功能路线图
+### 2.4 后端与 Admin 基础已具备
 
-### P0：稳定性与架构基础
+当前 API 已包含：
 
-目标：降低核心计时和数据统计的回归风险，为后续商业化能力铺底。
-
-#### 3.1 拆分 ViewModel 职责
-
-现状：`ProjectLumenViewModel` 已经承担大量职责，继续叠加功能会让状态机难以测试。
-
-建议拆分：
-
-- `SettingsRepository`
-  - 封装 `AppSettingsDao`。
-  - 暴露 `Flow<AppSettingsEntity>`。
-  - 提供 `update(transform)`、`setLanguageCode()`、`setThemeMode()`。
-- `RuntimeRepository`
-  - 封装 `RuntimeStateDao`。
-  - 提供状态机写入的单点入口。
-- `ReminderEngine`
-  - 负责普通提醒状态转移。
-  - 输入：`settings`、`runtime`、`nowMillis`、用户动作。
-  - 输出：`RuntimeTransition`，包含新状态、统计增量、通知计划、音频事件。
-- `PomodoroEngine`
-  - 负责番茄钟状态转移。
-- `StatisticsRepository`
-  - 统一统计聚合、日期键、导出数据读取。
-- `NotificationScheduler`
-  - 封装 `NotificationService` 中和调度有关的能力。
-
-推荐数据结构：
-
-```kotlin
-data class RuntimeTransition(
-    val nextRuntime: RuntimeStateEntity,
-    val eyeStatsDelta: EyeStatsDelta = EyeStatsDelta(),
-    val pomodoroStatsDelta: PomodoroStatsDelta = PomodoroStatsDelta(),
-    val notificationPlan: NotificationPlan = NotificationPlan.None,
-    val audioEvent: AudioEvent = AudioEvent.None,
-)
+```text
+GET  /api/health
+POST /api/v1/auth/email/start
+POST /api/v1/auth/email/verify
+GET  /api/v1/me
+GET  /api/v1/entitlements
+POST /api/v1/purchases/google/verify
+GET  /api/v1/sync/changes?since=cursor
+POST /api/v1/sync/push
+POST /api/v1/backups
+GET  /api/v1/backups/latest
+POST /api/v1/telemetry
+POST /api/v1/face-analysis/frames
+POST /api/admin/auth/login
+POST /api/admin/auth/refresh
+GET  /api/admin/me
+GET  /api/admin/dashboard
+POST /api/admin/actions
 ```
 
-收益：
+Admin Dashboard 已具备的管理方向：
 
-- 状态机可写纯 Kotlin 单元测试。
-- UI 只消费状态，不关心调度细节。
-- 商业化功能可以通过权限/权益层包裹入口，而不侵入核心状态机。
+- 用户、设备、访问审计、权益变更、Google purchase audit、云备份。
+- 崩溃聚合、脱敏堆栈、版本/设备影响、API health、sync throughput。
+- 模板 CMS、视觉模板参数、音频/触觉矩阵、i18n 分发、匿名宏观遥测。
+- OTA 完整性登记、灰度策略、Rust route topology、HTTP allowlist、安全会话。
 
-#### 3.2 建立核心状态机测试矩阵
+## 3. 商业化定位
 
-测试只在 GitHub Actions 中执行。建议新增 JVM 单元测试，覆盖：
+### 3.1 产品定位
 
-- 普通提醒：
-  - `WORKING -> PRE_ALERT`
-  - `WORKING/PRE_ALERT -> AWAITING_ACTION`
-  - `AWAITING_ACTION -> RESTING`
-  - `AWAITING_ACTION -> WORKING` 跳过
-  - `RESTING -> WORKING`
-  - `PAUSED -> WORKING` 到期恢复
-  - 关闭预提醒时不进入 `PRE_ALERT`
-  - 修改间隔/休息时长后运行态重新对齐
-- 番茄钟：
-  - 第 1-3 轮 `FOCUS -> SHORT_BREAK`
-  - 第 4 轮 `FOCUS -> LONG_BREAK`
-  - 长休息结束后轮次重置
-  - 中途停止统计 `restartCount`
-- 统计：
-  - 跨天场景。
-  - 离线恢复补记时长。
-  - `statsEnabled = false` 时不写统计。
-- 更新检测：
-  - 语义版本高低比较。
-  - 相同版本但发布时间更新。
-  - ABI 资产匹配和 universal 回退。
+Project Lumen 建议定位为：
 
-#### 3.3 Room 迁移策略收紧
+> 本地优先、低干扰、可长期使用的用眼健康与专注辅助工具。
 
-当前 `AppDatabase` 使用 `fallbackToDestructiveMigration(dropAllTables = true)`。在正式商业化前应移除或仅限 debug 使用，否则升级可能清空用户数据。
+商业化不应建立在“限制基础休息提醒”上。基础提醒、基础番茄钟、本地基础统计和核心护眼提醒应保持可长期免费使用，付费点集中在：
 
-建议：
+- 更强的个性化。
+- 更长期的数据洞察。
+- 更可靠的多设备能力。
+- 更完整的备份、同步和报告能力。
+- 团队/企业管理能力。
 
-- 保留显式 `Migration`。
-- 新增 schema 导出：`exportSchema = true`。
-- 在仓库中提交 Room schema JSON。
-- 为每次新增字段写迁移。
-- 对关键表新增 `createdAt`、`updatedAt`、`deletedAt`，为后续云同步做准备。
+### 3.2 商业化版本包
 
-建议新增字段：
+#### Free
 
-- `app_settings`
-  - `planTier TEXT NOT NULL DEFAULT 'free'`
-  - `entitlementExpiresAt INTEGER NOT NULL DEFAULT 0`
-  - `lastEntitlementSyncAt INTEGER NOT NULL DEFAULT 0`
-- `tip_templates`
-  - `isPremium INTEGER NOT NULL DEFAULT 0`
-  - `remoteId TEXT NOT NULL DEFAULT ''`
-  - `deletedAt INTEGER NOT NULL DEFAULT 0`
-- 新表 `feature_flags`
-  - `key TEXT PRIMARY KEY`
-  - `enabled INTEGER NOT NULL`
-  - `payloadJson TEXT NOT NULL DEFAULT ''`
-  - `updatedAt INTEGER NOT NULL`
+目标：建立信任和留存，保证核心护眼价值不被付费墙破坏。
 
-#### 3.4 后台计时可靠性增强
-
-当前使用 AlarmManager + 前台服务是正确方向。下一步建议：
-
-- 启动时统一调用 `restoreFromClock()` 后再刷新通知。
-- `BootReceiver` 中不要直接做复杂逻辑，只启动轻量恢复任务或打开前台服务。
-- 对 `SCHEDULE_EXACT_ALARM` 不可用的设备，UI 明确显示“可能延迟”状态。
-- 对厂商后台限制提供系统设置入口，例如电池优化白名单。
-- 增加 `lastForegroundAt`、`lastBackgroundAt` 写入逻辑，辅助恢复诊断。
-
-#### 3.5 崩溃报告可操作化
-
-现状是本地崩溃详情页。建议补充：
-
-- 一键复制崩溃报告。
-- 一键分享崩溃报告到邮件/反馈渠道。
-- 崩溃报告脱敏：
-  - 不上传文件路径中的用户名。
-  - 不上传自定义音频或图片 URI。
-  - 不包含完整设备唯一标识。
-- 后续如接入服务端，采用用户明确同意后上传。
-
-## 4. P1：核心体验增强
-
-### 4.1 自定义静默时段
-
-已有 `useAutoDarkWindow` 字段，但更需要“提醒静默时段”。
-
-新增设置字段：
-
-- `quietHoursEnabled Boolean`
-- `quietStartMinute Int`
-- `quietEndMinute Int`
-- `quietMode TEXT`：`pause_timer` / `silent_notifications` / `record_only`
-
-行为：
-
-- `pause_timer`：静默时段内不累计工作提醒，结束后重新开始一轮。
-- `silent_notifications`：继续计时和统计，但不弹高优先级通知。
-- `record_only`：只记录工作时长，不触发休息。
-
-技术点：
-
-- 在 `ReminderEngine` 计算下一次提醒时跳过静默区间。
-- 跨午夜处理：`start > end` 表示跨天。
-- UI 使用两个时间选择器，不使用自由文本输入。
-
-### 4.2 今日目标与健康达成
-
-新增目标：
-
-- 每日休息次数目标。
-- 每日最大连续工作时长目标。
-- 每日番茄数目标。
-- 每周专注天数目标。
-
-新增表 `daily_goals`：
-
-```sql
-CREATE TABLE daily_goals (
-  id INTEGER PRIMARY KEY,
-  restBreakGoal INTEGER NOT NULL DEFAULT 8,
-  maxContinuousWorkMinutes INTEGER NOT NULL DEFAULT 45,
-  pomodoroGoal INTEGER NOT NULL DEFAULT 4,
-  weeklyActiveDaysGoal INTEGER NOT NULL DEFAULT 5,
-  updatedAt INTEGER NOT NULL
-);
-```
-
-首页展示：
-
-- 今日目标进度。
-- 最大连续工作时长警告。
-- 本周连续达成天数。
-
-### 4.3 统计页升级
-
-当前统计较基础。建议升级为：
-
-- 日/周/月三个 Tab。
-- 趋势图：
-  - 工作分钟。
-  - 休息分钟。
-  - 跳过次数。
-  - 番茄数。
-- 指标卡：
-  - 总工作时长。
-  - 总休息时长。
-  - 休息完成率。
-  - 跳过率。
-  - 平均连续工作时长。
-- 可视化应优先使用 Compose Canvas 或引入轻量图表库。
-
-数据口径：
-
-- 休息完成率 = `completedBreakCount / (completedBreakCount + skipCount)`。
-- 番茄完成率后续需要记录计划数，否则不要展示。
-- “健康评分”不要做医学承诺，只做习惯完成度。
-
-### 4.4 模板系统增强
-
-现状已有模板和图片路径。下一步：
-
-- 模板编辑：
-  - 背景：系统色、纯色、图片。
-  - 主色。
-  - 标题文案。
-  - 副标题文案。
-  - 按钮显示。
-  - 倒计时样式：圆环、进度条、数字。
-- 模板导入/导出：
-  - 使用 JSON。
-  - 图片使用 SAF URI 或本地复制缓存。
-- 内置模板分层：
-  - 免费模板 3-5 个。
-  - Pro 模板 10+ 个。
-
-建议 `layoutJson` 结构：
-
-```json
-{
-  "countdownStyle": "circle",
-  "titleSizeSp": 28,
-  "subtitleSizeSp": 16,
-  "buttonStyle": "filled",
-  "showIllustration": true,
-  "safeAreaPaddingDp": 24
-}
-```
-
-### 4.5 音频与触觉反馈
-
-新增能力：
-
-- 内置音效包。
-- 自定义音频试听。
-- 震动提醒开关。
-- 分场景音量：
-  - 预提醒。
-  - 休息开始。
-  - 休息结束。
-  - 番茄开始/结束。
-
-Android 技术点：
-
-- 自定义音频保留 URI 权限：使用 `takePersistableUriPermission()`。
-- 音频播放统一由 `AudioService` 管理，避免多个 `MediaPlayer` 泄漏。
-- 震动使用 `VibratorManager`，Android 12+ 和低版本分支处理。
-
-## 5. P2：专业版与商业化功能
-
-商业化建议采用“免费可长期用 + Pro 提供效率和个性化增强”的模式。不要把基础用眼提醒、休息、番茄钟放入付费墙。
-
-### 5.1 免费版功能
+建议包含：
 
 - 基础用眼提醒。
 - 基础番茄钟。
-- 最近 7 天统计。
-- 3-5 个基础模板。
+- 通知、前台服务、开机恢复。
+- 静默时段基础配置。
+- 今日目标基础展示。
+- 最近 7 天或最近 30 天基础统计。
+- 免费模板 6 个。
 - CSV 导出。
-- GitHub Release 更新检测。
+- 本地崩溃报告。
+- GitHub 版更新检测。
+- 近距离、低光、眨眼提醒作为可选护眼能力，但上传遥测和高级报告必须单独授权。
 
-### 5.2 Pro 一次性买断功能
+#### Pro 一次性买断
 
-适合个人工具，用户接受度高，维护成本低。
+目标：适合个人用户，维护成本可控，不强迫订阅。
 
-建议 Pro 功能：
+建议包含：
 
-- 无限模板与高级模板。
-- 高级统计：月/年趋势、完成率、跳过率、连续达成。
-- 统计图片高级主题。
-- 自定义多个提醒计划。
-- 多套工作模式：
-  - 工作日模式。
-  - 周末模式。
-  - 阅读模式。
-  - 编程模式。
-  - 游戏/观影静默模式。
-- 高级声音包与震动模式。
-- 数据备份/恢复到本地文件。
-- 主题包。
+- Pro 模板 10+ 个。
+- 自定义模板高级编辑。
+- 多提醒计划。
+- 高级统计：月报、趋势、完成率、跳过率、最大连续工作分析、番茄趋势。
+- 高级导出：统计图片主题、PDF 月报、完整 JSON 备份/恢复。
+- 高级声音和震动配置。
+- 本地完整备份/恢复。
+- 工作模式：工作日、周末、阅读、编程、游戏/观影静默。
+- 更细的护眼阈值配置和报告展示。
 
-### 5.3 订阅功能
+#### Plus 订阅
 
-只有在加入服务端能力后才建议订阅。
+目标：只承接存在持续服务成本的能力。
 
-可订阅功能：
+建议包含：
 
 - 云同步。
+- 云备份。
 - 多设备同步。
-- Web 仪表盘。
-- 自动云备份。
-- AI 个性化建议。
-- 团队/家庭健康报表。
-
-如果没有服务端持续成本，不建议强行做订阅。
-
-### 5.4 团队版/企业版
-
-适合后续扩展，不建议第一阶段实现。
-
-功能：
-
-- 团队健康挑战。
-- 团队匿名统计。
-- 管理员配置默认提醒策略。
-- 公司统一模板。
-- 导出团队月报。
-- 企业私有化部署或组织授权码。
-
-隐私边界：
-
-- 默认只上传聚合数据。
-- 不上传具体使用 App、具体工作内容、精确位置。
-- 团队报表隐藏个人明细，除非用户明确选择加入。
-
-## 6. 支付与权益系统技术方案
-
-### 6.1 Android 支付通道
-
-海外/Google Play：
-
-- 使用 Google Play Billing Library。
-- 产品类型：
-  - `lumen_pro_lifetime`：一次性买断。
-  - `lumen_plus_monthly`：月订阅。
-  - `lumen_plus_yearly`：年订阅。
-
-国内分发：
-
-- 如果不走 Google Play，需要单独接入渠道支付或自建订单。
-- 自建支付必须有服务端校验，不要只在客户端本地写入 Pro 状态。
-
-### 6.2 本地权益模型
-
-新增表 `entitlements`：
-
-```sql
-CREATE TABLE entitlements (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  source TEXT NOT NULL,
-  productId TEXT NOT NULL,
-  purchaseToken TEXT NOT NULL DEFAULT '',
-  tier TEXT NOT NULL,
-  status TEXT NOT NULL,
-  purchasedAt INTEGER NOT NULL,
-  expiresAt INTEGER NOT NULL DEFAULT 0,
-  lastVerifiedAt INTEGER NOT NULL DEFAULT 0,
-  rawPayloadJson TEXT NOT NULL DEFAULT ''
-);
-```
-
-字段说明：
-
-- `source`：`google_play` / `manual_license` / `server`。
-- `tier`：`free` / `pro` / `plus` / `team`。
-- `status`：`active` / `expired` / `grace_period` / `revoked` / `pending`。
-- `expiresAt = 0` 表示永久授权。
-
-应用内统一使用：
-
-```kotlin
-interface EntitlementChecker {
-    fun observeTier(): Flow<PlanTier>
-    fun canUse(feature: PremiumFeature): Boolean
-}
-```
-
-### 6.3 权益校验策略
-
-- 客户端可缓存权益，保证离线可用。
-- 购买后立即本地解锁，但后台必须校验购买 token。
-- 周期性校验：
-  - App 启动。
-  - 手动恢复购买。
-  - 距上次校验超过 24 小时。
-- 校验失败处理：
-  - 网络失败：保留上次权益一段宽限期。
-  - 明确撤销/退款：降级。
-
-### 6.4 付费墙设计
-
-触发点：
-
-- 用户选择 Pro 模板。
-- 用户进入高级统计。
-- 用户创建超过免费数量的计划。
-- 用户开启云同步。
-
-原则：
-
-- 不打断计时。
-- 不用全屏强制弹窗。
-- 清楚列出当前操作为什么需要 Pro。
-- 购买失败后返回原页面。
-
-## 7. 云同步与账号系统
-
-云同步不是第一阶段必须项，但如果做订阅，必须规划。
-
-### 7.1 账号方案
-
-推荐分阶段：
-
-- V1：无账号，本地优先。
-- V2：邮箱验证码登录。
-- V3：第三方登录，如 Google。
-
-避免一开始实现密码体系，减少安全维护成本。
-
-### 7.2 服务端建议
-
-轻量方案：
-
-- API：Ktor / Spring Boot / Node.js 任一稳定框架。
-- 数据库：PostgreSQL。
-- 对象存储：用于模板图片和备份文件。
-- 鉴权：JWT + refresh token。
-- 部署：Docker + GitHub Actions。
-
-核心 API：
-
-```text
-POST /v1/auth/email/start
-POST /v1/auth/email/verify
-GET  /v1/me
-GET  /v1/entitlements
-POST /v1/purchases/google/verify
-GET  /v1/sync/changes?since=cursor
-POST /v1/sync/push
-POST /v1/backups
-GET  /v1/backups/latest
-```
-
-### 7.3 同步数据范围
-
-建议同步：
-
-- 设置。
-- 模板。
-- 目标。
-- 统计聚合。
-- 权益状态。
-
-不建议同步：
-
-- 崩溃报告，除非用户主动上传。
-- 本地文件原路径。
-- 系统通知权限状态。
-- APK 更新缓存。
-
-### 7.4 冲突处理
-
-设置类：
-
-- 使用 `updatedAt` 后写 wins。
-- 对每个设置项可采用字段级合并。
-
-统计类：
-
-- 使用按日聚合增量，不用简单覆盖。
-- 服务端保存 `deviceId + statDate` 明细，再聚合成用户统计。
-
-模板类：
-
-- `remoteId` 标识云端模板。
-- `deletedAt` 支持软删除。
-- 图片上传后保存远端 URL，本地保留缓存 URI。
-
-### 7.5 本地设备标识
-
-不要使用不可重置硬件 ID。生成随机 UUID 存本地：
-
-```text
-device_installation_id = UUID.randomUUID()
-```
-
-卸载后可重置，符合隐私预期。
-
-## 8. AI 个性化建议
-
-这适合作为 Plus 订阅功能，但要谨慎表述，避免医疗建议。
-
-功能：
-
-- 根据近 14 天跳过率建议调整提醒间隔。
-- 根据休息完成率建议降低/提高休息时长。
-- 根据番茄完成时间段建议推荐工作节奏。
-- 生成周报总结。
-
-本地优先方案：
-
-- 先使用规则引擎，不接大模型。
-- 规则示例：
-  - 跳过率 > 50% 且休息完成率 < 40%，建议把休息时长从 20 秒降到 15 秒。
-  - 连续 3 天工作时长高但休息少，建议开启强提醒。
-
-后续服务端 AI：
-
-- 上传聚合统计，不上传明细行为。
-- 文案明确“习惯建议，不构成医疗建议”。
-
-## 9. 数据备份与导入导出
-
-### 9.1 本地备份
-
-Pro 功能，优先级高于云同步。
-
-导出格式：
+- 云端权益恢复。
+- 跨设备统计聚合。
+- 远端模板库。
+- AI/规则混合个性化建议。
+- Web 仪表盘个人版。
+
+#### Team / Enterprise
+
+目标：后续 B2B 扩展，不作为下一次个人商业化发布的阻断项。
+
+建议包含：
+
+- 组织成员管理。
+- 团队匿名聚合统计。
+- 管理员默认提醒策略。
+- 企业模板分发。
+- 团队月报。
+- 企业授权码或私有化部署。
+- Admin Dashboard 中的组织、权益、审计、发布和模板管理。
+
+## 4. 下一次商业化发布目标
+
+建议把下一次商业化发布定义为 `1.1 商业化候选版`，目标不是一次性完成 Team/Enterprise，而是完成“个人 Pro/Plus 可真实售卖”的闭环。
+
+### 4.1 发布目标
+
+- 用户可以在客户端看到清晰的 Free/Pro/Plus 功能差异。
+- Pro 功能不再依赖手动本地授权。
+- 支付后可由服务端真实校验并下发权益。
+- 权益可离线缓存，但退款、撤销、过期能被服务端纠正。
+- 云同步入口只对 Plus 开放，且必须有账号和隐私同意。
+- GitHub 版、Play 版、国内/企业版的更新和支付策略边界清楚。
+- 所有验证通过 GitHub Actions 执行。
+
+### 4.2 非目标
+
+- 不在 `1.1` 阶段强行上线 Team/Enterprise。
+- 不把基础用眼提醒或基础番茄钟放入付费墙。
+- 不默认上传原始摄像头帧。
+- 不做医疗诊断、治疗、疾病预防等承诺。
+- 不使用本地手动 Pro 作为公开版正式授权方案。
+
+## 5. P0 发布阻断项
+
+### 5.1 真实支付与服务端验签
+
+当前状态：
+
+- 客户端已有本地权益模型和 Pro gating。
+- 后端已有 `POST /api/v1/purchases/google/verify`。
+- 后端当前在 `LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false` 时会写入 `pending`，不会真正下发 Pro/Plus 权益。
+- `LUMEN_ACCEPT_UNVERIFIED_PURCHASES=true` 只适合开发或临时验证，不适合生产。
+
+商业化发布必须新增：
+
+- Android Google Play Billing 接入：
+  - 商品 ID：
+    - `lumen_pro_lifetime`
+    - `lumen_plus_monthly`
+    - `lumen_plus_yearly`
+  - 购买入口：
+    - Pro 模板。
+    - 高级统计。
+    - 多提醒计划。
+    - 本地备份/高级导出。
+    - 云同步。
+  - 恢复购买入口：
+    - 设置页权益卡片。
+    - 关于页。
+    - 购买失败后的重试路径。
+  - 购买完成后提交：
+    - `productId`
+    - `purchaseToken`
+    - `deviceInstallationId`
+    - 当前登录用户 access token。
+- 后端 Google Play Developer API 验签：
+  - 使用服务账号凭据，不把凭据放入客户端。
+  - 针对一次性商品校验 purchase state、consumption/acknowledgement、orderId。
+  - 针对订阅校验 expiry time、cancel reason、payment state、linked purchase token。
+  - 明确退款、撤销、过期、宽限期状态。
+  - `accept_unverified_purchases` 在生产必须为 `false`。
+- MongoDB 约束：
+  - `entitlements.source + entitlements.purchaseToken` 唯一索引。
+  - `entitlements.userId + entitlements.productId + entitlements.status` 查询索引。
+  - `purchaseToken` 不能被另一个用户重复绑定。
+- 权益状态：
+  - `active`
+  - `pending`
+  - `expired`
+  - `grace_period`
+  - `revoked`
+  - `refunded`
+- 客户端缓存策略：
+  - 支付成功后可以临时解锁 `pending` 能力，但必须在服务端确认后写入 `active`。
+  - 网络失败时保留上次 `active` 权益一个有限宽限期。
+  - 服务端明确返回 `revoked/refunded/expired` 时降级。
+
+建议后端返回结构保持与现有 `PurchaseVerifyResponse` 兼容，但补充可解释字段：
 
 ```json
 {
-  "schemaVersion": 1,
-  "exportedAt": 1780000000000,
-  "settings": {},
-  "templates": [],
-  "dailyEyeStats": [],
-  "dailyPomodoroStats": []
+  "status": "active",
+  "tier": "PRO",
+  "verifiedAt": 1780000000000,
+  "entitlement": {},
+  "reason": "",
+  "expiresAt": 0
 }
 ```
 
-技术点：
+### 5.2 账号与会话落地
 
-- 使用 SAF 选择保存位置。
-- 导入前展示摘要：
-  - 统计天数。
-  - 模板数量。
-  - 设置是否覆盖。
-- 导入模式：
-  - 合并统计。
-  - 覆盖设置。
-  - 跳过已有模板或重命名。
+当前状态：
 
-### 9.2 导出格式增强
+- 后端已有邮箱登录 start/verify API。
+- Android `ProjectLumenApiClient` 已有 `startEmailLogin()`、`verifyEmailLogin()`、`fetchMe()`。
+- 客户端缺少完整账号 UI、session 持久化和登录态驱动的同步/权益流程。
+- 后端仍需接入真实邮件发送。
 
-现有 CSV 可保留。新增：
+必须新增：
 
-- JSON 完整备份。
-- PNG 周报。
-- PDF 月报，适合团队版或高级统计。
+- 客户端账号页：
+  - 邮箱输入。
+  - 验证码输入。
+  - 登录状态。
+  - 退出登录。
+  - 恢复权益。
+  - 云同步开关。
+- 客户端 session 存储：
+  - 保存 `accessToken`、`expiresAt`、`userId`、`email`。
+  - 不把 token 写入 JSON 备份。
+  - access token 过期时重新登录或后续补 refresh token。
+- 后端邮件：
+  - `LUMEN_DEV_LOGIN_CODE` 只用于非生产。
+  - 生产使用 SMTP、Resend、SES 或等价邮件服务。
+  - 登录验证码限流：同邮箱、同 IP、同设备分别限流。
+  - 验证码只存 hash，不存明文。
+- 安全策略：
+  - 登录请求 TTL 保持短周期。
+  - access token TTL 保持可控。
+  - Admin token 与用户 token 分离。
 
-## 10. 更新与发布体系增强
+### 5.3 完整权益同步
 
-当前 GitHub Release 更新检测已可用。下一步建议：
+当前状态：
 
-### 10.1 APK 完整性校验
+- 后端 `GET /api/v1/entitlements` 已存在。
+- 客户端 `fetchEntitlements()` 已存在。
+- 本地 `EntitlementRepository.observeTier()` 当前主要依赖 `settings.planTier`。
 
-Release body 或独立 `checksums.txt` 提供 SHA256。
+必须新增：
 
-客户端下载后：
+- `RemoteEntitlementSyncService`：
+  - 登录后拉取权益。
+  - 购买后拉取权益。
+  - App 启动时如果距离 `lastEntitlementSyncAt` 超过 24 小时则拉取。
+  - 手动“恢复购买”时强制拉取。
+- 本地合并规则：
+  - 以服务端 `status` 为准。
+  - 永久权益 `expiresAt = 0`。
+  - 订阅权益用 `expiresAt` 判断本地有效性，但不可只信客户端时间。
+  - `settings.planTier` 由本地 entitlement 列表计算，不应手写为长期真相来源。
+- 权益降级：
+  - Pro/Plus 功能入口保留，但显示升级或恢复购买。
+  - 已创建的 Pro 内容不删除，只限制新增、编辑或启用高级能力。
 
-- 计算 APK SHA256。
-- 与 Release 中声明值比对。
-- 不匹配则阻止安装并提示。
+### 5.4 付费墙与 feature gating 全覆盖
 
-### 10.2 渠道更新策略
+当前状态：
 
-- GitHub 版：使用现有 Release 检查。
-- Google Play 版：不建议内置 APK 下载，改用 Play 更新入口。
-- 国内渠道版：按渠道规则处理更新。
+- Pro 模板选择已 gating。
+- `PremiumFeature` 已覆盖主要付费能力。
+- 备份、高级统计、多提醒计划、高级导出、云同步还需要统一入口 gating。
 
-可通过 build flavor 区分：
+必须新增：
 
-- `github`
-- `play`
-- `fdroid`
-- `enterprise`
+- 统一 `PaywallState`：
+  - `feature: PremiumFeature`
+  - `requiredTier: PlanTier`
+  - `sourceScreen`
+  - `returnAction`
+  - `messageKey`
+- 统一入口方法：
 
-### 10.3 版本号策略
-
-当前 workflow 的 `VERSION_CODE=1` 固定。正式发布前应改为单调递增：
-
-- 使用 GitHub run number。
-- 或从 tag 生成。
-- 或维护 `version.properties`。
-
-示例：
-
-```text
-versionName = 1.4.0
-versionCode = 10400
+```kotlin
+fun requireFeature(feature: PremiumFeature, onAllowed: () -> Unit)
 ```
 
-## 11. 隐私、合规与风控
+- UI 触发点：
+  - 选择 Pro 模板 -> `PRO_TEMPLATES`
+  - 查看月报/高级趋势 -> `ADVANCED_STATISTICS`
+  - 导出 PDF/主题图片 -> `ADVANCED_EXPORT`
+  - 导出/导入完整 JSON 备份 -> `LOCAL_BACKUP`
+  - 创建第 2 个及以上提醒计划 -> `MULTIPLE_REMINDER_PLANS`
+  - 开启云同步/云备份 -> `CLOUD_SYNC`
+- 体验原则：
+  - 不打断正在运行的计时。
+  - 不用强制全屏拦截基础操作。
+  - 购买失败后返回原页面。
+  - 免费用户可以看见高级功能入口和示例，但不能误以为已开启。
 
-### 11.1 隐私政策必须覆盖
+### 5.5 云同步最小闭环
 
-- 本地保存哪些数据。
-- 是否上传统计。
-- 是否上传崩溃。
-- 是否使用支付 SDK。
-- 是否使用更新检查网络请求。
-- 如何删除数据。
-- 如何导出数据。
+当前状态：
 
-### 11.2 权限解释
+- 后端已有 `/sync/changes` 和 `/sync/push`。
+- 数据模型 `RemoteSyncChange` 已存在。
+- 本地表已具备 `updatedAt`、部分 `remoteId`、`deletedAt`。
+- 客户端还没有完整同步引擎和 UI。
 
-当前 Manifest 包含：
+Plus 发布最低要求：
 
-- `POST_NOTIFICATIONS`
-- `SCHEDULE_EXACT_ALARM`
-- `FOREGROUND_SERVICE`
-- `FOREGROUND_SERVICE_SPECIAL_USE`
-- `RECEIVE_BOOT_COMPLETED`
-- `INTERNET`
-- `ACCESS_NETWORK_STATE`
-- `REQUEST_INSTALL_PACKAGES`
+- 同步集合：
+  - `app_settings`
+  - `daily_goals`
+  - `tip_templates`
+  - `reminder_plans`
+  - `daily_eye_stats`
+  - `daily_pomodoro_stats`
+- 不同步：
+  - 崩溃报告，除非用户主动提交。
+  - 原始摄像头帧。
+  - 本地文件路径。
+  - 系统权限状态。
+  - APK 下载缓存。
+- 本地新增：
+  - 每个可同步集合维护 `remoteId`、`updatedAt`、`deletedAt`。
+  - 单独保存 `syncCursor`、`lastSyncAt`、`lastSyncError`。
+  - 同步失败不影响本地提醒计时。
+- 冲突规则：
+  - 设置：字段级或 `updatedAt` 后写 wins。
+  - 模板：`remoteId` 匹配，`deletedAt` 软删除。
+  - 提醒计划：`remoteId` 匹配，保留本地禁用状态。
+  - 统计：按日增量合并，不直接覆盖。
+  - 权益：只从服务端下发，不接受客户端 push。
+- 后端补充：
+  - `userId + cursor` 索引。
+  - `userId + collection + remoteId` 幂等约束。
+  - 单次 push changes 数量限制。
+  - 单用户每日同步写入限额。
 
-建议在设置页提供权限说明页：
+### 5.6 云备份最小闭环
 
-- 通知权限：用于提醒和前台计时。
-- 精确闹钟：用于更准时的休息提醒。
-- 开机启动：用于恢复提醒计划。
-- 网络：用于检查更新，未来用于云同步/支付校验。
-- 安装包权限：仅 GitHub 版用于安装更新 APK。
+当前状态：
 
-### 11.3 医疗合规边界
+- 本地 JSON 备份/恢复已存在。
+- 后端 `/backups` 和 `/backups/latest` 已存在。
+- 客户端 `uploadBackup()` 和 `fetchLatestBackup()` 已存在。
 
-避免使用“治疗”“预防疾病”“医学诊断”等表述。
+Plus 发布最低要求：
 
-推荐表述：
+- 客户端 UI：
+  - 手动上传云备份。
+  - 拉取最新云备份。
+  - 展示备份时间、设备 ID、schemaVersion。
+  - 恢复前复用现有导入摘要。
+- 后端：
+  - 单用户备份数量上限。
+  - 单个备份大小上限。
+  - 备份按 `userId + uploadedAt` 查询。
+  - 可选保留最近 N 份。
+- 隐私：
+  - 不上传 access token。
+  - 不上传本地文件真实路径。
+  - 模板图片如需云端保存，应走对象存储，不塞入 JSON。
 
-- “帮助建立休息习惯”
-- “减少长时间连续用眼”
-- “提醒你定期休息”
+### 5.7 生产后端安全
 
-## 12. UI/UX 下一步优化
+商业发布前必须完成：
 
-### 12.1 首页
+- HTTPS：
+  - `eye.chloemlla.com` 生产 API 必须使用 HTTPS。
+  - Android 生产配置移除对生产域的明文 HTTP 依赖。
+  - GitHub 版如仍需要 HTTP 调试，应通过 debug/flavor 区分。
+- 配置：
+  - `LUMEN_ADMIN_PASSWORD` 不使用默认值。
+  - `LUMEN_DEV_LOGIN_CODE` 生产禁用。
+  - `LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false`。
+  - MongoDB URI 不写入仓库。
+- Admin：
+  - Admin Dashboard 生产只通过 HTTPS 访问。
+  - Admin 操作保留审计。
+  - 敏感操作需要二次确认。
+  - 后续增加 MFA 或一次性操作码。
+- API 防护：
+  - 请求体大小限制。
+  - 登录、购买校验、同步、遥测限流。
+  - CORS allowlist。
+  - 统一 request id。
+  - 不在错误响应中泄露内部异常。
+- MongoDB：
+  - 定期备份。
+  - 必要索引。
+  - TTL 索引用于登录请求、过期 session、短期遥测样本。
 
-建议信息层级：
+### 5.8 隐私、权限与合规
 
-- 当前状态：工作中/预提醒/等待操作/休息中/番茄中。
-- 下一次关键时间。
-- 主操作按钮：开始/暂停/恢复/停止。
-- 今日摘要。
-- 权限状态提醒，只在缺失时显示。
+当前权限面较大，商业发布必须把权限解释和用户同意做成产品能力，而不是只写在上架说明里。
 
-### 12.2 设置页
+需要覆盖的权限：
 
-当前设置项越来越多，建议拆分为子页面：
+- `POST_NOTIFICATIONS`：提醒和前台计时通知。
+- `SCHEDULE_EXACT_ALARM`：准时触发休息提醒。
+- `CAMERA`：近距离检测和眨眼提醒。
+- `SYSTEM_ALERT_WINDOW`：强提醒遮罩。
+- `WRITE_SETTINGS`：自动亮度。
+- `USE_FULL_SCREEN_INTENT`：高优先级休息提醒。
+- `FOREGROUND_SERVICE` / `FOREGROUND_SERVICE_SPECIAL_USE` / `FOREGROUND_SERVICE_CAMERA`：后台计时、相机采样、光照监测。
+- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`：降低后台被杀概率。
+- `RECEIVE_BOOT_COMPLETED`：开机恢复提醒。
+- `INTERNET` / `ACCESS_NETWORK_STATE`：更新、账号、权益、同步、遥测。
+- `REQUEST_INSTALL_PACKAGES`：GitHub 版 APK 更新安装。
+- `VIBRATE`：触觉反馈。
+- `PACKAGE_USAGE_STATS`：如用于上下文判断，必须明确用户授权路径和用途。
 
-- 通用。
-- 提醒。
-- 番茄钟。
-- 通知与权限。
-- 声音与触觉。
-- 外观与模板。
-- 数据与导出。
-- 关于与更新。
+必须新增或完善：
 
-### 12.3 高级统计页
+- 首次启动权限说明页。
+- 设置页“权限与隐私”子页面。
+- 遥测单独开关，默认关闭或明确 opt-in。
+- 原始摄像头帧上传默认关闭，只允许开发/研究模式或明确同意。
+- 隐私政策：
+  - 本地保存哪些数据。
+  - 上传哪些聚合数据。
+  - 不上传哪些数据。
+  - 如何删除账号和云端数据。
+  - 如何导出本地数据。
+  - 支付 SDK 与第三方服务说明。
+- 医疗边界：
+  - 避免“治疗”“预防疾病”“诊断”等词。
+  - 使用“习惯建议”“用眼休息提醒”“减少长时间连续用眼”等表达。
 
-建议新增筛选：
+### 5.9 发布渠道策略
 
-- 最近 7 天。
-- 最近 30 天。
-- 本月。
-- 自定义范围。
+必须明确不同渠道的行为：
 
-避免堆叠过多卡片，优先以图表和少量关键指标呈现。
+- GitHub 版：
+  - 保留 GitHub Release 更新检测。
+  - 保留 APK 下载和 `REQUEST_INSTALL_PACKAGES`。
+  - 支付可使用外部授权码或后续自建支付，但不能只靠本地手写权益。
+- Google Play 版：
+  - 禁用内置 APK 下载更新。
+  - 使用 Play 更新入口或商店更新。
+  - 使用 Google Play Billing。
+  - 根据 Play 政策处理 `REQUEST_INSTALL_PACKAGES` 和高敏权限。
+- 国内渠道版：
+  - 按渠道要求接入支付、更新和隐私弹窗。
+  - 明确渠道包 API base URL 和更新策略。
+- 企业版：
+  - 可保留内置更新。
+  - 可使用企业授权码或私有后端。
+  - 可关闭面向个人的 Google Play Billing。
 
-## 13. 技术债清单
+建议新增 product flavor：
 
-优先处理：
+```text
+github
+play
+china
+enterprise
+```
 
-- `ProjectLumenViewModel` 过大，应拆分状态机和仓储。
-- `ProjectLumenApp.kt` 单文件 UI 过大，应拆分 screen/component。
-- 移除正式版 destructive migration。
-- 版本号 `versionCode` 固定问题。
-- 自定义 URI 权限持久化。
-- 更新 APK 缺少 SHA256 校验。
-- 通知动作与状态恢复需要更多测试。
+每个 flavor 控制：
 
-中期处理：
+- `API_BASE_URL`
+- 更新策略。
+- 支付策略。
+- 是否声明 `REQUEST_INSTALL_PACKAGES`。
+- 是否显示 Shizuku/高级调试入口。
+- 隐私政策 URL。
 
-- 引入依赖注入，Hilt 或手写轻量容器均可。
-- 引入 feature package：
-  - `feature_home`
-  - `feature_reminder`
-  - `feature_pomodoro`
-  - `feature_statistics`
-  - `feature_settings`
-  - `feature_templates`
-  - `feature_update`
-  - `feature_billing`
-- 为导出、更新、音频、通知增加接口，方便测试替身。
+## 6. P1 商业价值增强功能
 
-## 14. 推荐里程碑
+P1 不应阻塞首个商业闭环，但能显著提高 Pro/Plus 付费理由。
 
-### Milestone 1：稳定版 1.0
+### 6.1 商业化首页与权益卡片
 
-- 状态机拆分。
-- 核心测试矩阵。
-- 移除正式 destructive migration。
-- 设置页拆分。
-- 权限说明页。
-- 更新完整性校验。
-- 修正 `versionCode` 策略。
+新增目标：
 
-### Milestone 2：体验版 1.1
+- 首页或设置页清楚展示当前版本：Free / Pro / Plus / Team。
+- 展示权益有效期、上次同步时间、恢复购买入口。
+- 展示“已解锁能力”而不是只展示购买按钮。
 
-- 静默时段。
-- 今日目标。
-- 统计页升级。
-- 模板编辑增强。
-- 音频试听与震动提醒。
-- 本地备份/恢复。
+技术要点：
 
-### Milestone 3：Pro 版 1.2
+- `ProjectLumenUiState` 增加可派生的 `effectiveTier` 或由 UI formatter 计算。
+- 权益卡片读取本地 `entitlements` 和 `settings.lastEntitlementSyncAt`。
+- 购买入口调用统一 `PaywallState`。
+- 网络失败时展示可恢复错误，不阻断本地基础功能。
 
-- 本地权益模型。
-- Google Play Billing 或目标分发渠道支付。
-- Pro 模板。
-- 高级统计。
-- 多提醒计划。
-- 高级导出。
+### 6.2 多提醒计划真正产品化
 
-### Milestone 4：同步版 2.0
+当前已有 `ReminderPlanEntity`，下一步要把模型变成完整功能。
 
-- 账号系统。
-- 服务端权益校验。
-- 云同步。
-- 云备份。
-- Plus 订阅。
-- Web 仪表盘。
+功能目标：
 
-### Milestone 5：团队版 2.x
+- 免费版 1 个计划。
+- Pro 版无限或更高数量上限。
+- 每个计划包含提醒间隔、休息时长、静默时段、启用状态、排序。
+- 可快速切换计划。
+- 可按工作日/周末/时间段自动启用。
 
-- 团队组织。
-- 匿名聚合报表。
-- 管理员默认策略。
+技术要点：
+
+- DAO 增加 active plan 查询和排序更新。
+- `RuntimeRepository` 应用计划时重算运行态下一次触发时间。
+- `ReminderEngine` 输入应接收当前计划，而不是只读全局 settings。
+- 同步时用 `remoteId + updatedAt + deletedAt` 合并。
+- 删除计划使用软删除，避免多设备恢复后复活。
+
+### 6.3 远端模板 CMS
+
+当前 Admin Dashboard 已有模板 CMS 方向，客户端已有 `remoteId` 和 `layoutJson`。
+
+功能目标：
+
+- 后端维护模板目录。
+- 客户端按语言、版本、渠道拉取模板。
+- Pro 模板可远端更新。
+- 模板图片走对象存储或固定 CDN。
+
+技术要点：
+
+- 后端新增或完善：
+
+```text
+GET /api/v1/templates?locale=zh-CN&channel=play&since=cursor
+```
+
+- 模板字段：
+  - `remoteId`
+  - `name`
+  - `tier`
+  - `backgroundType`
+  - `backgroundValue`
+  - `primaryColor`
+  - `titleText`
+  - `subtitleText`
+  - `layoutJson`
+  - `assetUrl`
+  - `updatedAt`
+  - `deletedAt`
+- 客户端：
+  - 拉取后写入 `tip_templates`。
+  - 用户自定义模板不被远端覆盖。
+  - Pro 模板选择继续走 `PRO_TEMPLATES` gating。
+
+### 6.4 高级统计与报告
+
+当前已有统计图、PDF 月报和习惯建议基础。
+
+功能目标：
+
+- Free 展示基础统计。
+- Pro 展示长期趋势、月报、完成率、跳过率、番茄趋势、最大连续工作分析。
+- Plus 可聚合多设备。
+
+技术要点：
+
+- 指标口径固定：
+  - 休息完成率 = `completedBreakCount / (completedBreakCount + skipCount)`。
+  - 跳过率 = `skipCount / (completedBreakCount + skipCount)`。
+  - 最大连续工作 = `maxContinuousWorkSeconds` 最大值。
+  - 用眼总时长 = `workingSeconds` 求和。
+  - 休息总时长 = `restSeconds` 求和。
+- UI gating：
+  - 免费用户可见最近 7/30 天基础指标。
+  - 月报、PDF、高级趋势走 `ADVANCED_STATISTICS` 或 `ADVANCED_EXPORT`。
+- 导出：
+  - PDF 继续用 Android `PdfDocument`。
+  - PNG 继续用 `Canvas`。
+  - 所有文件通过 `FileProvider` 分享，不暴露真实路径。
+
+### 6.5 AI/规则建议
+
+当前本地已有基于统计的习惯建议方向，遥测模型也已存在。
+
+功能目标：
+
+- Free：本地规则建议。
+- Pro：更多本地规则和月报结论。
+- Plus：云端聚合后的个性化建议。
+
+技术要点：
+
+- 第一阶段不要依赖大模型，先使用规则引擎：
+  - 跳过率高于阈值 -> 建议缩短休息时长或调整提醒间隔。
+  - 连续工作过长 -> 建议开启强提醒或降低间隔。
+  - 低光提醒频繁 -> 建议开启环境光提醒。
+  - 近距离提醒频繁 -> 建议重新校准距离。
+- 服务端 AI 如后续接入：
+  - 只上传聚合统计。
+  - 默认不上传原始帧。
+  - 输出文案明确为习惯建议。
+  - Admin 可审计 prompt version 和建议版本。
+
+### 6.6 远端发布与灰度控制
+
+功能目标：
+
+- Admin 可登记发布版本、SHA256、渠道、灰度比例。
+- 客户端按渠道获取更新策略。
+- GitHub Release 更新继续保留，但商业版需要更清晰的渠道行为。
+
+技术要点：
+
+- 后端 `admin_releases` 集合：
+  - `versionName`
+  - `versionCode`
+  - `channel`
+  - `assetUrl`
+  - `sha256`
+  - `rolloutPercent`
+  - `minSupportedVersionCode`
+  - `forceUpdate`
+  - `publishedAt`
+- 客户端：
+  - GitHub flavor 继续读 GitHub Release。
+  - 其他 flavor 可读后端发布策略或跳转商店。
+  - 校验 SHA256 后再安装。
+
+## 7. P2 后续扩展
+
+### 7.1 Team / Enterprise
+
+功能目标：
+
 - 企业授权。
+- 团队匿名聚合报表。
+- 默认策略下发。
+- 组织模板。
+- 管理员审计。
 
-## 15. GitHub Actions 验证建议
+技术要点：
 
-由于本地禁止运行构建和测试，所有验证应进入工作流。
+- 新增后端实体：
+  - `organizations`
+  - `organization_members`
+  - `organization_policies`
+  - `team_entitlements`
+  - `team_reports`
+- 客户端：
+  - 登录后识别 `TEAM` tier。
+  - 拉取组织默认策略。
+  - 用户可选择是否上报聚合统计。
+- 隐私：
+  - 默认只给管理员看聚合数据。
+  - 不展示个人具体工作内容。
+  - 不上传具体使用 App 列表，除非企业版单独授权且清楚说明。
 
-建议在 `build.yml` 中逐步加入：
+### 7.2 国内商业化
 
-- 单元测试。
-- Android Lint。
-- Room migration 测试。
-- Release APK 构建。
-- APK SHA256 生成。
-- 上传测试报告。
+功能目标：
 
-建议命令在工作流中执行：
+- 国内支付渠道。
+- 国内更新渠道。
+- 国内隐私合规弹窗和 SDK 列表。
 
-```bash
-gradle test lint assembleDebug --no-daemon
+技术要点：
+
+- 独立 `china` flavor。
+- 独立隐私政策 URL。
+- 渠道支付 token 仍必须服务端验签。
+- 不把“渠道返回成功”直接等同于本地永久 Pro。
+
+### 7.3 企业私有化
+
+功能目标：
+
+- 企业独立 API base URL。
+- 私有 MongoDB。
+- 私有 Admin Dashboard。
+- 企业授权码。
+
+技术要点：
+
+- `enterprise` flavor 允许配置：
+  - `PROJECT_LUMEN_API_BASE_URL`
+  - 企业 logo 或标题。
+  - 是否禁用公共更新。
+  - 是否禁用个人支付。
+- 后端支持 license import/export。
+
+## 8. 数据与接口技术设计
+
+### 8.1 客户端本地表职责
+
+- `app_settings`：
+  - 本地设置、当前计划、权限相关开关、当前缓存 tier。
+  - 不应长期作为权益真相来源。
+- `entitlements`：
+  - 本地权益缓存。
+  - 由服务端同步或本地开发授权写入。
+- `feature_flags`：
+  - 本地和远端功能开关缓存。
+- `reminder_plans`：
+  - 多提醒计划。
+  - Pro 功能核心表。
+- `tip_templates`：
+  - 内置模板、自定义模板、远端模板。
+  - `isPremium`、`remoteId`、`deletedAt` 已适合商业化。
+- `daily_eye_stats` / `daily_pomodoro_stats`：
+  - 按日聚合统计。
+  - 同步时按日期和设备合并。
+- `runtime_state`：
+  - 当前计时真相来源。
+  - 不建议直接同步。
+
+### 8.2 服务端集合职责
+
+生产建议集合：
+
+```text
+users
+login_requests
+sessions
+entitlements
+sync_changes
+backups
+telemetry_uploads
+face_analysis_frames
+counters
+admin_sessions
+admin_actions
+admin_access_audit
+admin_crash_reports
+admin_api_metrics
+admin_sync_metrics
+admin_templates
+admin_telemetry
+admin_releases
+admin_security_allowlist
+```
+
+商业化发布必须重点补齐的索引：
+
+```text
+users.email unique
+sessions.accessTokenHash unique / ttl
+login_requests.expiresAt ttl
+entitlements.source + entitlements.purchaseToken unique
+entitlements.userId + entitlements.status
+sync_changes.userId + sync_changes.cursor
+sync_changes.userId + sync_changes.change.collection + sync_changes.change.remoteId
+backups.userId + backups.uploadedAt
+admin_actions.createdAt
+telemetry_uploads.receivedAt ttl
+face_analysis_frames.receivedAt ttl
+```
+
+### 8.3 客户端新增服务建议
+
+建议新增或补齐以下客户端组件：
+
+```text
+AuthSessionRepository
+RemoteEntitlementSyncService
+PurchaseRepository
+SyncRepository
+CloudBackupRepository
+PaywallCoordinator
+RemoteFeatureFlagRepository
+RemoteTemplateRepository
+CommercialReleaseConfig
+```
+
+职责边界：
+
+- `AuthSessionRepository`：只管登录态和 token，不做权益判断。
+- `PurchaseRepository`：只管购买、恢复和提交服务端验签。
+- `RemoteEntitlementSyncService`：把服务端权益写入本地 `entitlements`，并计算当前 tier。
+- `PaywallCoordinator`：只判断入口是否允许和应展示哪个付费墙。
+- `SyncRepository`：只负责 changes push/pull 和 cursor。
+- `CloudBackupRepository`：复用本地 `DataBackupService` 生成 JSON，再上传后端。
+- `RemoteFeatureFlagRepository`：合并后端 flag 和本地 flag。
+- `RemoteTemplateRepository`：拉取远端模板并写入 `tip_templates`。
+
+### 8.4 后端新增服务建议
+
+建议新增或补齐：
+
+```text
+GooglePlayVerifier
+EntitlementResolver
+EmailDeliveryService
+RateLimiter
+SyncCompactor
+BackupRetentionService
+AdminReleaseService
+TemplateCatalogService
+AuditLogger
+```
+
+职责边界：
+
+- `GooglePlayVerifier`：封装 Google API，不暴露给路由。
+- `EntitlementResolver`：统一从 entitlement records 计算 `FREE/PRO/PLUS/TEAM`。
+- `EmailDeliveryService`：生产发送验证码，开发可保留 dev delivery。
+- `RateLimiter`：登录、购买、同步、遥测分别限流。
+- `SyncCompactor`：后续可压缩同一 remoteId 的历史 changes。
+- `BackupRetentionService`：控制云备份数量和大小。
+- `AuditLogger`：Admin 和敏感用户操作统一审计。
+
+## 9. 质量与验证计划
+
+所有命令必须在 GitHub Actions 中执行，本地不执行。
+
+### 9.1 Android 验证
+
+现有 workflow 已执行：
+
+```text
+gradle testDebugUnitTest --no-daemon
+gradle lintDebug --no-daemon
 gradle assembleRelease --no-daemon
 ```
 
-CodeQL 已存在，建议保留。
+商业化新增后建议增加：
 
-## 16. 最推荐的下一步执行顺序
+- Billing 相关单元测试：
+  - 商品 ID 到 tier 映射。
+  - pending/active/expired/revoked 状态处理。
+  - restore purchases 合并规则。
+- Paywall 测试：
+  - Free 无法使用 Pro 模板。
+  - Pro 可用高级统计、本地备份、多计划和高级导出。
+  - Plus 可用云同步。
+- 同步测试：
+  - 设置后写 wins。
+  - 统计按日合并。
+  - 模板软删除。
+  - cursor 推进。
+- Room migration 测试：
+  - 版本 13 到下一版本。
+  - 权益和计划表迁移。
+  - release 构建不走 destructive migration。
+- 权限回归测试：
+  - 未授权相机时近距离功能不崩溃。
+  - 未授权悬浮窗时强提醒遮罩有引导。
+  - 未授权精确闹钟时 UI 展示延迟风险。
 
-1. 拆分状态机与 Repository，先不改 UI 行为。
-2. 在 GitHub Actions 增加状态机单元测试。
-3. 移除正式版破坏性迁移风险。
-4. 修正发布版本号和 APK SHA256 校验。
-5. 做静默时段、今日目标、统计升级。
-6. 做本地备份/恢复。
-7. 做 Pro 权益模型和付费墙。
-8. 再接支付。
-9. 最后考虑账号、云同步和订阅。
+### 9.2 Rust 后端验证
 
-这个顺序能保证商业化建立在稳定核心之上，同时不会破坏免费用户的基础体验。
+现有 workflow 已执行：
+
+```text
+cargo fmt --manifest-path backend/Cargo.toml --all -- --check
+cargo test --manifest-path backend/Cargo.toml --all-targets
+```
+
+商业化新增后建议增加：
+
+- Google purchase verifier mock 测试。
+- Entitlement resolver 测试。
+- Token hash 和 session TTL 测试。
+- Sync push idempotency 测试。
+- Backup size/retention 测试。
+- Admin audit 测试。
+- Rate limit 测试。
+
+### 9.3 发布产物验证
+
+必须保留：
+
+- Universal APK。
+- ABI split APK。
+- `checksums.txt`。
+- GitHub Release 生成 release notes。
+
+商业化新增：
+
+- 每个 flavor 单独构建产物。
+- Play 版不包含内置 APK 安装入口。
+- GitHub 版保留 SHA256 校验更新。
+- Release note 中标明隐私、权限、支付和同步变化。
+
+## 10. 推荐实施顺序
+
+### Phase 1：商业化基础闭环
+
+目标：Pro/Plus 能真实售卖，权益可信。
+
+任务：
+
+1. 接入账号 UI 和 session 存储。
+2. 接入真实邮件发送和登录限流。
+3. 接入 Google Play Billing 客户端。
+4. 后端实现 Google Play Developer API 验签。
+5. 本地 entitlement 由服务端快照计算 tier。
+6. 统一 Paywall 和 `PremiumFeature` gating。
+7. 禁止 release 版暴露手动 Pro 入口。
+
+验收：
+
+- 用户登录后能购买 Pro。
+- 后端验签后返回 `active/PRO`。
+- 客户端重启后仍能使用 Pro。
+- 退款/撤销后服务端可降级。
+- Free 用户不能绕过 Pro 模板和高级入口。
+
+### Phase 2：Plus 云能力闭环
+
+目标：Plus 订阅有持续服务价值。
+
+任务：
+
+1. 实现同步 cursor 本地存储。
+2. 实现 settings/templates/goals/plans/stats 的 push/pull。
+3. 实现云备份上传和恢复 UI。
+4. 处理同步冲突和离线失败。
+5. Admin Dashboard 展示同步和备份指标。
+
+验收：
+
+- 两台设备登录同一账号后可同步设置和模板。
+- 按日统计不会互相覆盖。
+- 云备份恢复前有摘要。
+- 网络失败不影响本地提醒。
+
+### Phase 3：渠道与合规发布
+
+目标：能面向公开用户发布。
+
+任务：
+
+1. 增加 flavor：`github`、`play`、`china`、`enterprise`。
+2. 生产 API 全面切 HTTPS。
+3. 编写隐私政策、用户协议、权限说明。
+4. 设置页加入权限与隐私中心。
+5. Play 版禁用内置 APK 更新安装。
+6. GitHub 版保留 Release 更新。
+
+验收：
+
+- 不同 flavor 权限和更新行为正确。
+- 隐私与权限说明覆盖所有敏感能力。
+- 生产配置不使用 dev code 或 unverified purchases。
+
+### Phase 4：商业价值增强
+
+目标：提高转化和留存。
+
+任务：
+
+1. 多提醒计划完整 UI。
+2. 远端模板 CMS。
+3. 高级统计和 Pro 月报优化。
+4. 本地规则建议增强。
+5. 远端 feature flags 和灰度。
+
+验收：
+
+- Pro 付费点清晰且不伤害基础体验。
+- Plus 用户能看到同步和备份价值。
+- Admin 能观察版本、同步、权益和模板状态。
+
+## 11. 商业化发布检查清单
+
+发布前必须确认：
+
+- [ ] 生产 API 使用 HTTPS。
+- [ ] 生产 `LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false`。
+- [ ] 生产禁用固定 dev login code。
+- [ ] Google Play Billing 客户端完成。
+- [ ] Google Play Developer API 服务端验签完成。
+- [ ] Entitlement token 去重和撤销逻辑完成。
+- [ ] Paywall 覆盖所有 `PremiumFeature`。
+- [ ] release 版隐藏或禁用手动 Pro 授权入口。
+- [ ] 账号 UI、登录态和退出登录完成。
+- [ ] 恢复购买完成。
+- [ ] 隐私政策和用户协议完成。
+- [ ] 权限说明页完成。
+- [ ] 遥测和原始帧上传默认受用户同意控制。
+- [ ] 云同步不会影响本地计时。
+- [ ] 云备份恢复前展示摘要。
+- [ ] GitHub Actions 通过 Android 和 Rust 验证。
+- [ ] Release assets 生成 SHA256。
+- [ ] Play/GitHub/国内/企业渠道行为区分完成。
+
+## 12. 最优先的下一步
+
+最推荐先做以下 5 件事：
+
+1. 把账号 UI、session 存储、权益同步接上现有 API。
+2. 把 `PremiumFeature` gating 从模板扩展到备份、高级统计、多提醒计划、高级导出和云同步。
+3. 实现后端真实 Google Play 验签，保持生产 `accept_unverified_purchases=false`。
+4. 增加商业化 flavor 和更新策略差异，避免 Play 版继续内置 APK 安装。
+5. 补齐隐私、权限、遥测同意和生产 HTTPS。
+
+完成这 5 件事后，Project Lumen 才具备对外销售 Pro/Plus 的基本可信闭环；Team/Enterprise、远端模板 CMS 和 AI 建议可以随后作为增长功能继续推进。
