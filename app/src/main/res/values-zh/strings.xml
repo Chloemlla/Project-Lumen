@@ -530,6 +530,21 @@
     <string name="developer_security_webview_bridge">WebView JS Bridge</string>
     <string name="developer_security_webview_debug_only">仅 Debug 构建启用</string>
     <string name="developer_security_webview_disabled">当前构建已关闭</string>
+    <string name="developer_api_last_operation">最近远端操作</string>
+    <string name="developer_api_last_error">最近远端错误</string>
+    <string name="developer_api_recent_count">最近 API 请求</string>
+    <string name="developer_api_probe_health">探测后端健康</string>
+    <string name="developer_api_clear_logs">清空 API 日志</string>
+    <string name="developer_api_no_requests">还没有记录后端 API 请求。点击健康探测或触发云同步后，这里会显示请求与返回详情。</string>
+    <string name="developer_api_trace_title">%1$s %2$s</string>
+    <string name="developer_api_trace_status">HTTP %1$d · %2$d ms · %3$s</string>
+    <string name="developer_api_trace_no_status">无 HTTP 响应 · %1$d ms · %2$s</string>
+    <string name="developer_api_trace_url">URL</string>
+    <string name="developer_api_trace_security">安全上下文</string>
+    <string name="developer_api_trace_security_value">签名=%1$s · Integrity=%2$s · 鉴权=%3$s</string>
+    <string name="developer_api_trace_request">请求体</string>
+    <string name="developer_api_trace_response">返回体</string>
+    <string name="developer_api_trace_error">错误</string>
     <string name="developer_lux">光线 Lux</string>
     <string name="developer_pitch">Pitch 俯仰角</string>
     <string name="developer_roll">Roll 横滚角</string>
@@ -623,4 +638,25 @@
     <string name="eye_care_guide_start_session">启动会话</string>
     <string name="eye_care_guide_done">完成</string>
     <string name="eye_care_guide_pending">待处理</string>
+    <string name="remote_cloud_title">账号与云同步</string>
+    <string name="remote_cloud_message">连接后端后，可使用邮箱登录、权益刷新、增量同步、云备份、遥测和安全校验 API 请求。</string>
+    <string name="remote_cloud_api_base">API 地址</string>
+    <string name="remote_cloud_account">账号</string>
+    <string name="remote_cloud_signed_out">未登录</string>
+    <string name="remote_cloud_stored_session">已加载本地会话</string>
+    <string name="remote_cloud_tier">云端权益</string>
+    <string name="remote_cloud_entitlements">权益数量</string>
+    <string name="remote_cloud_sync_cursor">同步游标</string>
+    <string name="remote_cloud_latest_backup">最近备份</string>
+    <string name="remote_cloud_email">邮箱</string>
+    <string name="remote_cloud_code">验证码</string>
+    <string name="remote_cloud_dev_code">开发验证码：%1$s</string>
+    <string name="remote_cloud_request_code">获取验证码</string>
+    <string name="remote_cloud_verify_code">验证登录</string>
+    <string name="remote_cloud_check_health">检查服务</string>
+    <string name="remote_cloud_refresh_account">刷新账号</string>
+    <string name="remote_cloud_sign_out">退出登录</string>
+    <string name="remote_cloud_sync_now">立即同步</string>
+    <string name="remote_cloud_upload_backup">上传备份</string>
+    <string name="remote_cloud_restore_backup">恢复备份</string>
 </resources>

@@ -103,6 +103,31 @@ internal fun JSONObject.toRemoteBackup(): RemoteBackup = RemoteBackup(
 
 internal fun JSONObject.optRemoteBackup(): RemoteBackup? = optJSONObject("backup")?.toRemoteBackup()
 
+internal fun JSONObject.toRemoteFeatureFlagSnapshot(): RemoteFeatureFlagSnapshot =
+    RemoteFeatureFlagSnapshot(
+        fetchedAt = optLong("fetchedAt"),
+        flags = optJSONArray("flags").toObjectList { it.toRemoteFeatureFlag() },
+    )
+
+internal fun JSONObject.toRemoteFeatureFlag(): RemoteFeatureFlag =
+    RemoteFeatureFlag(
+        key = optString("key"),
+        enabled = optBoolean("enabled"),
+        payload = optJSONObject("payload") ?: JSONObject(),
+    )
+
+internal fun JSONObject.toRemoteReleaseCheck(): RemoteReleaseCheck =
+    RemoteReleaseCheck(
+        updateAvailable = optBoolean("updateAvailable"),
+        currentVersionCode = optLong("currentVersionCode"),
+        versionCode = optLong("versionCode"),
+        versionName = optString("versionName"),
+        sha256 = optString("sha256"),
+        rollout = optString("rollout"),
+        forceUpdate = optBoolean("forceUpdate"),
+        checkedAt = optLong("checkedAt"),
+    )
+
 internal fun JSONObject.toRemoteDeviceRegistrationResult(): RemoteDeviceRegistrationResult =
     RemoteDeviceRegistrationResult(
         accepted = optBoolean("accepted"),

@@ -91,6 +91,28 @@ data class RemoteBackup(
     val backup: JSONObject,
 )
 
+data class RemoteFeatureFlag(
+    val key: String,
+    val enabled: Boolean,
+    val payload: JSONObject,
+)
+
+data class RemoteFeatureFlagSnapshot(
+    val fetchedAt: Long,
+    val flags: List<RemoteFeatureFlag>,
+)
+
+data class RemoteReleaseCheck(
+    val updateAvailable: Boolean,
+    val currentVersionCode: Long,
+    val versionCode: Long,
+    val versionName: String,
+    val sha256: String,
+    val rollout: String,
+    val forceUpdate: Boolean,
+    val checkedAt: Long,
+)
+
 data class RemoteDeviceRegistrationResult(
     val accepted: Boolean,
     val deviceInstallationId: String,

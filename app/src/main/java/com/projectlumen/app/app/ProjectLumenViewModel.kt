@@ -3,6 +3,8 @@ package com.projectlumen.app.app
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.projectlumen.app.core.api.ProjectLumenApiClient
+import com.projectlumen.app.core.api.ProjectLumenApiDiagnostics
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
@@ -15,6 +17,7 @@ import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
+import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +30,8 @@ class ProjectLumenViewModel(
     audio: AudioService,
     export: ExportService,
     backup: DataBackupService,
+    apiClient: ProjectLumenApiClient,
+    secureCredentials: SecureCredentialStore,
     eyeCarePreferences: EyeCarePreferencesDataStore,
     startTimerService: () -> Unit,
     stopTimerService: () -> Unit,
@@ -43,7 +48,7 @@ class ProjectLumenViewModel(
     private val simulateDeveloperLowMemory: () -> Unit,
     private val uploadTelemetrySnapshot: suspend () -> Unit,
 ) : ViewModel() {
-    private val repositories = ProjectLumenRepositories(database, eyeCarePreferences)
+    private val repositories = ProjectLumenRepositories(database, eyeCarePreferences, secureCredentials)
     private val now = MutableStateFlow(System.currentTimeMillis())
     private val stateStore = ProjectLumenStateStore(repositories, viewModelScope, now)
     private val runtimeEntry = ProjectLumenRuntimeFeatureEntry(
@@ -96,11 +101,22 @@ class ProjectLumenViewModel(
         settingsRepository = repositories.settings,
         entitlementRepository = repositories.entitlements,
     )
+    private val remoteEntry = ProjectLumenRemoteFeatureEntry(
+        scope = viewModelScope,
+        apiClient = apiClient,
+        credentials = secureCredentials,
+        backup = backup,
+        settingsRepository = repositories.settings,
+        entitlementRepository = repositories.entitlements,
+        featureFlagRepository = repositories.featureFlags,
+    )
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
 
     val webPageRequests = _webPageRequests.asSharedFlow()
     val backupImportPreview = backupEntry.importPreview
+    val remoteState = remoteEntry.state
     val shizukuState = shizuku.state
+    val apiDiagnostics = ProjectLumenApiDiagnostics.traces
     val uiState = stateStore.uiState
 
     init {
@@ -254,6 +270,15 @@ class ProjectLumenViewModel(
     fun importBackup(uri: Uri) = backupEntry.importBackup(uri)
 
     fun recordManualProEntitlement(productId: String = "manual_pro") = entitlementEntry.recordManualProEntitlement(productId)
+    fun checkRemoteHealth() = remoteEntry.checkHealth()
+    fun clearApiDiagnostics() = ProjectLumenApiDiagnostics.clear()
+    fun startRemoteEmailLogin(email: String) = remoteEntry.startEmailLogin(email)
+    fun verifyRemoteEmailLogin(code: String) = remoteEntry.verifyEmailLogin(code)
+    fun refreshRemoteAccount() = remoteEntry.refreshAccount()
+    fun syncRemoteNow() = remoteEntry.syncNow()
+    fun uploadCloudBackup() = remoteEntry.uploadCloudBackup()
+    fun restoreLatestCloudBackup() = remoteEntry.restoreLatestCloudBackup()
+    fun signOutRemote() = remoteEntry.signOut()
 
     private fun previewSettings(
         nowMillis: Long,

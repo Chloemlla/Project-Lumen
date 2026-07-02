@@ -532,6 +532,21 @@
     <string name="developer_security_webview_bridge">WebView JS bridge</string>
     <string name="developer_security_webview_debug_only">Enabled only in debug builds</string>
     <string name="developer_security_webview_disabled">Disabled in this build</string>
+    <string name="developer_api_last_operation">Last remote operation</string>
+    <string name="developer_api_last_error">Last remote error</string>
+    <string name="developer_api_recent_count">Recent API requests</string>
+    <string name="developer_api_probe_health">Probe backend health</string>
+    <string name="developer_api_clear_logs">Clear API logs</string>
+    <string name="developer_api_no_requests">No backend API requests recorded yet. Run the health probe or trigger cloud sync to capture request and response details.</string>
+    <string name="developer_api_trace_title">%1$s %2$s</string>
+    <string name="developer_api_trace_status">HTTP %1$d · %2$d ms · %3$s</string>
+    <string name="developer_api_trace_no_status">No HTTP response · %1$d ms · %2$s</string>
+    <string name="developer_api_trace_url">URL</string>
+    <string name="developer_api_trace_security">Security context</string>
+    <string name="developer_api_trace_security_value">signed=%1$s · integrity=%2$s · auth=%3$s</string>
+    <string name="developer_api_trace_request">Request body</string>
+    <string name="developer_api_trace_response">Response body</string>
+    <string name="developer_api_trace_error">Error</string>
     <string name="developer_lux">Light sensor lux</string>
     <string name="developer_pitch">Pitch</string>
     <string name="developer_roll">Roll</string>
@@ -625,4 +640,25 @@
     <string name="eye_care_guide_start_session">Start session</string>
     <string name="eye_care_guide_done">Done</string>
     <string name="eye_care_guide_pending">Pending</string>
+    <string name="remote_cloud_title">Account and cloud sync</string>
+    <string name="remote_cloud_message">Connect the app to the backend for email login, entitlement refresh, incremental sync, cloud backup, telemetry, and security-gated API requests.</string>
+    <string name="remote_cloud_api_base">API base</string>
+    <string name="remote_cloud_account">Account</string>
+    <string name="remote_cloud_signed_out">Not signed in</string>
+    <string name="remote_cloud_stored_session">Stored session available</string>
+    <string name="remote_cloud_tier">Cloud tier</string>
+    <string name="remote_cloud_entitlements">Entitlements</string>
+    <string name="remote_cloud_sync_cursor">Sync cursor</string>
+    <string name="remote_cloud_latest_backup">Latest backup</string>
+    <string name="remote_cloud_email">Email</string>
+    <string name="remote_cloud_code">Verification code</string>
+    <string name="remote_cloud_dev_code">Development code: %1$s</string>
+    <string name="remote_cloud_request_code">Request code</string>
+    <string name="remote_cloud_verify_code">Verify code</string>
+    <string name="remote_cloud_check_health">Check health</string>
+    <string name="remote_cloud_refresh_account">Refresh account</string>
+    <string name="remote_cloud_sign_out">Sign out</string>
+    <string name="remote_cloud_sync_now">Sync now</string>
+    <string name="remote_cloud_upload_backup">Upload backup</string>
+    <string name="remote_cloud_restore_backup">Restore backup</string>
 </resources>

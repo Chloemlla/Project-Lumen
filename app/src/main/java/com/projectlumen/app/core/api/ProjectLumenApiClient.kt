@@ -1,6 +1,7 @@
 package com.projectlumen.app.core.api
 
 import android.content.Context
+import android.os.SystemClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -89,6 +90,23 @@ class ProjectLumenApiClient(
         path = "v1/entitlements",
         accessToken = accessToken,
     ) { it.toEntitlementSnapshot() }
+
+    suspend fun fetchFeatureFlags(accessToken: String): RemoteFeatureFlagSnapshot = request(
+        method = "GET",
+        path = "v1/config/feature-flags",
+        accessToken = accessToken,
+    ) { it.toRemoteFeatureFlagSnapshot() }
+
+    suspend fun checkRemoteRelease(
+        accessToken: String,
+        currentVersionCode: Long,
+        abi: String = "universal",
+        channel: String = "stable",
+    ): RemoteReleaseCheck = request(
+        method = "GET",
+        path = "v1/releases/check?currentVersionCode=$currentVersionCode&abi=$abi&channel=$channel",
+        accessToken = accessToken,
+    ) { it.toRemoteReleaseCheck() }
 
     suspend fun verifyGooglePurchase(
         accessToken: String,
@@ -180,6 +198,9 @@ class ProjectLumenApiClient(
         val url = resolveUrl(path)
         val bodyText = body?.toString()
         val requestBody = bodyText?.toRequestBody(JSON_MEDIA_TYPE)
+        val startedAtMillis = System.currentTimeMillis()
+        val startedAtElapsed = SystemClock.elapsedRealtime()
+        val integrityRequested = requiresIntegrityToken(path)
         val requestBuilder = Request.Builder()
             .url(url)
             .method(method, requestBody)
@@ -190,18 +211,70 @@ class ProjectLumenApiClient(
             ?.let { requestBuilder.header("Authorization", "Bearer $it") }
         ProjectLumenRequestSigner.headers(method, url, bodyText)
             .forEach { (name, value) -> requestBuilder.header(name, value) }
-        if (requiresIntegrityToken(path)) {
+        if (integrityRequested) {
             integrityProvider.tokenForRequest(path, bodyText)
                 ?.takeIf { it.isNotBlank() }
                 ?.let { requestBuilder.header(ProjectLumenRequestSigner.HEADER_INTEGRITY, it) }
         }
+        val request = requestBuilder.build()
+        var traceRecorded = false
 
-        httpClient.newCall(requestBuilder.build()).execute().use { response ->
-            val responseText = readResponseText(response)
-            if (response.code !in 200..299) {
-                throw ProjectLumenApiException(response.code, parseErrorMessage(responseText, response.code))
+        fun recordTrace(
+            statusCode: Int? = null,
+            responseText: String? = null,
+            error: Throwable? = null,
+            errorMessage: String = "",
+        ) {
+            traceRecorded = true
+            ProjectLumenApiDiagnostics.record(
+                startedAtMillis = startedAtMillis,
+                method = method,
+                url = url.toString(),
+                path = url.encodedPath + url.encodedQuery.orEmpty().let { query ->
+                    if (query.isBlank()) "" else "?$query"
+                },
+                signed = true,
+                integrityRequested = integrityRequested,
+                authorizationAttached = !accessToken.isNullOrBlank(),
+                requestBodyText = bodyText,
+                statusCode = statusCode,
+                durationMillis = SystemClock.elapsedRealtime() - startedAtElapsed,
+                responseBodyText = responseText,
+                error = error,
+                errorMessage = errorMessage,
+            )
+        }
+
+        try {
+            httpClient.newCall(request).execute().use { response ->
+                val responseText = readResponseText(response)
+                if (response.code !in 200..299) {
+                    val message = parseErrorMessage(responseText, response.code)
+                    recordTrace(
+                        statusCode = response.code,
+                        responseText = responseText,
+                        errorMessage = message,
+                    )
+                    throw ProjectLumenApiException(response.code, message)
+                }
+                try {
+                    parse(responseText.toJsonObject()).also {
+                        recordTrace(statusCode = response.code, responseText = responseText)
+                    }
+                } catch (error: Throwable) {
+                    recordTrace(
+                        statusCode = response.code,
+                        responseText = responseText,
+                        error = error,
+                    )
+                    throw error
+                }
             }
-            parse(responseText.toJsonObject())
+        } catch (error: Throwable) {
+            if (!traceRecorded) {
+                recordTrace(error = error)
+            }
+            throw error
         }
     }
 

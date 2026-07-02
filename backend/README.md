@@ -80,16 +80,23 @@ The dashboard reads `/api/admin/dashboard` for live MongoDB-backed data after lo
 
 ```text
 GET  /api/health
+GET  /api/openapi.json
 POST /api/v1/auth/email/start
 POST /api/v1/auth/email/verify
+POST /api/v1/auth/session/refresh
 GET  /api/v1/me
 POST /api/v1/devices/register
 GET  /api/v1/entitlements
+GET  /api/v1/config/feature-flags
 POST /api/v1/purchases/google/verify
 GET  /api/v1/sync/changes?since=cursor
 POST /api/v1/sync/push
 POST /api/v1/backups
 GET  /api/v1/backups/latest
+POST /api/v1/telemetry
+GET  /api/v1/telemetry/debug/latest
+POST /api/v1/face-analysis/frames
+GET  /api/v1/releases/check?currentVersionCode=code&abi=arm64-v8a&channel=stable
 ```
 
 Authenticated endpoints use:

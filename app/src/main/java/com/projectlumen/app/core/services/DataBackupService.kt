@@ -34,10 +34,11 @@ class DataBackupService(
     private val context: Context,
     private val database: AppDatabase,
     private val eyeCarePreferences: EyeCarePreferencesDataStore? = null,
+    private val deviceInstallationIdProvider: ((String?) -> String)? = null,
 ) {
     suspend fun shareBackup() {
         val file = File(context.cacheDir, "project_lumen_backup.json")
-        file.writeText(buildBackupJson().toString(2), Charsets.UTF_8)
+        file.writeText(exportBackupJson().toString(2), Charsets.UTF_8)
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "application/json"
@@ -51,6 +52,8 @@ class DataBackupService(
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
+
+    suspend fun exportBackupJson(): JSONObject = buildBackupJson()
 
     suspend fun previewImport(uri: Uri): BackupImportSummary {
         val json = readBackupJson(uri)
@@ -67,7 +70,11 @@ class DataBackupService(
 
     suspend fun importBackup(uri: Uri): BackupImportSummary {
         val json = readBackupJson(uri)
-        val summary = previewImport(uri)
+        return importBackupJson(json)
+    }
+
+    suspend fun importBackupJson(json: JSONObject): BackupImportSummary {
+        val summary = backupSummary(json)
         importSettings(json.optJSONObject("settings"))
         importDailyGoal(json.optJSONObject("dailyGoal"))
         importTemplates(json.optJSONArray("templates"))
@@ -79,8 +86,20 @@ class DataBackupService(
         return summary
     }
 
+    private fun backupSummary(json: JSONObject): BackupImportSummary {
+        return BackupImportSummary(
+            schemaVersion = json.optInt("schemaVersion", 1),
+            exportedAt = json.optLong("exportedAt", 0L),
+            templateCount = json.optJSONArray("templates")?.length() ?: 0,
+            eyeStatDays = json.optJSONArray("dailyEyeStats")?.length() ?: 0,
+            pomodoroStatDays = json.optJSONArray("dailyPomodoroStats")?.length() ?: 0,
+            entitlementCount = json.optJSONArray("entitlements")?.length() ?: 0,
+            reminderPlanCount = json.optJSONArray("reminderPlans")?.length() ?: 0,
+        )
+    }
+
     private suspend fun buildBackupJson(): JSONObject {
-        val settings = SettingsRepository(database.appSettingsDao(), eyeCarePreferences).getOrDefault()
+        val settings = settingsRepository().getOrDefault()
         return JSONObject()
             .put("schemaVersion", 1)
             .put("exportedAt", System.currentTimeMillis())
@@ -102,9 +121,13 @@ class DataBackupService(
         return JSONObject(text)
     }
 
+    private fun settingsRepository(): SettingsRepository {
+        return SettingsRepository(database.appSettingsDao(), eyeCarePreferences, deviceInstallationIdProvider)
+    }
+
     private suspend fun importSettings(json: JSONObject?) {
         if (json == null) return
-        val current = SettingsRepository(database.appSettingsDao(), eyeCarePreferences).getOrDefault()
+        val current = settingsRepository().getOrDefault()
         val imported = current.copy(
             languageCode = json.optString("languageCode", current.languageCode),
             themeMode = json.optString("themeMode", current.themeMode),

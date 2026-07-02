@@ -25,12 +25,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BatterySaver
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Sensors
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -58,6 +60,7 @@ import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.R
 import com.projectlumen.app.core.api.ProjectLumenApiConfig
+import com.projectlumen.app.core.api.ProjectLumenApiTrace
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
@@ -74,6 +77,8 @@ internal fun DeveloperDebugScreen(
     val context = LocalContext.current
     val permissionRequirements = rememberPermissionRequirements()
     val shizukuState = viewModel.shizukuState.collectAsStateWithLifecycle().value
+    val remoteState = viewModel.remoteState.collectAsStateWithLifecycle().value
+    val apiTraces = viewModel.apiDiagnostics.collectAsStateWithLifecycle().value
     val luxHistory = remember { mutableStateListOf<Float>() }
     LaunchedEffect(runtime.ambientLastLux, uiState.nowMillis) {
         luxHistory += runtime.ambientLastLux.coerceAtLeast(0f)
@@ -234,6 +239,29 @@ internal fun DeveloperDebugScreen(
                     stringResource(R.string.developer_security_webview_disabled)
                 },
             )
+            DeveloperMetricRow(R.string.developer_api_last_operation, remoteState.lastOperation)
+            if (remoteState.errorMessage.isNotBlank()) {
+                DeveloperMetricRow(R.string.developer_api_last_error, remoteState.errorMessage)
+            }
+            DeveloperMetricRow(R.string.developer_api_recent_count, apiTraces.size.toString())
+            LumenFlowRow {
+                Button(onClick = viewModel::checkRemoteHealth) {
+                    DeveloperButtonLabel(Icons.Outlined.Sync, R.string.developer_api_probe_health)
+                }
+                OutlinedButton(
+                    onClick = viewModel::clearApiDiagnostics,
+                    enabled = apiTraces.isNotEmpty(),
+                ) {
+                    DeveloperButtonLabel(Icons.Outlined.DeleteSweep, R.string.developer_api_clear_logs)
+                }
+            }
+            if (apiTraces.isEmpty()) {
+                DeveloperNote(stringResource(R.string.developer_api_no_requests))
+            } else {
+                apiTraces.take(MAX_API_TRACE_CARDS).forEach { trace ->
+                    DeveloperApiTraceCard(trace)
+                }
+            }
         }
 
         SettingsSection(R.string.developer_section_raw_sensors, Icons.Outlined.Sensors) {
@@ -271,6 +299,99 @@ internal fun DeveloperDebugScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DeveloperApiTraceCard(trace: ProjectLumenApiTrace) {
+    val statusColor = if (trace.successful) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.error
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.developer_api_trace_title, trace.method, trace.path),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold,
+            softWrap = true,
+        )
+        Text(
+            text = traceStatusLabel(trace),
+            style = MaterialTheme.typography.bodySmall,
+            color = statusColor,
+            fontWeight = FontWeight.SemiBold,
+            softWrap = true,
+        )
+        ApiTraceLine(R.string.developer_api_trace_url, trace.url)
+        ApiTraceLine(
+            R.string.developer_api_trace_security,
+            stringResource(
+                R.string.developer_api_trace_security_value,
+                trace.signed.toString(),
+                trace.integrityRequested.toString(),
+                trace.authorizationAttached.toString(),
+            ),
+        )
+        ApiTraceLine(R.string.developer_api_trace_request, trace.requestBodyPreview.ifBlank { "-" })
+        ApiTraceLine(R.string.developer_api_trace_response, trace.responseBodyPreview.ifBlank { "-" })
+        if (trace.errorMessage.isNotBlank() || trace.errorType.isNotBlank()) {
+            ApiTraceLine(
+                R.string.developer_api_trace_error,
+                listOf(trace.errorType, trace.errorMessage)
+                    .filter { it.isNotBlank() }
+                    .joinToString(": "),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ApiTraceLine(@StringRes labelRes: Int, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(
+            text = stringResource(labelRes),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.SemiBold,
+        )
+        SelectionContainer {
+            Text(
+                text = smartWrapDebugText(value),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                softWrap = true,
+            )
+        }
+    }
+}
+
+@Composable
+private fun traceStatusLabel(trace: ProjectLumenApiTrace): String {
+    return if (trace.statusCode != null) {
+        stringResource(
+            R.string.developer_api_trace_status,
+            trace.statusCode,
+            trace.durationMillis,
+            timestampLabel(trace.startedAtMillis),
+        )
+    } else {
+        stringResource(
+            R.string.developer_api_trace_no_status,
+            trace.durationMillis,
+            timestampLabel(trace.startedAtMillis),
+        )
     }
 }
 
@@ -531,3 +652,4 @@ private fun createDeveloperCrashPreview(): CrashReport {
 }
 
 private const val DEBUG_WRAP_COLUMN = 36
+private const val MAX_API_TRACE_CARDS = 8

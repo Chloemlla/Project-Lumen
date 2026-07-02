@@ -222,6 +222,7 @@ internal fun SettingsScreen(
     val writeSettingsPermissionNeeded = permissionRequirements.writeSettings
     val shizukuNativeBrightnessEnabled = settings.shizukuAdvancedModeEnabled && settings.shizukuNativeEyeProtectionEnabled
     val backupImportPreview by viewModel.backupImportPreview.collectAsStateWithLifecycle()
+    val remoteState by viewModel.remoteState.collectAsStateWithLifecycle()
     val shizukuState by viewModel.shizukuState.collectAsStateWithLifecycle()
     var pendingBackupImportUri by remember { mutableStateOf<Uri?>(null) }
     var showProximityCalibrationDialog by rememberSaveable { mutableStateOf(false) }
@@ -404,6 +405,17 @@ internal fun SettingsScreen(
                 }
             }
         }
+        RemoteCloudAccountCard(
+            state = remoteState,
+            onCheckHealth = viewModel::checkRemoteHealth,
+            onStartEmailLogin = viewModel::startRemoteEmailLogin,
+            onVerifyEmailLogin = viewModel::verifyRemoteEmailLogin,
+            onRefreshAccount = viewModel::refreshRemoteAccount,
+            onSyncNow = viewModel::syncRemoteNow,
+            onUploadBackup = viewModel::uploadCloudBackup,
+            onRestoreBackup = viewModel::restoreLatestCloudBackup,
+            onSignOut = viewModel::signOutRemote,
+        )
         EyeCareGrowthCapabilityCard(uiState)
         SettingsSection(R.string.about_update_status, Icons.Outlined.Sync, initiallyExpanded = false) {
             if (checkingUpdate) {

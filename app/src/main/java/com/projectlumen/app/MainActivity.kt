@@ -38,6 +38,8 @@ open class MainActivity : ComponentActivity() {
                             audio = app.audio,
                             export = app.export,
                             backup = app.backup,
+                            apiClient = app.apiClient,
+                            secureCredentials = app.secureCredentials,
                             eyeCarePreferences = app.eyeCarePreferences,
                             startTimerService = app::startTimerService,
                             stopTimerService = app::stopTimerService,
