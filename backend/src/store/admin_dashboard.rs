@@ -23,8 +23,10 @@ impl AppStore {
     pub async fn admin_dashboard_snapshot(&self) -> Result<AdminDashboardResponse, ApiError> {
         let users = self.recent_users().await?;
         let user_ids = users.iter().map(|user| user.id.clone()).collect::<Vec<_>>();
-        let (latest_sync_by_user, entitlements) =
-            tokio::try_join!(self.latest_sync_by_user(&user_ids), self.admin_entitlements(),)?;
+        let (latest_sync_by_user, entitlements) = tokio::try_join!(
+            self.latest_sync_by_user(&user_ids),
+            self.admin_entitlements(),
+        )?;
         let tier_by_user = tier_by_user(&entitlements);
         let profiles = users
             .iter()
@@ -387,7 +389,10 @@ fn device_model(profile: &DeviceProfileTelemetry) -> String {
 fn device_security_summary(diagnostics: Option<&DeviceDiagnosticsTelemetry>) -> String {
     match diagnostics {
         Some(diagnostics) if diagnostics.shizuku_ready => {
-            format!("shizuku ready; {} user apps", diagnostics.user_app_count.max(0))
+            format!(
+                "shizuku ready; {} user apps",
+                diagnostics.user_app_count.max(0)
+            )
         }
         Some(diagnostics) => format!(
             "diagnostics collected; shizuku unavailable; {} user apps",

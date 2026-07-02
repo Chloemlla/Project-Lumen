@@ -19,10 +19,10 @@ pub mod face_analysis;
 pub mod health;
 #[path = "routes/me.rs"]
 pub mod me;
-#[path = "routes/purchases.rs"]
-pub mod purchases;
 #[path = "routes/platform.rs"]
 pub mod platform;
+#[path = "routes/purchases.rs"]
+pub mod purchases;
 #[path = "routes/security.rs"]
 pub mod security;
 #[path = "routes/session.rs"]
