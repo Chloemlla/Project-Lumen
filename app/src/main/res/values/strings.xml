@@ -587,6 +587,8 @@
     <string name="eye_care_permission_notifications_detail">Used for break, pomodoro, distance, dry-eye, and low-light alerts outside the app.</string>
     <string name="eye_care_permission_exact_alarm">Exact alarms</string>
     <string name="eye_care_permission_exact_alarm_detail">Used to keep break and pomodoro timing accurate under Android power management.</string>
+    <string name="eye_care_permission_full_screen">Full-screen reminders</string>
+    <string name="eye_care_permission_full_screen_detail">Used so urgent rest prompts can appear immediately instead of staying only in the notification shade.</string>
     <string name="eye_care_permission_camera">Camera</string>
     <string name="eye_care_permission_camera_detail">Used only for local face-distance and blink estimates; images are not saved by the app.</string>
     <string name="eye_care_permission_overlay">Full-screen overlay</string>
@@ -606,4 +608,21 @@
     <string name="eye_care_growth_status_detail">These are product lanes surfaced from existing client capabilities. Unfinished cloud, family, and AI flows are marked as planned until their full account and backend UI is complete.</string>
     <string name="eye_care_capability_active">Active</string>
     <string name="eye_care_capability_planned">Planned</string>
+    <string name="eye_care_guide_title">Eye-care guided setup</string>
+    <string name="eye_care_guide_message">Follow this checklist to turn the existing protection features into a working daily eye-care loop.</string>
+    <string name="eye_care_guide_step_recommended">Apply the baseline protection profile</string>
+    <string name="eye_care_guide_step_recommended_detail">Turns on reminders, statistics, pre-alerts, distance checks, blink checks, low-light monitoring, and strict rest overlay.</string>
+    <string name="eye_care_guide_step_permissions">Finish required permissions</string>
+    <string name="eye_care_guide_step_permissions_detail">Guides the next missing notification, alarm, camera, overlay, brightness, or Shizuku authorization.</string>
+    <string name="eye_care_guide_step_calibration">Calibrate viewing distance</string>
+    <string name="eye_care_guide_step_calibration_detail">Records a comfortable posture so near-distance warnings have a personal baseline.</string>
+    <string name="eye_care_guide_step_first_session">Run the first eye-care session</string>
+    <string name="eye_care_guide_step_first_session_detail">Starts the 20-20-20 reminder loop and begins collecting useful local statistics.</string>
+    <string name="eye_care_guide_step_report">Review and export a report</string>
+    <string name="eye_care_guide_step_report_detail">After several active days, use the health report and PDF export to review trends.</string>
+    <string name="eye_care_guide_fix_next_permission">Fix next permission</string>
+    <string name="eye_care_guide_calibrate_now">Calibrate distance</string>
+    <string name="eye_care_guide_start_session">Start session</string>
+    <string name="eye_care_guide_done">Done</string>
+    <string name="eye_care_guide_pending">Pending</string>
 </resources>

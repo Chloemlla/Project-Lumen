@@ -69,6 +69,103 @@ internal data class EyeCareInsightSummary(
     val actionRes: List<Int>,
 )
 
+private data class EyeCareGuideStep(
+    val icon: ImageVector,
+    @StringRes val titleRes: Int,
+    @StringRes val detailRes: Int,
+    val complete: Boolean,
+)
+
+@Composable
+internal fun EyeCareGuidedSetupCard(
+    uiState: ProjectLumenUiState,
+    permissionRequirements: PermissionRequirements,
+    shizukuReady: Boolean,
+    canStartReminder: Boolean,
+    onApplyRecommended: () -> Unit,
+    onResolveNextPermission: () -> Unit,
+    onCalibrateDistance: () -> Unit,
+    onStartReminder: () -> Unit,
+    onExportReport: () -> Unit,
+) {
+    val summary = rememberEyeCareInsightSummary(uiState, permissionRequirements, shizukuReady)
+    val distanceCalibrated = uiState.settings.proximityBaselineEyeDistancePx > 0f ||
+        uiState.settings.proximityBaselineFaceWidthPercent > 0
+    val missingRuntimePermission = summary.missingSetupCount > 0
+    val steps = listOf(
+        EyeCareGuideStep(
+            icon = Icons.Outlined.CheckCircle,
+            titleRes = R.string.eye_care_guide_step_recommended,
+            detailRes = R.string.eye_care_guide_step_recommended_detail,
+            complete = uiState.settings.reminderEnabled &&
+                uiState.settings.statsEnabled &&
+                uiState.settings.proximityMonitoringEnabled &&
+                uiState.settings.blinkMonitoringEnabled &&
+                uiState.settings.ambientLightMonitoringEnabled,
+        ),
+        EyeCareGuideStep(
+            icon = Icons.Outlined.Lock,
+            titleRes = R.string.eye_care_guide_step_permissions,
+            detailRes = R.string.eye_care_guide_step_permissions_detail,
+            complete = !missingRuntimePermission,
+        ),
+        EyeCareGuideStep(
+            icon = Icons.Outlined.PhotoCamera,
+            titleRes = R.string.eye_care_guide_step_calibration,
+            detailRes = R.string.eye_care_guide_step_calibration_detail,
+            complete = !uiState.settings.proximityMonitoringEnabled || distanceCalibrated,
+        ),
+        EyeCareGuideStep(
+            icon = Icons.Outlined.Schedule,
+            titleRes = R.string.eye_care_guide_step_first_session,
+            detailRes = R.string.eye_care_guide_step_first_session_detail,
+            complete = uiState.eyeStats.any { it.workingSeconds > 0L || it.completedBreakCount > 0 },
+        ),
+        EyeCareGuideStep(
+            icon = Icons.Outlined.BarChart,
+            titleRes = R.string.eye_care_guide_step_report,
+            detailRes = R.string.eye_care_guide_step_report_detail,
+            complete = uiState.eyeStats.size >= 3,
+        ),
+    )
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        shape = LumenCardShape,
+        colors = lumenCardColors(),
+        elevation = lumenCardElevation(),
+        border = lumenCardBorder(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeader(Icons.Outlined.Spa, R.string.eye_care_guide_title)
+            Text(
+                stringResource(R.string.eye_care_guide_message),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            steps.forEach { step -> GuideStepLine(step) }
+            LumenFlowRow {
+                Button(onClick = onApplyRecommended) {
+                    ButtonLabel(Icons.Outlined.CheckCircle, R.string.eye_care_apply_recommended)
+                }
+                OutlinedButton(onClick = onResolveNextPermission) {
+                    ButtonLabel(Icons.Outlined.Lock, R.string.eye_care_guide_fix_next_permission)
+                }
+                OutlinedButton(onClick = onCalibrateDistance) {
+                    ButtonLabel(Icons.Outlined.PhotoCamera, R.string.eye_care_guide_calibrate_now)
+                }
+                OutlinedButton(onClick = onStartReminder, enabled = canStartReminder) {
+                    ButtonLabel(Icons.Outlined.Schedule, R.string.eye_care_guide_start_session)
+                }
+                OutlinedButton(onClick = onExportReport) {
+                    ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 internal fun EyeCareInsightsHomeCard(
     uiState: ProjectLumenUiState,
@@ -219,6 +316,12 @@ internal fun EyeCareSetupAndPrivacyCard(
                 titleRes = R.string.eye_care_permission_exact_alarm,
                 detailRes = R.string.eye_care_permission_exact_alarm_detail,
                 satisfied = !permissionRequirements.exactAlarm,
+            )
+            PermissionTransparencyLine(
+                icon = Icons.Outlined.NotificationsActive,
+                titleRes = R.string.eye_care_permission_full_screen,
+                detailRes = R.string.eye_care_permission_full_screen_detail,
+                satisfied = !permissionRequirements.fullScreenIntent || !uiState.settings.notificationEnabled,
             )
             PermissionTransparencyLine(
                 icon = Icons.Outlined.PhotoCamera,
@@ -393,6 +496,7 @@ private fun rememberEyeCareInsightSummary(
     val missingSetupCount = listOf(
         permissionRequirements.notification && uiState.settings.notificationEnabled,
         permissionRequirements.exactAlarm && uiState.settings.notificationEnabled,
+        permissionRequirements.fullScreenIntent && uiState.settings.notificationEnabled,
         permissionRequirements.camera && (uiState.settings.proximityMonitoringEnabled || uiState.settings.blinkMonitoringEnabled),
         permissionRequirements.overlay && uiState.settings.globalOverlayEnabled,
         permissionRequirements.writeSettings && uiState.settings.autoBrightnessEnabled &&
@@ -476,6 +580,7 @@ private fun calculateRiskScore(
     val setupPenalty = listOf(
         permissionRequirements.notification,
         permissionRequirements.exactAlarm,
+        permissionRequirements.fullScreenIntent,
         permissionRequirements.camera,
         permissionRequirements.overlay,
         permissionRequirements.writeSettings,
@@ -558,6 +663,42 @@ private fun InsightActionList(actions: List<Int>) {
         actions.distinct().forEach { actionRes ->
             StatusLine(Icons.Outlined.CheckCircle, stringResource(actionRes))
         }
+    }
+}
+
+@Composable
+private fun GuideStepLine(step: EyeCareGuideStep) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (step.complete) 0.22f else 0.34f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = if (step.complete) Icons.Outlined.CheckCircle else step.icon,
+            contentDescription = null,
+            tint = if (step.complete) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                stringResource(step.titleRes),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                stringResource(step.detailRes),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        StatusPill(
+            if (step.complete) Icons.Outlined.CheckCircle else Icons.Outlined.Schedule,
+            if (step.complete) R.string.eye_care_guide_done else R.string.eye_care_guide_pending,
+        )
     }
 }
 

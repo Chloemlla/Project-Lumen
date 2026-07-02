@@ -214,9 +214,42 @@ internal fun HomeScreen(
     val canResumeReminder = uiState.settings.reminderEnabled && reminderPaused
     val permissionRequirements = rememberPermissionRequirements()
     val shizukuState by viewModel.shizukuState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val runWithNotificationPermission = rememberNotificationPermissionGate()
+    val runWithCameraPermission = rememberCameraPermissionGate()
     fun runReminderAction(action: () -> Unit) {
         if (uiState.settings.notificationEnabled) runWithNotificationPermission(action) else action()
+    }
+    fun resolveNextEyeCarePermission() {
+        when {
+            permissionRequirements.notification -> runWithNotificationPermission {
+                viewModel.setNotificationsEnabled(true)
+            }
+            permissionRequirements.exactAlarm -> openExactAlarmSettings(context)
+            permissionRequirements.fullScreenIntent -> openFullScreenIntentSettings(context)
+            permissionRequirements.camera &&
+                (uiState.settings.proximityMonitoringEnabled || uiState.settings.blinkMonitoringEnabled) -> {
+                runWithCameraPermission {
+                    viewModel.setProximityMonitoringEnabled(true)
+                    viewModel.setBlinkMonitoringEnabled(true)
+                    viewModel.calibrateProximity()
+                }
+            }
+            permissionRequirements.overlay && uiState.settings.globalOverlayEnabled -> openOverlaySettings(context)
+            permissionRequirements.writeSettings && uiState.settings.autoBrightnessEnabled -> openWriteSettings(context)
+            uiState.settings.shizukuAdvancedModeEnabled && !shizukuState.ready -> {
+                viewModel.refreshShizukuState()
+                viewModel.requestShizukuAuthorization()
+            }
+            else -> applyRecommendedEyeCareSettings(viewModel)
+        }
+    }
+    fun calibrateEyeCareDistance() {
+        runWithCameraPermission {
+            viewModel.setProximityMonitoringEnabled(true)
+            viewModel.setBlinkMonitoringEnabled(true)
+            viewModel.calibrateProximity()
+        }
     }
 
     LumenPage {
@@ -228,6 +261,17 @@ internal fun HomeScreen(
         StateCard(uiState.runtime, uiState.nowMillis)
         TodayStatsCard(uiState.eyeStats.firstOrNull())
         GoalProgressCard(uiState)
+        EyeCareGuidedSetupCard(
+            uiState = uiState,
+            permissionRequirements = permissionRequirements,
+            shizukuReady = shizukuState.ready,
+            canStartReminder = canStartReminder,
+            onApplyRecommended = { applyRecommendedEyeCareSettings(viewModel) },
+            onResolveNextPermission = ::resolveNextEyeCarePermission,
+            onCalibrateDistance = ::calibrateEyeCareDistance,
+            onStartReminder = { runReminderAction(viewModel::startReminder) },
+            onExportReport = viewModel::shareMonthlyReportPdf,
+        )
         EyeCareInsightsHomeCard(
             uiState = uiState,
             permissionRequirements = permissionRequirements,

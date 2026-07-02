@@ -585,6 +585,8 @@
     <string name="eye_care_permission_notifications_detail">用于在应用外显示休息、番茄钟、近距离、眼干和低光提醒。</string>
     <string name="eye_care_permission_exact_alarm">精确闹钟</string>
     <string name="eye_care_permission_exact_alarm_detail">用于在 Android 电源管理下保持休息和番茄钟到点准确。</string>
+    <string name="eye_care_permission_full_screen">全屏提醒</string>
+    <string name="eye_care_permission_full_screen_detail">用于让紧急休息提示立即出现，而不是只停留在通知栏。</string>
     <string name="eye_care_permission_camera">摄像头</string>
     <string name="eye_care_permission_camera_detail">仅用于本地人脸距离和眨眼估算，应用不会保存图像。</string>
     <string name="eye_care_permission_overlay">全屏遮罩</string>
@@ -604,4 +606,21 @@
     <string name="eye_care_growth_status_detail">这些是从现有客户端能力延展出的产品方向。云端、家庭和 AI 流程在账号与后端 UI 完整前标记为规划中。</string>
     <string name="eye_care_capability_active">已启用</string>
     <string name="eye_care_capability_planned">规划中</string>
+    <string name="eye_care_guide_title">护眼新手引导</string>
+    <string name="eye_care_guide_message">按这个清单把现有防护能力串成每天可运行的护眼闭环。</string>
+    <string name="eye_care_guide_step_recommended">应用基础防护方案</string>
+    <string name="eye_care_guide_step_recommended_detail">开启提醒、统计、预提醒、距离检测、眨眼检测、低光监测和严格休息遮罩。</string>
+    <string name="eye_care_guide_step_permissions">完成必要权限</string>
+    <string name="eye_care_guide_step_permissions_detail">自动引导下一项缺失的通知、闹钟、摄像头、悬浮窗、亮度或 Shizuku 授权。</string>
+    <string name="eye_care_guide_step_calibration">校准观看距离</string>
+    <string name="eye_care_guide_step_calibration_detail">记录一次舒适姿势，让近距离提醒拥有个人基准。</string>
+    <string name="eye_care_guide_step_first_session">运行第一次护眼会话</string>
+    <string name="eye_care_guide_step_first_session_detail">启动 20-20-20 提醒闭环，并开始积累有用的本地统计。</string>
+    <string name="eye_care_guide_step_report">查看并导出报告</string>
+    <string name="eye_care_guide_step_report_detail">活跃数天后，通过健康报告和 PDF 导出复盘趋势。</string>
+    <string name="eye_care_guide_fix_next_permission">处理下一项权限</string>
+    <string name="eye_care_guide_calibrate_now">校准距离</string>
+    <string name="eye_care_guide_start_session">启动会话</string>
+    <string name="eye_care_guide_done">完成</string>
+    <string name="eye_care_guide_pending">待处理</string>
 </resources>
