@@ -26,7 +26,7 @@ use mongodb::{
     Client, Collection, IndexModel,
 };
 use serde_json::json;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use telemetry::TelemetryUploadRecord;
 
 pub use documents::UserRecord;
@@ -56,11 +56,38 @@ pub struct AppStore {
 
 impl AppStore {
     pub async fn connect(config: &Config) -> Result<Self, ApiError> {
+        let started_at = Instant::now();
+        tracing::info!(
+            phase = "mongodb.options.parse",
+            mongodb_uri = %config.redacted_mongodb_uri(),
+            mongodb_database = %config.mongodb_database,
+            "parsing MongoDB client options"
+        );
         let client_options = ClientOptions::parse(&config.mongodb_uri)
             .await
-            .map_err(database_error)?;
-        let client = Client::with_options(client_options).map_err(database_error)?;
+            .map_err(|error| startup_database_error("mongodb.options.parse", error))?;
+        tracing::info!(
+            phase = "mongodb.options.parse",
+            elapsed_ms = elapsed_ms(&started_at),
+            "MongoDB client options parsed"
+        );
+
+        tracing::info!(phase = "mongodb.client.create", "creating MongoDB client");
+        let client = Client::with_options(client_options)
+            .map_err(|error| startup_database_error("mongodb.client.create", error))?;
+        tracing::info!(
+            phase = "mongodb.client.create",
+            elapsed_ms = elapsed_ms(&started_at),
+            "MongoDB client created"
+        );
+
         let database = client.database(&config.mongodb_database);
+        tracing::info!(
+            phase = "mongodb.database.select",
+            mongodb_database = %config.mongodb_database,
+            elapsed_ms = elapsed_ms(&started_at),
+            "MongoDB database selected"
+        );
         let store = Self {
             users: database.collection("users"),
             login_requests: database.collection("login_requests"),
@@ -83,139 +110,169 @@ impl AppStore {
             admin_releases: database.collection("admin_releases"),
             admin_security_allowlist: database.collection("admin_security_allowlist"),
         };
+        tracing::info!(
+            phase = "mongodb.collections.init",
+            elapsed_ms = elapsed_ms(&started_at),
+            "MongoDB collection handles initialized"
+        );
         store.ensure_indexes().await?;
         store.ensure_admin_defaults().await?;
+        tracing::info!(
+            phase = "mongodb.store.ready",
+            elapsed_ms = elapsed_ms(&started_at),
+            "MongoDB store initialization completed"
+        );
         Ok(store)
     }
 
     async fn ensure_indexes(&self) -> Result<(), ApiError> {
-        self.users
-            .create_index(unique_index("email_unique", doc! { "email": 1 }), None)
-            .await
-            .map_err(database_error)?;
-        self.sessions
-            .create_index(index("session_expiry", doc! { "expiresAt": 1 }), None)
-            .await
-            .map_err(database_error)?;
-        self.sessions
-            .create_index(
-                sparse_unique_index("session_refresh_unique", doc! { "refreshToken": 1 }),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
-        self.api_nonces
-            .create_index(ttl_index("api_nonce_expiry", doc! { "expiresAt": 1 }), None)
-            .await
-            .map_err(database_error)?;
-        self.login_requests
-            .create_index(index("login_request_expiry", doc! { "expiresAt": 1 }), None)
-            .await
-            .map_err(database_error)?;
-        self.entitlements
-            .create_index(
-                index("entitlement_user", doc! { "userId": 1, "purchasedAt": -1 }),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
-        self.sync_changes
-            .create_index(
-                index("sync_user_cursor", doc! { "userId": 1, "cursor": 1 }),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
-        self.telemetry_uploads
-            .create_index(
-                index(
-                    "telemetry_user_received",
-                    doc! { "userId": 1, "receivedAt": -1 },
-                ),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
-        self.telemetry_uploads
-            .create_index(
-                index(
-                    "telemetry_source_received",
-                    doc! { "payload.sourceApp": 1, "receivedAt": -1 },
-                ),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
-        self.face_analysis_frames
-            .create_index(
-                index(
-                    "face_analysis_user_received",
-                    doc! { "userId": 1, "receivedAt": -1 },
-                ),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
-        self.backups
-            .create_index(
-                index(
-                    "backup_user_uploaded",
-                    doc! { "userId": 1, "uploadedAt": -1 },
-                ),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
-        self.admin_sessions
-            .create_index(index("admin_session_expiry", doc! { "expiresAt": 1 }), None)
-            .await
-            .map_err(database_error)?;
-        self.admin_sessions
-            .create_index(
-                unique_index("admin_refresh_unique", doc! { "refreshToken": 1 }),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
-        self.admin_actions
-            .create_index(
-                index("admin_action_recorded", doc! { "recordedAt": -1 }),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
-        self.admin_access_audit
-            .create_index(index("admin_access_at", doc! { "at": -1 }), None)
-            .await
-            .map_err(database_error)?;
-        self.admin_crash_reports
-            .create_index(
-                index("admin_crash_last_seen", doc! { "lastSeenAt": -1 }),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
-        self.admin_releases
-            .create_index(
-                unique_index("admin_release_version", doc! { "versionCode": 1 }),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
-        self.admin_security_allowlist
-            .create_index(
-                unique_index(
-                    "admin_allowlist_origin",
-                    doc! { "origin": 1, "protocol": 1 },
-                ),
-                None,
-            )
-            .await
-            .map_err(database_error)?;
+        let started_at = Instant::now();
+        tracing::info!(phase = "mongodb.indexes.ensure", "ensuring MongoDB indexes");
+        ensure_index(
+            &self.users,
+            "users",
+            unique_index("email_unique", doc! { "email": 1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.sessions,
+            "sessions",
+            index("session_expiry", doc! { "expiresAt": 1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.sessions,
+            "sessions",
+            sparse_unique_index("session_refresh_unique", doc! { "refreshToken": 1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.api_nonces,
+            "api_nonces",
+            ttl_index("api_nonce_expiry", doc! { "expiresAt": 1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.login_requests,
+            "login_requests",
+            index("login_request_expiry", doc! { "expiresAt": 1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.entitlements,
+            "entitlements",
+            index("entitlement_user", doc! { "userId": 1, "purchasedAt": -1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.sync_changes,
+            "sync_changes",
+            index("sync_user_cursor", doc! { "userId": 1, "cursor": 1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.telemetry_uploads,
+            "telemetry_uploads",
+            index(
+                "telemetry_user_received",
+                doc! { "userId": 1, "receivedAt": -1 },
+            ),
+        )
+        .await?;
+        ensure_index(
+            &self.telemetry_uploads,
+            "telemetry_uploads",
+            index(
+                "telemetry_source_received",
+                doc! { "payload.sourceApp": 1, "receivedAt": -1 },
+            ),
+        )
+        .await?;
+        ensure_index(
+            &self.face_analysis_frames,
+            "face_analysis_frames",
+            index(
+                "face_analysis_user_received",
+                doc! { "userId": 1, "receivedAt": -1 },
+            ),
+        )
+        .await?;
+        ensure_index(
+            &self.backups,
+            "backups",
+            index(
+                "backup_user_uploaded",
+                doc! { "userId": 1, "uploadedAt": -1 },
+            ),
+        )
+        .await?;
+        ensure_index(
+            &self.admin_sessions,
+            "admin_sessions",
+            index("admin_session_expiry", doc! { "expiresAt": 1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.admin_sessions,
+            "admin_sessions",
+            unique_index("admin_refresh_unique", doc! { "refreshToken": 1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.admin_actions,
+            "admin_actions",
+            index("admin_action_recorded", doc! { "recordedAt": -1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.admin_access_audit,
+            "admin_access_audit",
+            index("admin_access_at", doc! { "at": -1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.admin_crash_reports,
+            "admin_crash_reports",
+            index("admin_crash_last_seen", doc! { "lastSeenAt": -1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.admin_releases,
+            "admin_releases",
+            unique_index("admin_release_version", doc! { "versionCode": 1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.admin_security_allowlist,
+            "admin_security_allowlist",
+            unique_index(
+                "admin_allowlist_origin",
+                doc! { "origin": 1, "protocol": 1 },
+            ),
+        )
+        .await?;
+        tracing::info!(
+            phase = "mongodb.indexes.ensure",
+            elapsed_ms = elapsed_ms(&started_at),
+            "MongoDB indexes ensured"
+        );
         Ok(())
     }
 
     async fn ensure_admin_defaults(&self) -> Result<(), ApiError> {
+        let started_at = Instant::now();
+        tracing::info!(
+            phase = "mongodb.defaults.ensure",
+            "ensuring MongoDB admin defaults"
+        );
+
+        let default_started_at = Instant::now();
+        tracing::debug!(
+            phase = "mongodb.default.ensure",
+            collection = "admin_templates",
+            default_id = "clear-sky",
+            "ensuring admin template default"
+        );
         self.admin_templates
             .update_one(
                 doc! { "_id": "clear-sky" },
@@ -229,12 +286,36 @@ impl AppStore {
                         locales: vec!["en".to_owned(), "zh".to_owned()],
                         layout_json: json!({ "countdownStyle": "circle", "showSkipButton": true }),
                         updated_at: 0,
-                    }).map_err(|_| ApiError::Internal)?,
+                    }).map_err(|error| {
+                        tracing::error!(
+                            phase = "mongodb.default.serialize",
+                            collection = "admin_templates",
+                            default_id = "clear-sky",
+                            %error,
+                            "failed to serialize admin template default"
+                        );
+                        ApiError::Internal
+                    })?,
                 },
                 UpdateOptions::builder().upsert(true).build(),
             )
             .await
-            .map_err(database_error)?;
+            .map_err(|error| startup_database_error("mongodb.default.ensure", error))?;
+        tracing::info!(
+            phase = "mongodb.default.ensure",
+            collection = "admin_templates",
+            default_id = "clear-sky",
+            elapsed_ms = elapsed_ms(&default_started_at),
+            "admin template default ensured"
+        );
+
+        let default_started_at = Instant::now();
+        tracing::debug!(
+            phase = "mongodb.default.ensure",
+            collection = "admin_security_allowlist",
+            default_id = "eye-https",
+            "ensuring admin security allowlist default"
+        );
         self.admin_security_allowlist
             .update_one(
                 doc! { "_id": "eye-https" },
@@ -245,12 +326,36 @@ impl AppStore {
                         protocol: "https".to_owned(),
                         risk: "approved".to_owned(),
                         updated_at: 0,
-                    }).map_err(|_| ApiError::Internal)?,
+                    }).map_err(|error| {
+                        tracing::error!(
+                            phase = "mongodb.default.serialize",
+                            collection = "admin_security_allowlist",
+                            default_id = "eye-https",
+                            %error,
+                            "failed to serialize admin security allowlist default"
+                        );
+                        ApiError::Internal
+                    })?,
                 },
                 UpdateOptions::builder().upsert(true).build(),
             )
             .await
-            .map_err(database_error)?;
+            .map_err(|error| startup_database_error("mongodb.default.ensure", error))?;
+        tracing::info!(
+            phase = "mongodb.default.ensure",
+            collection = "admin_security_allowlist",
+            default_id = "eye-https",
+            elapsed_ms = elapsed_ms(&default_started_at),
+            "admin security allowlist default ensured"
+        );
+
+        let default_started_at = Instant::now();
+        tracing::debug!(
+            phase = "mongodb.default.ensure",
+            collection = "admin_releases",
+            default_id = "bootstrap-release",
+            "ensuring admin release default"
+        );
         self.admin_releases
             .update_one(
                 doc! { "_id": "bootstrap-release" },
@@ -263,12 +368,33 @@ impl AppStore {
                         rollout: "blocked".to_owned(),
                         force_update: false,
                         created_at: 0,
-                    }).map_err(|_| ApiError::Internal)?,
+                    }).map_err(|error| {
+                        tracing::error!(
+                            phase = "mongodb.default.serialize",
+                            collection = "admin_releases",
+                            default_id = "bootstrap-release",
+                            %error,
+                            "failed to serialize admin release default"
+                        );
+                        ApiError::Internal
+                    })?,
                 },
                 UpdateOptions::builder().upsert(true).build(),
             )
             .await
-            .map_err(database_error)?;
+            .map_err(|error| startup_database_error("mongodb.default.ensure", error))?;
+        tracing::info!(
+            phase = "mongodb.default.ensure",
+            collection = "admin_releases",
+            default_id = "bootstrap-release",
+            elapsed_ms = elapsed_ms(&default_started_at),
+            "admin release default ensured"
+        );
+        tracing::info!(
+            phase = "mongodb.defaults.ensure",
+            elapsed_ms = elapsed_ms(&started_at),
+            "MongoDB admin defaults ensured"
+        );
         Ok(())
     }
 }
@@ -320,4 +446,52 @@ fn ttl_index(name: &str, keys: mongodb::bson::Document) -> IndexModel {
                 .build(),
         )
         .build()
+}
+
+async fn ensure_index<T>(
+    collection: &Collection<T>,
+    collection_name: &'static str,
+    model: IndexModel,
+) -> Result<(), ApiError>
+where
+    T: Send + Sync,
+{
+    let index_name = model
+        .options
+        .as_ref()
+        .and_then(|options| options.name.as_deref())
+        .unwrap_or("<unnamed>")
+        .to_owned();
+    let started_at = Instant::now();
+    tracing::debug!(
+        phase = "mongodb.index.ensure",
+        collection = collection_name,
+        index = %index_name,
+        "ensuring MongoDB index"
+    );
+    collection
+        .create_index(model, None)
+        .await
+        .map_err(|error| startup_database_error("mongodb.index.ensure", error))?;
+    tracing::info!(
+        phase = "mongodb.index.ensure",
+        collection = collection_name,
+        index = %index_name,
+        elapsed_ms = elapsed_ms(&started_at),
+        "MongoDB index ensured"
+    );
+    Ok(())
+}
+
+fn startup_database_error(phase: &'static str, error: mongodb::error::Error) -> ApiError {
+    tracing::error!(
+        phase = phase,
+        %error,
+        "MongoDB startup operation failed"
+    );
+    ApiError::Internal
+}
+
+fn elapsed_ms(started_at: &Instant) -> u64 {
+    started_at.elapsed().as_millis().min(u128::from(u64::MAX)) as u64
 }

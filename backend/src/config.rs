@@ -53,6 +53,22 @@ impl Config {
             accept_unverified_purchases: env_bool("LUMEN_ACCEPT_UNVERIFIED_PURCHASES", false),
         }
     }
+
+    pub fn redacted_mongodb_uri(&self) -> String {
+        redact_connection_uri(&self.mongodb_uri)
+    }
+
+    pub fn uses_default_admin_password(&self) -> bool {
+        self.admin_password == "change-me"
+    }
+
+    pub fn uses_default_login_code(&self) -> bool {
+        self.login_code == "000000"
+    }
+
+    pub fn uses_default_request_signing_secret(&self) -> bool {
+        self.request_signing_secret == "project-lumen-local-request-signing-key"
+    }
 }
 
 fn env_value(key: &str, default: &str) -> String {
@@ -85,4 +101,28 @@ fn normalize_prefix(value: &str) -> String {
     } else {
         format!("/{trimmed}")
     }
+}
+
+fn redact_connection_uri(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return "<empty>".to_owned();
+    }
+
+    let (scheme_prefix, remainder) = trimmed
+        .split_once("://")
+        .map(|(scheme, rest)| (format!("{scheme}://"), rest))
+        .unwrap_or_else(|| (String::new(), trimmed));
+    let authority_end = remainder
+        .char_indices()
+        .find_map(|(index, character)| matches!(character, '/' | '?' | '#').then_some(index))
+        .unwrap_or(remainder.len());
+    let (authority, suffix) = remainder.split_at(authority_end);
+    let redacted_authority = authority
+        .rsplit_once('@')
+        .map(|(_, host)| format!("***@{host}"))
+        .unwrap_or_else(|| authority.to_owned());
+    let suffix_without_query = suffix.split('?').next().unwrap_or(suffix);
+
+    format!("{scheme_prefix}{redacted_authority}{suffix_without_query}")
 }
