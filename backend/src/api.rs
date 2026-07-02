@@ -1,5 +1,6 @@
 use crate::state::AppState;
 use axum::{middleware, Router};
+use std::path::PathBuf;
 use tower_http::services::{ServeDir, ServeFile};
 
 #[path = "routes/admin.rs"]
@@ -30,6 +31,9 @@ pub mod telemetry;
 pub fn router(state: AppState) -> Router {
     let prefix = state.config.api_prefix.clone();
     let admin_static_dir = state.config.admin_static_dir.clone();
+    let admin_static_path = PathBuf::from(&admin_static_dir);
+    let admin_assets_dir = admin_static_path.join("assets");
+    let admin_index_file = admin_static_path.join("index.html");
     let v1 = Router::new()
         .nest("/auth", session::router())
         .merge(me::router())
@@ -54,11 +58,12 @@ pub fn router(state: AppState) -> Router {
 
     Router::new()
         .nest(&prefix, api)
+        .nest_service("/assets", ServeDir::new(admin_assets_dir))
         .nest_service(
             "/admin",
             ServeDir::new(&admin_static_dir)
                 .append_index_html_on_directories(true)
-                .fallback(ServeFile::new(format!("{admin_static_dir}/index.html"))),
+                .fallback(ServeFile::new(admin_index_file)),
         )
         .with_state(state)
 }
