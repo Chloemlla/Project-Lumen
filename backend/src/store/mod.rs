@@ -211,6 +211,15 @@ impl AppStore {
         )
         .await?;
         ensure_index(
+            &self.telemetry_uploads,
+            "telemetry_uploads",
+            index(
+                "telemetry_received_recent",
+                doc! { "receivedAt": -1, "_id": -1 },
+            ),
+        )
+        .await?;
+        ensure_index(
             &self.face_analysis_frames,
             "face_analysis_frames",
             index(

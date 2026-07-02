@@ -1,24 +1,30 @@
-use super::{database_error, documents::*, time::now_millis, AppStore};
+use super::{
+    database_error, documents::*, telemetry::TelemetryUploadRecord, time::now_millis, AppStore,
+};
 use crate::{
     error::ApiError,
     models::{
-        AdminAccessAuditEntry, AdminBackupSnapshot, AdminBackupSummary, AdminContentSection,
-        AdminDashboardResponse, AdminEntitlementItem, AdminObservabilitySection,
-        AdminPurchaseAuditEntry, AdminReleaseSection, AdminUserProfile, AdminUsersSection,
+        AdminAccessAuditEntry, AdminApiMetric, AdminBackupSnapshot, AdminBackupSummary,
+        AdminContentSection, AdminDashboardResponse, AdminDeviceAsset, AdminEntitlementItem,
+        AdminObservabilitySection, AdminPurchaseAuditEntry, AdminReleaseSection,
+        AdminRouteStatusItem, AdminUserProfile, AdminUsersSection, DeviceDiagnosticsTelemetry,
+        DeviceProfileTelemetry,
     },
 };
 use futures_util::TryStreamExt;
-use mongodb::{bson::doc, options::FindOptions};
+use mongodb::{
+    bson::{doc, Bson},
+    options::FindOptions,
+};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 impl AppStore {
     pub async fn admin_dashboard_snapshot(&self) -> Result<AdminDashboardResponse, ApiError> {
-        let (users, latest_sync_by_user, entitlements) = tokio::try_join!(
-            self.recent_users(),
-            self.latest_sync_by_user(),
-            self.admin_entitlements(),
-        )?;
+        let users = self.recent_users().await?;
+        let user_ids = users.iter().map(|user| user.id.clone()).collect::<Vec<_>>();
+        let (latest_sync_by_user, entitlements) =
+            tokio::try_join!(self.latest_sync_by_user(&user_ids), self.admin_entitlements(),)?;
         let tier_by_user = tier_by_user(&entitlements);
         let profiles = users
             .iter()
@@ -48,6 +54,7 @@ impl AppStore {
             telemetry,
             releases,
             allowlist,
+            devices,
         ) = tokio::try_join!(
             self.access_audit(),
             self.purchase_audit(),
@@ -59,17 +66,19 @@ impl AppStore {
             self.telemetry(),
             self.releases(),
             self.security_allowlist(),
+            self.device_assets(),
         )?;
         let clean_stack = crash_groups
             .first()
             .map(|group| group.clean_stack.clone())
             .unwrap_or_default();
+        let routes = route_status(&api_metrics);
 
         Ok(AdminDashboardResponse {
             generated_at: now_millis(),
             users: AdminUsersSection {
                 profiles,
-                devices: Vec::new(),
+                devices,
                 access_audit,
                 entitlements,
                 purchase_audit,
@@ -87,7 +96,7 @@ impl AppStore {
             },
             release: AdminReleaseSection {
                 releases,
-                routes: Vec::new(),
+                routes,
                 allowlist,
             },
         })
@@ -107,25 +116,32 @@ impl AppStore {
             .map_err(database_error)
     }
 
-    async fn latest_sync_by_user(&self) -> Result<HashMap<String, i64>, ApiError> {
-        let options = FindOptions::builder()
-            .sort(doc! { "cursor": -1 })
-            .limit(200)
-            .build();
-        let changes: Vec<StoredSyncChange> = self
+    async fn latest_sync_by_user(
+        &self,
+        user_ids: &[String],
+    ) -> Result<HashMap<String, i64>, ApiError> {
+        if user_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let pipeline = vec![
+            doc! { "$match": { "userId": { "$in": user_ids.to_vec() } } },
+            doc! {
+                "$group": {
+                    "_id": "$userId",
+                    "lastSyncAt": { "$max": "$change.updatedAt" },
+                },
+            },
+        ];
+        let mut cursor = self
             .sync_changes
-            .find(doc! {}, options)
-            .await
-            .map_err(database_error)?
-            .try_collect()
+            .aggregate(pipeline, None)
             .await
             .map_err(database_error)?;
         let mut latest: HashMap<String, i64> = HashMap::new();
-        for change in changes {
-            latest
-                .entry(change.user_id)
-                .and_modify(|value| *value = (*value).max(change.change.updated_at))
-                .or_insert(change.change.updated_at);
+        while let Some(row) = cursor.try_next().await.map_err(database_error)? {
+            if let Ok(user_id) = row.get_str("_id") {
+                latest.insert(user_id.to_owned(), bson_i64(row.get("lastSyncAt")));
+            }
         }
         Ok(latest)
     }
@@ -154,6 +170,81 @@ impl AppStore {
                 status: entry.status,
             })
             .collect())
+    }
+
+    async fn device_assets(&self) -> Result<Vec<AdminDeviceAsset>, ApiError> {
+        let options = FindOptions::builder()
+            .sort(doc! { "receivedAt": -1 })
+            .limit(200)
+            .build();
+        let telemetry_rows: Vec<TelemetryUploadRecord> = self
+            .telemetry_uploads
+            .find(doc! { "deviceInstallationId": { "$ne": "" } }, options)
+            .await
+            .map_err(database_error)?
+            .try_collect()
+            .await
+            .map_err(database_error)?;
+
+        let mut devices_by_id: HashMap<String, AdminDeviceAsset> = HashMap::new();
+        for row in telemetry_rows {
+            let device_installation_id = row.device_installation_id.trim().to_owned();
+            if device_installation_id.is_empty()
+                || devices_by_id.contains_key(&device_installation_id)
+            {
+                continue;
+            }
+            devices_by_id.insert(
+                device_installation_id.clone(),
+                AdminDeviceAsset {
+                    user_id: row.user_id,
+                    device_installation_id,
+                    model: device_model(&row.payload.device_profile),
+                    version_code: row.payload.device_profile.app_version_code,
+                    last_seen_at: row.received_at,
+                    local_security_config: device_security_summary(
+                        row.payload.device_diagnostics.as_ref(),
+                    ),
+                },
+            );
+        }
+
+        let options = FindOptions::builder()
+            .sort(doc! { "uploadedAt": -1 })
+            .limit(200)
+            .build();
+        let backup_rows: Vec<BackupRecord> = self
+            .backups
+            .find(doc! { "deviceInstallationId": { "$ne": "" } }, options)
+            .await
+            .map_err(database_error)?
+            .try_collect()
+            .await
+            .map_err(database_error)?;
+        for row in backup_rows {
+            let device_installation_id = row.device_installation_id.trim().to_owned();
+            if device_installation_id.is_empty()
+                || devices_by_id.contains_key(&device_installation_id)
+            {
+                continue;
+            }
+            devices_by_id.insert(
+                device_installation_id.clone(),
+                AdminDeviceAsset {
+                    user_id: row.user_id,
+                    device_installation_id,
+                    model: "not reported".to_owned(),
+                    version_code: 0,
+                    last_seen_at: row.uploaded_at,
+                    local_security_config: "not reported".to_owned(),
+                },
+            );
+        }
+
+        let mut devices = devices_by_id.into_values().collect::<Vec<_>>();
+        devices.sort_by(|left, right| right.last_seen_at.cmp(&left.last_seen_at));
+        devices.truncate(25);
+        Ok(devices)
     }
 
     async fn admin_entitlements(&self) -> Result<Vec<AdminEntitlementItem>, ApiError> {
@@ -234,6 +325,40 @@ impl AppStore {
     }
 }
 
+fn bson_i64(value: Option<&Bson>) -> i64 {
+    match value {
+        Some(Bson::Int32(value)) => i64::from(*value),
+        Some(Bson::Int64(value)) => *value,
+        Some(Bson::Double(value)) => *value as i64,
+        _ => 0,
+    }
+}
+
+fn device_model(profile: &DeviceProfileTelemetry) -> String {
+    let manufacturer = profile.manufacturer.trim();
+    let model = profile.model.trim();
+    match (manufacturer.is_empty(), model.is_empty()) {
+        (true, true) => "not reported".to_owned(),
+        (true, false) => model.to_owned(),
+        (false, true) => manufacturer.to_owned(),
+        (false, false) if model.starts_with(manufacturer) => model.to_owned(),
+        (false, false) => format!("{manufacturer} {model}"),
+    }
+}
+
+fn device_security_summary(diagnostics: Option<&DeviceDiagnosticsTelemetry>) -> String {
+    match diagnostics {
+        Some(diagnostics) if diagnostics.shizuku_ready => {
+            format!("shizuku ready; {} user apps", diagnostics.user_app_count.max(0))
+        }
+        Some(diagnostics) => format!(
+            "diagnostics collected; shizuku unavailable; {} user apps",
+            diagnostics.user_app_count.max(0)
+        ),
+        None => "not reported".to_owned(),
+    }
+}
+
 fn backup_summary(backup: &Value) -> AdminBackupSummary {
     AdminBackupSummary {
         templates: json_array_len(backup, "templates"),
@@ -285,4 +410,56 @@ fn mask_token(token: &str) -> String {
         return "****".to_owned();
     }
     format!("{}...{}", &token[..4], &token[token.len() - 4..])
+}
+
+fn route_status(metrics: &[AdminApiMetric]) -> Vec<AdminRouteStatusItem> {
+    let mut seen = HashSet::new();
+    let mut routes = Vec::new();
+    for metric in metrics {
+        let path = metric.endpoint.trim();
+        if path.is_empty() || !seen.insert(path.to_owned()) {
+            continue;
+        }
+        routes.push(AdminRouteStatusItem {
+            module: route_module(path).to_owned(),
+            path: path.to_owned(),
+            state: route_state(metric).to_owned(),
+            p95_ms: metric.p95_ms,
+        });
+    }
+    routes
+}
+
+fn route_module(path: &str) -> &'static str {
+    if path.contains("/auth/") {
+        "routes/session.rs"
+    } else if path.contains("/sync/") {
+        "routes/sync.rs"
+    } else if path.contains("/backups") {
+        "routes/backups.rs"
+    } else if path.contains("/purchases/") {
+        "routes/purchases.rs"
+    } else if path.contains("/telemetry") {
+        "routes/telemetry.rs"
+    } else if path.contains("/face-analysis/") {
+        "routes/face_analysis.rs"
+    } else if path.contains("/admin/") {
+        "routes/admin.rs"
+    } else if path.contains("/entitlements") {
+        "routes/entitlements.rs"
+    } else if path.contains("/me") {
+        "routes/me.rs"
+    } else {
+        "unknown"
+    }
+}
+
+fn route_state(metric: &AdminApiMetric) -> &'static str {
+    if metric.status_5xx > 0 || metric.p95_ms >= 1_000 {
+        "risk"
+    } else if metric.status_4xx > metric.status_2xx || metric.p95_ms >= 300 {
+        "watch"
+    } else {
+        "ok"
+    }
 }
