@@ -302,6 +302,7 @@ internal fun TemplateColorSwatch(template: TipTemplateEntity) {
 
 @Composable
 internal fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Start, content: @Composable ColumnScope.() -> Unit) {
+    val pageTokens = rememberLumenUiTokens(LocalContext.current).page
     val fallbackScrollState = rememberScrollState()
     val scrollState = LocalLumenPageScrollState.current ?: fallbackScrollState
     Box(
@@ -313,12 +314,19 @@ internal fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Sta
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 720.dp)
+                .widthIn(max = pageTokens.maxContentWidthDp.dp)
                 .verticalScroll(scrollState)
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
-                .padding(PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 18.dp)),
+                .padding(
+                    PaddingValues(
+                        start = pageTokens.contentPaddingStartDp.dp,
+                        top = pageTokens.contentPaddingTopDp.dp,
+                        end = pageTokens.contentPaddingEndDp.dp,
+                        bottom = pageTokens.contentPaddingBottomDp.dp,
+                    ),
+                ),
             horizontalAlignment = horizontalAlignment,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(pageTokens.sectionGapDp.dp),
             content = content,
         )
     }

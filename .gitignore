@@ -9,3 +9,5 @@ app/build/
 *.keystore
 bypass-read/
 backend/target/
+tools/lumen-ui-tuner/node_modules/
+tools/lumen-ui-tuner/dist/

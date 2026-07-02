@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "topBar": {
+    "containerStartPaddingDp": 8,
+    "containerEndPaddingDp": 16,
+    "contentTopGapDp": 8,
+    "contentHeightDp": 56,
+    "contentBottomGapDp": 8,
+    "collapseThresholdDp": 72,
+    "primaryTitleStartDp": 40,
+    "secondaryLeadingWidthDp": 48,
+    "titleFontSizeSp": 16,
+    "titleFontWeight": 600,
+    "titleMaxLines": 2,
+    "primaryColor": null,
+    "onPrimaryColor": null,
+    "samplePrimaryTitle": "Home",
+    "sampleSecondaryTitle": "Templates"
+  },
+  "page": {
+    "maxContentWidthDp": 720,
+    "contentPaddingStartDp": 12,
+    "contentPaddingTopDp": 12,
+    "contentPaddingEndDp": 12,
+    "contentPaddingBottomDp": 18,
+    "sectionGapDp": 12
+  },
+  "preview": {
+    "deviceWidthDp": 393,
+    "statusBarHeightDp": 28,
+    "bottomNavigationHeightDp": 80,
+    "backgroundColor": "#F8FAF7",
+    "surfaceColor": "#FFFCFA",
+    "primaryColor": "#126B66",
+    "onPrimaryColor": "#FFFFFF",
+    "outlineColor": "#C4CECA",
+    "textColor": "#263331"
+  },
+  "previewText": {
+    "cardKicker": "Today",
+    "cardTitle": "Eye care dashboard",
+    "metricRest": "Rest 4",
+    "metricFocus": "Focus 72m",
+    "metricBlink": "Blinks 18/m",
+    "metricLight": "Lux stable"
+  }
+}

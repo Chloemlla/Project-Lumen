@@ -153,6 +153,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
@@ -203,14 +204,16 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
+    val uiTokens = rememberLumenUiTokens(LocalContext.current)
+    val topBarTokens = uiTokens.topBar
     val scrollState = LocalLumenPageScrollState.current
     val density = LocalDensity.current
     val topInsetHeight = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
-    val contentTopGap = 8.dp
-    val contentHeight = 56.dp
-    val contentBottomGap = 8.dp
+    val contentTopGap = topBarTokens.contentTopGapDp.dp
+    val contentHeight = topBarTokens.contentHeightDp.dp
+    val contentBottomGap = topBarTokens.contentBottomGapDp.dp
     val expandedTopBarHeight = topInsetHeight + contentTopGap + contentHeight + contentBottomGap
-    val collapseThresholdPx = with(density) { 72.dp.toPx() }
+    val collapseThresholdPx = with(density) { topBarTokens.collapseThresholdDp.dp.toPx() }
     val scrollProgress = ((scrollState?.value ?: 0).toFloat() / collapseThresholdPx).coerceIn(0f, 1f)
     val collapseProgress by animateFloatAsState(
         targetValue = scrollProgress,
@@ -220,6 +223,8 @@ internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
     val topBarAlpha = 1f - collapseProgress
     val visibleTopBarHeight = expandedTopBarHeight * topBarAlpha
     val topBarOffsetY = with(density) { -expandedTopBarHeight.toPx() * collapseProgress }
+    val topBarBackground = topBarTokens.primaryColor ?: MaterialTheme.colorScheme.primary
+    val topBarContentColor = topBarTokens.onPrimaryColor ?: MaterialTheme.colorScheme.onPrimary
 
     Box(
         modifier = Modifier
@@ -231,7 +236,7 @@ internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
             modifier = Modifier
                 .fillMaxWidth()
                 .requiredHeight(expandedTopBarHeight)
-                .background(MaterialTheme.colorScheme.primary)
+                .background(topBarBackground)
                 .graphicsLayer {
                     alpha = topBarAlpha
                     translationY = topBarOffsetY
@@ -241,9 +246,9 @@ internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(
-                        start = 8.dp,
+                        start = topBarTokens.containerStartPaddingDp.dp,
                         top = topInsetHeight + contentTopGap,
-                        end = 16.dp,
+                        end = topBarTokens.containerEndPaddingDp.dp,
                     )
                     .height(contentHeight),
                 verticalAlignment = Alignment.CenterVertically,
@@ -251,16 +256,16 @@ internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
                 if (onNavigateBack != null) {
                     IconButton(
                         onClick = onNavigateBack,
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(topBarTokens.secondaryLeadingWidthDp.dp),
                     ) {
                         Icon(
                             Icons.AutoMirrored.Outlined.ArrowBack,
                             contentDescription = stringResource(R.string.navigate_back),
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = topBarContentColor,
                         )
                     }
                 } else {
-                    Spacer(modifier = Modifier.width(40.dp))
+                    Spacer(modifier = Modifier.width(topBarTokens.primaryTitleStartDp.dp))
                 }
                 Box(
                     modifier = Modifier
@@ -270,10 +275,10 @@ internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
                 ) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        maxLines = 2,
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = topBarTokens.titleFontSizeSp.sp),
+                        fontWeight = FontWeight(topBarTokens.titleFontWeight),
+                        color = topBarContentColor,
+                        maxLines = topBarTokens.titleMaxLines,
                         softWrap = true,
                         overflow = TextOverflow.Ellipsis,
                     )
