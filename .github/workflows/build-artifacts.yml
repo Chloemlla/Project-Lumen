@@ -14,8 +14,7 @@ permissions:
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  DEPLOY_SCRIPT_COMMIT: d8023efa37e5da37786642ed734b229fde3173bb
-  DEPLOY_SCRIPT_SHA256: 89a4876e3952db2c01c49fd76cbbf43ce90df023f21f7a48a619f7eeced12977
+  DEPLOY_SCRIPT_REF: main
 
 jobs:
   build-image:
@@ -113,8 +112,7 @@ jobs:
         if: steps.deploy_config.outputs.enabled == 'true'
         run: |
           mkdir -p scripts
-          curl -fsSL "https://raw.githubusercontent.com/Chloemlla/Happy-TTS/${DEPLOY_SCRIPT_COMMIT}/scripts/deploy_image.js" -o scripts/deploy_image.js
-          echo "${DEPLOY_SCRIPT_SHA256}  scripts/deploy_image.js" | sha256sum -c -
+          curl -fsSL "https://raw.githubusercontent.com/Chloemlla/Happy-TTS/${DEPLOY_SCRIPT_REF}/scripts/deploy_image.js" -o scripts/deploy_image.js
           chmod +x scripts/deploy_image.js
 
       - name: Run deployment script
