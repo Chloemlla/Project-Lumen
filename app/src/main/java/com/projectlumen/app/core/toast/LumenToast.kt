@@ -201,19 +201,19 @@ object LumenToast {
             gravity = Gravity.TOP
             setPadding((0 * density).toInt(), 0, (14 * density).toInt(), 0)
             background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
-                Color.argb(248, 18, 24, 30),
-                Color.argb(244, 27, 34, 42),
+                Color.argb(226, 255, 255, 255),
+                Color.argb(206, 247, 249, 252),
             )).apply {
                 setCornerRadius(cornerRadius)
-                setStroke(strokeWidth, Color.argb(190, 82, 92, 106))
+                setStroke(strokeWidth, Color.argb(210, 255, 255, 255))
             }
-            elevation = 12 * density
+            elevation = 10 * density
             clipToOutline = true
         }
         val accentRail = View(context).apply {
             background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(
-                Color.argb(255, Color.red(kind.accentColor), Color.green(kind.accentColor), Color.blue(kind.accentColor)),
-                Color.argb(130, Color.red(kind.accentColor), Color.green(kind.accentColor), Color.blue(kind.accentColor)),
+                Color.argb(210, Color.red(kind.accentColor), Color.green(kind.accentColor), Color.blue(kind.accentColor)),
+                Color.argb(96, Color.red(kind.accentColor), Color.green(kind.accentColor), Color.blue(kind.accentColor)),
             )).apply {
                 cornerRadii = floatArrayOf(cornerRadius, cornerRadius, 0f, 0f, 0f, 0f, cornerRadius, cornerRadius)
             }
@@ -227,8 +227,8 @@ object LumenToast {
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.argb(42, Color.red(kind.accentColor), Color.green(kind.accentColor), Color.blue(kind.accentColor)))
-                setStroke(strokeWidth, Color.argb(220, Color.red(kind.accentColor), Color.green(kind.accentColor), Color.blue(kind.accentColor)))
+                setColor(Color.argb(124, 255, 255, 255))
+                setStroke(strokeWidth, Color.argb(150, Color.red(kind.accentColor), Color.green(kind.accentColor), Color.blue(kind.accentColor)))
             }
         }
         val iconParams = LinearLayout.LayoutParams((34 * density).toInt(), (34 * density).toInt()).apply {
@@ -244,13 +244,13 @@ object LumenToast {
             textSize = 11f
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.08f
-            setTextColor(Color.argb(210, Color.red(kind.accentColor), Color.green(kind.accentColor), Color.blue(kind.accentColor)))
+            setTextColor(Color.argb(220, Color.red(kind.accentColor), Color.green(kind.accentColor), Color.blue(kind.accentColor)))
             includeFontPadding = false
         }
         val textView = TextView(context).apply {
             text = message
             textSize = 14.5f
-            setTextColor(Color.rgb(244, 247, 251))
+            setTextColor(Color.BLACK)
             maxLines = 3
             includeFontPadding = true
             setLineSpacing(1.5f * density, 1.0f)
