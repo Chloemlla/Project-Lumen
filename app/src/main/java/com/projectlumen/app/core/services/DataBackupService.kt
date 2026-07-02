@@ -230,6 +230,48 @@ class DataBackupService(
                 "shizukuNativeExtraDimPercent",
                 current.shizukuNativeExtraDimPercent,
             ),
+            diagnosticTelemetryUploadEnabled = json.optBoolean(
+                "diagnosticTelemetryUploadEnabled",
+                current.diagnosticTelemetryUploadEnabled,
+            ),
+            diagnosticCrashReportUploadEnabled = json.optBoolean(
+                "diagnosticCrashReportUploadEnabled",
+                current.diagnosticCrashReportUploadEnabled,
+            ),
+            shizukuAppInventoryUploadEnabled = json.optBoolean(
+                "shizukuAppInventoryUploadEnabled",
+                current.shizukuAppInventoryUploadEnabled,
+            ),
+            translationEntryEnabled = json.optBoolean("translationEntryEnabled", current.translationEntryEnabled),
+            developerModeEnabled = json.optBoolean("developerModeEnabled", current.developerModeEnabled),
+            developerDebugOverlayEnabled = json.optBoolean(
+                "developerDebugOverlayEnabled",
+                current.developerDebugOverlayEnabled,
+            ),
+            developerDebugPreviewEnabled = json.optBoolean(
+                "developerDebugPreviewEnabled",
+                current.developerDebugPreviewEnabled,
+            ),
+            developerTickIntervalSeconds = json.optInt(
+                "developerTickIntervalSeconds",
+                current.developerTickIntervalSeconds,
+            ),
+            developerTimeTriggerEnabled = json.optBoolean(
+                "developerTimeTriggerEnabled",
+                current.developerTimeTriggerEnabled,
+            ),
+            developerUnlockTriggerEnabled = json.optBoolean(
+                "developerUnlockTriggerEnabled",
+                current.developerUnlockTriggerEnabled,
+            ),
+            developerStillnessTriggerEnabled = json.optBoolean(
+                "developerStillnessTriggerEnabled",
+                current.developerStillnessTriggerEnabled,
+            ),
+            developerShakeSuppressionEnabled = json.optBoolean(
+                "developerShakeSuppressionEnabled",
+                current.developerShakeSuppressionEnabled,
+            ),
             autoUpdateCheckEnabled = json.optBoolean("autoUpdateCheckEnabled", current.autoUpdateCheckEnabled),
             updatedAt = System.currentTimeMillis(),
         )
@@ -418,6 +460,18 @@ class DataBackupService(
         .put("shizukuNativeBrightnessPercent", shizukuNativeBrightnessPercent)
         .put("shizukuNativeExtraDimEnabled", shizukuNativeExtraDimEnabled)
         .put("shizukuNativeExtraDimPercent", shizukuNativeExtraDimPercent)
+        .put("diagnosticTelemetryUploadEnabled", diagnosticTelemetryUploadEnabled)
+        .put("diagnosticCrashReportUploadEnabled", diagnosticCrashReportUploadEnabled)
+        .put("shizukuAppInventoryUploadEnabled", shizukuAppInventoryUploadEnabled)
+        .put("translationEntryEnabled", translationEntryEnabled)
+        .put("developerModeEnabled", developerModeEnabled)
+        .put("developerDebugOverlayEnabled", developerDebugOverlayEnabled)
+        .put("developerDebugPreviewEnabled", developerDebugPreviewEnabled)
+        .put("developerTickIntervalSeconds", developerTickIntervalSeconds)
+        .put("developerTimeTriggerEnabled", developerTimeTriggerEnabled)
+        .put("developerUnlockTriggerEnabled", developerUnlockTriggerEnabled)
+        .put("developerStillnessTriggerEnabled", developerStillnessTriggerEnabled)
+        .put("developerShakeSuppressionEnabled", developerShakeSuppressionEnabled)
         .put("autoUpdateCheckEnabled", autoUpdateCheckEnabled)
 
     private fun DailyGoalEntity.toJson(): JSONObject = JSONObject()
