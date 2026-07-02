@@ -125,6 +125,32 @@ class ShizukuCapabilityManager(
         return shouldDefer
     }
 
+    suspend fun collectDeviceDiagnostics(includeUserApps: Boolean): ShizukuDeviceDiagnostics = withContext(Dispatchers.IO) {
+        val currentState = queryState()
+        _state.value = currentState
+        if (!currentState.ready) {
+            return@withContext ShizukuDeviceDiagnostics(
+                collectedAt = System.currentTimeMillis(),
+                shizukuReady = false,
+                shizukuServerVersion = currentState.serverVersion,
+                shizukuServerUid = currentState.serverUid,
+                userAppCount = 0,
+                userAppsTruncated = false,
+                userApps = emptyList(),
+            )
+        }
+        val installedApps = if (includeUserApps) latestInstalledUserApps() else emptyList()
+        ShizukuDeviceDiagnostics(
+            collectedAt = System.currentTimeMillis(),
+            shizukuReady = true,
+            shizukuServerVersion = currentState.serverVersion,
+            shizukuServerUid = currentState.serverUid,
+            userAppCount = installedApps.size,
+            userAppsTruncated = installedApps.size > MAX_DIAGNOSTIC_USER_APPS,
+            userApps = installedApps.take(MAX_DIAGNOSTIC_USER_APPS),
+        )
+    }
+
     suspend fun applyNativeEyeProtection(settings: AppSettingsEntity, smooth: Boolean = true): Boolean = withContext(Dispatchers.IO) {
         val currentState = queryState()
         val shouldEnable = settings.shizukuAdvancedModeEnabled && settings.shizukuNativeEyeProtectionEnabled
@@ -552,6 +578,66 @@ class ShizukuCapabilityManager(
         return false
     }
 
+    private fun latestInstalledUserApps(): List<ShizukuInstalledApp> {
+        val result = executeShellCommand(USER_APP_LIST_COMMAND)
+        if (!result.success) return emptyList()
+        return result.output
+            .lineSequence()
+            .mapNotNull { parseInstalledAppLine(it) }
+            .distinctBy { it.packageName }
+            .sortedBy { it.packageName }
+            .toList()
+    }
+
+    private fun parseInstalledAppLine(line: String): ShizukuInstalledApp? {
+        var packageName = ""
+        var installerPackageName = ""
+        var versionCode: Long? = null
+        var uid: Int? = null
+        PACKAGE_LIST_TOKEN_SPLIT_REGEX.split(line.trim())
+            .asSequence()
+            .filter { it.isNotBlank() }
+            .forEach { token ->
+                when {
+                    token.startsWith("package:") -> {
+                        packageName = token
+                            .removePrefix("package:")
+                            .substringAfterLast("=")
+                    }
+                    token.startsWith("installer=") -> {
+                        installerPackageName = token.substringAfter("=")
+                    }
+                    token.startsWith("installerPackageName=") -> {
+                        installerPackageName = token.substringAfter("=")
+                    }
+                    token.startsWith("versionCode:") -> {
+                        versionCode = token.substringAfter(":").toLongOrNull()
+                    }
+                    token.startsWith("versionCode=") -> {
+                        versionCode = token.substringAfter("=").toLongOrNull()
+                    }
+                    token.startsWith("uid:") -> {
+                        uid = token.substringAfter(":").toIntOrNull()
+                    }
+                    token.startsWith("uid=") -> {
+                        uid = token.substringAfter("=").toIntOrNull()
+                    }
+                }
+            }
+        val normalizedPackageName = sanitizePackageToken(packageName)
+        if (!ANDROID_PACKAGE_NAME_REGEX.matches(normalizedPackageName)) return null
+        return ShizukuInstalledApp(
+            packageName = normalizedPackageName,
+            installerPackageName = sanitizePackageToken(installerPackageName).takeIf { it != "null" }.orEmpty(),
+            versionCode = versionCode?.coerceAtLeast(0L),
+            uid = uid?.coerceAtLeast(0),
+        )
+    }
+
+    private fun sanitizePackageToken(value: String): String {
+        return value.trim().take(MAX_PACKAGE_FIELD_LENGTH)
+    }
+
     private data class BatterySnapshot(
         val levelPercent: Int,
         val lowBatteryActive: Boolean,
@@ -602,11 +688,20 @@ class ShizukuCapabilityManager(
         private const val SHELL_SERVICE_BIND_TIMEOUT_MILLIS = 5_000L
         private const val SHIZUKU_SHELL_SERVICE_TAG = "project_lumen_shell_v1"
         private const val SHIZUKU_SHELL_SERVICE_VERSION = 1
+        private const val MAX_DIAGNOSTIC_USER_APPS = 150
+        private const val MAX_PACKAGE_FIELD_LENGTH = 160
+        private const val USER_APP_LIST_COMMAND =
+            "cmd package list packages -3 -i -U --show-versioncode 2>/dev/null || " +
+                "pm list packages -3 -i -U --show-versioncode 2>/dev/null || " +
+                "cmd package list packages -3 -i -U 2>/dev/null || " +
+                "pm list packages -3 -i -U"
 
         private val sensitiveCameraHints = listOf("camera", "camerax", "scanner", "barcode", "qr")
         private val sensitiveCallHints = listOf("call", "voip", "meeting", "conference", "telecom", "zoom", "meet")
         private val sensitiveMediaHints = listOf("player", "video", "fullscreen", "youtube", "netflix", "bilibili", "tiktok")
         private val sensitiveGameHints = listOf("game", "unity", "unreal", "tmgp", "mihoyo", "hoyoverse", "netease")
+        private val PACKAGE_LIST_TOKEN_SPLIT_REGEX = Regex("\\s+")
+        private val ANDROID_PACKAGE_NAME_REGEX = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+")
     }
 }
 

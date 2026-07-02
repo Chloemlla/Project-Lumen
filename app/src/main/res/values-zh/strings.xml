@@ -180,6 +180,14 @@
     <string name="shizuku_quick_native_off">关闭原生护眼</string>
     <string name="shizuku_group_native_eye">原生护眼</string>
     <string name="shizuku_group_sampling_guards">采样守卫</string>
+    <string name="shizuku_group_diagnostics">诊断上传</string>
+    <string name="enable_diagnostic_telemetry_upload">允许诊断上传</string>
+    <string name="diagnostic_telemetry_upload_summary">仅在此开关开启时，向 Project Lumen 后端上传已签名诊断信息。设备画像会被包含；崩溃报告和用户应用清单需要分别开启。</string>
+    <string name="upload_diagnostics_now">立即上传诊断</string>
+    <string name="enable_diagnostic_crash_upload">附带脱敏崩溃报告</string>
+    <string name="enable_shizuku_app_inventory_upload">附带 Shizuku 用户应用清单</string>
+    <string name="shizuku_app_inventory_authorization_needed">应用清单需要 Shizuku 正在运行且已授权。</string>
+    <string name="diagnostic_security_policy">安全策略：请求会签名并鉴权，后端会限流，超大的诊断负载会被拒绝。</string>
     <string name="shizuku_authorize">授权 Shizuku</string>
     <string name="shizuku_refresh_status">刷新状态</string>
     <string name="shizuku_status">Shizuku 状态</string>

@@ -218,6 +218,11 @@ class ProjectLumenViewModel(
         }
     }
     fun requestShizukuAuthorization() = shizuku.requestPermission()
+    fun uploadDiagnosticsNow() {
+        viewModelScope.launch {
+            runCatching { uploadTelemetrySnapshot() }
+        }
+    }
 
     fun selectTemplate(templateId: Long) {
         val state = stateStore.uiState.value

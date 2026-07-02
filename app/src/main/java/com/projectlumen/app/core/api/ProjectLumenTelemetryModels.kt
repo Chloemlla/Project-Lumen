@@ -10,6 +10,7 @@ data class RemoteTelemetryUpload(
     val calibrationAnchor: CalibrationAnchorTelemetry?,
     val aiPerformance: AiPerformanceTelemetry?,
     val developerDebug: DeveloperDebugTelemetry?,
+    val deviceDiagnostics: DeviceDiagnosticsTelemetry?,
 )
 
 data class DailyEyeHealthTelemetry(
@@ -60,6 +61,25 @@ data class DeviceProfileTelemetry(
     val frontCameraResolution: String,
     val appVersionName: String,
     val appVersionCode: Long,
+)
+
+data class DeviceDiagnosticsTelemetry(
+    val consentActiveAt: Long,
+    val collectedAt: Long,
+    val collectionSource: String,
+    val shizukuReady: Boolean,
+    val shizukuServerVersion: Int,
+    val shizukuServerUid: Int,
+    val userAppCount: Int,
+    val userAppsTruncated: Boolean,
+    val userApps: List<InstalledAppTelemetry>,
+)
+
+data class InstalledAppTelemetry(
+    val packageName: String,
+    val installerPackageName: String,
+    val versionCode: Long?,
+    val uid: Int?,
 )
 
 data class CalibrationAnchorTelemetry(

@@ -44,6 +44,7 @@ class ProjectLumenApplication : Application() {
             context = this,
             database = database,
             apiClient = apiClient,
+            shizuku = shizuku,
             accessTokenProvider = {
                 secureCredentials.load()?.accessToken
                     ?: com.projectlumen.app.core.api.ProjectLumenApiConfig.telemetryAccessToken.takeIf { it.isNotBlank() }

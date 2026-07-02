@@ -60,6 +60,7 @@ internal fun ShizukuAdvancedSettingsSection(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 ShizukuQuickActions(settings, state, viewModel)
+                ShizukuDiagnosticUploadSettings(settings, state, viewModel)
                 ShizukuNativeEyeProtectionSettings(settings, viewModel)
                 ShizukuSamplingGuardSettings(settings, viewModel)
                 Text(
@@ -97,6 +98,85 @@ private fun ShizukuStatusSummary(settings: AppSettingsEntity, state: ShizukuCapa
                 state.nativeExtraDimPercent,
             ),
         )
+    }
+}
+
+@Composable
+private fun ShizukuDiagnosticUploadSettings(
+    settings: AppSettingsEntity,
+    state: ShizukuCapabilityState,
+    viewModel: ProjectLumenViewModel,
+) {
+    ShizukuGroupTitle(R.string.shizuku_group_diagnostics)
+    SwitchRow(
+        R.string.enable_diagnostic_telemetry_upload,
+        Icons.Outlined.Info,
+        settings.diagnosticTelemetryUploadEnabled,
+    ) { enabled ->
+        viewModel.updateSettings { current ->
+            current.copy(
+                diagnosticTelemetryUploadEnabled = enabled,
+                diagnosticCrashReportUploadEnabled = if (enabled) {
+                    current.diagnosticCrashReportUploadEnabled
+                } else {
+                    false
+                },
+                shizukuAppInventoryUploadEnabled = if (enabled) {
+                    current.shizukuAppInventoryUploadEnabled
+                } else {
+                    false
+                },
+            )
+        }
+    }
+    AnimatedVisibility(
+        visible = settings.diagnosticTelemetryUploadEnabled,
+        enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+        exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                stringResource(R.string.diagnostic_telemetry_upload_summary),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LumenFlowRow {
+                Button(onClick = viewModel::uploadDiagnosticsNow) {
+                    ButtonLabel(Icons.Outlined.Refresh, R.string.upload_diagnostics_now)
+                }
+            }
+            SwitchRow(
+                R.string.enable_diagnostic_crash_upload,
+                Icons.Outlined.WarningAmber,
+                settings.diagnosticCrashReportUploadEnabled,
+            ) { enabled ->
+                viewModel.updateSettings { current ->
+                    current.copy(diagnosticCrashReportUploadEnabled = enabled)
+                }
+            }
+            SwitchRow(
+                R.string.enable_shizuku_app_inventory_upload,
+                Icons.Outlined.Settings,
+                settings.shizukuAppInventoryUploadEnabled,
+            ) { enabled ->
+                viewModel.updateSettings { current ->
+                    current.copy(
+                        diagnosticTelemetryUploadEnabled = true,
+                        shizukuAdvancedModeEnabled = if (enabled) true else current.shizukuAdvancedModeEnabled,
+                        shizukuAppInventoryUploadEnabled = enabled,
+                    )
+                }
+                if (enabled) viewModel.requestShizukuAuthorization()
+            }
+            if (settings.shizukuAppInventoryUploadEnabled && !state.ready) {
+                StatusLine(Icons.Outlined.Lock, stringResource(R.string.shizuku_app_inventory_authorization_needed))
+            }
+            Text(
+                stringResource(R.string.diagnostic_security_policy),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

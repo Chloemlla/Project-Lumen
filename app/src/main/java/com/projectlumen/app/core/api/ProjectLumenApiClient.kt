@@ -197,7 +197,8 @@ class ProjectLumenApiClient(
     private fun requiresIntegrityToken(path: String): Boolean {
         val normalizedPath = path.substringBefore('?').trimStart('/')
         return normalizedPath.startsWith("v1/auth/") ||
-            normalizedPath == "v1/purchases/google/verify"
+            normalizedPath == "v1/purchases/google/verify" ||
+            normalizedPath == "v1/telemetry"
     }
 
     private fun parseErrorMessage(responseText: String, responseCode: Int): String {

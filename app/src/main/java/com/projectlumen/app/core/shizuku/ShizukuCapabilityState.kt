@@ -47,3 +47,20 @@ data class ShizukuSystemContext(
     val cameraPrivacyEnabled: Boolean,
     val shouldDeferSampling: Boolean,
 )
+
+data class ShizukuDeviceDiagnostics(
+    val collectedAt: Long,
+    val shizukuReady: Boolean,
+    val shizukuServerVersion: Int,
+    val shizukuServerUid: Int,
+    val userAppCount: Int,
+    val userAppsTruncated: Boolean,
+    val userApps: List<ShizukuInstalledApp>,
+)
+
+data class ShizukuInstalledApp(
+    val packageName: String,
+    val installerPackageName: String,
+    val versionCode: Long?,
+    val uid: Int?,
+)

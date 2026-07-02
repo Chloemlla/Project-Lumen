@@ -123,7 +123,9 @@ fn validate_signature(secret: &str, canonical: &str, signature: &str) -> Result<
 }
 
 fn requires_integrity(path: &str) -> bool {
-    path.contains("/v1/auth/") || path.ends_with("/v1/purchases/google/verify")
+    path.contains("/v1/auth/")
+        || path.ends_with("/v1/purchases/google/verify")
+        || path.ends_with("/v1/telemetry")
 }
 
 fn now_millis() -> i64 {

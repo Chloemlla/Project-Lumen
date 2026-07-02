@@ -14,6 +14,8 @@ pub enum ApiError {
     Unauthorized,
     #[error("Forbidden")]
     Forbidden,
+    #[error("Too many requests: {0}")]
+    TooManyRequests(String),
     #[error("Not found: {0}")]
     NotFound(String),
     #[error("Conflict: {0}")]
@@ -28,6 +30,7 @@ impl IntoResponse for ApiError {
             ApiError::BadRequest(_) => StatusCode::BAD_REQUEST,
             ApiError::Unauthorized => StatusCode::UNAUTHORIZED,
             ApiError::Forbidden => StatusCode::FORBIDDEN,
+            ApiError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
             ApiError::NotFound(_) => StatusCode::NOT_FOUND,
             ApiError::Conflict(_) => StatusCode::CONFLICT,
             ApiError::Internal => StatusCode::INTERNAL_SERVER_ERROR,

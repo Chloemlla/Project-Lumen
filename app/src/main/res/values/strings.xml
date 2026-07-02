@@ -180,6 +180,14 @@
     <string name="shizuku_quick_native_off">Native shield off</string>
     <string name="shizuku_group_native_eye">Native eye shield</string>
     <string name="shizuku_group_sampling_guards">Sampling guards</string>
+    <string name="shizuku_group_diagnostics">Diagnostic upload</string>
+    <string name="enable_diagnostic_telemetry_upload">Allow diagnostic uploads</string>
+    <string name="diagnostic_telemetry_upload_summary">Uploads signed diagnostics to the Project Lumen backend only while this setting is enabled. Device profile is included; crash reports and user app inventory are separate opt-ins.</string>
+    <string name="upload_diagnostics_now">Upload diagnostics now</string>
+    <string name="enable_diagnostic_crash_upload">Include sanitized crash reports</string>
+    <string name="enable_shizuku_app_inventory_upload">Include Shizuku user app inventory</string>
+    <string name="shizuku_app_inventory_authorization_needed">App inventory requires Shizuku to be running and authorized.</string>
+    <string name="diagnostic_security_policy">Security policy: requests are signed, authenticated, rate-limited by the backend, and oversized diagnostics are rejected.</string>
     <string name="shizuku_authorize">Authorize Shizuku</string>
     <string name="shizuku_refresh_status">Refresh status</string>
     <string name="shizuku_status">Shizuku status</string>

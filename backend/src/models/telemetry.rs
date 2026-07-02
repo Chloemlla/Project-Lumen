@@ -14,6 +14,7 @@ pub struct TelemetryUploadRequest {
     pub calibration_anchor: Option<CalibrationAnchorTelemetry>,
     pub ai_performance: Option<AiPerformanceTelemetry>,
     pub developer_debug: Option<DeveloperDebugTelemetry>,
+    pub device_diagnostics: Option<DeviceDiagnosticsTelemetry>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -81,6 +82,30 @@ pub struct DeviceProfileTelemetry {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DeviceDiagnosticsTelemetry {
+    pub consent_active_at: i64,
+    pub collected_at: i64,
+    pub collection_source: String,
+    pub shizuku_ready: bool,
+    pub shizuku_server_version: i32,
+    pub shizuku_server_uid: i32,
+    pub user_app_count: i32,
+    pub user_apps_truncated: bool,
+    #[serde(default)]
+    pub user_apps: Vec<InstalledAppTelemetry>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledAppTelemetry {
+    pub package_name: String,
+    pub installer_package_name: String,
+    pub version_code: Option<i64>,
+    pub uid: Option<i32>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CalibrationAnchorTelemetry {
     pub standard_distance_cm: i32,
     pub base_face_width_percent: i32,
@@ -128,6 +153,27 @@ pub struct TelemetryUploadResponse {
     pub accepted: bool,
     pub id: String,
     pub received_at: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TelemetryDebugLatestResponse {
+    pub items: Vec<TelemetryDebugItem>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TelemetryDebugItem {
+    pub id: String,
+    pub device_installation_id: String,
+    pub received_at: i64,
+    pub source_app: String,
+    pub recorded_at: i64,
+    pub has_device_diagnostics: bool,
+    pub diagnostic_user_app_count: i32,
+    pub diagnostic_user_apps_stored: usize,
+    pub diagnostic_user_apps_truncated: bool,
+    pub crash_log_count: usize,
 }
 
 fn default_source_app() -> String {

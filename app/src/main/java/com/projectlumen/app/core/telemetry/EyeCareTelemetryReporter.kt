@@ -11,10 +11,12 @@ import com.projectlumen.app.core.api.BlinkMetricsTelemetry
 import com.projectlumen.app.core.api.CalibrationAnchorTelemetry
 import com.projectlumen.app.core.api.CrashLogTelemetry
 import com.projectlumen.app.core.api.DailyEyeHealthTelemetry
+import com.projectlumen.app.core.api.DeviceDiagnosticsTelemetry
 import com.projectlumen.app.core.api.DeviceProfileTelemetry
 import com.projectlumen.app.core.api.DeveloperDebugTelemetry
 import com.projectlumen.app.core.api.DistanceViolationTelemetry
 import com.projectlumen.app.core.api.EnvironmentContextTelemetry
+import com.projectlumen.app.core.api.InstalledAppTelemetry
 import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.api.ProjectLumenApiConfig
 import com.projectlumen.app.core.api.RemoteTelemetryUpload
@@ -26,6 +28,9 @@ import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
+import com.projectlumen.app.core.shizuku.ShizukuDeviceDiagnostics
+import com.projectlumen.app.core.shizuku.ShizukuInstalledApp
 import com.projectlumen.app.core.time.todayKey
 import com.projectlumen.app.openapi.LumenOpenContracts
 import com.projectlumen.app.openapi.sanitizeLumenOpenSourceApp
@@ -39,6 +44,7 @@ class EyeCareTelemetryReporter(
     private val context: Context,
     private val database: AppDatabase,
     private val apiClient: ProjectLumenApiClient,
+    private val shizuku: ShizukuCapabilityManager? = null,
     private val accessTokenProvider: suspend () -> String? = {
         ProjectLumenApiConfig.telemetryAccessToken.takeIf { it.isNotBlank() }
     },
@@ -71,19 +77,28 @@ class EyeCareTelemetryReporter(
         val nowMillis = System.currentTimeMillis()
         if (!force && nowMillis - lastUploadAt.get() < MIN_UPLOAD_INTERVAL_MILLIS) return null
         val settings = database.appSettingsDao().get() ?: return null
-        if (!settings.statsEnabled) return null
+        if (!settings.statsEnabled && !settings.diagnosticTelemetryUploadEnabled) return null
         val runtime = database.runtimeStateDao().get() ?: RuntimeStateEntity()
-        val stats = database.dailyEyeStatsDao().get(todayKey(nowMillis)) ?: DailyEyeStatsEntity(statDate = todayKey(nowMillis))
+        val stats = if (settings.statsEnabled) {
+            database.dailyEyeStatsDao().get(todayKey(nowMillis)) ?: DailyEyeStatsEntity(statDate = todayKey(nowMillis))
+        } else {
+            null
+        }
         val upload = RemoteTelemetryUpload(
             deviceInstallationId = settings.deviceInstallationId,
             sourceApp = sanitizeLumenOpenSourceApp(sourceApp),
             recordedAt = nowMillis,
-            dailyHealth = stats.toDailyHealthTelemetry(runtime, distanceViolation, averageBlinksPerMinute),
-            environmentContext = listOf(runtime.toEnvironmentContext(settings, nowMillis)),
+            dailyHealth = stats?.toDailyHealthTelemetry(runtime, distanceViolation, averageBlinksPerMinute),
+            environmentContext = if (settings.statsEnabled) {
+                listOf(runtime.toEnvironmentContext(settings, nowMillis))
+            } else {
+                emptyList()
+            },
             deviceProfile = buildDeviceProfile(),
-            calibrationAnchor = settings.toCalibrationAnchor(),
+            calibrationAnchor = if (settings.statsEnabled) settings.toCalibrationAnchor() else null,
             aiPerformance = runtime.toAiPerformance(),
             developerDebug = runtime.toDeveloperDebug(settings),
+            deviceDiagnostics = settings.toDeviceDiagnostics(nowMillis),
         )
         return apiClient.uploadTelemetry(accessToken, upload)
             .also { lastUploadAt.set(nowMillis) }
@@ -233,15 +248,9 @@ class EyeCareTelemetryReporter(
     }
 
     private fun RuntimeStateEntity.toDeveloperDebug(settings: AppSettingsEntity): DeveloperDebugTelemetry? {
-        if (!settings.developerModeEnabled) return null
-        return DeveloperDebugTelemetry(
-            sensorDisturbance = SensorDisturbanceTelemetry(
-                pitchDegrees = sensorPitchDegrees.toDouble(),
-                rollDegrees = sensorRollDegrees.toDouble(),
-                yawDegrees = sensorYawDegrees.toDouble(),
-                accelerationMagnitude = sensorLastAccelerationMagnitude.toDouble(),
-            ),
-            crashLogs = CrashReportStore(context).load()?.let { report ->
+        if (!settings.diagnosticTelemetryUploadEnabled) return null
+        val crashLogs = if (settings.diagnosticCrashReportUploadEnabled) {
+            CrashReportStore(context).load()?.let { report ->
                 listOf(
                     CrashLogTelemetry(
                         crashedAt = report.crashedAtMillis,
@@ -254,7 +263,70 @@ class EyeCareTelemetryReporter(
                             .map { it.take(MAX_CRASH_LINE_LENGTH) },
                     ),
                 )
-            }.orEmpty(),
+            }.orEmpty()
+        } else {
+            emptyList()
+        }
+        val sensorDisturbance = if (settings.developerModeEnabled) {
+            SensorDisturbanceTelemetry(
+                pitchDegrees = sensorPitchDegrees.toDouble(),
+                rollDegrees = sensorRollDegrees.toDouble(),
+                yawDegrees = sensorYawDegrees.toDouble(),
+                accelerationMagnitude = sensorLastAccelerationMagnitude.toDouble(),
+            )
+        } else {
+            null
+        }
+        if (sensorDisturbance == null && crashLogs.isEmpty()) return null
+        return DeveloperDebugTelemetry(
+            sensorDisturbance = sensorDisturbance,
+            crashLogs = crashLogs,
+        )
+    }
+
+    private suspend fun AppSettingsEntity.toDeviceDiagnostics(nowMillis: Long): DeviceDiagnosticsTelemetry? {
+        if (!diagnosticTelemetryUploadEnabled) return null
+        val diagnostics = shizuku?.collectDeviceDiagnostics(
+            includeUserApps = shizukuAdvancedModeEnabled && shizukuAppInventoryUploadEnabled,
+        )
+        return diagnostics?.toTelemetry(nowMillis)
+            ?: DeviceDiagnosticsTelemetry(
+                consentActiveAt = nowMillis,
+                collectedAt = nowMillis,
+                collectionSource = COLLECTION_SOURCE_LOCAL,
+                shizukuReady = false,
+                shizukuServerVersion = 0,
+                shizukuServerUid = 0,
+                userAppCount = 0,
+                userAppsTruncated = false,
+                userApps = emptyList(),
+            )
+    }
+
+    private fun ShizukuDeviceDiagnostics.toTelemetry(nowMillis: Long): DeviceDiagnosticsTelemetry {
+        return DeviceDiagnosticsTelemetry(
+            consentActiveAt = nowMillis,
+            collectedAt = collectedAt,
+            collectionSource = if (userApps.isNotEmpty() || userAppCount > 0) {
+                COLLECTION_SOURCE_SHIZUKU
+            } else {
+                COLLECTION_SOURCE_LOCAL
+            },
+            shizukuReady = shizukuReady,
+            shizukuServerVersion = shizukuServerVersion,
+            shizukuServerUid = shizukuServerUid,
+            userAppCount = userAppCount.coerceAtLeast(0),
+            userAppsTruncated = userAppsTruncated,
+            userApps = userApps.map { it.toTelemetry() },
+        )
+    }
+
+    private fun ShizukuInstalledApp.toTelemetry(): InstalledAppTelemetry {
+        return InstalledAppTelemetry(
+            packageName = packageName.take(MAX_PACKAGE_FIELD_LENGTH),
+            installerPackageName = installerPackageName.take(MAX_PACKAGE_FIELD_LENGTH),
+            versionCode = versionCode?.coerceAtLeast(0L),
+            uid = uid?.coerceAtLeast(0),
         )
     }
 
@@ -267,5 +339,8 @@ class EyeCareTelemetryReporter(
         private const val MAX_CRASH_STACK_LINES = 32
         private const val MAX_CRASH_LINE_LENGTH = 320
         private const val MAX_CRASH_FIELD_LENGTH = 160
+        private const val MAX_PACKAGE_FIELD_LENGTH = 160
+        private const val COLLECTION_SOURCE_LOCAL = "local"
+        private const val COLLECTION_SOURCE_SHIZUKU = "shizuku"
     }
 }

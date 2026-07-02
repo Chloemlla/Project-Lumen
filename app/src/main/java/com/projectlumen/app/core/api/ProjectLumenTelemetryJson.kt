@@ -13,6 +13,7 @@ internal fun RemoteTelemetryUpload.toJson(): JSONObject = JSONObject()
     .putNullable("calibrationAnchor", calibrationAnchor?.toJson())
     .putNullable("aiPerformance", aiPerformance?.toJson())
     .putNullable("developerDebug", developerDebug?.toJson())
+    .putNullable("deviceDiagnostics", deviceDiagnostics?.toJson())
 
 internal fun JSONObject.toTelemetryUploadResult(): RemoteTelemetryUploadResult = RemoteTelemetryUploadResult(
     accepted = optBoolean("accepted"),
@@ -63,6 +64,23 @@ private fun DeviceProfileTelemetry.toJson(): JSONObject = JSONObject()
     .put("frontCameraResolution", frontCameraResolution)
     .put("appVersionName", appVersionName)
     .put("appVersionCode", appVersionCode)
+
+private fun DeviceDiagnosticsTelemetry.toJson(): JSONObject = JSONObject()
+    .put("consentActiveAt", consentActiveAt)
+    .put("collectedAt", collectedAt)
+    .put("collectionSource", collectionSource)
+    .put("shizukuReady", shizukuReady)
+    .put("shizukuServerVersion", shizukuServerVersion)
+    .put("shizukuServerUid", shizukuServerUid)
+    .put("userAppCount", userAppCount)
+    .put("userAppsTruncated", userAppsTruncated)
+    .put("userApps", JSONArray(userApps.map { it.toJson() }))
+
+private fun InstalledAppTelemetry.toJson(): JSONObject = JSONObject()
+    .put("packageName", packageName)
+    .put("installerPackageName", installerPackageName)
+    .putNullable("versionCode", versionCode)
+    .putNullable("uid", uid)
 
 private fun CalibrationAnchorTelemetry.toJson(): JSONObject = JSONObject()
     .put("standardDistanceCm", standardDistanceCm)
