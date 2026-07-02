@@ -4,7 +4,12 @@ use crate::{
     models::{TelemetryDebugLatestResponse, TelemetryUploadRequest, TelemetryUploadResponse},
     state::AppState,
 };
-use axum::{extract::{Query, State}, http::HeaderMap, routing::{get, post}, Json, Router};
+use axum::{
+    extract::{Query, State},
+    http::HeaderMap,
+    routing::{get, post},
+    Json, Router,
+};
 use serde::Deserialize;
 
 pub fn router() -> Router<AppState> {
@@ -42,10 +47,7 @@ async fn debug_latest(
     Ok(Json(
         state
             .store
-            .latest_telemetry_debug_items(
-                &user.id,
-                query.device_installation_id.as_deref(),
-            )
+            .latest_telemetry_debug_items(&user.id, query.device_installation_id.as_deref())
             .await?,
     ))
 }

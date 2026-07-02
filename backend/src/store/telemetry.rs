@@ -1,7 +1,10 @@
 use super::{database_error, time::now_millis, AppStore};
 use crate::{
     error::ApiError,
-    models::{TelemetryDebugItem, TelemetryDebugLatestResponse, TelemetryUploadRequest, TelemetryUploadResponse},
+    models::{
+        TelemetryDebugItem, TelemetryDebugLatestResponse, TelemetryUploadRequest,
+        TelemetryUploadResponse,
+    },
 };
 use futures_util::TryStreamExt;
 use mongodb::{bson::doc, options::FindOptions};
@@ -39,7 +42,8 @@ impl AppStore {
 
         let id = Uuid::new_v4().to_string();
         let received_at = now_millis();
-        self.enforce_telemetry_rate_limit(user_id, received_at).await?;
+        self.enforce_telemetry_rate_limit(user_id, received_at)
+            .await?;
         sanitize_telemetry_upload(&mut request);
 
         self.telemetry_uploads
@@ -120,20 +124,39 @@ impl AppStore {
 
 fn sanitize_telemetry_upload(request: &mut TelemetryUploadRequest) {
     request.device_installation_id = request.device_installation_id.trim().to_owned();
-    truncate_string(&mut request.device_installation_id, MAX_DEVICE_INSTALLATION_ID_LENGTH);
+    truncate_string(
+        &mut request.device_installation_id,
+        MAX_DEVICE_INSTALLATION_ID_LENGTH,
+    );
     request.source_app = request.source_app.trim().to_owned();
     truncate_string(&mut request.source_app, MAX_SOURCE_APP_LENGTH);
-    request.environment_context.truncate(MAX_ENVIRONMENT_CONTEXTS);
+    request
+        .environment_context
+        .truncate(MAX_ENVIRONMENT_CONTEXTS);
 
-    truncate_string(&mut request.device_profile.manufacturer, MAX_SHORT_TEXT_LENGTH);
+    truncate_string(
+        &mut request.device_profile.manufacturer,
+        MAX_SHORT_TEXT_LENGTH,
+    );
     truncate_string(&mut request.device_profile.model, MAX_SHORT_TEXT_LENGTH);
-    truncate_string(&mut request.device_profile.android_release, MAX_SHORT_TEXT_LENGTH);
-    truncate_string(&mut request.device_profile.front_camera_resolution, MAX_SHORT_TEXT_LENGTH);
-    truncate_string(&mut request.device_profile.app_version_name, MAX_SHORT_TEXT_LENGTH);
+    truncate_string(
+        &mut request.device_profile.android_release,
+        MAX_SHORT_TEXT_LENGTH,
+    );
+    truncate_string(
+        &mut request.device_profile.front_camera_resolution,
+        MAX_SHORT_TEXT_LENGTH,
+    );
+    truncate_string(
+        &mut request.device_profile.app_version_name,
+        MAX_SHORT_TEXT_LENGTH,
+    );
 
     if let Some(daily_health) = &mut request.daily_health {
         truncate_string(&mut daily_health.stat_date, MAX_SHORT_TEXT_LENGTH);
-        daily_health.distance_violations.truncate(MAX_DISTANCE_VIOLATIONS);
+        daily_health
+            .distance_violations
+            .truncate(MAX_DISTANCE_VIOLATIONS);
     }
     if let Some(developer_debug) = &mut request.developer_debug {
         developer_debug.crash_logs.truncate(MAX_CRASH_LOGS);
@@ -147,12 +170,18 @@ fn sanitize_telemetry_upload(request: &mut TelemetryUploadRequest) {
         }
     }
     if let Some(device_diagnostics) = &mut request.device_diagnostics {
-        truncate_string(&mut device_diagnostics.collection_source, MAX_SHORT_TEXT_LENGTH);
+        truncate_string(
+            &mut device_diagnostics.collection_source,
+            MAX_SHORT_TEXT_LENGTH,
+        );
         let original_len = device_diagnostics.user_apps.len();
         device_diagnostics.user_apps.retain(|app| {
-            is_android_package_name(&app.package_name) && app.package_name.len() <= MAX_PACKAGE_FIELD_LENGTH
+            is_android_package_name(&app.package_name)
+                && app.package_name.len() <= MAX_PACKAGE_FIELD_LENGTH
         });
-        device_diagnostics.user_apps.truncate(MAX_DIAGNOSTIC_USER_APPS);
+        device_diagnostics
+            .user_apps
+            .truncate(MAX_DIAGNOSTIC_USER_APPS);
         device_diagnostics.user_apps_truncated =
             device_diagnostics.user_apps_truncated || original_len > MAX_DIAGNOSTIC_USER_APPS;
         device_diagnostics.user_app_count = device_diagnostics
@@ -164,7 +193,9 @@ fn sanitize_telemetry_upload(request: &mut TelemetryUploadRequest) {
             app.installer_package_name = app.installer_package_name.trim().to_owned();
             truncate_string(&mut app.package_name, MAX_PACKAGE_FIELD_LENGTH);
             truncate_string(&mut app.installer_package_name, MAX_PACKAGE_FIELD_LENGTH);
-            if !app.installer_package_name.is_empty() && !is_android_package_name(&app.installer_package_name) {
+            if !app.installer_package_name.is_empty()
+                && !is_android_package_name(&app.installer_package_name)
+            {
                 app.installer_package_name.clear();
             }
             app.version_code = app.version_code.map(|value| value.max(0));
