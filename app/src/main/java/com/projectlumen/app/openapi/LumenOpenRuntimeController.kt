@@ -106,12 +106,17 @@ class LumenOpenRuntimeController(
     suspend fun triggerEyeRelaxation(
         sourceApp: String?,
         requestedDurationSeconds: Int? = null,
-    ) = withContext(Dispatchers.IO) {
+    ): Int = withContext(Dispatchers.IO) {
         val settings = settingsRepository.getOrDefault()
         val runtime = runtimeRepository.getOrDefault()
         val nowMillis = System.currentTimeMillis()
         val durationSeconds = (requestedDurationSeconds ?: settings.restDurationSeconds)
             .coerceIn(MIN_REST_DURATION_SECONDS, MAX_REST_DURATION_SECONDS)
+        val blockingDurationSeconds = if (settings.globalOverlayEnabled) {
+            durationSeconds.coerceAtLeast(settings.overlayRestDurationSeconds)
+        } else {
+            durationSeconds
+        }
         val restSettings = settings.copy(restDurationSeconds = durationSeconds)
         val transition = if (runtime.activeEngine == ActiveEngine.REMINDER.name &&
             runtime.reminderPhase in reminderWorkPhases
@@ -134,6 +139,7 @@ class LumenOpenRuntimeController(
         showBlockingOverlayIfNeeded(settings, durationSeconds)
         refreshActiveNotifications(settings, transition.nextRuntime)
         uploadOpenApiTelemetry(sourceApp)
+        blockingDurationSeconds
     }
 
     suspend fun recordOpenLaunch(

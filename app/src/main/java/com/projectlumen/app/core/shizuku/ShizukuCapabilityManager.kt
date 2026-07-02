@@ -206,7 +206,10 @@ class ShizukuCapabilityManager(
         applied
     }
 
-    suspend fun applySystemBrightness(percent: Int): Boolean = withContext(Dispatchers.IO) {
+    suspend fun applySystemBrightness(
+        percent: Int,
+        extraDimPercent: Int? = null,
+    ): Boolean = withContext(Dispatchers.IO) {
         val currentState = queryState()
         if (!currentState.ready) {
             _state.value = currentState.copy(
@@ -215,18 +218,39 @@ class ShizukuCapabilityManager(
             return@withContext false
         }
         val normalizedPercent = percent.coerceIn(1, 100)
+        val normalizedExtraDimPercent = extraDimPercent?.coerceIn(0, 100)
         val brightness = percentToSystemBrightness(normalizedPercent)
         val modeResult = executeShellCommand("settings put system screen_brightness_mode 0")
         val brightnessResult = executeShellCommand("settings put system screen_brightness $brightness")
-        val applied = brightnessResult.success
+        val extraDimApplied = normalizedExtraDimPercent?.let {
+            setExtraDim(enabled = it > 0, percent = it)
+        } ?: true
+        val applied = brightnessResult.success && extraDimApplied
         _state.value = queryState(
-            if (applied) "" else brightnessResult.error.ifBlank { modeResult.error.ifBlank { "System brightness command failed." } },
+            when {
+                applied -> ""
+                !brightnessResult.success -> brightnessResult.error.ifBlank {
+                    modeResult.error.ifBlank { "System brightness command failed." }
+                }
+                normalizedExtraDimPercent != null && !extraDimApplied -> "Extra Dim command failed."
+                else -> "System brightness command failed."
+            },
         ).copy(
             nativeEyeProtectionApplied = _state.value.nativeEyeProtectionApplied,
             nativeColorTemperatureKelvin = _state.value.nativeColorTemperatureKelvin,
-            nativeBrightnessPercent = if (applied) normalizedPercent else _state.value.nativeBrightnessPercent,
-            nativeExtraDimEnabled = _state.value.nativeExtraDimEnabled,
-            nativeExtraDimPercent = _state.value.nativeExtraDimPercent,
+            nativeBrightnessPercent = if (brightnessResult.success) {
+                normalizedPercent
+            } else {
+                _state.value.nativeBrightnessPercent
+            },
+            nativeExtraDimEnabled = when (normalizedExtraDimPercent) {
+                null -> _state.value.nativeExtraDimEnabled
+                else -> extraDimApplied && normalizedExtraDimPercent > 0
+            },
+            nativeExtraDimPercent = when (normalizedExtraDimPercent) {
+                null -> _state.value.nativeExtraDimPercent
+                else -> if (extraDimApplied) normalizedExtraDimPercent else _state.value.nativeExtraDimPercent
+            },
         )
         applied
     }

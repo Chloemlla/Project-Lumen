@@ -13,6 +13,7 @@ data class LumenOpenLaunchRequest(
     val id: Long,
     val target: LumenOpenLaunchTarget,
     val sourceApp: String,
+    val callerPackage: String = "",
     val restDurationSeconds: Int? = null,
 )
 
@@ -44,10 +45,11 @@ object LumenOpenIntents {
             LumenOpenContracts.ACTION_START_VISUAL_MONITOR -> LumenOpenLaunchTarget.VISUAL_MONITOR
             else -> return null
         }
+        val rawCaller = platformCallerPackage
+            ?: intent.getStringExtra(LumenOpenContracts.EXTRA_CALLER_PACKAGE)
+            ?: intent.getStringExtra(LumenOpenContracts.EXTRA_SOURCE_APP)
         val sourceApp = sanitizeLumenOpenSourceApp(
-            platformCallerPackage
-                ?: intent.getStringExtra(LumenOpenContracts.EXTRA_CALLER_PACKAGE)
-                ?: intent.getStringExtra(LumenOpenContracts.EXTRA_SOURCE_APP),
+            rawCaller,
             fallback = LumenOpenContracts.SOURCE_APP_EXTERNAL,
         )
         val restDurationSeconds = intent.getPositiveIntExtra(LumenOpenContracts.EXTRA_REST_DURATION_MIN)
@@ -57,6 +59,7 @@ object LumenOpenIntents {
             id = SystemClock.elapsedRealtimeNanos(),
             target = target,
             sourceApp = sourceApp,
+            callerPackage = sanitizeLumenOpenCallerPackage(rawCaller).orEmpty(),
             restDurationSeconds = restDurationSeconds,
         )
     }
@@ -79,4 +82,14 @@ internal fun sanitizeLumenOpenSourceApp(
     return if (SOURCE_APP_PATTERN.matches(trimmed)) trimmed else fallback
 }
 
+internal fun sanitizeLumenOpenCallerPackage(packageName: String?): String? {
+    val trimmed = packageName
+        ?.trim()
+        ?.take(160)
+        ?.takeIf { it.isNotBlank() }
+        ?: return null
+    return trimmed.takeIf { ANDROID_PACKAGE_NAME_PATTERN.matches(it) }
+}
+
 private val SOURCE_APP_PATTERN = Regex("[A-Za-z0-9_.:-]{1,120}")
+private val ANDROID_PACKAGE_NAME_PATTERN = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+")

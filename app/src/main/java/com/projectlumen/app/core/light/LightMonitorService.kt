@@ -111,15 +111,18 @@ class LightMonitorService : Service(), SensorEventListener {
     }
 
     private suspend fun applyBrightness(lux: Float, settings: AppSettingsEntity) {
-        val min = settings.autoBrightnessMinPercent.coerceIn(5, 100)
+        val min = settings.autoBrightnessMinPercent.coerceIn(1, 100)
         val max = settings.autoBrightnessMaxPercent.coerceIn(min, 100)
         val ratio = (lux.coerceIn(0f, 500f) / 500f)
-        val percent = (min + (max - min) * ratio).roundToInt().coerceIn(5, 100)
+        val percent = (min + (max - min) * ratio).roundToInt().coerceIn(1, 100)
         val app = application as ProjectLumenApplication
         if (
             settings.shizukuAdvancedModeEnabled &&
             settings.shizukuNativeEyeProtectionEnabled &&
-            app.shizuku.applySystemBrightness(percent)
+            app.shizuku.applySystemBrightness(
+                percent = percent,
+                extraDimPercent = extraDimPercentForAutoBrightness(percent, settings),
+            )
         ) {
             return
         }
@@ -129,6 +132,20 @@ class LightMonitorService : Service(), SensorEventListener {
             Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
             Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, brightness)
         }
+    }
+
+    private fun extraDimPercentForAutoBrightness(percent: Int, settings: AppSettingsEntity): Int {
+        val configuredExtraDim = if (settings.shizukuNativeExtraDimEnabled) {
+            settings.shizukuNativeExtraDimPercent.coerceIn(1, 100)
+        } else {
+            0
+        }
+        val ultraLowExtraDim = if (percent <= ULTRA_LOW_BRIGHTNESS_THRESHOLD_PERCENT) {
+            ((ULTRA_LOW_BRIGHTNESS_THRESHOLD_PERCENT - percent + 1) * 10).coerceIn(10, 100)
+        } else {
+            0
+        }
+        return maxOf(configuredExtraDim, ultraLowExtraDim)
     }
 
     private suspend fun incrementLowLightStats(app: ProjectLumenApplication, nowMillis: Long) {
@@ -141,6 +158,7 @@ class LightMonitorService : Service(), SensorEventListener {
 
     companion object {
         private const val LOW_LIGHT_COOLDOWN_MILLIS = 120_000L
+        private const val ULTRA_LOW_BRIGHTNESS_THRESHOLD_PERCENT = 10
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, LightMonitorService::class.java))

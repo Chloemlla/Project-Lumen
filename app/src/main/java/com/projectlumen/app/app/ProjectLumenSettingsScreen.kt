@@ -642,12 +642,12 @@ internal fun SettingsScreen(
                     onClick = { openWriteSettings(context) },
                 )
             }
-            NumberSlider(R.string.auto_brightness_min, Icons.Outlined.Style, settings.autoBrightnessMinPercent, 5f..100f, 19, stringResource(R.string.percent_value, settings.autoBrightnessMinPercent)) {
+            NumberSlider(R.string.auto_brightness_min, Icons.Outlined.Style, settings.autoBrightnessMinPercent, 1f..100f, 99, stringResource(R.string.percent_value, settings.autoBrightnessMinPercent)) {
                 viewModel.updateSettings { current ->
                     current.copy(autoBrightnessMinPercent = it.coerceAtMost(current.autoBrightnessMaxPercent))
                 }
             }
-            NumberSlider(R.string.auto_brightness_max, Icons.Outlined.Style, settings.autoBrightnessMaxPercent, 5f..100f, 19, stringResource(R.string.percent_value, settings.autoBrightnessMaxPercent)) {
+            NumberSlider(R.string.auto_brightness_max, Icons.Outlined.Style, settings.autoBrightnessMaxPercent, 1f..100f, 99, stringResource(R.string.percent_value, settings.autoBrightnessMaxPercent)) {
                 viewModel.updateSettings { current ->
                     current.copy(autoBrightnessMaxPercent = it.coerceAtLeast(current.autoBrightnessMinPercent))
                 }

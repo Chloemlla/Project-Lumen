@@ -16,6 +16,7 @@ import com.projectlumen.app.openapi.LumenOpenIntents
 import com.projectlumen.app.openapi.LumenOpenLaunchRequest
 import com.projectlumen.app.openapi.LumenOpenLaunchTarget
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 open class MainActivity : ComponentActivity() {
@@ -76,13 +77,32 @@ open class MainActivity : ComponentActivity() {
         val app = application as ProjectLumenApplication
         lifecycleScope.launch(Dispatchers.IO) {
             when (request.target) {
-                LumenOpenLaunchTarget.REST -> app.openApiController.triggerEyeRelaxation(
-                    sourceApp = request.sourceApp,
-                    requestedDurationSeconds = request.restDurationSeconds,
-                )
+                LumenOpenLaunchTarget.REST -> {
+                    val durationSeconds = app.openApiController.triggerEyeRelaxation(
+                        sourceApp = request.sourceApp,
+                        requestedDurationSeconds = request.restDurationSeconds,
+                    )
+                    scheduleReturnToCaller(request, durationSeconds)
+                }
                 LumenOpenLaunchTarget.DASHBOARD,
                 LumenOpenLaunchTarget.VISUAL_MONITOR -> app.openApiController.recordOpenLaunch(request.sourceApp)
             }
         }
+    }
+
+    private fun scheduleReturnToCaller(request: LumenOpenLaunchRequest, durationSeconds: Int) {
+        val targetPackage = request.callerPackage.takeIf { it.isNotBlank() } ?: return
+        if (targetPackage == packageName) return
+        lifecycleScope.launch {
+            delay(durationSeconds.coerceAtLeast(1) * 1000L + EXTERNAL_REST_RETURN_GRACE_MILLIS)
+            val launchIntent = packageManager.getLaunchIntentForPackage(targetPackage)
+                ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                ?: return@launch
+            runCatching { startActivity(launchIntent) }
+        }
+    }
+
+    private companion object {
+        private const val EXTERNAL_REST_RETURN_GRACE_MILLIS = 750L
     }
 }
