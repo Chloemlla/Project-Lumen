@@ -114,7 +114,7 @@ class ProjectLumenViewModel(
 
     val webPageRequests = _webPageRequests.asSharedFlow()
     val backupImportPreview = backupEntry.importPreview
-    val remoteState = remoteEntry.state
+    internal val remoteState = remoteEntry.state
     val shizukuState = shizuku.state
     val apiDiagnostics = ProjectLumenApiDiagnostics.traces
     val uiState = stateStore.uiState
