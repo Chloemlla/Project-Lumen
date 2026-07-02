@@ -259,6 +259,8 @@ internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
                             tint = MaterialTheme.colorScheme.onPrimary,
                         )
                     }
+                } else {
+                    Spacer(modifier = Modifier.width(40.dp))
                 }
                 Box(
                     modifier = Modifier
