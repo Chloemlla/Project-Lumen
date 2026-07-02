@@ -15,9 +15,11 @@ use std::collections::HashMap;
 
 impl AppStore {
     pub async fn admin_dashboard_snapshot(&self) -> Result<AdminDashboardResponse, ApiError> {
-        let users = self.recent_users().await?;
-        let latest_sync_by_user = self.latest_sync_by_user().await?;
-        let entitlements = self.admin_entitlements().await?;
+        let (users, latest_sync_by_user, entitlements) = tokio::try_join!(
+            self.recent_users(),
+            self.latest_sync_by_user(),
+            self.admin_entitlements(),
+        )?;
         let tier_by_user = tier_by_user(&entitlements);
         let profiles = users
             .iter()
@@ -36,31 +38,59 @@ impl AppStore {
                 feature_flags: Vec::new(),
             })
             .collect();
+        let devices = device_assets(&users);
+        let (
+            access_audit,
+            purchase_audit,
+            backups,
+            crash_groups,
+            api_metrics,
+            sync_metrics,
+            templates,
+            telemetry,
+            releases,
+            allowlist,
+        ) = tokio::try_join!(
+            self.access_audit(),
+            self.purchase_audit(),
+            self.backup_snapshots(),
+            self.crash_groups(),
+            self.api_metrics(),
+            self.sync_metrics(),
+            self.template_catalog(),
+            self.telemetry(),
+            self.releases(),
+            self.security_allowlist(),
+        )?;
+        let clean_stack = crash_groups
+            .first()
+            .map(|group| group.clean_stack.clone())
+            .unwrap_or_default();
 
         Ok(AdminDashboardResponse {
             generated_at: now_millis(),
             users: AdminUsersSection {
                 profiles,
-                devices: self.device_assets(&users).await?,
-                access_audit: self.access_audit().await?,
+                devices,
+                access_audit,
                 entitlements,
-                purchase_audit: self.purchase_audit().await?,
-                backups: self.backup_snapshots().await?,
+                purchase_audit,
+                backups,
             },
             observability: AdminObservabilitySection {
-                crash_groups: self.crash_groups().await?,
-                clean_stack: self.latest_clean_stack().await?,
-                api_metrics: self.api_metrics().await?,
-                sync_metrics: self.sync_metrics().await?,
+                crash_groups,
+                clean_stack,
+                api_metrics,
+                sync_metrics,
             },
             content: AdminContentSection {
-                templates: self.template_catalog().await?,
-                telemetry: self.telemetry().await?,
+                templates,
+                telemetry,
             },
             release: AdminReleaseSection {
-                releases: self.releases().await?,
+                releases,
                 routes: route_status(),
-                allowlist: self.security_allowlist().await?,
+                allowlist,
             },
         })
     }
@@ -100,21 +130,6 @@ impl AppStore {
                 .or_insert(change.change.updated_at);
         }
         Ok(latest)
-    }
-
-    async fn device_assets(&self, users: &[UserRecord]) -> Result<Vec<AdminDeviceAsset>, ApiError> {
-        Ok(users
-            .iter()
-            .filter(|user| !user.device_installation_id.is_empty())
-            .map(|user| AdminDeviceAsset {
-                user_id: user.id.clone(),
-                device_installation_id: user.device_installation_id.clone(),
-                model: "Android device".to_owned(),
-                version_code: 0,
-                last_seen_at: user.created_at,
-                local_security_config: "Reported by future admin access audit events".to_owned(),
-            })
-            .collect())
     }
 
     async fn access_audit(&self) -> Result<Vec<AdminAccessAuditEntry>, ApiError> {
@@ -219,6 +234,21 @@ impl AppStore {
             })
             .collect())
     }
+}
+
+fn device_assets(users: &[UserRecord]) -> Vec<AdminDeviceAsset> {
+    users
+        .iter()
+        .filter(|user| !user.device_installation_id.is_empty())
+        .map(|user| AdminDeviceAsset {
+            user_id: user.id.clone(),
+            device_installation_id: user.device_installation_id.clone(),
+            model: "Android device".to_owned(),
+            version_code: 0,
+            last_seen_at: user.created_at,
+            local_security_config: "Reported by future admin access audit events".to_owned(),
+        })
+        .collect()
 }
 
 fn backup_summary(backup: &Value) -> AdminBackupSummary {

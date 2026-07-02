@@ -35,16 +35,6 @@ impl AppStore {
             .map_err(database_error)
     }
 
-    pub(crate) async fn latest_clean_stack(&self) -> Result<Vec<String>, ApiError> {
-        Ok(self
-            .crash_groups()
-            .await?
-            .into_iter()
-            .next()
-            .map(|group| group.clean_stack)
-            .unwrap_or_default())
-    }
-
     pub(crate) async fn api_metrics(&self) -> Result<Vec<AdminApiMetric>, ApiError> {
         let options = FindOptions::builder()
             .sort(doc! { "sampledAt": -1 })

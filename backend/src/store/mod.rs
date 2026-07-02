@@ -165,9 +165,33 @@ impl AppStore {
         )
         .await?;
         ensure_index(
+            &self.entitlements,
+            "entitlements",
+            index(
+                "entitlement_purchased_recent",
+                doc! { "purchasedAt": -1, "_id": -1 },
+            ),
+        )
+        .await?;
+        ensure_index(
+            &self.entitlements,
+            "entitlements",
+            index(
+                "entitlement_google_last_verified",
+                doc! { "source": 1, "lastVerifiedAt": -1 },
+            ),
+        )
+        .await?;
+        ensure_index(
             &self.sync_changes,
             "sync_changes",
             index("sync_user_cursor", doc! { "userId": 1, "cursor": 1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.sync_changes,
+            "sync_changes",
+            index("sync_cursor_recent", doc! { "cursor": -1 }),
         )
         .await?;
         ensure_index(
@@ -207,6 +231,12 @@ impl AppStore {
         )
         .await?;
         ensure_index(
+            &self.backups,
+            "backups",
+            index("backup_uploaded_recent", doc! { "uploadedAt": -1, "_id": -1 }),
+        )
+        .await?;
+        ensure_index(
             &self.admin_sessions,
             "admin_sessions",
             index("admin_session_expiry", doc! { "expiresAt": 1 }),
@@ -234,6 +264,30 @@ impl AppStore {
             &self.admin_crash_reports,
             "admin_crash_reports",
             index("admin_crash_last_seen", doc! { "lastSeenAt": -1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.admin_api_metrics,
+            "admin_api_metrics",
+            index("admin_api_metric_sampled", doc! { "sampledAt": -1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.admin_sync_metrics,
+            "admin_sync_metrics",
+            index("admin_sync_metric_sampled", doc! { "sampledAt": -1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.admin_templates,
+            "admin_templates",
+            index("admin_template_updated", doc! { "updatedAt": -1 }),
+        )
+        .await?;
+        ensure_index(
+            &self.admin_telemetry,
+            "admin_telemetry",
+            index("admin_telemetry_sampled", doc! { "sampledAt": -1 }),
         )
         .await?;
         ensure_index(

@@ -16,31 +16,38 @@ impl AppStore {
         user_id: &str,
         request: SyncPushRequest,
     ) -> Result<SyncPushResponse, ApiError> {
-        let mut last_cursor = request.cursor.unwrap_or_default() as i64;
-        let mut accepted = 0usize;
-
-        for mut change in request.changes {
-            if change.device_installation_id.trim().is_empty() {
-                change.device_installation_id = request.device_installation_id.clone();
-            }
-            last_cursor = self.next_sync_cursor().await?;
-            self.sync_changes
-                .insert_one(
-                    StoredSyncChange {
-                        id: Uuid::new_v4().to_string(),
-                        user_id: user_id.to_owned(),
-                        cursor: last_cursor,
-                        change,
-                    },
-                    None,
-                )
-                .await
-                .map_err(database_error)?;
-            accepted += 1;
+        let change_count = request.changes.len();
+        if change_count == 0 {
+            return Ok(SyncPushResponse {
+                accepted: 0,
+                next_cursor: request.cursor.unwrap_or_default(),
+            });
         }
 
+        let last_cursor = self.reserve_sync_cursors(change_count as i64).await?;
+        let first_cursor = last_cursor - change_count as i64 + 1;
+        let default_device_installation_id = request.device_installation_id;
+        let mut records = Vec::with_capacity(change_count);
+
+        for (index, mut change) in request.changes.into_iter().enumerate() {
+            if change.device_installation_id.trim().is_empty() {
+                change.device_installation_id = default_device_installation_id.clone();
+            }
+            records.push(StoredSyncChange {
+                id: Uuid::new_v4().to_string(),
+                user_id: user_id.to_owned(),
+                cursor: first_cursor + index as i64,
+                change,
+            });
+        }
+
+        self.sync_changes
+            .insert_many(records, None)
+            .await
+            .map_err(database_error)?;
+
         Ok(SyncPushResponse {
-            accepted,
+            accepted: change_count,
             next_cursor: last_cursor.max(0) as u64,
         })
     }
@@ -82,7 +89,7 @@ impl AppStore {
         })
     }
 
-    async fn next_sync_cursor(&self) -> Result<i64, ApiError> {
+    async fn reserve_sync_cursors(&self, count: i64) -> Result<i64, ApiError> {
         let options = FindOneAndUpdateOptions::builder()
             .upsert(true)
             .return_document(ReturnDocument::After)
@@ -91,7 +98,7 @@ impl AppStore {
             .counters
             .find_one_and_update(
                 doc! { "_id": SYNC_COUNTER_ID },
-                doc! { "$inc": { "value": 1_i64 } },
+                doc! { "$inc": { "value": count } },
                 options,
             )
             .await
