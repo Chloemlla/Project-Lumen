@@ -233,7 +233,10 @@ impl AppStore {
         ensure_index(
             &self.backups,
             "backups",
-            index("backup_uploaded_recent", doc! { "uploadedAt": -1, "_id": -1 }),
+            index(
+                "backup_uploaded_recent",
+                doc! { "uploadedAt": -1, "_id": -1 },
+            ),
         )
         .await?;
         ensure_index(
