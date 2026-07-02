@@ -18,7 +18,7 @@ class BootReceiver : BroadcastReceiver() {
                 val app = context.applicationContext as ProjectLumenApplication
                 val settingsRepository = app.settingsRepository()
                 val settings = settingsRepository.get()
-                val runtime = app.database.runtimeStateDao().get()
+                val runtime = app.runtimeRepository().get()
                 if (settings?.proximityMonitoringEnabled == true || settings?.blinkMonitoringEnabled == true) {
                     app.scheduleProximityMonitoring()
                 }

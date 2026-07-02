@@ -24,6 +24,7 @@ import com.projectlumen.app.core.services.TimerForegroundService
 import com.projectlumen.app.core.services.TimerReconciliationWorker
 import com.projectlumen.app.core.light.LightMonitorService
 import com.projectlumen.app.core.proximity.ProximityDetectionWorker
+import com.projectlumen.app.core.repositories.RuntimeRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.telemetry.EyeCareTelemetryReporter
@@ -106,6 +107,10 @@ class ProjectLumenApplication : Application() {
             eyeCarePreferences,
             secureCredentials::deviceInstallationId,
         )
+    }
+
+    fun runtimeRepository(): RuntimeRepository {
+        return RuntimeRepository(database.runtimeStateDao())
     }
 
     fun stopTimerService() {

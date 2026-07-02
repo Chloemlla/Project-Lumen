@@ -18,6 +18,11 @@ object ProjectLumenMmkv {
         return MMKV.mmkvWithID(id)
     }
 
+    fun multiProcessMmkvWithId(id: String): MMKV {
+        check(initialized) { "MMKV must be initialized from ProjectLumenApplication before use." }
+        return MMKV.mmkvWithID(id, MMKV.MULTI_PROCESS_MODE)
+    }
+
     fun encryptedMmkvWithId(id: String, cryptKey: String): MMKV {
         check(initialized) { "MMKV must be initialized from ProjectLumenApplication before use." }
         return MMKV.mmkvWithID(id, MMKV.SINGLE_PROCESS_MODE, cryptKey)

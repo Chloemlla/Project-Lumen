@@ -28,7 +28,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 val app = context.applicationContext as ProjectLumenApplication
                 val notifications = NotificationService(context.applicationContext)
                 val settings = app.settingsRepository().getOrDefault()
-                val runtime = app.database.runtimeStateDao().get() ?: RuntimeStateEntity()
+                val runtime = app.runtimeRepository().getOrDefault()
                 val nowMillis = System.currentTimeMillis()
                 val reconciledRuntime = reconcileRuntime(app, notifications, settings, runtime, nowMillis)
                 val suppressReminder = QuietHours.suppressesReminderNotifications(settings, nowMillis) &&
@@ -114,7 +114,7 @@ class AlarmReceiver : BroadcastReceiver() {
     ) {
         statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, transition.eyeStatsDelta)
         statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, transition.pomodoroStatsDelta)
-        app.database.runtimeStateDao().upsert(transition.nextRuntime)
+        app.runtimeRepository().upsert(transition.nextRuntime)
         playAudioEvent(app, transition.audioEvent)
     }
 

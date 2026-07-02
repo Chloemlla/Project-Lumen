@@ -84,7 +84,8 @@ class LightMonitorService : Service(), SensorEventListener {
             return
         }
         val tooDark = lux < settings.ambientLightLowLuxThreshold
-        val runtime = db.runtimeStateDao().get()
+        val runtimeRepository = app.runtimeRepository()
+        val runtime = runtimeRepository.get()
         val shouldWarn = settings.ambientLightMonitoringEnabled &&
             tooDark &&
             nowMillis - (runtime?.ambientLastWarningAt ?: 0L) >= LOW_LIGHT_COOLDOWN_MILLIS
@@ -96,7 +97,7 @@ class LightMonitorService : Service(), SensorEventListener {
             incrementLowLightStats(app, nowMillis)
         }
         runtime?.let {
-            db.runtimeStateDao().upsert(
+            runtimeRepository.upsert(
                 it.copy(
                     ambientLastLux = lux,
                     ambientTooDark = tooDark,

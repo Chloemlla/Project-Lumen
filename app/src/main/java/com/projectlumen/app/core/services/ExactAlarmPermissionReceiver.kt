@@ -21,7 +21,7 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
             runCatching {
                 val app = context.applicationContext as ProjectLumenApplication
                 val settings = app.settingsRepository().getOrDefault()
-                val runtime = app.database.runtimeStateDao().get() ?: return@runCatching
+                val runtime = app.runtimeRepository().get() ?: return@runCatching
                 app.notifications.syncRuntimeAlarms(settings, runtime)
                 if (settings.keepAliveEnabled && runtime.activeEngine != ActiveEngine.IDLE.name) {
                     app.startTimerService()

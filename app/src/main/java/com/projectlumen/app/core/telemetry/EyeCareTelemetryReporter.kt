@@ -28,6 +28,7 @@ import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.repositories.RuntimeRepository
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.shizuku.ShizukuDeviceDiagnostics
 import com.projectlumen.app.core.shizuku.ShizukuInstalledApp
@@ -78,7 +79,7 @@ class EyeCareTelemetryReporter(
         if (!force && nowMillis - lastUploadAt.get() < MIN_UPLOAD_INTERVAL_MILLIS) return null
         val settings = database.appSettingsDao().get() ?: return null
         if (!settings.statsEnabled && !settings.diagnosticTelemetryUploadEnabled) return null
-        val runtime = database.runtimeStateDao().get() ?: RuntimeStateEntity()
+        val runtime = RuntimeRepository(database.runtimeStateDao()).getOrDefault()
         val stats = if (settings.statsEnabled) {
             database.dailyEyeStatsDao().get(todayKey(nowMillis)) ?: DailyEyeStatsEntity(statDate = todayKey(nowMillis))
         } else {

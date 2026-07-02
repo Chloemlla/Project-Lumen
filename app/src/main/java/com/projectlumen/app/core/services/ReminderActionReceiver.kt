@@ -24,8 +24,8 @@ class ReminderActionReceiver : BroadcastReceiver() {
                 val app = context.applicationContext as ProjectLumenApplication
                 val db = app.database
                 val settings = app.settingsRepository().get()
-                val runtime = db.runtimeStateDao().get() ?: RuntimeStateEntity()
-                val runtimeRepository = RuntimeRepository(db.runtimeStateDao())
+                val runtimeRepository = app.runtimeRepository()
+                val runtime = runtimeRepository.getOrDefault()
                 val statisticsRepository = StatisticsRepository(db.dailyEyeStatsDao(), db.dailyPomodoroStatsDao())
                 val reminderEngine = ReminderEngine()
                 val now = System.currentTimeMillis()

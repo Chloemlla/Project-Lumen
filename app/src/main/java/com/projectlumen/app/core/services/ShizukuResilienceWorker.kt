@@ -40,7 +40,7 @@ class ShizukuResilienceWorker(
         }
 
         if (settings.shizukuServiceRecoveryEnabled) {
-            val runtime = app.database.runtimeStateDao().get()
+            val runtime = app.runtimeRepository().get()
             if (settings.keepAliveEnabled && runtime != null && runtime.activeEngine != ActiveEngine.IDLE.name) {
                 app.startTimerService()
                 app.notifications.syncRuntimeAlarms(settings, runtime)

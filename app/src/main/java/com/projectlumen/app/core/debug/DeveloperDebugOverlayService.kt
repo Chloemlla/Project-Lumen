@@ -92,8 +92,9 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         if (app != null) {
             scope.launch {
                 val now = System.currentTimeMillis()
-                app.database.runtimeStateDao().get()?.let {
-                    app.database.runtimeStateDao().upsert(
+                val runtimeRepository = app.runtimeRepository()
+                runtimeRepository.get()?.let {
+                    runtimeRepository.upsert(
                         it.copy(
                             foregroundServiceLastTaskRemovedAt = now,
                             updatedAt = now,
@@ -231,8 +232,9 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
     private fun writeSensorRuntime(nowMillis: Long) {
         val app = application as ProjectLumenApplication
         scope.launch {
-            app.database.runtimeStateDao().get()?.let {
-                app.database.runtimeStateDao().upsert(
+            val runtimeRepository = app.runtimeRepository()
+            runtimeRepository.get()?.let {
+                runtimeRepository.upsert(
                     it.copy(
                         ambientLastLux = lastLux,
                         sensorPitchDegrees = lastPitch,
@@ -252,8 +254,9 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
         scope.launch {
             val now = System.currentTimeMillis()
-            app.database.runtimeStateDao().get()?.let {
-                app.database.runtimeStateDao().upsert(
+            val runtimeRepository = app.runtimeRepository()
+            runtimeRepository.get()?.let {
+                runtimeRepository.upsert(
                     it.copy(
                         developerLastLowMemorySimulatedAt = now,
                         updatedAt = now,
@@ -267,8 +270,9 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         scope.launch {
             val now = System.currentTimeMillis()
             val restarted = flags and (START_FLAG_REDELIVERY or START_FLAG_RETRY) != 0
-            app.database.runtimeStateDao().get()?.let {
-                app.database.runtimeStateDao().upsert(
+            val runtimeRepository = app.runtimeRepository()
+            runtimeRepository.get()?.let {
+                runtimeRepository.upsert(
                     it.copy(
                         foregroundServiceStartedAt = now,
                         foregroundServiceStoppedAt = 0L,
@@ -284,8 +288,9 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         val app = application as? ProjectLumenApplication ?: return
         CoroutineScope(Dispatchers.IO).launch {
             val now = System.currentTimeMillis()
-            app.database.runtimeStateDao().get()?.let {
-                app.database.runtimeStateDao().upsert(
+            val runtimeRepository = app.runtimeRepository()
+            runtimeRepository.get()?.let {
+                runtimeRepository.upsert(
                     it.copy(
                         foregroundServiceStoppedAt = now,
                         updatedAt = now,

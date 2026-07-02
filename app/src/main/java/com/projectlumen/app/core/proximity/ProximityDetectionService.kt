@@ -66,8 +66,9 @@ class ProximityDetectionService : Service() {
         if (app != null) {
             scope.launch {
                 val now = System.currentTimeMillis()
-                app.database.runtimeStateDao().get()?.let {
-                    app.database.runtimeStateDao().upsert(
+                val runtimeRepository = app.runtimeRepository()
+                runtimeRepository.get()?.let {
+                    runtimeRepository.upsert(
                         it.copy(
                             foregroundServiceLastTaskRemovedAt = now,
                             updatedAt = now,
@@ -90,6 +91,7 @@ class ProximityDetectionService : Service() {
 
     private suspend fun runDetection(app: ProjectLumenApplication, calibrate: Boolean) {
         val db = app.database
+        val runtimeRepository = app.runtimeRepository()
         val settings = app.settingsRepository().get() ?: return
         if (!calibrate && !settings.proximityMonitoringEnabled && !settings.blinkMonitoringEnabled) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return
@@ -99,8 +101,8 @@ class ProximityDetectionService : Service() {
         }
 
         val now = System.currentTimeMillis()
-        db.runtimeStateDao().get()?.let {
-            db.runtimeStateDao().upsert(it.copy(proximityMonitoringActive = true, updatedAt = now))
+        runtimeRepository.get()?.let {
+            runtimeRepository.upsert(it.copy(proximityMonitoringActive = true, updatedAt = now))
         }
 
         val captureSeconds = when {
@@ -132,7 +134,7 @@ class ProximityDetectionService : Service() {
         val ratioPercent = sample?.let { latestSettings.distanceRatioPercent(it) } ?: 0
         val tooClose = latestSettings.proximityMonitoringEnabled && (sample?.let { latestSettings.isTooClose(it) } ?: false)
 
-        val runtime = db.runtimeStateDao().get()
+        val runtime = runtimeRepository.get()
         val lastWarningAt = runtime?.proximityLastWarningAt ?: 0L
         val shouldWarn = latestSettings.proximityMonitoringEnabled &&
             tooClose &&
@@ -176,8 +178,8 @@ class ProximityDetectionService : Service() {
             )
         }
 
-        db.runtimeStateDao().get()?.let {
-            db.runtimeStateDao().upsert(
+        runtimeRepository.get()?.let {
+            runtimeRepository.upsert(
                 it.copy(
                     proximityMonitoringActive = false,
                     proximityTooClose = tooClose,
@@ -224,9 +226,10 @@ class ProximityDetectionService : Service() {
         nowMillis: Long,
         flags: Int,
     ) {
-        app.database.runtimeStateDao().get()?.let {
+        val runtimeRepository = app.runtimeRepository()
+        runtimeRepository.get()?.let {
             val restarted = flags and (START_FLAG_REDELIVERY or START_FLAG_RETRY) != 0
-            app.database.runtimeStateDao().upsert(
+            runtimeRepository.upsert(
                 it.copy(
                     foregroundServiceStartedAt = nowMillis,
                     foregroundServiceStoppedAt = 0L,
@@ -238,8 +241,9 @@ class ProximityDetectionService : Service() {
     }
 
     private suspend fun recordForegroundServiceStop(app: ProjectLumenApplication, nowMillis: Long) {
-        app.database.runtimeStateDao().get()?.let {
-            app.database.runtimeStateDao().upsert(
+        val runtimeRepository = app.runtimeRepository()
+        runtimeRepository.get()?.let {
+            runtimeRepository.upsert(
                 it.copy(
                     foregroundServiceStoppedAt = nowMillis,
                     updatedAt = nowMillis,
@@ -262,8 +266,9 @@ class ProximityDetectionService : Service() {
 
     private suspend fun clearActiveState(app: ProjectLumenApplication) {
         val now = System.currentTimeMillis()
-        app.database.runtimeStateDao().get()?.let {
-            app.database.runtimeStateDao().upsert(
+        val runtimeRepository = app.runtimeRepository()
+        runtimeRepository.get()?.let {
+            runtimeRepository.upsert(
                 it.copy(
                     proximityMonitoringActive = false,
                     proximityTooClose = false,

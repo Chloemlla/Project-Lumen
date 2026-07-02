@@ -8,7 +8,6 @@ import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
-import com.projectlumen.app.core.repositories.RuntimeRepository
 import com.projectlumen.app.core.repositories.StatisticsRepository
 import com.projectlumen.app.core.runtime.AudioEvent
 import com.projectlumen.app.core.runtime.PomodoroEngine
@@ -25,7 +24,7 @@ class LumenOpenRuntimeController(
     private val settingsRepository by lazy {
         app.settingsRepository()
     }
-    private val runtimeRepository by lazy { RuntimeRepository(app.database.runtimeStateDao()) }
+    private val runtimeRepository by lazy { app.runtimeRepository() }
     private val statisticsRepository by lazy {
         StatisticsRepository(app.database.dailyEyeStatsDao(), app.database.dailyPomodoroStatsDao())
     }

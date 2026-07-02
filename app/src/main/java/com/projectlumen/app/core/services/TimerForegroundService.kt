@@ -64,7 +64,7 @@ class TimerForegroundService : LifecycleService() {
         app = application as ProjectLumenApplication
         notifications = NotificationService(this)
         settingsRepository = app.settingsRepository()
-        runtimeRepository = RuntimeRepository(app.database.runtimeStateDao())
+        runtimeRepository = app.runtimeRepository()
         statisticsRepository = StatisticsRepository(
             app.database.dailyEyeStatsDao(),
             app.database.dailyPomodoroStatsDao(),

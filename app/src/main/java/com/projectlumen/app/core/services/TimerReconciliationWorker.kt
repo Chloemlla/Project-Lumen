@@ -18,7 +18,7 @@ class TimerReconciliationWorker(
         val app = applicationContext as ProjectLumenApplication
         val settings = app.settingsRepository().get()
             ?: return Result.success()
-        val runtime = app.database.runtimeStateDao().get()
+        val runtime = app.runtimeRepository().get()
             ?: return Result.success()
         if (settings.keepAliveEnabled && runtime.activeEngine != ActiveEngine.IDLE.name) {
             app.startTimerService()
