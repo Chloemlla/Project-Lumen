@@ -103,6 +103,13 @@ internal fun JSONObject.toRemoteBackup(): RemoteBackup = RemoteBackup(
 
 internal fun JSONObject.optRemoteBackup(): RemoteBackup? = optJSONObject("backup")?.toRemoteBackup()
 
+internal fun JSONObject.toRemoteDeviceRegistrationResult(): RemoteDeviceRegistrationResult =
+    RemoteDeviceRegistrationResult(
+        accepted = optBoolean("accepted"),
+        deviceInstallationId = optString("deviceInstallationId"),
+        registeredAt = optLong("registeredAt"),
+    )
+
 internal fun JSONObject.optNullableString(name: String): String? {
     if (!has(name) || isNull(name)) return null
     return optString(name)

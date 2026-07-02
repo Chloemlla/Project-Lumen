@@ -140,18 +140,30 @@ function handleAction(action) {
     } else if (action === "refresh-token") {
         refreshAdminSession();
     } else if (SENSITIVE_ACTIONS.has(action)) {
-        recordAdminAction(action, payload || {});
+        if (!payload) {
+            toast("Select a user before applying entitlement changes.");
+            return;
+        }
+        recordAdminAction(action, payload);
     } else {
         copyText(payload || `${action} queued in ${state.environment}.`);
     }
 }
 
 function actionPayload(action) {
-  const firstUserId = data.profile?.id || "";
+  const selectedPlanUserId = fieldValue("planUserIdInput") || data.profile?.id || "";
+  const selectedTier = fieldValue("planTierInput") || "PRO";
+  const selectedProductId = fieldValue("planProductIdInput") || "manual_admin_pro";
+  const selectedExpiresAt = Number(fieldValue("planExpiresAtInput") || 0);
   const firstReleaseCode = Number(data.releases?.[0]?.version || 0);
   const payloads = {
-    "change-plan": { userId: firstUserId, tier: "PRO", productId: "manual_admin_pro", expiresAt: 0 },
-    "revoke-pro": { userId: firstUserId },
+    "change-plan": selectedPlanUserId ? {
+      userId: selectedPlanUserId,
+      tier: selectedTier,
+      productId: selectedProductId,
+      expiresAt: Number.isFinite(selectedExpiresAt) ? selectedExpiresAt : 0,
+    } : null,
+    "revoke-pro": selectedPlanUserId ? { userId: selectedPlanUserId } : null,
     "push-template": {
       id: `admin-template-${Date.now()}`,
       name: "Admin dispatched template",
@@ -283,6 +295,7 @@ async function recordAdminAction(action, payload) {
             body: JSON.stringify({ action, payload }),
         });
         toast(response.accepted ? `${action} recorded.` : `${action} rejected.`);
+        if (response.accepted) fetchDashboard();
     } catch (error) {
         toast(`Action failed: ${error.message}`);
     }
@@ -338,7 +351,14 @@ function mapDashboard(snapshot) {
     const apiMetrics = snapshot.observability?.apiMetrics || [];
     const syncMetrics = snapshot.observability?.syncMetrics || [];
     const crashGroups = snapshot.observability?.crashGroups || [];
+    const entitlements = snapshot.users?.entitlements || [];
     return {
+        users: profiles.map((user) => ({
+            id: user.id || "",
+            email: user.email || "unknown",
+            planTier: user.planTier || "FREE",
+            lastSyncAt: formatTime(user.lastSyncAt),
+        })),
         profile: {
             id: profile.id || "",
             email: profile.email || "No users yet",
@@ -364,10 +384,19 @@ function mapDashboard(snapshot) {
         })),
         purchaseAudit: (snapshot.users?.purchaseAudit || []).map((entry) => ({
             time: formatTime(entry.at),
+            userId: entry.userId,
             product: entry.productId,
             status: entry.status,
             token: entry.purchaseToken,
             action: entry.action,
+        })),
+        entitlements: entitlements.map((entry) => ({
+            userId: entry.userId,
+            product: entry.productId,
+            tier: entry.tier,
+            status: entry.status,
+            expiresAt: formatTime(entry.expiresAt),
+            lastVerifiedAt: formatTime(entry.lastVerifiedAt),
         })),
         backups: (snapshot.users?.backups || []).map((backup) => ({
             id: backup.id,
@@ -498,6 +527,10 @@ function isSecureAdminOrigin() {
 
 function avg(values) {
   return values.reduce((sum, value) => sum + value, 0) / Math.max(values.length, 1);
+}
+
+function fieldValue(id) {
+  return document.getElementById(id)?.value?.trim() || "";
 }
 
 function byId(id) {

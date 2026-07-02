@@ -67,6 +67,23 @@ class ProjectLumenApiClient(
         accessToken = accessToken,
     ) { it.getJSONObject("user").toApiUser() }
 
+    suspend fun registerDevice(
+        accessToken: String,
+        deviceInstallationId: String,
+        model: String,
+        versionCode: Long,
+        localSecurityConfig: String,
+    ): RemoteDeviceRegistrationResult = request(
+        method = "POST",
+        path = "v1/devices/register",
+        accessToken = accessToken,
+        body = JSONObject()
+            .put("deviceInstallationId", deviceInstallationId)
+            .put("model", model)
+            .put("versionCode", versionCode)
+            .put("localSecurityConfig", localSecurityConfig),
+    ) { it.toRemoteDeviceRegistrationResult() }
+
     suspend fun fetchEntitlements(accessToken: String): RemoteEntitlementSnapshot = request(
         method = "GET",
         path = "v1/entitlements",
@@ -198,6 +215,7 @@ class ProjectLumenApiClient(
         val normalizedPath = path.substringBefore('?').trimStart('/')
         return normalizedPath.startsWith("v1/auth/") ||
             normalizedPath == "v1/purchases/google/verify" ||
+            normalizedPath == "v1/devices/register" ||
             normalizedPath == "v1/telemetry"
     }
 

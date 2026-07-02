@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,4 +21,21 @@ pub struct UserDto {
 #[serde(rename_all = "camelCase")]
 pub struct MeResponse {
     pub user: UserDto,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceRegistrationRequest {
+    pub device_installation_id: String,
+    pub model: String,
+    pub version_code: i64,
+    pub local_security_config: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceRegistrationResponse {
+    pub accepted: bool,
+    pub device_installation_id: String,
+    pub registered_at: i64,
 }

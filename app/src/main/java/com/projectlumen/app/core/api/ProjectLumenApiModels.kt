@@ -90,3 +90,9 @@ data class RemoteBackup(
     val metadata: RemoteBackupMetadata,
     val backup: JSONObject,
 )
+
+data class RemoteDeviceRegistrationResult(
+    val accepted: Boolean,
+    val deviceInstallationId: String,
+    val registeredAt: Long,
+)

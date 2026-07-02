@@ -1,8 +1,11 @@
 package com.projectlumen.app.core.lifecycle
 
+import android.os.Build
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.ProjectLumenApplication
+import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.PomodoroPhase
@@ -30,6 +33,7 @@ class AppLifecycleCoordinator(
             val nowMillis = System.currentTimeMillis()
             val settings = settingsRepository.getOrDefault()
             val runtime = runtimeRepository.getOrDefault()
+            registerDeviceAsset(settings)
             val shouldResumePausedTime = !settings.keepAliveEnabled
             val foregroundRuntime = runtime.resumeAfterBackgroundPause(
                 nowMillis = nowMillis,
@@ -88,6 +92,46 @@ class AppLifecycleCoordinator(
                 app.stopLightMonitoring()
             }
         }
+    }
+
+    private suspend fun registerDeviceAsset(settings: AppSettingsEntity) {
+        val accessToken = app.secureCredentials.load()
+            ?.accessToken
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+        val deviceInstallationId = settings.deviceInstallationId.takeIf { it.isNotBlank() } ?: return
+        runCatching {
+            app.apiClient.registerDevice(
+                accessToken = accessToken,
+                deviceInstallationId = deviceInstallationId,
+                model = deviceAssetModel(),
+                versionCode = BuildConfig.VERSION_CODE.toLong(),
+                localSecurityConfig = localSecurityConfig(settings),
+            )
+        }
+    }
+
+    private fun deviceAssetModel(): String {
+        val manufacturer = Build.MANUFACTURER.orEmpty().trim()
+        val model = Build.MODEL.orEmpty().trim()
+        return when {
+            manufacturer.isEmpty() && model.isEmpty() -> "not reported"
+            manufacturer.isEmpty() -> model
+            model.isEmpty() || model.startsWith(manufacturer, ignoreCase = true) -> {
+                model.ifBlank { manufacturer }
+            }
+            else -> "$manufacturer $model"
+        }
+    }
+
+    private fun localSecurityConfig(settings: AppSettingsEntity): String {
+        val diagnostics = if (settings.diagnosticTelemetryUploadEnabled) {
+            "diagnostics:on"
+        } else {
+            "diagnostics:off"
+        }
+        val shizuku = if (settings.shizukuAdvancedModeEnabled) "shizuku:on" else "shizuku:off"
+        return "$diagnostics; $shizuku"
     }
 
     private fun RuntimeStateEntity.resumeAfterBackgroundPause(

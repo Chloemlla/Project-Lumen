@@ -83,6 +83,7 @@ GET  /api/health
 POST /api/v1/auth/email/start
 POST /api/v1/auth/email/verify
 GET  /api/v1/me
+POST /api/v1/devices/register
 GET  /api/v1/entitlements
 POST /api/v1/purchases/google/verify
 GET  /api/v1/sync/changes?since=cursor

@@ -232,6 +232,10 @@ impl AppStore {
             email,
             created_at: now_millis(),
             device_installation_id,
+            device_asset_model: String::new(),
+            device_asset_version_code: 0,
+            device_asset_last_seen_at: 0,
+            device_asset_security_config: String::new(),
         };
         self.users
             .insert_one(&user, None)

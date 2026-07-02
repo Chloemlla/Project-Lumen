@@ -67,6 +67,7 @@ window.LumenAdminModules = (() => {
   }
 
   function renderDevices() {
+    if (!data.devices.length) return `<div class="empty-state">No registered device assets have been recorded.</div>`;
     return `<div class="list-stack">${data.devices.map((device) => row(device.model, `${device.id} | versionCode ${device.versionCode} | ${device.config}`, tag(device.lastSeen, "info"))).join("")}</div>`;
   }
 
@@ -81,14 +82,39 @@ window.LumenAdminModules = (() => {
   }
 
   function renderPlan() {
+    const users = data.users?.length
+      ? data.users
+      : (data.profile?.id ? [{ id: data.profile.id, email: data.profile.email, planTier: data.profile.planTier }] : []);
+    const entitlementRows = (data.entitlements || []).map((entry) => [
+      `<code>${escapeHtml(entry.userId)}</code>`,
+      entry.product,
+      tag(entry.tier, entry.status === "active" ? "ok" : "watch"),
+      tag(entry.status, entry.status === "active" ? "ok" : "risk"),
+      entry.expiresAt,
+    ]);
     return `
       <div class="split-panel">
-        <div>${formRows([
-          ["Plan tier", "select", ["FREE", "PRO", "PLUS", "TEAM", "DEVELOPER"]],
-          ["Entitlement", "select", ["pro_templates", "advanced_statistics", "cloud_sync", "advanced_export"]],
-          ["Expires at", "text", "0 means lifetime"],
-        ])}</div>
-        <div class="timeline">${data.purchaseAudit.map((entry) => timelineItem(entry.time, `${entry.product} | ${entry.status} | ${entry.token}`, entry.action)).join("")}</div>
+        <div>
+          ${users.length ? "" : `<div class="empty-state">No users are available for entitlement changes.</div>`}
+          <label class="form-row">
+            <span>User</span>
+            <select id="planUserIdInput">
+              ${users.map((user) => `<option value="${escapeHtml(user.id)}">${escapeHtml(user.email)} | ${escapeHtml(user.planTier || "FREE")}</option>`).join("")}
+            </select>
+          </label>
+          <label class="form-row">
+            <span>Plan tier</span>
+            <select id="planTierInput">
+              ${["PRO", "PLUS", "TEAM", "DEVELOPER", "FREE"].map((tier) => `<option>${tier}</option>`).join("")}
+            </select>
+          </label>
+          <label class="form-row"><span>Product ID</span><input id="planProductIdInput" type="text" value="manual_admin_pro"></label>
+          <label class="form-row"><span>Expires at</span><input id="planExpiresAtInput" type="number" value="0"></label>
+        </div>
+        <div>
+          ${entitlementRows.length ? table(["User", "Product", "Tier", "Status", "Expires"], entitlementRows) : `<div class="empty-state">No entitlement records have been recorded.</div>`}
+          <div class="timeline">${data.purchaseAudit.map((entry) => timelineItem(entry.time, `${entry.product} | ${entry.status} | ${entry.token}`, entry.action)).join("")}</div>
+        </div>
       </div>
     `;
   }

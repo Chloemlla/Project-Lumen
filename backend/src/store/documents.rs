@@ -10,6 +10,14 @@ pub struct UserRecord {
     pub email: String,
     pub created_at: i64,
     pub device_installation_id: String,
+    #[serde(default)]
+    pub device_asset_model: String,
+    #[serde(default)]
+    pub device_asset_version_code: i64,
+    #[serde(default)]
+    pub device_asset_last_seen_at: i64,
+    #[serde(default)]
+    pub device_asset_security_config: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -125,6 +125,7 @@ fn validate_signature(secret: &str, canonical: &str, signature: &str) -> Result<
 fn requires_integrity(path: &str) -> bool {
     path.contains("/v1/auth/")
         || path.ends_with("/v1/purchases/google/verify")
+        || path.ends_with("/v1/devices/register")
         || path.ends_with("/v1/telemetry")
 }
 

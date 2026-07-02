@@ -66,7 +66,7 @@ impl AppStore {
             self.telemetry(),
             self.releases(),
             self.security_allowlist(),
-            self.device_assets(),
+            self.device_assets(&users),
         )?;
         let clean_stack = crash_groups
             .first()
@@ -172,7 +172,30 @@ impl AppStore {
             .collect())
     }
 
-    async fn device_assets(&self) -> Result<Vec<AdminDeviceAsset>, ApiError> {
+    async fn device_assets(&self, users: &[UserRecord]) -> Result<Vec<AdminDeviceAsset>, ApiError> {
+        let mut devices_by_id: HashMap<String, AdminDeviceAsset> = HashMap::new();
+        for user in users {
+            let device_installation_id = user.device_installation_id.trim();
+            if device_installation_id.is_empty() {
+                continue;
+            }
+            upsert_latest_device(
+                &mut devices_by_id,
+                AdminDeviceAsset {
+                    user_id: user.id.clone(),
+                    device_installation_id: device_installation_id.to_owned(),
+                    model: non_empty_or(user.device_asset_model.trim(), "not reported").to_owned(),
+                    version_code: user.device_asset_version_code.max(0),
+                    last_seen_at: user.device_asset_last_seen_at.max(user.created_at),
+                    local_security_config: non_empty_or(
+                        user.device_asset_security_config.trim(),
+                        "not reported",
+                    )
+                    .to_owned(),
+                },
+            );
+        }
+
         let options = FindOptions::builder()
             .sort(doc! { "receivedAt": -1 })
             .limit(200)
@@ -186,16 +209,13 @@ impl AppStore {
             .await
             .map_err(database_error)?;
 
-        let mut devices_by_id: HashMap<String, AdminDeviceAsset> = HashMap::new();
         for row in telemetry_rows {
             let device_installation_id = row.device_installation_id.trim().to_owned();
-            if device_installation_id.is_empty()
-                || devices_by_id.contains_key(&device_installation_id)
-            {
+            if device_installation_id.is_empty() {
                 continue;
             }
-            devices_by_id.insert(
-                device_installation_id.clone(),
+            upsert_latest_device(
+                &mut devices_by_id,
                 AdminDeviceAsset {
                     user_id: row.user_id,
                     device_installation_id,
@@ -223,13 +243,11 @@ impl AppStore {
             .map_err(database_error)?;
         for row in backup_rows {
             let device_installation_id = row.device_installation_id.trim().to_owned();
-            if device_installation_id.is_empty()
-                || devices_by_id.contains_key(&device_installation_id)
-            {
+            if device_installation_id.is_empty() {
                 continue;
             }
-            devices_by_id.insert(
-                device_installation_id.clone(),
+            upsert_latest_device(
+                &mut devices_by_id,
                 AdminDeviceAsset {
                     user_id: row.user_id,
                     device_installation_id,
@@ -325,12 +343,32 @@ impl AppStore {
     }
 }
 
+fn upsert_latest_device(
+    devices_by_id: &mut HashMap<String, AdminDeviceAsset>,
+    device: AdminDeviceAsset,
+) {
+    match devices_by_id.get(&device.device_installation_id) {
+        Some(current) if current.last_seen_at >= device.last_seen_at => {}
+        _ => {
+            devices_by_id.insert(device.device_installation_id.clone(), device);
+        }
+    }
+}
+
 fn bson_i64(value: Option<&Bson>) -> i64 {
     match value {
         Some(Bson::Int32(value)) => i64::from(*value),
         Some(Bson::Int64(value)) => *value,
         Some(Bson::Double(value)) => *value as i64,
         _ => 0,
+    }
+}
+
+fn non_empty_or<'a>(value: &'a str, fallback: &'a str) -> &'a str {
+    if value.is_empty() {
+        fallback
+    } else {
+        value
     }
 }
 

@@ -5,6 +5,7 @@ mod admin_dashboard;
 mod admin_dashboard_ops;
 mod auth;
 mod backups;
+mod devices;
 mod documents;
 mod entitlements;
 mod face_analysis;

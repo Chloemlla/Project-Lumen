@@ -9,6 +9,8 @@ pub mod admin;
 pub mod audit;
 #[path = "routes/backups.rs"]
 pub mod backups;
+#[path = "routes/devices.rs"]
+pub mod devices;
 #[path = "routes/entitlements.rs"]
 pub mod entitlements;
 #[path = "routes/face_analysis.rs"]
@@ -19,6 +21,8 @@ pub mod health;
 pub mod me;
 #[path = "routes/purchases.rs"]
 pub mod purchases;
+#[path = "routes/platform.rs"]
+pub mod platform;
 #[path = "routes/security.rs"]
 pub mod security;
 #[path = "routes/session.rs"]
@@ -37,8 +41,10 @@ pub fn router(state: AppState) -> Router {
     let v1 = Router::new()
         .nest("/auth", session::router())
         .merge(me::router())
+        .merge(devices::router())
         .merge(entitlements::router())
         .merge(face_analysis::router())
+        .merge(platform::router())
         .merge(purchases::router())
         .merge(sync::router())
         .merge(telemetry::router())
@@ -49,6 +55,7 @@ pub fn router(state: AppState) -> Router {
         ));
     let api = Router::new()
         .route("/health", axum::routing::get(health::health))
+        .merge(platform::public_router())
         .nest("/admin", admin::router())
         .nest("/v1", v1)
         .layer(middleware::from_fn_with_state(
