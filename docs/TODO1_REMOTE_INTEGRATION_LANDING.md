@@ -7,12 +7,12 @@
 - 设置页新增“账号与云同步”卡片，普通用户可以直接访问后端能力。
 - 支持后端健康检查，显示当前 API base。
 - 支持邮箱验证码登录，登录成功后使用 `SecureCredentialStore` 保存 access token 和 refresh token。
-- 支持设备安装 ID 持久化，用于登录、设备注册、同步和云备份。
+- 支持设备安装 ID 和远端同步 cursor 持久化，用于登录、设备注册、同步和云备份。
 - 支持刷新账号：拉取 `/v1/me`、注册 `/v1/devices/register`、拉取 `/v1/entitlements`、拉取 `/v1/config/feature-flags`。
 - 支持把远端权益写入本地 `entitlements` 表，并同步更新本地 plan tier。
 - 支持把远端 feature flags 写入本地 `feature_flags` 表。
 - 支持把本地 JSON 备份结构上传到 `/v1/backups`，也支持从 `/v1/backups/latest` 恢复。
-- 支持把本地设置、目标、模板、统计、权益、feature flags、提醒计划打包成增量同步 payload 推送到 `/v1/sync/push`，并拉取 `/v1/sync/changes`。
+- 支持把本地设置、目标、模板、统计、权益、feature flags、提醒计划打包成增量同步 payload 推送到 `/v1/sync/push`，并通过 `/v1/sync/changes` 拉取、过滤本机变更、落库合并远端变更。
 - 遥测上传继续复用已有 `EyeCareTelemetryReporter`，登录后优先使用安全存储里的 access token。
 
 ## 2. 后端落地
