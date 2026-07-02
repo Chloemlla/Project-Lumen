@@ -305,6 +305,18 @@ internal fun SettingsScreen(
             titleRes = R.string.nav_settings,
             message = stringResource(R.string.settings_subtitle),
         )
+        EyeCareSetupAndPrivacyCard(
+            uiState = uiState,
+            permissionRequirements = permissionRequirements,
+            shizukuReady = shizukuState.ready,
+        )
+        EyeCareActionPlanCard(
+            uiState = uiState,
+            permissionRequirements = permissionRequirements,
+            shizukuReady = shizukuState.ready,
+            onApplyRecommended = { applyRecommendedEyeCareSettings(viewModel) },
+            onExportReport = viewModel::shareMonthlyReportPdf,
+        )
         SettingsSection(R.string.section_general, Icons.Outlined.Settings) {
             Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall)
             LumenFlowRow {
@@ -392,10 +404,7 @@ internal fun SettingsScreen(
                 }
             }
         }
-        SettingsSection(R.string.section_pro, Icons.Outlined.CheckCircle, initiallyExpanded = false) {
-            MetricRow(R.string.plan_tier, settings.planTier.lowercase())
-            MetricRow(R.string.pro_templates, uiState.templates.count { it.isPremium }.toString())
-        }
+        EyeCareGrowthCapabilityCard(uiState)
         SettingsSection(R.string.about_update_status, Icons.Outlined.Sync, initiallyExpanded = false) {
             if (checkingUpdate) {
                 StatusLine(Icons.Outlined.Sync, stringResource(R.string.about_update_checking))

@@ -212,6 +212,8 @@ internal fun HomeScreen(
     val canStartReminder = uiState.settings.reminderEnabled && runtime.activeEngine == ActiveEngine.IDLE.name
     val canPauseReminder = reminderActive && !reminderPaused
     val canResumeReminder = uiState.settings.reminderEnabled && reminderPaused
+    val permissionRequirements = rememberPermissionRequirements()
+    val shizukuState by viewModel.shizukuState.collectAsStateWithLifecycle()
     val runWithNotificationPermission = rememberNotificationPermissionGate()
     fun runReminderAction(action: () -> Unit) {
         if (uiState.settings.notificationEnabled) runWithNotificationPermission(action) else action()
@@ -226,6 +228,12 @@ internal fun HomeScreen(
         StateCard(uiState.runtime, uiState.nowMillis)
         TodayStatsCard(uiState.eyeStats.firstOrNull())
         GoalProgressCard(uiState)
+        EyeCareInsightsHomeCard(
+            uiState = uiState,
+            permissionRequirements = permissionRequirements,
+            shizukuReady = shizukuState.ready,
+            onApplyRecommended = { applyRecommendedEyeCareSettings(viewModel) },
+        )
         AnimatedVisibility(
             visible = uiState.settings.translationEntryEnabled,
             enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
@@ -532,6 +540,8 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
     val eye = uiState.eyeStats.firstOrNull()
     val pomodoro = uiState.pomodoroStats.firstOrNull()
     val statsEnabled = uiState.settings.statsEnabled
+    val permissionRequirements = rememberPermissionRequirements()
+    val shizukuState by viewModel.shizukuState.collectAsStateWithLifecycle()
     var statsWindow by rememberSaveable { mutableIntStateOf(7) }
     val windowEyeStats = uiState.eyeStats.take(statsWindow)
     val windowPomodoroStats = uiState.pomodoroStats.take(statsWindow)
@@ -546,6 +556,7 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
             titleRes = R.string.statistics_title,
             message = stringResource(if (statsEnabled) R.string.statistics_subtitle else R.string.statistics_disabled),
         )
+        EyeCareHealthReportCard(uiState, permissionRequirements, shizukuState.ready)
         TodayStatsCard(eye)
         LumenFlowRow {
             FilterChip(selected = statsWindow == 7, onClick = { statsWindow = 7 }, label = { Text(stringResource(R.string.stats_range_7_days)) })
@@ -555,6 +566,13 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
         AdvancedStatsCard(windowEyeStats, windowPomodoroStats)
         HabitSuggestionCard(uiState)
         TrendCard(uiState)
+        EyeCareActionPlanCard(
+            uiState = uiState,
+            permissionRequirements = permissionRequirements,
+            shizukuReady = shizukuState.ready,
+            onApplyRecommended = { applyRecommendedEyeCareSettings(viewModel) },
+            onExportReport = viewModel::shareMonthlyReportPdf,
+        )
         Card(
             modifier = Modifier
                 .fillMaxWidth()
