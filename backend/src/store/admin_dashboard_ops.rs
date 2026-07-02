@@ -85,7 +85,7 @@ impl AppStore {
             .sort(doc! { "updatedAt": -1 })
             .build();
         self.admin_templates
-            .find(doc! {}, options)
+            .find(doc! { "updatedAt": { "$gt": 0 } }, options)
             .await
             .map_err(database_error)?
             .map_ok(|row| AdminTemplateItem {
@@ -174,7 +174,7 @@ impl AppStore {
             .limit(25)
             .build();
         self.admin_releases
-            .find(doc! {}, options)
+            .find(doc! { "createdAt": { "$gt": 0 } }, options)
             .await
             .map_err(database_error)?
             .map_ok(|row| AdminReleaseItem {
@@ -194,7 +194,7 @@ impl AppStore {
         &self,
     ) -> Result<Vec<AdminSecurityAllowlistItem>, ApiError> {
         self.admin_security_allowlist
-            .find(doc! {}, None)
+            .find(doc! { "updatedAt": { "$gt": 0 } }, None)
             .await
             .map_err(database_error)?
             .map_ok(|row| AdminSecurityAllowlistItem {

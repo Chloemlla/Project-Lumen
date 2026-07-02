@@ -334,7 +334,7 @@ function clearSession() {
 
 function mapDashboard(snapshot) {
     const profiles = snapshot.users?.profiles || [];
-    const profile = profiles[0] || data.profile;
+    const profile = profiles[0] || {};
     const apiMetrics = snapshot.observability?.apiMetrics || [];
     const syncMetrics = snapshot.observability?.syncMetrics || [];
     const crashGroups = snapshot.observability?.crashGroups || [];
@@ -344,13 +344,13 @@ function mapDashboard(snapshot) {
             email: profile.email || "No users yet",
             registeredAt: formatTime(profile.registeredAt),
             lastSyncAt: formatTime(profile.lastSyncAt),
-            planTier: profile.planTier || "FREE",
+            planTier: profile.planTier || "not recorded",
             featureFlags: profile.featureFlags || [],
-            localSecurity: "MongoDB-backed admin snapshot",
+            localSecurity: "not reported",
         },
         devices: (snapshot.users?.devices || []).map((device) => ({
             id: device.deviceInstallationId || "unknown",
-            model: device.model || "Android device",
+            model: device.model || "not reported",
             versionCode: device.versionCode || 0,
             lastSeen: formatTime(device.lastSeenAt),
             config: device.localSecurityConfig || "not reported",

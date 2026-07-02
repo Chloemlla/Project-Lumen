@@ -22,10 +22,9 @@ use documents::{
 use face_analysis::FaceAnalysisFrameRecord;
 use mongodb::{
     bson::doc,
-    options::{ClientOptions, IndexOptions, UpdateOptions},
+    options::{ClientOptions, IndexOptions},
     Client, Collection, IndexModel,
 };
-use serde_json::json;
 use std::time::{Duration, Instant};
 use telemetry::TelemetryUploadRecord;
 
@@ -116,7 +115,6 @@ impl AppStore {
             "MongoDB collection handles initialized"
         );
         store.ensure_indexes().await?;
-        store.ensure_admin_defaults().await?;
         tracing::info!(
             phase = "mongodb.store.ready",
             elapsed_ms = elapsed_ms(&started_at),
@@ -312,145 +310,6 @@ impl AppStore {
             phase = "mongodb.indexes.ensure",
             elapsed_ms = elapsed_ms(&started_at),
             "MongoDB indexes ensured"
-        );
-        Ok(())
-    }
-
-    async fn ensure_admin_defaults(&self) -> Result<(), ApiError> {
-        let started_at = Instant::now();
-        tracing::info!(
-            phase = "mongodb.defaults.ensure",
-            "ensuring MongoDB admin defaults"
-        );
-
-        let default_started_at = Instant::now();
-        tracing::debug!(
-            phase = "mongodb.default.ensure",
-            collection = "admin_templates",
-            default_id = "clear-sky",
-            "ensuring admin template default"
-        );
-        self.admin_templates
-            .update_one(
-                doc! { "_id": "clear-sky" },
-                doc! {
-                    "$setOnInsert": mongodb::bson::to_document(&AdminTemplateRecord {
-                        id: "clear-sky".to_owned(),
-                        name: "Clear sky".to_owned(),
-                        tier: "PRO".to_owned(),
-                        countdown_style: "circle".to_owned(),
-                        color: "#2563EB".to_owned(),
-                        locales: vec!["en".to_owned(), "zh".to_owned()],
-                        layout_json: json!({ "countdownStyle": "circle", "showSkipButton": true }),
-                        updated_at: 0,
-                    }).map_err(|error| {
-                        tracing::error!(
-                            phase = "mongodb.default.serialize",
-                            collection = "admin_templates",
-                            default_id = "clear-sky",
-                            %error,
-                            "failed to serialize admin template default"
-                        );
-                        ApiError::Internal
-                    })?,
-                },
-                UpdateOptions::builder().upsert(true).build(),
-            )
-            .await
-            .map_err(|error| startup_database_error("mongodb.default.ensure", error))?;
-        tracing::info!(
-            phase = "mongodb.default.ensure",
-            collection = "admin_templates",
-            default_id = "clear-sky",
-            elapsed_ms = elapsed_ms(&default_started_at),
-            "admin template default ensured"
-        );
-
-        let default_started_at = Instant::now();
-        tracing::debug!(
-            phase = "mongodb.default.ensure",
-            collection = "admin_security_allowlist",
-            default_id = "eye-https",
-            "ensuring admin security allowlist default"
-        );
-        self.admin_security_allowlist
-            .update_one(
-                doc! { "_id": "eye-https" },
-                doc! {
-                    "$setOnInsert": mongodb::bson::to_document(&AdminSecurityAllowlistRecord {
-                        id: "eye-https".to_owned(),
-                        origin: "eye.chloemlla.com".to_owned(),
-                        protocol: "https".to_owned(),
-                        risk: "approved".to_owned(),
-                        updated_at: 0,
-                    }).map_err(|error| {
-                        tracing::error!(
-                            phase = "mongodb.default.serialize",
-                            collection = "admin_security_allowlist",
-                            default_id = "eye-https",
-                            %error,
-                            "failed to serialize admin security allowlist default"
-                        );
-                        ApiError::Internal
-                    })?,
-                },
-                UpdateOptions::builder().upsert(true).build(),
-            )
-            .await
-            .map_err(|error| startup_database_error("mongodb.default.ensure", error))?;
-        tracing::info!(
-            phase = "mongodb.default.ensure",
-            collection = "admin_security_allowlist",
-            default_id = "eye-https",
-            elapsed_ms = elapsed_ms(&default_started_at),
-            "admin security allowlist default ensured"
-        );
-
-        let default_started_at = Instant::now();
-        tracing::debug!(
-            phase = "mongodb.default.ensure",
-            collection = "admin_releases",
-            default_id = "bootstrap-release",
-            "ensuring admin release default"
-        );
-        self.admin_releases
-            .update_one(
-                doc! { "_id": "bootstrap-release" },
-                doc! {
-                    "$setOnInsert": mongodb::bson::to_document(&AdminReleaseRecord {
-                        id: "bootstrap-release".to_owned(),
-                        version_code: 0,
-                        version_name: "unregistered".to_owned(),
-                        sha256: "pending".to_owned(),
-                        rollout: "blocked".to_owned(),
-                        force_update: false,
-                        created_at: 0,
-                    }).map_err(|error| {
-                        tracing::error!(
-                            phase = "mongodb.default.serialize",
-                            collection = "admin_releases",
-                            default_id = "bootstrap-release",
-                            %error,
-                            "failed to serialize admin release default"
-                        );
-                        ApiError::Internal
-                    })?,
-                },
-                UpdateOptions::builder().upsert(true).build(),
-            )
-            .await
-            .map_err(|error| startup_database_error("mongodb.default.ensure", error))?;
-        tracing::info!(
-            phase = "mongodb.default.ensure",
-            collection = "admin_releases",
-            default_id = "bootstrap-release",
-            elapsed_ms = elapsed_ms(&default_started_at),
-            "admin release default ensured"
-        );
-        tracing::info!(
-            phase = "mongodb.defaults.ensure",
-            elapsed_ms = elapsed_ms(&started_at),
-            "MongoDB admin defaults ensured"
         );
         Ok(())
     }

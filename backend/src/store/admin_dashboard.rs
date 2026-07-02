@@ -3,9 +3,8 @@ use crate::{
     error::ApiError,
     models::{
         AdminAccessAuditEntry, AdminBackupSnapshot, AdminBackupSummary, AdminContentSection,
-        AdminDashboardResponse, AdminDeviceAsset, AdminEntitlementItem, AdminObservabilitySection,
-        AdminPurchaseAuditEntry, AdminReleaseSection, AdminRouteStatusItem, AdminUserProfile,
-        AdminUsersSection,
+        AdminDashboardResponse, AdminEntitlementItem, AdminObservabilitySection,
+        AdminPurchaseAuditEntry, AdminReleaseSection, AdminUserProfile, AdminUsersSection,
     },
 };
 use futures_util::TryStreamExt;
@@ -38,7 +37,6 @@ impl AppStore {
                 feature_flags: Vec::new(),
             })
             .collect();
-        let devices = device_assets(&users);
         let (
             access_audit,
             purchase_audit,
@@ -71,7 +69,7 @@ impl AppStore {
             generated_at: now_millis(),
             users: AdminUsersSection {
                 profiles,
-                devices,
+                devices: Vec::new(),
                 access_audit,
                 entitlements,
                 purchase_audit,
@@ -89,7 +87,7 @@ impl AppStore {
             },
             release: AdminReleaseSection {
                 releases,
-                routes: route_status(),
+                routes: Vec::new(),
                 allowlist,
             },
         })
@@ -236,21 +234,6 @@ impl AppStore {
     }
 }
 
-fn device_assets(users: &[UserRecord]) -> Vec<AdminDeviceAsset> {
-    users
-        .iter()
-        .filter(|user| !user.device_installation_id.is_empty())
-        .map(|user| AdminDeviceAsset {
-            user_id: user.id.clone(),
-            device_installation_id: user.device_installation_id.clone(),
-            model: "Android device".to_owned(),
-            version_code: 0,
-            last_seen_at: user.created_at,
-            local_security_config: "Reported by future admin access audit events".to_owned(),
-        })
-        .collect()
-}
-
 fn backup_summary(backup: &Value) -> AdminBackupSummary {
     AdminBackupSummary {
         templates: json_array_len(backup, "templates"),
@@ -302,33 +285,4 @@ fn mask_token(token: &str) -> String {
         return "****".to_owned();
     }
     format!("{}...{}", &token[..4], &token[token.len() - 4..])
-}
-
-fn route_status() -> Vec<AdminRouteStatusItem> {
-    vec![
-        AdminRouteStatusItem {
-            module: "routes/session.rs".to_owned(),
-            path: "/api/v1/auth/email/*".to_owned(),
-            state: "ok".to_owned(),
-            p95_ms: 0,
-        },
-        AdminRouteStatusItem {
-            module: "routes/sync.rs".to_owned(),
-            path: "/api/v1/sync/*".to_owned(),
-            state: "ok".to_owned(),
-            p95_ms: 0,
-        },
-        AdminRouteStatusItem {
-            module: "routes/backups.rs".to_owned(),
-            path: "/api/v1/backups/*".to_owned(),
-            state: "ok".to_owned(),
-            p95_ms: 0,
-        },
-        AdminRouteStatusItem {
-            module: "routes/admin.rs".to_owned(),
-            path: "/api/admin/*".to_owned(),
-            state: "ok".to_owned(),
-            p95_ms: 0,
-        },
-    ]
 }

@@ -74,7 +74,7 @@ admin_releases
 admin_security_allowlist
 ```
 
-The dashboard reads `/api/admin/dashboard` for live MongoDB-backed data. The static fallback data only keeps the UI usable before login or before management collections receive samples.
+The dashboard reads `/api/admin/dashboard` for live MongoDB-backed data after login. Static fallback data is only for the pre-login/pre-load UI; authenticated dashboard responses return real MongoDB records or empty sections.
 
 ## Endpoints
 
