@@ -4,21 +4,28 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
+import com.projectlumen.app.core.mmkv.ProjectLumenMmkv
 import java.io.IOException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
-private val Context.eyeCarePreferencesDataStore: DataStore<Preferences> by preferencesDataStore(
+private val Context.eyeCarePreferencesLegacyDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "eye_care_preferences",
 )
+
+private const val STORE_ID = "eye_care_preferences"
+private const val KEY_MMKV_MIGRATION_COMPLETE = "__mmkv_migration_complete"
 
 data class EyeCarePreferences(
     val hasPersistedValues: Boolean = false,
@@ -70,70 +77,27 @@ data class EyeCarePreferences(
 )
 
 class EyeCarePreferencesDataStore(context: Context) {
-    private val dataStore = context.applicationContext.eyeCarePreferencesDataStore
+    private val appContext = context.applicationContext
+    private val legacyDataStore = appContext.eyeCarePreferencesLegacyDataStore
+    private val mmkv by lazy { ProjectLumenMmkv.mmkvWithId(STORE_ID) }
+    private val migrationLock = Mutex()
+    private val state by lazy { MutableStateFlow(readFromMmkv()) }
 
     fun observe(): Flow<EyeCarePreferences> {
-        return dataStore.data
-            .catch { throwable ->
-                if (throwable is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw throwable
-                }
-            }
-            .map(::toEyeCarePreferences)
+        return flow {
+            ensureLegacyMigrated()
+            emitAll(state)
+        }
     }
 
-    suspend fun read(): EyeCarePreferences = observe().first()
+    suspend fun read(): EyeCarePreferences {
+        ensureLegacyMigrated()
+        return state.value
+    }
 
     suspend fun saveFromSettings(settings: AppSettingsEntity) {
-        dataStore.edit { preferences ->
-            preferences[Keys.REMINDER_ENABLED] = settings.reminderEnabled
-            preferences[Keys.WARN_INTERVAL_MINUTES] = settings.warnIntervalMinutes
-            preferences[Keys.REST_DURATION_SECONDS] = settings.restDurationSeconds
-            preferences[Keys.PRE_ALERT_ENABLED] = settings.preAlertEnabled
-            preferences[Keys.PRE_ALERT_SECONDS] = settings.preAlertSeconds
-            preferences[Keys.USE_DYNAMIC_COLORS] = settings.useDynamicColors
-            preferences[Keys.POMODORO_ENABLED] = settings.pomodoroEnabled
-            preferences[Keys.POMODORO_WORK_MINUTES] = settings.pomodoroWorkMinutes
-            preferences[Keys.POMODORO_SHORT_BREAK_MINUTES] = settings.pomodoroShortBreakMinutes
-            preferences[Keys.POMODORO_LONG_BREAK_MINUTES] = settings.pomodoroLongBreakMinutes
-            preferences[Keys.NOTIFICATION_ENABLED] = settings.notificationEnabled
-            preferences[Keys.KEEP_ALIVE_ENABLED] = settings.keepAliveEnabled
-            preferences[Keys.PROXIMITY_MONITORING_ENABLED] = settings.proximityMonitoringEnabled
-            preferences[Keys.PROXIMITY_BASELINE_EYE_DISTANCE_PX] = settings.proximityBaselineEyeDistancePx
-            preferences[Keys.PROXIMITY_BASELINE_FACE_WIDTH_PERCENT] = settings.proximityBaselineFaceWidthPercent
-            preferences[Keys.PROXIMITY_DISTANCE_MULTIPLIER_PERCENT] = settings.proximityDistanceMultiplierPercent
-            preferences[Keys.PROXIMITY_CHECK_INTERVAL_MINUTES] = settings.proximityCheckIntervalMinutes
-            preferences[Keys.PROXIMITY_CAPTURE_SECONDS] = settings.proximityCaptureSeconds
-            preferences[Keys.PROXIMITY_FACE_THRESHOLD_PERCENT] = settings.proximityFaceThresholdPercent
-            preferences[Keys.PROXIMITY_ALERT_COOLDOWN_SECONDS] = settings.proximityAlertCooldownSeconds
-            preferences[Keys.BLINK_MONITORING_ENABLED] = settings.blinkMonitoringEnabled
-            preferences[Keys.BLINK_NO_BLINK_THRESHOLD_SECONDS] = settings.blinkNoBlinkThresholdSeconds
-            preferences[Keys.BLINK_ALERT_COOLDOWN_SECONDS] = settings.blinkAlertCooldownSeconds
-            preferences[Keys.AMBIENT_LIGHT_MONITORING_ENABLED] = settings.ambientLightMonitoringEnabled
-            preferences[Keys.AMBIENT_LIGHT_LOW_LUX_THRESHOLD] = settings.ambientLightLowLuxThreshold
-            preferences[Keys.AUTO_BRIGHTNESS_ENABLED] = settings.autoBrightnessEnabled
-            preferences[Keys.AUTO_BRIGHTNESS_MIN_PERCENT] = settings.autoBrightnessMinPercent
-            preferences[Keys.AUTO_BRIGHTNESS_MAX_PERCENT] = settings.autoBrightnessMaxPercent
-            preferences[Keys.GLOBAL_OVERLAY_ENABLED] = settings.globalOverlayEnabled
-            preferences[Keys.OVERLAY_REST_DURATION_SECONDS] = settings.overlayRestDurationSeconds
-            preferences[Keys.OVERLAY_STRICT_DISTANCE_PERCENT] = settings.overlayStrictDistancePercent
-            preferences[Keys.SHIZUKU_ADVANCED_MODE_ENABLED] = settings.shizukuAdvancedModeEnabled
-            preferences[Keys.SHIZUKU_CONTEXT_AWARE_SAMPLING_ENABLED] = settings.shizukuContextAwareSamplingEnabled
-            preferences[Keys.SHIZUKU_SERVICE_RECOVERY_ENABLED] = settings.shizukuServiceRecoveryEnabled
-            preferences[Keys.SHIZUKU_SCREEN_OFF_GUARD_ENABLED] = settings.shizukuScreenOffGuardEnabled
-            preferences[Keys.SHIZUKU_LOW_BATTERY_GUARD_ENABLED] = settings.shizukuLowBatteryGuardEnabled
-            preferences[Keys.SHIZUKU_POWER_SAVE_GUARD_ENABLED] = settings.shizukuPowerSaveGuardEnabled
-            preferences[Keys.SHIZUKU_DND_GUARD_ENABLED] = settings.shizukuDndGuardEnabled
-            preferences[Keys.SHIZUKU_THERMAL_GUARD_ENABLED] = settings.shizukuThermalGuardEnabled
-            preferences[Keys.SHIZUKU_CAMERA_PRIVACY_GUARD_ENABLED] = settings.shizukuCameraPrivacyGuardEnabled
-            preferences[Keys.SHIZUKU_NATIVE_EYE_PROTECTION_ENABLED] = settings.shizukuNativeEyeProtectionEnabled
-            preferences[Keys.SHIZUKU_NATIVE_COLOR_TEMPERATURE_KELVIN] = settings.shizukuNativeColorTemperatureKelvin
-            preferences[Keys.SHIZUKU_NATIVE_BRIGHTNESS_PERCENT] = settings.shizukuNativeBrightnessPercent
-            preferences[Keys.SHIZUKU_NATIVE_EXTRA_DIM_ENABLED] = settings.shizukuNativeExtraDimEnabled
-            preferences[Keys.SHIZUKU_NATIVE_EXTRA_DIM_PERCENT] = settings.shizukuNativeExtraDimPercent
-        }
+        ensureLegacyMigrated()
+        writeToMmkv(settings.toEyeCarePreferences())
     }
 
     private fun toEyeCarePreferences(preferences: Preferences): EyeCarePreferences {
@@ -184,6 +148,186 @@ class EyeCarePreferencesDataStore(context: Context) {
             shizukuNativeBrightnessPercent = preferences[Keys.SHIZUKU_NATIVE_BRIGHTNESS_PERCENT] ?: 35,
             shizukuNativeExtraDimEnabled = preferences[Keys.SHIZUKU_NATIVE_EXTRA_DIM_ENABLED] ?: false,
             shizukuNativeExtraDimPercent = preferences[Keys.SHIZUKU_NATIVE_EXTRA_DIM_PERCENT] ?: 25,
+        )
+    }
+
+    private suspend fun ensureLegacyMigrated() {
+        if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) return
+        migrationLock.withLock {
+            if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) return
+            if (!hasMmkvPersistedValues()) {
+                val legacyPreferences = legacyDataStore.data
+                    .catch { throwable ->
+                        if (throwable is IOException) {
+                            emit(emptyPreferences())
+                        } else {
+                            throw throwable
+                        }
+                    }
+                    .first()
+                if (legacyPreferences.asMap().isNotEmpty()) {
+                    writeToMmkv(toEyeCarePreferences(legacyPreferences))
+                    return
+                }
+            }
+            mmkv.encode(KEY_MMKV_MIGRATION_COMPLETE, true)
+            state.value = readFromMmkv()
+        }
+    }
+
+    private fun hasMmkvPersistedValues(): Boolean {
+        return mmkv.allKeys()?.any { key -> key != KEY_MMKV_MIGRATION_COMPLETE } == true
+    }
+
+    private fun readFromMmkv(): EyeCarePreferences {
+        return EyeCarePreferences(
+            hasPersistedValues = hasMmkvPersistedValues(),
+            reminderEnabled = mmkv.decodeBool(Keys.REMINDER_ENABLED.name, true),
+            warnIntervalMinutes = mmkv.decodeInt(Keys.WARN_INTERVAL_MINUTES.name, 20),
+            restDurationSeconds = mmkv.decodeInt(Keys.REST_DURATION_SECONDS.name, 20),
+            preAlertEnabled = mmkv.decodeBool(Keys.PRE_ALERT_ENABLED.name, true),
+            preAlertSeconds = mmkv.decodeInt(Keys.PRE_ALERT_SECONDS.name, 60),
+            useDynamicColors = mmkv.decodeBool(Keys.USE_DYNAMIC_COLORS.name, true),
+            pomodoroEnabled = mmkv.decodeBool(Keys.POMODORO_ENABLED.name, true),
+            pomodoroWorkMinutes = mmkv.decodeInt(Keys.POMODORO_WORK_MINUTES.name, 25),
+            pomodoroShortBreakMinutes = mmkv.decodeInt(Keys.POMODORO_SHORT_BREAK_MINUTES.name, 5),
+            pomodoroLongBreakMinutes = mmkv.decodeInt(Keys.POMODORO_LONG_BREAK_MINUTES.name, 15),
+            notificationEnabled = mmkv.decodeBool(Keys.NOTIFICATION_ENABLED.name, true),
+            keepAliveEnabled = mmkv.decodeBool(Keys.KEEP_ALIVE_ENABLED.name, true),
+            proximityMonitoringEnabled = mmkv.decodeBool(Keys.PROXIMITY_MONITORING_ENABLED.name, false),
+            proximityBaselineEyeDistancePx = mmkv.decodeFloat(Keys.PROXIMITY_BASELINE_EYE_DISTANCE_PX.name, 0f),
+            proximityBaselineFaceWidthPercent = mmkv.decodeInt(Keys.PROXIMITY_BASELINE_FACE_WIDTH_PERCENT.name, 0),
+            proximityDistanceMultiplierPercent = mmkv.decodeInt(Keys.PROXIMITY_DISTANCE_MULTIPLIER_PERCENT.name, 130),
+            proximityCheckIntervalMinutes = mmkv.decodeInt(Keys.PROXIMITY_CHECK_INTERVAL_MINUTES.name, 3),
+            proximityCaptureSeconds = mmkv.decodeInt(Keys.PROXIMITY_CAPTURE_SECONDS.name, 2),
+            proximityFaceThresholdPercent = mmkv.decodeInt(Keys.PROXIMITY_FACE_THRESHOLD_PERCENT.name, 38),
+            proximityAlertCooldownSeconds = mmkv.decodeInt(Keys.PROXIMITY_ALERT_COOLDOWN_SECONDS.name, 120),
+            blinkMonitoringEnabled = mmkv.decodeBool(Keys.BLINK_MONITORING_ENABLED.name, false),
+            blinkNoBlinkThresholdSeconds = mmkv.decodeInt(Keys.BLINK_NO_BLINK_THRESHOLD_SECONDS.name, 10),
+            blinkAlertCooldownSeconds = mmkv.decodeInt(Keys.BLINK_ALERT_COOLDOWN_SECONDS.name, 60),
+            ambientLightMonitoringEnabled = mmkv.decodeBool(Keys.AMBIENT_LIGHT_MONITORING_ENABLED.name, false),
+            ambientLightLowLuxThreshold = mmkv.decodeInt(Keys.AMBIENT_LIGHT_LOW_LUX_THRESHOLD.name, 10),
+            autoBrightnessEnabled = mmkv.decodeBool(Keys.AUTO_BRIGHTNESS_ENABLED.name, false),
+            autoBrightnessMinPercent = mmkv.decodeInt(Keys.AUTO_BRIGHTNESS_MIN_PERCENT.name, 35),
+            autoBrightnessMaxPercent = mmkv.decodeInt(Keys.AUTO_BRIGHTNESS_MAX_PERCENT.name, 85),
+            globalOverlayEnabled = mmkv.decodeBool(Keys.GLOBAL_OVERLAY_ENABLED.name, true),
+            overlayRestDurationSeconds = mmkv.decodeInt(Keys.OVERLAY_REST_DURATION_SECONDS.name, 20),
+            overlayStrictDistancePercent = mmkv.decodeInt(Keys.OVERLAY_STRICT_DISTANCE_PERCENT.name, 160),
+            shizukuAdvancedModeEnabled = mmkv.decodeBool(Keys.SHIZUKU_ADVANCED_MODE_ENABLED.name, false),
+            shizukuContextAwareSamplingEnabled = mmkv.decodeBool(Keys.SHIZUKU_CONTEXT_AWARE_SAMPLING_ENABLED.name, true),
+            shizukuServiceRecoveryEnabled = mmkv.decodeBool(Keys.SHIZUKU_SERVICE_RECOVERY_ENABLED.name, true),
+            shizukuScreenOffGuardEnabled = mmkv.decodeBool(Keys.SHIZUKU_SCREEN_OFF_GUARD_ENABLED.name, true),
+            shizukuLowBatteryGuardEnabled = mmkv.decodeBool(Keys.SHIZUKU_LOW_BATTERY_GUARD_ENABLED.name, true),
+            shizukuPowerSaveGuardEnabled = mmkv.decodeBool(Keys.SHIZUKU_POWER_SAVE_GUARD_ENABLED.name, true),
+            shizukuDndGuardEnabled = mmkv.decodeBool(Keys.SHIZUKU_DND_GUARD_ENABLED.name, false),
+            shizukuThermalGuardEnabled = mmkv.decodeBool(Keys.SHIZUKU_THERMAL_GUARD_ENABLED.name, true),
+            shizukuCameraPrivacyGuardEnabled = mmkv.decodeBool(Keys.SHIZUKU_CAMERA_PRIVACY_GUARD_ENABLED.name, true),
+            shizukuNativeEyeProtectionEnabled = mmkv.decodeBool(Keys.SHIZUKU_NATIVE_EYE_PROTECTION_ENABLED.name, false),
+            shizukuNativeColorTemperatureKelvin = mmkv.decodeInt(Keys.SHIZUKU_NATIVE_COLOR_TEMPERATURE_KELVIN.name, 4200),
+            shizukuNativeBrightnessPercent = mmkv.decodeInt(Keys.SHIZUKU_NATIVE_BRIGHTNESS_PERCENT.name, 35),
+            shizukuNativeExtraDimEnabled = mmkv.decodeBool(Keys.SHIZUKU_NATIVE_EXTRA_DIM_ENABLED.name, false),
+            shizukuNativeExtraDimPercent = mmkv.decodeInt(Keys.SHIZUKU_NATIVE_EXTRA_DIM_PERCENT.name, 25),
+        )
+    }
+
+    private fun writeToMmkv(preferences: EyeCarePreferences) {
+        mmkv.encode(Keys.REMINDER_ENABLED.name, preferences.reminderEnabled)
+        mmkv.encode(Keys.WARN_INTERVAL_MINUTES.name, preferences.warnIntervalMinutes)
+        mmkv.encode(Keys.REST_DURATION_SECONDS.name, preferences.restDurationSeconds)
+        mmkv.encode(Keys.PRE_ALERT_ENABLED.name, preferences.preAlertEnabled)
+        mmkv.encode(Keys.PRE_ALERT_SECONDS.name, preferences.preAlertSeconds)
+        mmkv.encode(Keys.USE_DYNAMIC_COLORS.name, preferences.useDynamicColors)
+        mmkv.encode(Keys.POMODORO_ENABLED.name, preferences.pomodoroEnabled)
+        mmkv.encode(Keys.POMODORO_WORK_MINUTES.name, preferences.pomodoroWorkMinutes)
+        mmkv.encode(Keys.POMODORO_SHORT_BREAK_MINUTES.name, preferences.pomodoroShortBreakMinutes)
+        mmkv.encode(Keys.POMODORO_LONG_BREAK_MINUTES.name, preferences.pomodoroLongBreakMinutes)
+        mmkv.encode(Keys.NOTIFICATION_ENABLED.name, preferences.notificationEnabled)
+        mmkv.encode(Keys.KEEP_ALIVE_ENABLED.name, preferences.keepAliveEnabled)
+        mmkv.encode(Keys.PROXIMITY_MONITORING_ENABLED.name, preferences.proximityMonitoringEnabled)
+        mmkv.encode(Keys.PROXIMITY_BASELINE_EYE_DISTANCE_PX.name, preferences.proximityBaselineEyeDistancePx)
+        mmkv.encode(Keys.PROXIMITY_BASELINE_FACE_WIDTH_PERCENT.name, preferences.proximityBaselineFaceWidthPercent)
+        mmkv.encode(Keys.PROXIMITY_DISTANCE_MULTIPLIER_PERCENT.name, preferences.proximityDistanceMultiplierPercent)
+        mmkv.encode(Keys.PROXIMITY_CHECK_INTERVAL_MINUTES.name, preferences.proximityCheckIntervalMinutes)
+        mmkv.encode(Keys.PROXIMITY_CAPTURE_SECONDS.name, preferences.proximityCaptureSeconds)
+        mmkv.encode(Keys.PROXIMITY_FACE_THRESHOLD_PERCENT.name, preferences.proximityFaceThresholdPercent)
+        mmkv.encode(Keys.PROXIMITY_ALERT_COOLDOWN_SECONDS.name, preferences.proximityAlertCooldownSeconds)
+        mmkv.encode(Keys.BLINK_MONITORING_ENABLED.name, preferences.blinkMonitoringEnabled)
+        mmkv.encode(Keys.BLINK_NO_BLINK_THRESHOLD_SECONDS.name, preferences.blinkNoBlinkThresholdSeconds)
+        mmkv.encode(Keys.BLINK_ALERT_COOLDOWN_SECONDS.name, preferences.blinkAlertCooldownSeconds)
+        mmkv.encode(Keys.AMBIENT_LIGHT_MONITORING_ENABLED.name, preferences.ambientLightMonitoringEnabled)
+        mmkv.encode(Keys.AMBIENT_LIGHT_LOW_LUX_THRESHOLD.name, preferences.ambientLightLowLuxThreshold)
+        mmkv.encode(Keys.AUTO_BRIGHTNESS_ENABLED.name, preferences.autoBrightnessEnabled)
+        mmkv.encode(Keys.AUTO_BRIGHTNESS_MIN_PERCENT.name, preferences.autoBrightnessMinPercent)
+        mmkv.encode(Keys.AUTO_BRIGHTNESS_MAX_PERCENT.name, preferences.autoBrightnessMaxPercent)
+        mmkv.encode(Keys.GLOBAL_OVERLAY_ENABLED.name, preferences.globalOverlayEnabled)
+        mmkv.encode(Keys.OVERLAY_REST_DURATION_SECONDS.name, preferences.overlayRestDurationSeconds)
+        mmkv.encode(Keys.OVERLAY_STRICT_DISTANCE_PERCENT.name, preferences.overlayStrictDistancePercent)
+        mmkv.encode(Keys.SHIZUKU_ADVANCED_MODE_ENABLED.name, preferences.shizukuAdvancedModeEnabled)
+        mmkv.encode(Keys.SHIZUKU_CONTEXT_AWARE_SAMPLING_ENABLED.name, preferences.shizukuContextAwareSamplingEnabled)
+        mmkv.encode(Keys.SHIZUKU_SERVICE_RECOVERY_ENABLED.name, preferences.shizukuServiceRecoveryEnabled)
+        mmkv.encode(Keys.SHIZUKU_SCREEN_OFF_GUARD_ENABLED.name, preferences.shizukuScreenOffGuardEnabled)
+        mmkv.encode(Keys.SHIZUKU_LOW_BATTERY_GUARD_ENABLED.name, preferences.shizukuLowBatteryGuardEnabled)
+        mmkv.encode(Keys.SHIZUKU_POWER_SAVE_GUARD_ENABLED.name, preferences.shizukuPowerSaveGuardEnabled)
+        mmkv.encode(Keys.SHIZUKU_DND_GUARD_ENABLED.name, preferences.shizukuDndGuardEnabled)
+        mmkv.encode(Keys.SHIZUKU_THERMAL_GUARD_ENABLED.name, preferences.shizukuThermalGuardEnabled)
+        mmkv.encode(Keys.SHIZUKU_CAMERA_PRIVACY_GUARD_ENABLED.name, preferences.shizukuCameraPrivacyGuardEnabled)
+        mmkv.encode(Keys.SHIZUKU_NATIVE_EYE_PROTECTION_ENABLED.name, preferences.shizukuNativeEyeProtectionEnabled)
+        mmkv.encode(Keys.SHIZUKU_NATIVE_COLOR_TEMPERATURE_KELVIN.name, preferences.shizukuNativeColorTemperatureKelvin)
+        mmkv.encode(Keys.SHIZUKU_NATIVE_BRIGHTNESS_PERCENT.name, preferences.shizukuNativeBrightnessPercent)
+        mmkv.encode(Keys.SHIZUKU_NATIVE_EXTRA_DIM_ENABLED.name, preferences.shizukuNativeExtraDimEnabled)
+        mmkv.encode(Keys.SHIZUKU_NATIVE_EXTRA_DIM_PERCENT.name, preferences.shizukuNativeExtraDimPercent)
+        mmkv.encode(KEY_MMKV_MIGRATION_COMPLETE, true)
+        state.value = readFromMmkv()
+    }
+
+    private fun AppSettingsEntity.toEyeCarePreferences(): EyeCarePreferences {
+        return EyeCarePreferences(
+            hasPersistedValues = true,
+            reminderEnabled = reminderEnabled,
+            warnIntervalMinutes = warnIntervalMinutes,
+            restDurationSeconds = restDurationSeconds,
+            preAlertEnabled = preAlertEnabled,
+            preAlertSeconds = preAlertSeconds,
+            useDynamicColors = useDynamicColors,
+            pomodoroEnabled = pomodoroEnabled,
+            pomodoroWorkMinutes = pomodoroWorkMinutes,
+            pomodoroShortBreakMinutes = pomodoroShortBreakMinutes,
+            pomodoroLongBreakMinutes = pomodoroLongBreakMinutes,
+            notificationEnabled = notificationEnabled,
+            keepAliveEnabled = keepAliveEnabled,
+            proximityMonitoringEnabled = proximityMonitoringEnabled,
+            proximityBaselineEyeDistancePx = proximityBaselineEyeDistancePx,
+            proximityBaselineFaceWidthPercent = proximityBaselineFaceWidthPercent,
+            proximityDistanceMultiplierPercent = proximityDistanceMultiplierPercent,
+            proximityCheckIntervalMinutes = proximityCheckIntervalMinutes,
+            proximityCaptureSeconds = proximityCaptureSeconds,
+            proximityFaceThresholdPercent = proximityFaceThresholdPercent,
+            proximityAlertCooldownSeconds = proximityAlertCooldownSeconds,
+            blinkMonitoringEnabled = blinkMonitoringEnabled,
+            blinkNoBlinkThresholdSeconds = blinkNoBlinkThresholdSeconds,
+            blinkAlertCooldownSeconds = blinkAlertCooldownSeconds,
+            ambientLightMonitoringEnabled = ambientLightMonitoringEnabled,
+            ambientLightLowLuxThreshold = ambientLightLowLuxThreshold,
+            autoBrightnessEnabled = autoBrightnessEnabled,
+            autoBrightnessMinPercent = autoBrightnessMinPercent,
+            autoBrightnessMaxPercent = autoBrightnessMaxPercent,
+            globalOverlayEnabled = globalOverlayEnabled,
+            overlayRestDurationSeconds = overlayRestDurationSeconds,
+            overlayStrictDistancePercent = overlayStrictDistancePercent,
+            shizukuAdvancedModeEnabled = shizukuAdvancedModeEnabled,
+            shizukuContextAwareSamplingEnabled = shizukuContextAwareSamplingEnabled,
+            shizukuServiceRecoveryEnabled = shizukuServiceRecoveryEnabled,
+            shizukuScreenOffGuardEnabled = shizukuScreenOffGuardEnabled,
+            shizukuLowBatteryGuardEnabled = shizukuLowBatteryGuardEnabled,
+            shizukuPowerSaveGuardEnabled = shizukuPowerSaveGuardEnabled,
+            shizukuDndGuardEnabled = shizukuDndGuardEnabled,
+            shizukuThermalGuardEnabled = shizukuThermalGuardEnabled,
+            shizukuCameraPrivacyGuardEnabled = shizukuCameraPrivacyGuardEnabled,
+            shizukuNativeEyeProtectionEnabled = shizukuNativeEyeProtectionEnabled,
+            shizukuNativeColorTemperatureKelvin = shizukuNativeColorTemperatureKelvin,
+            shizukuNativeBrightnessPercent = shizukuNativeBrightnessPercent,
+            shizukuNativeExtraDimEnabled = shizukuNativeExtraDimEnabled,
+            shizukuNativeExtraDimPercent = shizukuNativeExtraDimPercent,
         )
     }
 

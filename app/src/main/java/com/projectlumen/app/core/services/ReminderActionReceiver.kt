@@ -9,7 +9,6 @@ import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
 import com.projectlumen.app.core.repositories.RuntimeRepository
-import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.repositories.StatisticsRepository
 import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
@@ -24,7 +23,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
             runCatching {
                 val app = context.applicationContext as ProjectLumenApplication
                 val db = app.database
-                val settings = SettingsRepository(db.appSettingsDao(), app.eyeCarePreferences).get()
+                val settings = app.settingsRepository().get()
                 val runtime = db.runtimeStateDao().get() ?: RuntimeStateEntity()
                 val runtimeRepository = RuntimeRepository(db.runtimeStateDao())
                 val statisticsRepository = StatisticsRepository(db.dailyEyeStatsDao(), db.dailyPomodoroStatsDao())

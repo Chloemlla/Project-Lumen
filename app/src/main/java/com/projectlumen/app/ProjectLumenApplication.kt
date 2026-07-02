@@ -12,6 +12,7 @@ import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.debug.DeveloperDebugOverlayService
 import com.projectlumen.app.core.lifecycle.AppLifecycleCoordinator
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
+import com.projectlumen.app.core.mmkv.ProjectLumenMmkv
 import com.projectlumen.app.core.security.AppIntegrityGuard
 import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.services.AudioService
@@ -23,6 +24,7 @@ import com.projectlumen.app.core.services.TimerForegroundService
 import com.projectlumen.app.core.services.TimerReconciliationWorker
 import com.projectlumen.app.core.light.LightMonitorService
 import com.projectlumen.app.core.proximity.ProximityDetectionWorker
+import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.telemetry.EyeCareTelemetryReporter
 import com.projectlumen.app.core.toast.LumenToast
@@ -34,7 +36,9 @@ class ProjectLumenApplication : Application() {
     val notifications: NotificationService by lazy { NotificationService(this) }
     val audio: AudioService by lazy { AudioService(this) }
     val export: ExportService by lazy { ExportService(this) }
-    val backup: DataBackupService by lazy { DataBackupService(this, database, eyeCarePreferences) }
+    val backup: DataBackupService by lazy {
+        DataBackupService(this, database, eyeCarePreferences, secureCredentials::deviceInstallationId)
+    }
     val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient(this) }
     val crashReports: CrashReportStore by lazy { CrashReportStore(this) }
     val secureCredentials: SecureCredentialStore by lazy { SecureCredentialStore(this) }
@@ -57,11 +61,13 @@ class ProjectLumenApplication : Application() {
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
+        ProjectLumenMmkv.initialize(this)
         installCrashReporter()
     }
 
     override fun onCreate() {
         super.onCreate()
+        ProjectLumenMmkv.initialize(this)
         installCrashReporter()
         AppIntegrityGuard.enforce(this)
         notifications.ensureChannels()
@@ -92,6 +98,14 @@ class ProjectLumenApplication : Application() {
     fun startTimerService() {
         ContextCompat.startForegroundService(this, Intent(this, TimerForegroundService::class.java))
         TimerReconciliationWorker.enqueue(this)
+    }
+
+    fun settingsRepository(): SettingsRepository {
+        return SettingsRepository(
+            database.appSettingsDao(),
+            eyeCarePreferences,
+            secureCredentials::deviceInstallationId,
+        )
     }
 
     fun stopTimerService() {

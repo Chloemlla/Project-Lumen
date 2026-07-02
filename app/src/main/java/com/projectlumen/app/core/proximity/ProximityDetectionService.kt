@@ -16,7 +16,6 @@ import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.debug.DeveloperDebugFrameStore
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
-import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.time.todayKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -91,7 +90,7 @@ class ProximityDetectionService : Service() {
 
     private suspend fun runDetection(app: ProjectLumenApplication, calibrate: Boolean) {
         val db = app.database
-        val settings = SettingsRepository(db.appSettingsDao(), app.eyeCarePreferences).get() ?: return
+        val settings = app.settingsRepository().get() ?: return
         if (!calibrate && !settings.proximityMonitoringEnabled && !settings.blinkMonitoringEnabled) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return
         if (!calibrate && app.shizuku.shouldDeferSampling(settings)) {

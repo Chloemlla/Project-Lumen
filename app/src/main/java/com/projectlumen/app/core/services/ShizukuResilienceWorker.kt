@@ -11,7 +11,6 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.enums.ActiveEngine
-import com.projectlumen.app.core.repositories.SettingsRepository
 import java.util.concurrent.TimeUnit
 
 class ShizukuResilienceWorker(
@@ -20,7 +19,7 @@ class ShizukuResilienceWorker(
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
         val app = applicationContext as ProjectLumenApplication
-        val settings = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences).get()
+        val settings = app.settingsRepository().get()
             ?: return Result.success()
         val shouldRun = settings.shizukuAdvancedModeEnabled &&
             (settings.shizukuServiceRecoveryEnabled || settings.shizukuNativeEyeProtectionEnabled)

@@ -18,7 +18,6 @@ import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
 import com.projectlumen.app.core.repositories.RuntimeRepository
-import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.repositories.StatisticsRepository
 import com.projectlumen.app.core.runtime.AudioEvent
 import com.projectlumen.app.core.runtime.PomodoroEngine
@@ -63,7 +62,7 @@ class TimerForegroundService : LifecycleService() {
         super.onCreate()
         app = application as ProjectLumenApplication
         notifications = NotificationService(this)
-        settingsRepository = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences)
+        settingsRepository = app.settingsRepository()
         runtimeRepository = RuntimeRepository(app.database.runtimeStateDao())
         statisticsRepository = StatisticsRepository(
             app.database.dailyEyeStatsDao(),

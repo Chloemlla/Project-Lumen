@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.combine
 class SettingsRepository(
     private val dao: AppSettingsDao,
     private val preferences: EyeCarePreferencesDataStore? = null,
+    private val deviceInstallationIdProvider: ((String?) -> String)? = null,
 ) {
     fun observe(): Flow<AppSettingsEntity?> {
         val preferencesStore = preferences ?: return dao.observe()
@@ -27,18 +28,28 @@ class SettingsRepository(
 
     suspend fun getOrDefault(): AppSettingsEntity {
         get()?.let { return it }
-        val defaultSettings = AppSettingsEntity()
+        val defaultSettings = AppSettingsEntity(
+            deviceInstallationId = deviceInstallationIdProvider?.invoke(null).orEmpty(),
+        )
         val persistedPreferences = preferences?.read() ?: return defaultSettings
         return defaultSettings.withEyeCarePreferences(persistedPreferences)
     }
 
     suspend fun ensureDefault() {
         val current = dao.get()
+        val preferredDeviceInstallationId = deviceInstallationIdProvider?.invoke(current?.deviceInstallationId)
         val baseSettings = if (current == null) {
-            AppSettingsEntity(deviceInstallationId = UUID.randomUUID().toString()).also { dao.upsert(it) }
+            AppSettingsEntity(
+                deviceInstallationId = preferredDeviceInstallationId ?: UUID.randomUUID().toString(),
+            ).also { dao.upsert(it) }
         } else if (current.deviceInstallationId.isBlank()) {
             current.copy(
-                deviceInstallationId = UUID.randomUUID().toString(),
+                deviceInstallationId = preferredDeviceInstallationId ?: UUID.randomUUID().toString(),
+                updatedAt = System.currentTimeMillis(),
+            ).also { dao.upsert(it) }
+        } else if (preferredDeviceInstallationId != null && preferredDeviceInstallationId != current.deviceInstallationId) {
+            current.copy(
+                deviceInstallationId = preferredDeviceInstallationId,
                 updatedAt = System.currentTimeMillis(),
             ).also { dao.upsert(it) }
         } else {

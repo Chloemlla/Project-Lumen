@@ -10,7 +10,6 @@ import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
-import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.repositories.StatisticsRepository
 import com.projectlumen.app.core.runtime.AudioEvent
 import com.projectlumen.app.core.runtime.PomodoroEngine
@@ -28,7 +27,7 @@ class AlarmReceiver : BroadcastReceiver() {
             runCatching {
                 val app = context.applicationContext as ProjectLumenApplication
                 val notifications = NotificationService(context.applicationContext)
-                val settings = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences).getOrDefault()
+                val settings = app.settingsRepository().getOrDefault()
                 val runtime = app.database.runtimeStateDao().get() ?: RuntimeStateEntity()
                 val nowMillis = System.currentTimeMillis()
                 val reconciledRuntime = reconcileRuntime(app, notifications, settings, runtime, nowMillis)

@@ -11,7 +11,6 @@ import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.repositories.RuntimeRepository
-import com.projectlumen.app.core.repositories.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,10 +21,7 @@ class AppLifecycleCoordinator(
     private val app: ProjectLumenApplication,
 ) : DefaultLifecycleObserver {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val settingsRepository = SettingsRepository(
-        app.database.appSettingsDao(),
-        app.eyeCarePreferences,
-    )
+    private val settingsRepository = app.settingsRepository()
     private val runtimeRepository = RuntimeRepository(app.database.runtimeStateDao())
 
     override fun onStart(owner: LifecycleOwner) {

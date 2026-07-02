@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.enums.ActiveEngine
-import com.projectlumen.app.core.repositories.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -17,7 +16,7 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
                 val app = context.applicationContext as ProjectLumenApplication
-                val settingsRepository = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences)
+                val settingsRepository = app.settingsRepository()
                 val settings = settingsRepository.get()
                 val runtime = app.database.runtimeStateDao().get()
                 if (settings?.proximityMonitoringEnabled == true || settings?.blinkMonitoringEnabled == true) {

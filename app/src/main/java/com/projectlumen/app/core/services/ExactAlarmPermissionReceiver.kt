@@ -7,7 +7,6 @@ import android.content.Intent
 import android.os.Build
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.enums.ActiveEngine
-import com.projectlumen.app.core.repositories.SettingsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -21,7 +20,7 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
                 val app = context.applicationContext as ProjectLumenApplication
-                val settings = SettingsRepository(app.database.appSettingsDao(), app.eyeCarePreferences).getOrDefault()
+                val settings = app.settingsRepository().getOrDefault()
                 val runtime = app.database.runtimeStateDao().get() ?: return@runCatching
                 app.notifications.syncRuntimeAlarms(settings, runtime)
                 if (settings.keepAliveEnabled && runtime.activeEngine != ActiveEngine.IDLE.name) {
