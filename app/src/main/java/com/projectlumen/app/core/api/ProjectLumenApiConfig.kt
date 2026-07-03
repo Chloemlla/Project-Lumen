@@ -4,6 +4,7 @@ import com.projectlumen.app.BuildConfig
 
 object ProjectLumenApiConfig {
     const val DEFAULT_BASE_URL = "https://eye.chloemlla.com/api"
+    private const val DEFAULT_HOST_ROOT = "https://eye.chloemlla.com"
     const val DEFAULT_TRANSLATION_BASE_URL = "https://tts.chloemlla.com"
     const val REQUEST_TIMEOUT_MILLIS = 6_000
     private const val DEFAULT_API_CERTIFICATE_PINS =
@@ -11,7 +12,7 @@ object ProjectLumenApiConfig {
             "sha256/xwyjb5aN7tSRWj02XSZa2cKGLxXLdKHUBfLT/7twjhQ="
 
     val baseUrl: String
-        get() = BuildConfig.API_BASE_URL.trim().ifBlank { DEFAULT_BASE_URL }.trimEnd('/')
+        get() = normalizeApiBaseUrl(BuildConfig.API_BASE_URL.trim().ifBlank { DEFAULT_BASE_URL })
 
     val translationBaseUrl: String
         get() = BuildConfig.TRANSLATION_API_BASE_URL.trim().ifBlank { DEFAULT_TRANSLATION_BASE_URL }.trimEnd('/')
@@ -24,4 +25,13 @@ object ProjectLumenApiConfig {
 
     val translationCertificatePins: String
         get() = BuildConfig.TRANSLATION_CERTIFICATE_PINS.trim()
+
+    internal fun normalizeApiBaseUrl(value: String): String {
+        val trimmed = value.trim().trimEnd('/')
+        return when {
+            trimmed.isBlank() -> DEFAULT_BASE_URL
+            trimmed == DEFAULT_HOST_ROOT -> DEFAULT_BASE_URL
+            else -> trimmed
+        }
+    }
 }

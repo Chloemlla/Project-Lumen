@@ -21,11 +21,13 @@ class ProjectLumenApiClient(
     context: Context,
     private val baseUrl: String = ProjectLumenApiConfig.baseUrl,
     private val httpClient: OkHttpClient = SecureOkHttpFactory.create(
-        baseUrl = baseUrl,
+        baseUrl = ProjectLumenApiConfig.normalizeApiBaseUrl(baseUrl),
         certificatePins = ProjectLumenApiConfig.apiCertificatePins,
     ),
     private val integrityProvider: ProjectLumenIntegrityProvider = ProjectLumenIntegrityProvider(context),
 ) {
+    private val resolvedBaseUrl = ProjectLumenApiConfig.normalizeApiBaseUrl(baseUrl)
+
     suspend fun health(): ApiHealth = request(
         method = "GET",
         path = "health",
@@ -300,7 +302,8 @@ class ProjectLumenApiClient(
         }
     }
 
-    private fun resolveUrl(path: String) = "${baseUrl.trimEnd('/')}/${path.trimStart('/')}".toHttpUrl()
+    private fun resolveUrl(path: String) =
+        "${resolvedBaseUrl.trimEnd('/')}/${path.trimStart('/')}".toHttpUrl()
 
     private fun queryEncode(value: String): String {
         return URLEncoder.encode(value, "UTF-8").replace("+", "%20")

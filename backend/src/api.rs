@@ -57,6 +57,12 @@ pub fn router(state: AppState) -> Router {
         .route("/health", axum::routing::get(health::health))
         .merge(platform::public_router())
         .nest("/admin", admin::router())
+        .nest("/v1", v1.clone())
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            audit::audit_request,
+        ));
+    let legacy_v1 = Router::new()
         .nest("/v1", v1)
         .layer(middleware::from_fn_with_state(
             state.clone(),
@@ -65,6 +71,7 @@ pub fn router(state: AppState) -> Router {
 
     Router::new()
         .nest(&prefix, api)
+        .merge(legacy_v1)
         .nest_service("/assets", ServeDir::new(admin_assets_dir))
         .nest_service(
             "/admin",
