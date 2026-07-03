@@ -480,10 +480,11 @@ internal fun StatusLine(icon: ImageVector, text: String) {
             )
         }
         Text(
-            text,
+            smartWrapDisplayText(text),
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            softWrap = true,
         )
     }
 }
@@ -566,7 +567,7 @@ internal fun NotificationRequirementCard(
     icon: ImageVector,
     onClick: () -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
@@ -574,27 +575,48 @@ internal fun NotificationRequirementCard(
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(titleRes), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Text(stringResource(messageRes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(titleRes),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    softWrap = true,
+                )
+                Text(
+                    stringResource(messageRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    softWrap = true,
+                )
+            }
         }
-        OutlinedButton(onClick = onClick) {
-            Text(stringResource(actionLabelRes))
+        OutlinedButton(modifier = Modifier.align(Alignment.End), onClick = onClick) {
+            Text(
+                stringResource(actionLabelRes),
+                maxLines = 2,
+                softWrap = true,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
 
 @Composable
 internal fun ButtonLabel(icon: ImageVector, @StringRes labelRes: Int) {
-    Icon(icon, contentDescription = null)
+    Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
     Spacer(Modifier.width(8.dp))
     Text(
         stringResource(labelRes),
-        maxLines = 1,
+        maxLines = 2,
+        softWrap = true,
         overflow = TextOverflow.Ellipsis,
     )
 }

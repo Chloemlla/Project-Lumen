@@ -201,6 +201,39 @@ import kotlinx.coroutines.launch
 
 internal val LocalLumenPageScrollState = staticCompositionLocalOf<ScrollState?> { null }
 
+internal fun smartWrapDisplayText(value: String): String {
+    val normalized = value.trim().ifBlank { "-" }
+    if (normalized.length <= DISPLAY_WRAP_CHUNK_SIZE) return normalized
+
+    val withBreakpoints = normalized
+        .replace("://", "://$ZERO_WIDTH_SPACE")
+        .replace("/", "/$ZERO_WIDTH_SPACE")
+        .replace("?", "?$ZERO_WIDTH_SPACE")
+        .replace("&", "&$ZERO_WIDTH_SPACE")
+        .replace("=", "=$ZERO_WIDTH_SPACE")
+        .replace(".", ".$ZERO_WIDTH_SPACE")
+        .replace("-", "-$ZERO_WIDTH_SPACE")
+        .replace("_", "_$ZERO_WIDTH_SPACE")
+        .replace("@", "@$ZERO_WIDTH_SPACE")
+        .replace(":", ":$ZERO_WIDTH_SPACE")
+
+    val wrapped = StringBuilder(withBreakpoints.length)
+    var tokenLength = 0
+    withBreakpoints.forEach { char ->
+        wrapped.append(char)
+        if (char.isWhitespace() || char == ZERO_WIDTH_SPACE.first()) {
+            tokenLength = 0
+        } else {
+            tokenLength += 1
+            if (tokenLength >= DISPLAY_WRAP_CHUNK_SIZE) {
+                wrapped.append(ZERO_WIDTH_SPACE)
+                tokenLength = 0
+            }
+        }
+    }
+    return wrapped.toString()
+}
+
 @Composable
 internal fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
     Column(
@@ -217,7 +250,7 @@ internal fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
             stringResource(labelRes),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         AnimatedContent(
@@ -229,12 +262,13 @@ internal fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
             label = "metricValue",
         ) { metricValue ->
             Text(
-                metricValue,
+                smartWrapDisplayText(metricValue),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+                softWrap = true,
             )
         }
     }
@@ -247,25 +281,25 @@ internal fun MetricRow(@StringRes labelRes: Int, value: String) {
 
 @Composable
 internal fun MetricRow(label: String, value: String) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
             .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
             label,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.bodyLarge,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface,
+            softWrap = true,
         )
         AnimatedContent(
             targetState = value,
+            modifier = Modifier.fillMaxWidth(),
             transitionSpec = {
                 (fadeIn(tween(140)) + slideInVertically(tween(140)) { it / 2 }) togetherWith
                     (fadeOut(tween(100)) + slideOutVertically(tween(100)) { -it / 2 })
@@ -273,16 +307,20 @@ internal fun MetricRow(label: String, value: String) {
             label = "metricRowValue",
         ) { metricValue ->
             Text(
-                metricValue,
+                smartWrapDisplayText(metricValue),
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                softWrap = true,
+                overflow = TextOverflow.Clip,
             )
         }
     }
 }
+
+private const val DISPLAY_WRAP_CHUNK_SIZE = 24
+private const val ZERO_WIDTH_SPACE = "\u200B"
 
 @Composable
 internal fun ColorSwatch(color: Color, size: Dp = 44.dp) {
