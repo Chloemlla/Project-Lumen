@@ -2,8 +2,10 @@ package com.projectlumen.app.core.mmkv
 
 import android.content.Context
 import com.tencent.mmkv.MMKV
+import java.io.File
 
 object ProjectLumenMmkv {
+    @Volatile
     private var initialized = false
     private var initializationFailure: Throwable? = null
 
@@ -11,8 +13,8 @@ object ProjectLumenMmkv {
     fun initialize(context: Context) {
         if (initialized) return
         initializationFailure = null
-        val storageContext = context.applicationContext ?: context
-        runCatching { MMKV.initialize(storageContext) }
+        val rootDir = File(context.filesDir, ROOT_DIR_NAME).absolutePath
+        runCatching { MMKV.initialize(context, rootDir) }
             .onSuccess { initialized = true }
             .onFailure { throwable ->
                 initializationFailure = throwable
@@ -42,4 +44,6 @@ object ProjectLumenMmkv {
         }
         error("MMKV must be initialized from ProjectLumenApplication before use.")
     }
+
+    private const val ROOT_DIR_NAME = "mmkv"
 }

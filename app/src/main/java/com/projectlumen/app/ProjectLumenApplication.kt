@@ -68,7 +68,6 @@ class ProjectLumenApplication : Application() {
         super.attachBaseContext(base)
         CrashBreadcrumbs.record("Application.attachBaseContext")
         installCrashReporter()
-        initializeMmkvOrRecordCrash()
     }
 
     override fun onCreate() {
