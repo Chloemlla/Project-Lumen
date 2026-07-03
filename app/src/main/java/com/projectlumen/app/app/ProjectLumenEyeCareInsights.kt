@@ -359,6 +359,10 @@ internal fun EyeCareGrowthCapabilityCard(
     uiState: ProjectLumenUiState,
     remoteState: ProjectLumenRemoteUiState,
     onOpenTemplates: () -> Unit,
+    onConfigureReports: () -> Unit,
+    onConfigureCloud: () -> Unit,
+    onConfigureFamilyMode: () -> Unit,
+    onConfigureAiGuidance: () -> Unit,
     onSyncCloud: () -> Unit,
     onApplyFamilyMode: () -> Unit,
     onApplyAiGuidance: () -> Unit,
@@ -366,10 +370,10 @@ internal fun EyeCareGrowthCapabilityCard(
 ) {
     val proEnabled = planTier(uiState.settings) >= PlanTier.PRO
     val hasPremiumTemplates = uiState.templates.any { it.isPremium }
-    val advancedReportsReady = uiState.settings.statsEnabled && uiState.eyeStats.isNotEmpty()
+    val advancedReportsReady = uiState.settings.statsEnabled
     val cloudSyncReady = remoteState.signedIn
     val familyModeReady = isFamilyEyeCareModeActive(uiState)
-    val aiGuidanceReady = uiState.settings.statsEnabled && uiState.eyeStats.any { it.workingSeconds > 0L }
+    val aiGuidanceReady = uiState.settings.statsEnabled && uiState.settings.reminderEnabled
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -386,26 +390,31 @@ internal fun EyeCareGrowthCapabilityCard(
                 icon = Icons.Outlined.Style,
                 titleRes = R.string.eye_care_growth_pro_templates,
                 active = proEnabled && hasPremiumTemplates,
+                onConfigure = onOpenTemplates,
             )
             CapabilityLine(
                 icon = Icons.Outlined.BarChart,
                 titleRes = R.string.eye_care_growth_advanced_reports,
                 active = advancedReportsReady,
+                onConfigure = onConfigureReports,
             )
             CapabilityLine(
                 icon = Icons.Outlined.Sync,
                 titleRes = R.string.eye_care_growth_cloud_sync,
                 active = cloudSyncReady,
+                onConfigure = onConfigureCloud,
             )
             CapabilityLine(
                 icon = Icons.Outlined.Lock,
                 titleRes = R.string.eye_care_growth_family_mode,
                 active = familyModeReady,
+                onConfigure = onConfigureFamilyMode,
             )
             CapabilityLine(
                 icon = Icons.Outlined.Info,
                 titleRes = R.string.eye_care_growth_ai_guidance,
                 active = aiGuidanceReady,
+                onConfigure = onConfigureAiGuidance,
             )
             LumenFlowRow {
                 OutlinedButton(onClick = onOpenTemplates) {
@@ -899,6 +908,7 @@ private fun CapabilityLine(
     icon: ImageVector,
     @StringRes titleRes: Int,
     active: Boolean,
+    onConfigure: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -916,14 +926,17 @@ private fun CapabilityLine(
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyLarge,
         )
-        StatusPill(
-            if (active) Icons.Outlined.CheckCircle else Icons.Outlined.Schedule,
-            if (active) R.string.eye_care_capability_active else R.string.eye_care_guide_pending,
-        )
+        if (active) {
+            StatusPill(Icons.Outlined.CheckCircle, R.string.eye_care_capability_active)
+        } else {
+            OutlinedButton(onClick = onConfigure) {
+                ButtonLabel(Icons.Outlined.Schedule, R.string.eye_care_guide_pending)
+            }
+        }
     }
 }
 
-private fun isFamilyEyeCareModeActive(uiState: ProjectLumenUiState): Boolean {
+internal fun isFamilyEyeCareModeActive(uiState: ProjectLumenUiState): Boolean {
     val settings = uiState.settings
     return settings.reminderEnabled &&
         settings.warnIntervalMinutes <= 15 &&

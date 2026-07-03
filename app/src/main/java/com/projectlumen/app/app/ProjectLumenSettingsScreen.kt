@@ -49,6 +49,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -131,6 +132,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -143,6 +145,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -198,6 +203,35 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+private enum class GrowthConfigTarget {
+    REPORTS,
+    CLOUD,
+    FAMILY,
+    AI,
+}
+
+@Composable
+private fun GrowthConfigAnchor(
+    target: GrowthConfigTarget,
+    scrollState: ScrollState?,
+    anchorPositions: MutableMap<GrowthConfigTarget, Int>,
+) {
+    val topOffsetPx = with(LocalDensity.current) { 96.dp.toPx().roundToInt() }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(0.dp)
+            .onGloballyPositioned { coordinates ->
+                val activeScrollState = scrollState ?: return@onGloballyPositioned
+                anchorPositions[target] = (
+                    activeScrollState.value +
+                        coordinates.positionInRoot().y.roundToInt() -
+                        topOffsetPx
+                    ).coerceAtLeast(0)
+            },
+    )
+}
+
 @Composable
 internal fun SettingsScreen(
     uiState: ProjectLumenUiState,
@@ -224,6 +258,12 @@ internal fun SettingsScreen(
     val backupImportPreview by viewModel.backupImportPreview.collectAsStateWithLifecycle()
     val remoteState by viewModel.remoteState.collectAsStateWithLifecycle()
     val shizukuState by viewModel.shizukuState.collectAsStateWithLifecycle()
+    val coroutineScope = rememberCoroutineScope()
+    val settingsScrollState = LocalLumenPageScrollState.current
+    val growthAnchorPositions = remember { mutableStateMapOf<GrowthConfigTarget, Int>() }
+    var activeGrowthConfigTarget by rememberSaveable { mutableStateOf<GrowthConfigTarget?>(null) }
+    var growthReturnScrollPosition by rememberSaveable { mutableIntStateOf(0) }
+    var showGrowthConfiguredDialog by rememberSaveable { mutableStateOf(false) }
     var pendingBackupImportUri by remember { mutableStateOf<Uri?>(null) }
     var showProximityCalibrationDialog by rememberSaveable { mutableStateOf(false) }
     val proximityCalibrated = settings.proximityBaselineEyeDistancePx > 0f ||
@@ -237,6 +277,28 @@ internal fun SettingsScreen(
         when {
             needsExactAlarmSettings(context) -> openExactAlarmSettings(context)
             needsFullScreenIntentSettings(context) -> openFullScreenIntentSettings(context)
+        }
+    }
+    fun scrollToGrowthTarget(target: GrowthConfigTarget) {
+        val scrollState = settingsScrollState ?: return
+        activeGrowthConfigTarget = target
+        showGrowthConfiguredDialog = false
+        growthReturnScrollPosition = scrollState.value
+        growthAnchorPositions[target]?.let { position ->
+            coroutineScope.launch { scrollState.animateScrollTo(position) }
+        }
+    }
+    fun markGrowthApplyStarted(target: GrowthConfigTarget) {
+        activeGrowthConfigTarget = target
+        showGrowthConfiguredDialog = false
+        growthReturnScrollPosition = settingsScrollState?.value ?: 0
+    }
+    fun isGrowthTargetConfigured(target: GrowthConfigTarget): Boolean {
+        return when (target) {
+            GrowthConfigTarget.REPORTS -> settings.statsEnabled
+            GrowthConfigTarget.CLOUD -> remoteState.signedIn
+            GrowthConfigTarget.FAMILY -> isFamilyEyeCareModeActive(uiState)
+            GrowthConfigTarget.AI -> settings.statsEnabled && settings.reminderEnabled
         }
     }
     val restSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -293,6 +355,48 @@ internal fun SettingsScreen(
             },
         )
     }
+    if (showGrowthConfiguredDialog) {
+        AlertDialog(
+            onDismissRequest = { showGrowthConfiguredDialog = false },
+            title = { Text(stringResource(R.string.eye_care_guide_done)) },
+            text = { Text(stringResource(R.string.eye_care_capability_active)) },
+            confirmButton = {
+                OutlinedButton(
+                    onClick = {
+                        showGrowthConfiguredDialog = false
+                        activeGrowthConfigTarget = null
+                        settingsScrollState?.let { scrollState ->
+                            coroutineScope.launch {
+                                scrollState.animateScrollTo(growthReturnScrollPosition)
+                            }
+                        }
+                    },
+                ) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        )
+    }
+    LaunchedEffect(
+        activeGrowthConfigTarget,
+        settings.statsEnabled,
+        settings.reminderEnabled,
+        settings.warnIntervalMinutes,
+        settings.restDurationSeconds,
+        settings.disableSkip,
+        settings.timeoutAutoBreak,
+        settings.proximityMonitoringEnabled,
+        settings.blinkMonitoringEnabled,
+        settings.ambientLightMonitoringEnabled,
+        settings.globalOverlayEnabled,
+        uiState.dailyGoal.maxContinuousWorkMinutes,
+        remoteState.signedIn,
+    ) {
+        val target = activeGrowthConfigTarget ?: return@LaunchedEffect
+        if (isGrowthTargetConfigured(target)) {
+            showGrowthConfiguredDialog = true
+        }
+    }
     LaunchedEffect(settings.shizukuAdvancedModeEnabled) {
         if (settings.shizukuAdvancedModeEnabled) {
             viewModel.refreshShizukuState()
@@ -318,6 +422,8 @@ internal fun SettingsScreen(
             onApplyRecommended = { applyRecommendedEyeCareSettings(viewModel) },
             onExportReport = viewModel::shareMonthlyReportPdf,
         )
+        GrowthConfigAnchor(GrowthConfigTarget.REPORTS, settingsScrollState, growthAnchorPositions)
+        GrowthConfigAnchor(GrowthConfigTarget.AI, settingsScrollState, growthAnchorPositions)
         SettingsSection(R.string.section_general, Icons.Outlined.Settings) {
             Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall)
             LumenFlowRow {
@@ -405,6 +511,7 @@ internal fun SettingsScreen(
                 }
             }
         }
+        GrowthConfigAnchor(GrowthConfigTarget.CLOUD, settingsScrollState, growthAnchorPositions)
         RemoteCloudAccountCard(
             state = remoteState,
             onCheckHealth = viewModel::checkRemoteHealth,
@@ -420,9 +527,19 @@ internal fun SettingsScreen(
             uiState = uiState,
             remoteState = remoteState,
             onOpenTemplates = openTemplates,
+            onConfigureReports = { scrollToGrowthTarget(GrowthConfigTarget.REPORTS) },
+            onConfigureCloud = { scrollToGrowthTarget(GrowthConfigTarget.CLOUD) },
+            onConfigureFamilyMode = { scrollToGrowthTarget(GrowthConfigTarget.FAMILY) },
+            onConfigureAiGuidance = { scrollToGrowthTarget(GrowthConfigTarget.AI) },
             onSyncCloud = viewModel::syncRemoteNow,
-            onApplyFamilyMode = { applyFamilyEyeCareMode(viewModel) },
-            onApplyAiGuidance = { applyPersonalizedEyeCareGuidance(viewModel, uiState) },
+            onApplyFamilyMode = {
+                markGrowthApplyStarted(GrowthConfigTarget.FAMILY)
+                applyFamilyEyeCareMode(viewModel)
+            },
+            onApplyAiGuidance = {
+                markGrowthApplyStarted(GrowthConfigTarget.AI)
+                applyPersonalizedEyeCareGuidance(viewModel, uiState)
+            },
             onExportReport = viewModel::shareMonthlyReportPdf,
         )
         SettingsSection(R.string.about_update_status, Icons.Outlined.Sync, initiallyExpanded = false) {
@@ -507,6 +624,7 @@ internal fun SettingsScreen(
             state = shizukuState,
             viewModel = viewModel,
         )
+        GrowthConfigAnchor(GrowthConfigTarget.FAMILY, settingsScrollState, growthAnchorPositions)
         SettingsSection(R.string.section_proximity, Icons.Outlined.PhotoCamera, initiallyExpanded = false) {
             SwitchRow(R.string.enable_proximity_monitoring, Icons.Outlined.PhotoCamera, settings.proximityMonitoringEnabled) { enabled ->
                 if (enabled) {
