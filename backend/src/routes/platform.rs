@@ -184,7 +184,9 @@ async fn check_release(
     let full_apk_sha256 = selected_asset
         .map(|asset| asset.sha256.as_str())
         .unwrap_or(release.sha256.as_str());
-    let full_apk_size_bytes = selected_asset.map(|asset| asset.size_bytes).unwrap_or_default();
+    let full_apk_size_bytes = selected_asset
+        .map(|asset| asset.size_bytes)
+        .unwrap_or_default();
     Ok(Json(json!({
         "updateAvailable": true,
         "currentVersionCode": current_version_code,
@@ -307,7 +309,8 @@ fn release_patch_json(patch: &AdminReleasePatchItem) -> Value {
 
 fn channel_matches(release_channel: &str, requested_channel: &str) -> bool {
     let release_channel = normalize_channel(release_channel);
-    release_channel == requested_channel || (requested_channel != DEFAULT_CHANNEL && release_channel == DEFAULT_CHANNEL)
+    release_channel == requested_channel
+        || (requested_channel != DEFAULT_CHANNEL && release_channel == DEFAULT_CHANNEL)
 }
 
 fn rollout_allows(release: &AdminReleaseItem, rollout_key: Option<&str>) -> bool {
@@ -349,7 +352,11 @@ fn rollout_bucket(key: &str, version_code: i64) -> f64 {
 }
 
 fn normalize_channel(value: &str) -> String {
-    value.trim().to_ascii_lowercase().replace('_', "-").if_empty(DEFAULT_CHANNEL)
+    value
+        .trim()
+        .to_ascii_lowercase()
+        .replace('_', "-")
+        .if_empty(DEFAULT_CHANNEL)
 }
 
 fn normalize_abi(value: &str) -> String {

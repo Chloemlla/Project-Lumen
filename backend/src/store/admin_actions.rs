@@ -245,8 +245,15 @@ fn release_assets_from_payload(payload: &Value) -> Result<Vec<AdminReleaseAssetR
             payload_str(payload, "name", "Project-Lumen_android_universal.apk"),
             full_apk_url,
             full_apk_sha256,
-            payload.get("fullApkSizeBytes").and_then(Value::as_i64).unwrap_or_default(),
-            payload_str(payload, "contentType", "application/vnd.android.package-archive"),
+            payload
+                .get("fullApkSizeBytes")
+                .and_then(Value::as_i64)
+                .unwrap_or_default(),
+            payload_str(
+                payload,
+                "contentType",
+                "application/vnd.android.package-archive",
+            ),
         )?;
         assets.push(asset);
     }
@@ -323,7 +330,10 @@ fn release_asset_from_fields(
     }
     Ok(AdminReleaseAssetRecord {
         abi: abi.trim().to_owned().if_empty("universal"),
-        name: name.trim().to_owned().if_empty("Project-Lumen_android_universal.apk"),
+        name: name
+            .trim()
+            .to_owned()
+            .if_empty("Project-Lumen_android_universal.apk"),
         url,
         sha256: sha256.to_ascii_lowercase(),
         size_bytes: size_bytes.max(0),
@@ -360,7 +370,10 @@ fn release_patches_from_payload(payload: &Value) -> Result<Vec<AdminReleasePatch
                 patch_url,
                 patch_sha256: patch_sha256.to_ascii_lowercase(),
                 algorithm: payload_nested_str(item, "algorithm").if_empty("bsdiff"),
-                size_bytes: item.get("sizeBytes").and_then(Value::as_i64).unwrap_or_default(),
+                size_bytes: item
+                    .get("sizeBytes")
+                    .and_then(Value::as_i64)
+                    .unwrap_or_default(),
             });
         }
     }
