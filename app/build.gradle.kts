@@ -148,6 +148,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments += listOf(
+                    "-DANDROID_STL=c++_shared",
                     "-DLUMEN_REQUEST_SIGNING_SECRET=${projectLumenBuildConfigString(projectLumenRequestSigningSecret)}",
                     "-DLUMEN_RELEASE_CERT_SHA256=${projectLumenBuildConfigString(projectLumenReleaseCertSha256)}",
                     "-DLUMEN_EXPECTED_PACKAGE=${projectLumenBuildConfigString("com.projectlumen.app")}",
@@ -207,6 +208,12 @@ android {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
+        }
+    }
+
+    packaging {
+        jniLibs {
+            pickFirsts += "**/libc++_shared.so"
         }
     }
 
