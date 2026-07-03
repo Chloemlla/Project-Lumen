@@ -26,6 +26,7 @@ import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
 import com.projectlumen.app.core.time.QuietHours
 import com.projectlumen.app.core.time.coerceElapsedSecondsSince
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -46,7 +47,11 @@ class TimerForegroundService : LifecycleService() {
     private lateinit var statisticsRepository: StatisticsRepository
     private val reminderEngine = ReminderEngine()
     private val pomodoroEngine = PomodoroEngine()
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
+            if (::app.isInitialized) app.recordCrash(throwable)
+        },
+    )
     @Volatile private var loopStarted = false
     private var screenReceiverRegistered = false
     private val screenReceiver = object : BroadcastReceiver() {

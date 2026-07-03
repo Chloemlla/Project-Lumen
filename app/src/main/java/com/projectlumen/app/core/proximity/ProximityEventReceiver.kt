@@ -33,8 +33,9 @@ class ProximityEventReceiver : BroadcastReceiver() {
         if (action !in triggerActions) return
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
+            val app = context.applicationContext as? ProjectLumenApplication
             try {
-                val app = context.applicationContext as? ProjectLumenApplication ?: return@launch
+                app ?: return@launch
                 val settings = app.settingsRepository().get()
                 if (settings?.proximityMonitoringEnabled != true && settings?.blinkMonitoringEnabled != true) return@launch
                 if (settings.developerModeEnabled && !settings.developerUnlockTriggerEnabled) return@launch
@@ -43,6 +44,8 @@ class ProximityEventReceiver : BroadcastReceiver() {
                 if (app.shizuku.shouldDeferSampling(settings)) return@launch
                 if (!ProximityTriggerGate(app).canRun(settings)) return@launch
                 ProximityDetectionWorker.enqueueNext(app, delaySeconds = 0)
+            } catch (throwable: Throwable) {
+                app?.recordCrash(throwable)
             } finally {
                 pendingResult.finish()
             }

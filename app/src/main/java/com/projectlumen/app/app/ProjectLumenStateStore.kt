@@ -3,10 +3,12 @@ package com.projectlumen.app.app
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.crash.CrashReport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
@@ -14,10 +16,15 @@ internal class ProjectLumenStateStore(
     repositories: ProjectLumenRepositories,
     scope: CoroutineScope,
     now: StateFlow<Long>,
+    private val recordCrashReport: (Throwable) -> CrashReport,
 ) {
     private val settingsPreview = MutableStateFlow<AppSettingsEntity?>(null)
+    private val crashReport = MutableStateFlow<CrashReport?>(null)
     private val settingsState = combine(
-        repositories.settings.observe(),
+        repositories.settings.observe().catch { throwable ->
+            recordCrash(throwable)
+            emit(null)
+        },
         settingsPreview,
     ) { persisted, preview ->
         SettingsSnapshot(
@@ -28,10 +35,22 @@ internal class ProjectLumenStateStore(
 
     private val baseDataState = combine(
         settingsState,
-        repositories.runtime.observe(),
-        repositories.statistics.observeEyeStats(),
-        repositories.statistics.observePomodoroStats(),
-        repositories.tipTemplates.observeAll(),
+        repositories.runtime.observe().catch { throwable ->
+            recordCrash(throwable)
+            emit(null)
+        },
+        repositories.statistics.observeEyeStats().catch { throwable ->
+            recordCrash(throwable)
+            emit(emptyList())
+        },
+        repositories.statistics.observePomodoroStats().catch { throwable ->
+            recordCrash(throwable)
+            emit(emptyList())
+        },
+        repositories.tipTemplates.observeAll().catch { throwable ->
+            recordCrash(throwable)
+            emit(emptyList())
+        },
     ) { settingsState, runtime, eyeStats, pomodoroStats, templates ->
         ProjectLumenUiState(
             settings = settingsState.settings ?: AppSettingsEntity(),
@@ -45,9 +64,18 @@ internal class ProjectLumenStateStore(
 
     private val dataState = combine(
         baseDataState,
-        repositories.dailyGoals.observe(),
-        repositories.entitlements.observeAll(),
-        repositories.reminderPlans.observeActive(),
+        repositories.dailyGoals.observe().catch { throwable ->
+            recordCrash(throwable)
+            emit(null)
+        },
+        repositories.entitlements.observeAll().catch { throwable ->
+            recordCrash(throwable)
+            emit(emptyList())
+        },
+        repositories.reminderPlans.observeActive().catch { throwable ->
+            recordCrash(throwable)
+            emit(emptyList())
+        },
     ) { state, dailyGoal, entitlements, reminderPlans ->
         state.copy(
             dailyGoal = dailyGoal ?: DailyGoalEntity(),
@@ -57,8 +85,8 @@ internal class ProjectLumenStateStore(
         )
     }
 
-    val uiState = combine(dataState, now) { state, nowMillis ->
-        state.copy(nowMillis = nowMillis)
+    val uiState = combine(dataState, now, crashReport) { state, nowMillis, report ->
+        state.copy(nowMillis = nowMillis, crashReport = report)
     }.stateIn(
         scope = scope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -67,6 +95,14 @@ internal class ProjectLumenStateStore(
 
     fun previewSettings(settings: AppSettingsEntity) {
         settingsPreview.value = settings
+    }
+
+    fun recordCrash(throwable: Throwable) {
+        crashReport.value = recordCrashReport(throwable)
+    }
+
+    fun clearCrashReport() {
+        crashReport.value = null
     }
 
     private fun resolveSettings(

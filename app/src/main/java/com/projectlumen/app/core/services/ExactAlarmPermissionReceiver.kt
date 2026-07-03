@@ -18,8 +18,9 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
 
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
+            val app = context.applicationContext as? ProjectLumenApplication
             runCatching {
-                val app = context.applicationContext as ProjectLumenApplication
+                app ?: return@runCatching
                 val settings = app.settingsRepository().getOrDefault()
                 val runtime = app.runtimeRepository().get() ?: return@runCatching
                 app.notifications.syncRuntimeAlarms(settings, runtime)
@@ -27,6 +28,7 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
                     app.startTimerService()
                 }
             }
+                .onFailure { throwable -> app?.recordCrash(throwable) }
             pendingResult.finish()
         }
     }

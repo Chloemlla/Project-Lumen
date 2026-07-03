@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.api.ProjectLumenApiDiagnostics
+import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
@@ -19,6 +20,8 @@ import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
 import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -47,12 +50,23 @@ class ProjectLumenViewModel(
     private val shizuku: ShizukuCapabilityManager,
     private val simulateDeveloperLowMemory: () -> Unit,
     private val uploadTelemetrySnapshot: suspend () -> Unit,
+    private val recordCrashReport: (Throwable) -> CrashReport,
 ) : ViewModel() {
     private val repositories = ProjectLumenRepositories(database, eyeCarePreferences, secureCredentials)
     private val now = MutableStateFlow(System.currentTimeMillis())
-    private val stateStore = ProjectLumenStateStore(repositories, viewModelScope, now)
+    private var crashStateStore: ProjectLumenStateStore? = null
+    private val crashReportingHandler = CoroutineExceptionHandler { _, throwable ->
+        crashStateStore?.recordCrash(throwable) ?: recordCrashReport(throwable)
+    }
+    private val reportingScope = CoroutineScope(viewModelScope.coroutineContext + crashReportingHandler)
+    private val stateStore = ProjectLumenStateStore(
+        repositories = repositories,
+        scope = reportingScope,
+        now = now,
+        recordCrashReport = recordCrashReport,
+    ).also { crashStateStore = it }
     private val runtimeEntry = ProjectLumenRuntimeFeatureEntry(
-        scope = viewModelScope,
+        scope = reportingScope,
         settingsRepository = repositories.settings,
         runtimeRepository = repositories.runtime,
         statisticsRepository = repositories.statistics,
@@ -63,7 +77,7 @@ class ProjectLumenViewModel(
         uploadTelemetrySnapshot = uploadTelemetrySnapshot,
     )
     private val settingsEntry = ProjectLumenSettingsFeatureEntry(
-        scope = viewModelScope,
+        scope = reportingScope,
         settingsRepository = repositories.settings,
         runtimeRepository = repositories.runtime,
         dailyGoalsRepository = repositories.dailyGoals,
@@ -82,7 +96,7 @@ class ProjectLumenViewModel(
         shizuku = shizuku,
     )
     private val templatesEntry = ProjectLumenTemplatesFeatureEntry(
-        scope = viewModelScope,
+        scope = reportingScope,
         settingsRepository = repositories.settings,
         tipTemplateRepository = repositories.tipTemplates,
     )
@@ -91,18 +105,18 @@ class ProjectLumenViewModel(
         stateProvider = { stateStore.uiState.value },
     )
     private val backupEntry = ProjectLumenBackupFeatureEntry(
-        scope = viewModelScope,
+        scope = reportingScope,
         backup = backup,
         settingsRepository = repositories.settings,
         runtimeEntry = runtimeEntry,
     )
     private val entitlementEntry = ProjectLumenEntitlementFeatureEntry(
-        scope = viewModelScope,
+        scope = reportingScope,
         settingsRepository = repositories.settings,
         entitlementRepository = repositories.entitlements,
     )
     private val remoteEntry = ProjectLumenRemoteFeatureEntry(
-        scope = viewModelScope,
+        scope = reportingScope,
         apiClient = apiClient,
         credentials = secureCredentials,
         backup = backup,
@@ -120,7 +134,7 @@ class ProjectLumenViewModel(
     val uiState = stateStore.uiState
 
     init {
-        viewModelScope.launch {
+        reportingScope.launch {
             repositories.settings.ensureDefault()
             repositories.runtime.ensureDefault()
             repositories.dailyGoals.ensureDefault()
@@ -202,7 +216,9 @@ class ProjectLumenViewModel(
         settingsEntry.setAutoBrightnessEnabled(enabled, nowMillis)
     }
 
-    fun calibrateProximity() = settingsEntry.calibrateProximity()
+    fun calibrateProximity() = reportIfThrows {
+        settingsEntry.calibrateProximity()
+    }
 
     fun setLanguageCode(languageCode: String) {
         val nowMillis = System.currentTimeMillis()
@@ -224,20 +240,29 @@ class ProjectLumenViewModel(
     }
 
     fun updateDailyGoal(transform: (DailyGoalEntity) -> DailyGoalEntity) = settingsEntry.updateDailyGoal(transform)
-    fun simulateLowMemory() = simulateDeveloperLowMemory()
+    fun simulateLowMemory() = reportIfThrows {
+        simulateDeveloperLowMemory()
+    }
     fun refreshShizukuState() {
         shizuku.refreshState()
-        viewModelScope.launch {
+        reportingScope.launch {
             val settings = stateStore.uiState.value.settings
             shizuku.refreshForegroundContext()
             shizuku.refreshSystemContext(settings)
         }
     }
-    fun requestShizukuAuthorization() = shizuku.requestPermission()
+    fun requestShizukuAuthorization() = reportIfThrows {
+        shizuku.requestPermission()
+    }
     fun uploadDiagnosticsNow() {
-        viewModelScope.launch {
+        reportingScope.launch {
             runCatching { uploadTelemetrySnapshot() }
+                .onFailure(stateStore::recordCrash)
         }
+    }
+
+    fun clearCrashReport() {
+        stateStore.clearCrashReport()
     }
 
     fun selectTemplate(templateId: Long) {
@@ -261,9 +286,15 @@ class ProjectLumenViewModel(
     fun updateTemplateCountdownStyle(template: TipTemplateEntity, countdownStyle: String) =
         templatesEntry.updateTemplateCountdownStyle(template, countdownStyle)
 
-    fun shareStatistics() = sharingEntry.shareStatistics()
-    fun shareStatisticsImage() = sharingEntry.shareStatisticsImage()
-    fun shareMonthlyReportPdf() = sharingEntry.shareMonthlyReportPdf()
+    fun shareStatistics() = reportIfThrows {
+        sharingEntry.shareStatistics()
+    }
+    fun shareStatisticsImage() = reportIfThrows {
+        sharingEntry.shareStatisticsImage()
+    }
+    fun shareMonthlyReportPdf() = reportIfThrows {
+        sharingEntry.shareMonthlyReportPdf()
+    }
     fun shareBackup() = backupEntry.shareBackup()
     fun previewBackupImport(uri: Uri) = backupEntry.previewBackupImport(uri)
     fun clearBackupImportPreview() = backupEntry.clearBackupImportPreview()
@@ -295,5 +326,9 @@ class ProjectLumenViewModel(
             themeMode = AppThemeMode.LIGHT.name,
             useAutoDarkWindow = false,
         )
+    }
+
+    private inline fun reportIfThrows(block: () -> Unit) {
+        runCatching(block).onFailure(stateStore::recordCrash)
     }
 }

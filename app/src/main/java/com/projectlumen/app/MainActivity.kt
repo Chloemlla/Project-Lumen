@@ -6,15 +6,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.projectlumen.app.app.CrashReportScreen
 import com.projectlumen.app.app.ProjectLumenApp
 import com.projectlumen.app.app.ProjectLumenViewModel
+import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.openapi.LumenOpenIntents
 import com.projectlumen.app.openapi.LumenOpenLaunchRequest
 import com.projectlumen.app.openapi.LumenOpenLaunchTarget
+import com.projectlumen.app.ui.theme.ProjectLumenTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -28,37 +34,57 @@ open class MainActivity : ComponentActivity() {
         handleOpenIntent(intent)
         setContent {
             val app = application as ProjectLumenApplication
-            val viewModel: ProjectLumenViewModel = viewModel(
-                factory = object : ViewModelProvider.Factory {
-                    @Suppress("UNCHECKED_CAST")
-                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                        return ProjectLumenViewModel(
-                            database = app.database,
-                            notifications = app.notifications,
-                            audio = app.audio,
-                            export = app.export,
-                            backup = app.backup,
-                            apiClient = app.apiClient,
-                            secureCredentials = app.secureCredentials,
-                            eyeCarePreferences = app.eyeCarePreferences,
-                            startTimerService = app::startTimerService,
-                            stopTimerService = app::stopTimerService,
-                            scheduleProximityMonitoring = app::scheduleProximityMonitoring,
-                            cancelProximityMonitoring = app::cancelProximityMonitoring,
-                            calibrateProximityMonitoring = app::calibrateProximityMonitoring,
-                            startLightMonitoring = app::startLightMonitoring,
-                            stopLightMonitoring = app::stopLightMonitoring,
-                            startDeveloperDebugService = app::startDeveloperDebugService,
-                            stopDeveloperDebugService = app::stopDeveloperDebugService,
-                            startShizukuResilience = app::startShizukuResilience,
-                            stopShizukuResilience = app::stopShizukuResilience,
-                            shizuku = app.shizuku,
-                            simulateDeveloperLowMemory = app::simulateDeveloperLowMemory,
-                            uploadTelemetrySnapshot = { app.telemetry.uploadCurrentSnapshot(force = true) },
-                        ) as T
-                    }
-                },
-            )
+            var startupReport by remember { mutableStateOf(app.startupCrashReport ?: app.crashReports.load()) }
+            startupReport?.let { report ->
+                ProjectLumenTheme(themeMode = AppThemeMode.SYSTEM, useDynamicColors = false) {
+                    CrashReportScreen(
+                        report = report,
+                        onContinue = {
+                            app.clearStartupCrashReport()
+                            startupReport = null
+                        },
+                    )
+                }
+                return@setContent
+            }
+            val viewModel: ProjectLumenViewModel? = try {
+                viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                            return ProjectLumenViewModel(
+                                database = app.database,
+                                notifications = app.notifications,
+                                audio = app.audio,
+                                export = app.export,
+                                backup = app.backup,
+                                apiClient = app.apiClient,
+                                secureCredentials = app.secureCredentials,
+                                eyeCarePreferences = app.eyeCarePreferences,
+                                startTimerService = app::startTimerService,
+                                stopTimerService = app::stopTimerService,
+                                scheduleProximityMonitoring = app::scheduleProximityMonitoring,
+                                cancelProximityMonitoring = app::cancelProximityMonitoring,
+                                calibrateProximityMonitoring = app::calibrateProximityMonitoring,
+                                startLightMonitoring = app::startLightMonitoring,
+                                stopLightMonitoring = app::stopLightMonitoring,
+                                startDeveloperDebugService = app::startDeveloperDebugService,
+                                stopDeveloperDebugService = app::stopDeveloperDebugService,
+                                startShizukuResilience = app::startShizukuResilience,
+                                stopShizukuResilience = app::stopShizukuResilience,
+                                shizuku = app.shizuku,
+                                simulateDeveloperLowMemory = app::simulateDeveloperLowMemory,
+                                uploadTelemetrySnapshot = { app.telemetry.uploadCurrentSnapshot(force = true) },
+                                recordCrashReport = app::recordCrash,
+                            ) as T
+                        }
+                    },
+                )
+            } catch (throwable: Throwable) {
+                startupReport = app.recordCrash(throwable)
+                null
+            }
+            if (viewModel == null) return@setContent
             ProjectLumenApp(
                 viewModel = viewModel,
                 crashReport = app.crashReports.load(),

@@ -59,17 +59,20 @@ class ProjectLumenApplication : Application() {
     val shizuku: ShizukuCapabilityManager by lazy { ShizukuCapabilityManager(this) }
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
     private var crashExceptionHandler: Thread.UncaughtExceptionHandler? = null
+    @Volatile
+    var startupCrashReport: CrashReport? = null
+        private set
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
-        ProjectLumenMmkv.initialize(this)
         installCrashReporter()
+        initializeMmkvOrRecordCrash()
     }
 
     override fun onCreate() {
         super.onCreate()
-        ProjectLumenMmkv.initialize(this)
         installCrashReporter()
+        initializeMmkvOrRecordCrash()
         AppIntegrityGuard.enforce(this)
         notifications.ensureChannels()
         LumenToast.install(this)
@@ -94,6 +97,27 @@ class ProjectLumenApplication : Application() {
         }
         crashExceptionHandler = handler
         Thread.setDefaultUncaughtExceptionHandler(handler)
+    }
+
+    private fun initializeMmkvOrRecordCrash() {
+        runCatching { ProjectLumenMmkv.initialize(this) }
+            .onFailure(::recordCrash)
+    }
+
+    fun recordStartupCrash(throwable: Throwable): CrashReport {
+        return recordCrash(throwable)
+    }
+
+    fun recordCrash(throwable: Throwable): CrashReport {
+        val report = runCatching { CrashReport.fromThrowable(throwable) }
+            .getOrElse { CrashReport.fromThrowableFallback(throwable, it) }
+        startupCrashReport = report
+        runCatching { CrashReportStore(this).save(report) }
+        return report
+    }
+
+    fun clearStartupCrashReport() {
+        startupCrashReport = null
     }
 
     fun startTimerService() {

@@ -17,6 +17,7 @@ import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.debug.DeveloperDebugFrameStore
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
 import com.projectlumen.app.core.time.todayKey
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,7 +26,13 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 class ProximityDetectionService : Service() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
+            runCatching { application as? ProjectLumenApplication }
+                .getOrNull()
+                ?.recordCrash(throwable)
+        },
+    )
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val app = application as ProjectLumenApplication
@@ -46,7 +53,10 @@ class ProximityDetectionService : Service() {
         }
         scope.launch {
             runCatching { runDetection(app, calibrate) }
-                .onFailure { clearActiveState(app) }
+                .onFailure { throwable ->
+                    app.recordCrash(throwable)
+                    clearActiveState(app)
+                }
             stopSelf(startId)
         }
         return START_STICKY
@@ -211,7 +221,7 @@ class ProximityDetectionService : Service() {
                 averageBlinksPerMinute = blinkState.averageBlinksPerMinute,
                 force = calibrate || shouldWarn || blinkState.shouldWarn,
             )
-        }
+        }.onFailure(app::recordCrash)
     }
 
     private fun latestSettingsNeedsDebugFrame(settings: AppSettingsEntity): Boolean {

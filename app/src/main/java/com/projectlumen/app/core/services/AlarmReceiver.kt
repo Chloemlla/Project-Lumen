@@ -24,8 +24,9 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
+            val app = context.applicationContext as? ProjectLumenApplication
             runCatching {
-                val app = context.applicationContext as ProjectLumenApplication
+                app ?: return@runCatching
                 val notifications = NotificationService(context.applicationContext)
                 val settings = app.settingsRepository().getOrDefault()
                 val runtime = app.runtimeRepository().getOrDefault()
@@ -78,6 +79,7 @@ class AlarmReceiver : BroadcastReceiver() {
                     app.startTimerService()
                 }
             }
+                .onFailure { throwable -> app?.recordCrash(throwable) }
             pendingResult.finish()
         }
     }

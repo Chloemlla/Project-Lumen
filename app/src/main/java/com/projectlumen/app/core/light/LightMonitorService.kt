@@ -18,6 +18,7 @@ import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.time.todayKey
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,7 +27,13 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 class LightMonitorService : Service(), SensorEventListener {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
+            runCatching { application as? ProjectLumenApplication }
+                .getOrNull()
+                ?.recordCrash(throwable)
+        },
+    )
     private lateinit var sensorManager: SensorManager
     private var lastHandledAt: Long = 0L
 
@@ -107,6 +114,7 @@ class LightMonitorService : Service(), SensorEventListener {
         }
         if (shouldWarn) {
             runCatching { app.telemetry.uploadCurrentSnapshot(force = true) }
+                .onFailure(app::recordCrash)
         }
     }
 
@@ -131,7 +139,7 @@ class LightMonitorService : Service(), SensorEventListener {
         runCatching {
             Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
             Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, brightness)
-        }
+        }.onFailure(app::recordCrash)
     }
 
     private fun extraDimPercentForAutoBrightness(percent: Int, settings: AppSettingsEntity): Int {

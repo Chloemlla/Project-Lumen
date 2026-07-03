@@ -20,8 +20,9 @@ class ReminderActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
+            val app = context.applicationContext as? ProjectLumenApplication
             runCatching {
-                val app = context.applicationContext as ProjectLumenApplication
+                app ?: return@runCatching
                 val db = app.database
                 val settings = app.settingsRepository().get()
                 val runtimeRepository = app.runtimeRepository()
@@ -52,6 +53,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
                     }
                 }
             }
+                .onFailure { throwable -> app?.recordCrash(throwable) }
             pendingResult.finish()
         }
     }

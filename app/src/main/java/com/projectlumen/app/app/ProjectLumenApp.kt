@@ -140,6 +140,12 @@ fun ProjectLumenApp(
     var activeCrashReport by remember(crashReport) { mutableStateOf(crashReport) }
     var activeCrashReportClearsStore by remember(crashReport) { mutableStateOf(crashReport != null) }
 
+    LaunchedEffect(uiState.crashReport?.crashedAtMillis) {
+        val report = uiState.crashReport ?: return@LaunchedEffect
+        activeCrashReportClearsStore = true
+        activeCrashReport = report
+    }
+
     fun triggerUpdateCheck(manual: Boolean) {
         coroutineScope.launch {
             if (manual) {
@@ -252,7 +258,10 @@ fun ProjectLumenApp(
             activeCrashReport?.let { report ->
                 CrashReportScreen(
                     report = report,
-                    onContinue = { activeCrashReport = null },
+                    onContinue = {
+                        activeCrashReport = null
+                        viewModel.clearCrashReport()
+                    },
                     clearStoredReportOnContinue = activeCrashReportClearsStore,
                 )
                 return@ProjectLumenTheme

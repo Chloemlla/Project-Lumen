@@ -10,6 +10,7 @@ import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,7 +20,11 @@ import kotlin.math.max
 class AppLifecycleCoordinator(
     private val app: ProjectLumenApplication,
 ) : DefaultLifecycleObserver {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
+            app.recordCrash(throwable)
+        },
+    )
     private val settingsRepository = app.settingsRepository()
     private val runtimeRepository = app.runtimeRepository()
 
@@ -103,7 +108,7 @@ class AppLifecycleCoordinator(
                 versionCode = BuildConfig.VERSION_CODE.toLong(),
                 localSecurityConfig = localSecurityConfig(settings),
             )
-        }
+        }.onFailure(app::recordCrash)
     }
 
     private fun deviceAssetModel(): String {

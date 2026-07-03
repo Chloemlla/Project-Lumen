@@ -14,8 +14,9 @@ class BootReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
+            val app = context.applicationContext as? ProjectLumenApplication
             runCatching {
-                val app = context.applicationContext as ProjectLumenApplication
+                app ?: return@runCatching
                 val settingsRepository = app.settingsRepository()
                 val settings = settingsRepository.get()
                 val runtime = app.runtimeRepository().get()
@@ -45,6 +46,7 @@ class BootReceiver : BroadcastReceiver() {
                     }
                 }
             }
+                .onFailure { throwable -> app?.recordCrash(throwable) }
             pendingResult.finish()
         }
     }

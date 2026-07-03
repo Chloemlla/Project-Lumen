@@ -225,7 +225,10 @@ internal fun CrashReportScreen(
                 },
                 onClear = {
                     if (clearStoredReportOnContinue) {
-                        (context.applicationContext as? ProjectLumenApplication)?.crashReports?.clear()
+                        (context.applicationContext as? ProjectLumenApplication)?.let { application ->
+                            application.crashReports.clear()
+                            application.clearStartupCrashReport()
+                        }
                     }
                     Toast.makeText(context, context.getString(R.string.crash_report_cleared), Toast.LENGTH_SHORT).show()
                     onContinue?.invoke()
