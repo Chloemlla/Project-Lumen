@@ -96,11 +96,11 @@ class AppLifecycleCoordinator(
     }
 
     private suspend fun registerDeviceAsset(settings: AppSettingsEntity) {
-        val accessToken = app.secureCredentials.load()
-            ?.accessToken
-            ?.takeIf { it.isNotBlank() }
+        val deviceInstallationId = app.secureCredentials
+            .deviceInstallationId(settings.deviceInstallationId.takeIf { it.isNotBlank() })
+            .takeIf { it.isNotBlank() }
             ?: return
-        val deviceInstallationId = settings.deviceInstallationId.takeIf { it.isNotBlank() } ?: return
+        val accessToken = accessTokenForDeviceRegistration(deviceInstallationId) ?: return
         runCatching {
             app.apiClient.registerDevice(
                 accessToken = accessToken,
@@ -110,6 +110,28 @@ class AppLifecycleCoordinator(
                 localSecurityConfig = localSecurityConfig(settings),
             )
         }.onFailure(app::recordCrash)
+    }
+
+    private suspend fun accessTokenForDeviceRegistration(deviceInstallationId: String): String? {
+        val session = app.secureCredentials.load() ?: return null
+        if (session.accessToken.isBlank()) return null
+
+        val nowMillis = System.currentTimeMillis()
+        if (session.expiresAt <= 0L || session.expiresAt > nowMillis + TOKEN_REFRESH_MARGIN_MILLIS) {
+            return session.accessToken
+        }
+        if (session.refreshToken.isBlank()) return null
+        if (session.refreshExpiresAt > 0L && session.refreshExpiresAt <= nowMillis) return null
+
+        return runCatching {
+            app.apiClient.refreshSession(
+                refreshToken = session.refreshToken,
+                deviceInstallationId = deviceInstallationId,
+            ).also(app.secureCredentials::save).accessToken
+        }.getOrElse { throwable ->
+            app.recordCrash(throwable)
+            null
+        }
     }
 
     private fun deviceAssetModel(): String {
@@ -191,5 +213,9 @@ class AppLifecycleCoordinator(
 
     private fun Long.shiftIfSet(deltaMillis: Long): Long {
         return if (this > 0L) this + deltaMillis else this
+    }
+
+    private companion object {
+        private const val TOKEN_REFRESH_MARGIN_MILLIS = 60_000L
     }
 }
