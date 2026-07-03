@@ -1,9 +1,10 @@
-use crate::{config::Config, store::AppStore};
+use crate::{config::Config, outemail::OutEmailClient, store::AppStore};
 use std::{sync::Arc, time::Instant};
 
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<Config>,
+    pub outemail: Option<Arc<OutEmailClient>>,
     pub store: Arc<AppStore>,
 }
 
@@ -17,8 +18,10 @@ impl AppState {
             elapsed_ms = elapsed_ms(&started_at),
             "application store created"
         );
+        let outemail = OutEmailClient::from_config(&config).map(Arc::new);
         Ok(Self {
             config: Arc::new(config),
+            outemail,
             store: Arc::new(store),
         })
     }

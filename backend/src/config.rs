@@ -14,6 +14,12 @@ pub struct Config {
     pub admin_refresh_token_ttl_seconds: u64,
     pub login_code: String,
     pub login_ttl_seconds: u64,
+    pub outemail_base_url: String,
+    pub outemail_api_key: String,
+    pub outemail_from: String,
+    pub outemail_display_name: String,
+    pub outemail_domain: String,
+    pub outemail_timeout_seconds: u64,
     pub access_token_ttl_seconds: u64,
     pub refresh_token_ttl_seconds: u64,
     pub request_signing_secret: String,
@@ -41,6 +47,12 @@ impl Config {
             ),
             login_code: env_value("LUMEN_DEV_LOGIN_CODE", "000000"),
             login_ttl_seconds: env_u64("LUMEN_LOGIN_TTL_SECONDS", 600),
+            outemail_base_url: env_value("LUMEN_OUTEMAIL_BASE_URL", "https://tts.chloemlla.com"),
+            outemail_api_key: env_value("LUMEN_OUTEMAIL_API_KEY", ""),
+            outemail_from: env_value("LUMEN_OUTEMAIL_FROM", "noreply"),
+            outemail_display_name: env_value("LUMEN_OUTEMAIL_DISPLAY_NAME", "Project Lumen"),
+            outemail_domain: env_value("LUMEN_OUTEMAIL_DOMAIN", ""),
+            outemail_timeout_seconds: env_u64("LUMEN_OUTEMAIL_TIMEOUT_SECONDS", 10).clamp(1, 60),
             access_token_ttl_seconds: env_u64("LUMEN_ACCESS_TOKEN_TTL_SECONDS", 7_200).min(7_200),
             refresh_token_ttl_seconds: env_u64("LUMEN_REFRESH_TOKEN_TTL_SECONDS", 2_592_000)
                 .min(2_592_000),
@@ -66,6 +78,10 @@ impl Config {
 
     pub fn uses_default_login_code(&self) -> bool {
         self.login_code == "000000"
+    }
+
+    pub fn outemail_configured(&self) -> bool {
+        !self.outemail_api_key.trim().is_empty() && !self.outemail_base_url.trim().is_empty()
     }
 
     pub fn uses_default_request_signing_secret(&self) -> bool {

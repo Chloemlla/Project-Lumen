@@ -25,11 +25,19 @@ LUMEN_ADMIN_ACCESS_TOKEN_TTL_SECONDS=3600
 LUMEN_ADMIN_REFRESH_TOKEN_TTL_SECONDS=604800
 LUMEN_DEV_LOGIN_CODE=000000
 LUMEN_LOGIN_TTL_SECONDS=600
+LUMEN_OUTEMAIL_BASE_URL=https://tts.chloemlla.com
+LUMEN_OUTEMAIL_API_KEY=
+LUMEN_OUTEMAIL_FROM=noreply
+LUMEN_OUTEMAIL_DISPLAY_NAME=Project Lumen
+LUMEN_OUTEMAIL_DOMAIN=
+LUMEN_OUTEMAIL_TIMEOUT_SECONDS=10
 LUMEN_ACCESS_TOKEN_TTL_SECONDS=604800
 LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false
 ```
 
 `LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false` is intentionally fail-closed for Google Play purchases until real platform verification credentials are wired in.
+
+Email login sends verification codes through Happy-TTS outemail when both `LUMEN_OUTEMAIL_BASE_URL` and `LUMEN_OUTEMAIL_API_KEY` are configured. The API key is sent as a Bearer token to `POST /api/outemail/send`; when the key is empty, `/api/v1/auth/email/start` keeps returning `devCode` for development use.
 
 ## Admin Dashboard
 

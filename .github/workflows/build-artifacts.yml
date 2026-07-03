@@ -125,4 +125,10 @@ jobs:
           CONTAINER_NAMES: ${{ secrets.CONTAINER_NAMES }}
           IMAGE_URL: ${{ needs.build-image.outputs.deploy_image }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          LUMEN_OUTEMAIL_BASE_URL: ${{ secrets.LUMEN_OUTEMAIL_BASE_URL }}
+          LUMEN_OUTEMAIL_API_KEY: ${{ secrets.LUMEN_OUTEMAIL_API_KEY }}
+          LUMEN_OUTEMAIL_FROM: ${{ secrets.LUMEN_OUTEMAIL_FROM }}
+          LUMEN_OUTEMAIL_DISPLAY_NAME: ${{ secrets.LUMEN_OUTEMAIL_DISPLAY_NAME }}
+          LUMEN_OUTEMAIL_DOMAIN: ${{ secrets.LUMEN_OUTEMAIL_DOMAIN }}
+          LUMEN_OUTEMAIL_TIMEOUT_SECONDS: ${{ secrets.LUMEN_OUTEMAIL_TIMEOUT_SECONDS }}
         run: node scripts/deploy_image.js
