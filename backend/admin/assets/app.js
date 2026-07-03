@@ -1,163 +1,586 @@
-const API_BASE = `${window.location.origin}/api`;
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-const SENSITIVE_ACTIONS = new Set(["change-plan", "revoke-pro", "download-backup", "push-template", "force-update", "save-allowlist"]);
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Gauge,
+  KeyRound,
+  LayoutDashboard,
+  LogIn,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  SlidersHorizontal,
+} from "lucide-react";
+import { createRoot } from "react-dom/client";
+import { requestJson, probeHealth } from "./admin-api.js";
+import { adminSections } from "./data.js";
+import {
+  API_BASE,
+  SENSITIVE_ACTIONS,
+  avg,
+  buildDashboardSummary,
+  clearLegacyStoredTokens,
+  cloneValue,
+  createDashboardData,
+  formatTime,
+  isSecureAdminOrigin,
+  mapDashboard,
+  moduleStatusCounts,
+  normalizeStatus,
+  safeColor,
+  statusLabel,
+} from "./dashboard-model.js";
+import { ModuleCard, StatusPill } from "./module-components.js";
+import { React, html } from "./ui.js";
 
-const data = window.LumenAdminData;
-const sections = window.LumenAdminSections;
-const modules = window.LumenAdminModules;
-const state = {
-    section: "users",
-    query: "",
-    environment: "production",
-    range: "30",
-    username: localStorage.getItem("projectLumenAdminUsername") || "admin",
-    token: localStorage.getItem("projectLumenAdminToken") || "",
-    refreshToken: localStorage.getItem("projectLumenAdminRefreshToken") || "",
-    tokenExpiresAt: Number(localStorage.getItem("projectLumenAdminTokenExpiresAt") || 0),
-};
+const USERNAME_STORAGE_KEY = "projectLumenAdminUsername";
+const INITIAL_USERNAME = localStorage.getItem(USERNAME_STORAGE_KEY) || "admin";
 
-document.addEventListener("DOMContentLoaded", () => {
-  bindControls();
-  updateStaticLabels();
-    renderNav();
-    render();
-    refreshHealth();
-    if (state.token) fetchDashboard();
-    setInterval(updateTransportStatus, 30_000);
-});
-
-function bindControls() {
-    byId("adminUsernameInput").value = state.username;
-    byId("adminTokenInput").value = state.token;
-    byId("loginButton").addEventListener("click", loginAdmin);
-    byId("saveTokenButton").addEventListener("click", saveToken);
-    byId("refreshSessionButton").addEventListener("click", refreshAdminSession);
-    byId("refreshButton").addEventListener("click", refreshAll);
-  byId("moduleSearch").addEventListener("input", (event) => {
-    state.query = event.target.value.trim().toLowerCase();
-    render();
+function AdminDashboardApp() {
+  const [dashboard, setDashboard] = React.useState(() => createDashboardData());
+  const [sectionId, setSectionId] = React.useState("users");
+  const [query, setQuery] = React.useState("");
+  const [environment, setEnvironment] = React.useState("production");
+  const [range, setRange] = React.useState("30");
+  const [now, setNow] = React.useState(Date.now());
+  const [lastUpdated, setLastUpdated] = React.useState("");
+  const [health, setHealth] = React.useState({
+    ok: false,
+    status: "Unknown",
+    detail: "No probe yet",
+    latencyMs: 0,
+    checkedAt: "",
   });
-  byId("environmentSelect").addEventListener("change", (event) => {
-    state.environment = event.target.value;
-    render();
+  const [authForm, setAuthForm] = React.useState({
+    username: INITIAL_USERNAME,
+    password: "",
+    token: "",
   });
-  byId("rangeSelect").addEventListener("change", (event) => {
-    state.range = event.target.value;
-    render();
+  const [session, setSession] = React.useState({
+    username: INITIAL_USERNAME,
+    token: "",
+    refreshToken: "",
+    tokenExpiresAt: 0,
   });
-    byId("copySecurityNoteButton").addEventListener("click", () => copyText("Admin operations require HTTPS outside localhost."));
-}
-
-function updateStaticLabels() {
-  byId("apiBaseLabel").textContent = API_BASE;
-  byId("crashMetric").textContent = data.crashes.length;
-  byId("syncMetric").textContent = `${Math.round(avg(data.syncSeries))} KB/s`;
-  byId("releaseMetric").textContent = data.releases.some((release) => release.force) ? "Action" : "Clear";
-  updateTransportStatus();
-}
-
-function updateTransportStatus() {
+  const [loading, setLoading] = React.useState({
+    health: false,
+    dashboard: false,
+    login: false,
+    refresh: false,
+    action: "",
+  });
+  const [toasts, setToasts] = React.useState([]);
+  const sessionRef = React.useRef(session);
   const secure = isSecureAdminOrigin();
-  byId("securityBanner").hidden = secure;
-  byId("transportStatus").textContent = secure ? "Secure admin transport" : "Sensitive actions locked";
-  document.querySelectorAll("[data-sensitive='true']").forEach((button) => {
-    button.disabled = !secure;
-  });
-}
+  const selectedSection = adminSections.find((section) => section.id === sectionId) || adminSections[0];
+  const visibleModules = selectedSection.modules.filter((module) => matchesQuery(module, query));
+  const summaryCards = buildDashboardSummary(dashboard, health, secure, session);
+  const statusCounts = moduleStatusCounts(adminSections);
+  const runtimeState = {
+    section: sectionId,
+    query,
+    environment,
+    range,
+    token: session.token,
+    tokenExpiresAt: session.tokenExpiresAt,
+    now,
+  };
 
-function renderNav() {
-  const nav = byId("sectionNav");
-  nav.innerHTML = sections.map((section) => `
-    <button class="nav-button ${section.id === state.section ? "active" : ""}" type="button" data-section="${section.id}">
-      <span>${modules.escapeHtml(section.title)}</span>
-      <span class="nav-count">${section.modules.length}</span>
-    </button>
-  `).join("");
-  nav.querySelectorAll("button").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.section = button.dataset.section;
-      renderNav();
-      render();
-    });
-  });
-}
+  React.useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
-function render() {
-  const section = sections.find((item) => item.id === state.section) || sections[0];
-  byId("sectionTitle").textContent = section.title;
-  byId("sectionSubtitle").textContent = section.subtitle;
-  const visibleModules = section.modules.filter((module) => matchesQuery(module));
-  const grid = byId("moduleGrid");
-  grid.innerHTML = "";
+  const updateLoading = React.useCallback((patch) => {
+    setLoading((current) => ({ ...current, ...patch }));
+  }, []);
 
-  if (visibleModules.length === 0) {
-    grid.innerHTML = `<div class="empty-state">No modules match the current filter.</div>`;
-    return;
+  const notify = React.useCallback((message, tone = "info") => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((current) => [...current.slice(-2), { id, message, tone }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 3200);
+  }, []);
+
+  const applySession = React.useCallback((payload) => {
+    const nextSession = {
+      username: payload.operator?.username || sessionRef.current.username || INITIAL_USERNAME,
+      token: payload.accessToken || "",
+      refreshToken: payload.refreshToken || "",
+      tokenExpiresAt: payload.expiresAt || 0,
+    };
+    sessionRef.current = nextSession;
+    setSession(nextSession);
+    setAuthForm((current) => ({
+      ...current,
+      username: nextSession.username,
+      password: "",
+      token: "",
+    }));
+    localStorage.setItem(USERNAME_STORAGE_KEY, nextSession.username);
+  }, []);
+
+  const clearSession = React.useCallback(() => {
+    const nextSession = {
+      username: sessionRef.current.username || INITIAL_USERNAME,
+      token: "",
+      refreshToken: "",
+      tokenExpiresAt: 0,
+    };
+    sessionRef.current = nextSession;
+    setSession(nextSession);
+    setAuthForm((current) => ({ ...current, token: "" }));
+    setDashboard(createDashboardData());
+    setLastUpdated("");
+  }, []);
+
+  const refreshAdminSession = React.useCallback(async (options = {}) => {
+    const refreshToken = sessionRef.current.refreshToken;
+    if (!refreshToken) {
+      if (!options.silent) notify("No refresh token is available.", "watch");
+      return false;
+    }
+    updateLoading({ refresh: true });
+    try {
+      const payload = await requestJson("admin/auth/refresh", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken }),
+      });
+      applySession(payload);
+      if (!options.silent) notify("Admin token refreshed.", "ok");
+      return true;
+    } catch (error) {
+      clearSession();
+      notify(`Refresh failed: ${error.message}`, "risk");
+      return false;
+    } finally {
+      updateLoading({ refresh: false });
+    }
+  }, [applySession, clearSession, notify, updateLoading]);
+
+  const apiJson = React.useCallback(async (path, options = {}) => {
+    const activeToken = sessionRef.current.token;
+    try {
+      return await requestJson(path, { ...options, token: activeToken });
+    } catch (error) {
+      if (error.status === 401 && !options.skipRefresh && await refreshAdminSession({ silent: true })) {
+        return requestJson(path, { ...options, skipRefresh: true, token: sessionRef.current.token });
+      }
+      throw error;
+    }
+  }, [refreshAdminSession]);
+
+  const refreshHealth = React.useCallback(async () => {
+    updateLoading({ health: true });
+    setHealth((current) => ({ ...current, status: "Checking", detail: "Probing /api/health" }));
+    try {
+      const result = await probeHealth(sessionRef.current.token);
+      setHealth(result);
+    } catch (error) {
+      setHealth({
+        ok: false,
+        status: "Offline",
+        detail: error.message,
+        latencyMs: 0,
+        checkedAt: new Date().toLocaleTimeString(),
+      });
+    } finally {
+      updateLoading({ health: false });
+    }
+  }, [updateLoading]);
+
+  const fetchDashboard = React.useCallback(async () => {
+    if (!sessionRef.current.token) {
+      notify("Login or paste an admin token to load live data.", "watch");
+      return;
+    }
+    updateLoading({ dashboard: true });
+    try {
+      const snapshot = await apiJson("admin/dashboard");
+      setDashboard(mapDashboard(snapshot));
+      setLastUpdated(formatTime(snapshot.generatedAt || Date.now()));
+      notify("Dashboard refreshed from MongoDB.", "ok");
+    } catch (error) {
+      notify(`Dashboard refresh failed: ${error.message}`, "risk");
+    } finally {
+      updateLoading({ dashboard: false });
+    }
+  }, [apiJson, notify, updateLoading]);
+
+  React.useEffect(() => {
+    clearLegacyStoredTokens();
+    refreshHealth();
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [refreshHealth]);
+
+  async function loginAdmin(event) {
+    event.preventDefault();
+    const username = authForm.username.trim();
+    const password = authForm.password;
+    if (!username || !password) {
+      notify("Username and password are required.", "watch");
+      return;
+    }
+    updateLoading({ login: true });
+    try {
+      const payload = await requestJson("admin/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      });
+      applySession(payload);
+      notify("Admin session established.", "ok");
+      await fetchDashboard();
+    } catch (error) {
+      notify(`Login failed: ${error.message}`, "risk");
+    } finally {
+      updateLoading({ login: false });
+    }
   }
 
-  visibleModules.forEach((module) => grid.appendChild(renderModule(module)));
-  drawPendingCharts();
-  updateTransportStatus();
-}
-
-function matchesQuery(module) {
-  if (!state.query) return true;
-  return `${module.title} ${module.kicker} ${module.kind}`.toLowerCase().includes(state.query);
-}
-
-function renderModule(module) {
-  const template = byId("moduleTemplate").content.cloneNode(true);
-  const card = template.querySelector(".module-card");
-  card.dataset.kind = module.kind;
-  template.querySelector(".module-kicker").textContent = module.kicker;
-  template.querySelector("h2").textContent = module.title;
-  const status = template.querySelector(".status-pill");
-  status.textContent = modules.statusLabel(module.status);
-  status.className = `status-pill status-${module.status}`;
-  template.querySelector(".module-body").innerHTML = modules.bodyForKind(module.kind, {
-    state,
-    isSecureAdminOrigin,
-  });
-  template.querySelector(".module-actions").innerHTML = modules.actionsForKind(module.kind);
-  attachModuleActions(template);
-  return card;
-}
-
-function attachModuleActions(scope) {
-  scope.querySelectorAll("[data-action]").forEach((button) => {
-    button.addEventListener("click", () => handleAction(button.dataset.action));
-  });
-}
-
-function handleAction(action) {
-    if (SENSITIVE_ACTIONS.has(action) && !isSecureAdminOrigin()) {
-        toast("Sensitive admin action blocked until HTTPS is enabled.");
-        return;
+  async function usePastedToken() {
+    const token = authForm.token.trim();
+    if (!token) {
+      clearSession();
+      notify("Admin token cleared from this tab.", "watch");
+      return;
     }
-    const payload = actionPayload(action);
+    const nextSession = {
+      username: authForm.username.trim() || sessionRef.current.username || INITIAL_USERNAME,
+      token,
+      refreshToken: "",
+      tokenExpiresAt: Date.now() + 50 * 60 * 1000,
+    };
+    sessionRef.current = nextSession;
+    setSession(nextSession);
+    setAuthForm((current) => ({ ...current, token: "" }));
+    localStorage.setItem(USERNAME_STORAGE_KEY, nextSession.username);
+    notify("Admin token loaded for this tab.", "ok");
+    await fetchDashboard();
+  }
+
+  async function refreshAll() {
+    await refreshHealth();
+    await fetchDashboard();
+  }
+
+  async function recordAdminAction(action, payload) {
+    updateLoading({ action });
+    try {
+      const response = await apiJson("admin/actions", {
+        method: "POST",
+        body: JSON.stringify({ action, payload }),
+      });
+      notify(response.accepted ? `${action} recorded.` : `${action} rejected.`, response.accepted ? "ok" : "watch");
+      if (response.accepted) await fetchDashboard();
+    } catch (error) {
+      notify(`Action failed: ${error.message}`, "risk");
+    } finally {
+      updateLoading({ action: "" });
+    }
+  }
+
+  async function handleModuleAction(action) {
     if (action === "probe-health") {
-        refreshHealth();
-    } else if (action === "refresh-token") {
-        refreshAdminSession();
-    } else if (SENSITIVE_ACTIONS.has(action)) {
-        if (!payload) {
-            toast("Live dashboard data is required for this admin action.");
-            return;
-        }
-        recordAdminAction(action, payload);
-    } else {
-        copyText(payload || `${action} queued in ${state.environment}.`);
+      await refreshHealth();
+      return;
     }
+    if (action === "refresh-token") {
+      await refreshAdminSession();
+      return;
+    }
+    if (SENSITIVE_ACTIONS.has(action) && !secure) {
+      notify("Sensitive admin action blocked until HTTPS is enabled.", "risk");
+      return;
+    }
+
+    const payload = buildActionPayload(action, dashboard, runtimeState);
+    if (SENSITIVE_ACTIONS.has(action)) {
+      if (!payload) {
+        notify("Live dashboard data or required form input is missing for this admin action.", "watch");
+        return;
+      }
+      await recordAdminAction(action, payload);
+      return;
+    }
+
+    if (!payload) {
+      notify("No live data is available for this action.", "watch");
+      return;
+    }
+    await copyText(typeof payload === "string" ? payload : JSON.stringify(payload, null, 2), notify);
+  }
+
+  function updateAuthField(field, value) {
+    setAuthForm((current) => ({ ...current, [field]: value }));
+  }
+
+  return html`
+    <div className="app-shell">
+      <aside className="sidebar" aria-label="Admin sections">
+        <div className="brand-block">
+          <div className="brand-mark">PL</div>
+          <div>
+            <div className="brand-name">Project Lumen</div>
+            <div className="brand-subtitle">Admin Dashboard</div>
+          </div>
+        </div>
+
+        <nav className="nav-list">
+          ${adminSections.map((section) => html`
+            <button
+              key=${section.id}
+              className=${`nav-button ${section.id === sectionId ? "active" : ""}`}
+              type="button"
+              onClick=${() => setSectionId(section.id)}
+            >
+              <span>${section.title}</span>
+              <span className="nav-count">${section.modules.length}</span>
+            </button>
+          `)}
+        </nav>
+
+        <div className="runtime-box">
+          <div className="runtime-label">API base</div>
+          <code>${API_BASE}</code>
+          <div className=${`runtime-status ${secure ? "ok" : "risk"}`}>
+            ${secure ? "Secure admin transport" : "Sensitive actions locked"}
+          </div>
+        </div>
+
+        <div className="sidebar-summary" aria-label="Module status summary">
+          ${["ok", "watch", "risk", "info"].map((status) => html`
+            <div className="sidebar-summary-row" key=${status}>
+              <span>${statusLabel(status)}</span>
+              <strong>${statusCounts[status] || 0}</strong>
+            </div>
+          `)}
+        </div>
+      </aside>
+
+      <main className="workspace">
+        <header className="topbar">
+          <div className="title-block">
+            <div className="eyebrow">
+              <${LayoutDashboard} size=${16} aria-hidden="true" />
+              <span>${environment} · last ${range} days</span>
+            </div>
+            <h1>${selectedSection.title}</h1>
+            <p>${selectedSection.subtitle}</p>
+            <div className="title-meta">
+              <${SessionChip} session=${session} now=${now} secure=${secure} />
+              ${lastUpdated ? html`<span>Updated ${lastUpdated}</span>` : html`<span>Live data not loaded</span>`}
+            </div>
+          </div>
+
+          <form className="auth-panel" onSubmit=${loginAdmin}>
+            <label className="token-field">
+              <span>Username</span>
+              <input
+                type="text"
+                autoComplete="username"
+                value=${authForm.username}
+                onInput=${(event) => updateAuthField("username", event.currentTarget.value)}
+              />
+            </label>
+            <label className="token-field">
+              <span>Password</span>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value=${authForm.password}
+                onInput=${(event) => updateAuthField("password", event.currentTarget.value)}
+              />
+            </label>
+            <button className="button primary button-with-icon" type="submit" disabled=${loading.login}>
+              <${LogIn} size=${15} aria-hidden="true" />
+              <span>${loading.login ? "Signing in" : "Login"}</span>
+            </button>
+            <label className="token-field token-field-wide">
+              <span>Admin token</span>
+              <input
+                type="password"
+                autoComplete="off"
+                placeholder="Bearer token"
+                value=${authForm.token}
+                onInput=${(event) => updateAuthField("token", event.currentTarget.value)}
+              />
+            </label>
+            <button className="button secondary button-with-icon" type="button" onClick=${usePastedToken}>
+              <${KeyRound} size=${15} aria-hidden="true" />
+              <span>Use token</span>
+            </button>
+            <button
+              className="button secondary button-with-icon"
+              type="button"
+              disabled=${loading.refresh || !session.refreshToken}
+              onClick=${() => refreshAdminSession()}
+            >
+              <${RefreshCw} size=${15} aria-hidden="true" />
+              <span>${loading.refresh ? "Refreshing" : "Refresh token"}</span>
+            </button>
+            <button className="button primary button-with-icon" type="button" disabled=${loading.dashboard || loading.health} onClick=${refreshAll}>
+              <${RefreshCw} size=${15} aria-hidden="true" />
+              <span>${loading.dashboard || loading.health ? "Refreshing" : "Refresh"}</span>
+            </button>
+          </form>
+        </header>
+
+        ${secure ? null : html`
+          <section className="security-banner" role="alert">
+            <div>
+              <strong>HTTPS required for admin operations.</strong>
+              <span>This dashboard disables sensitive actions on non-local HTTP origins.</span>
+            </div>
+            <button
+              className="button danger button-with-icon"
+              type="button"
+              onClick=${() => copyText("Admin operations require HTTPS outside localhost.", notify)}
+            >
+              <${ShieldAlert} size=${15} aria-hidden="true" />
+              <span>Copy note</span>
+            </button>
+          </section>
+        `}
+
+        <section className="status-grid" aria-label="Service summary">
+          ${summaryCards.map((item) => html`<${MetricCard} key=${item.id} item=${item} />`)}
+        </section>
+
+        <section className="controls-strip" aria-label="Dashboard controls">
+          <label className="search-field">
+            <span>Search modules</span>
+            <div className="input-with-icon">
+              <${Search} size=${16} aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="Search users, crashes, templates, releases"
+                value=${query}
+                onInput=${(event) => setQuery(event.currentTarget.value)}
+              />
+            </div>
+          </label>
+          <label className="select-field">
+            <span>Environment</span>
+            <div className="input-with-icon">
+              <${SlidersHorizontal} size=${16} aria-hidden="true" />
+              <select value=${environment} onChange=${(event) => setEnvironment(event.currentTarget.value)}>
+                <option value="production">Production</option>
+                <option value="staging">Staging</option>
+                <option value="local">Local</option>
+              </select>
+            </div>
+          </label>
+          <label className="select-field">
+            <span>Range</span>
+            <div className="input-with-icon">
+              <${Gauge} size=${16} aria-hidden="true" />
+              <select value=${range} onChange=${(event) => setRange(event.currentTarget.value)}>
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+              </select>
+            </div>
+          </label>
+        </section>
+
+        <section className="section-strip" aria-label="Current section modules">
+          ${selectedSection.modules.map((module) => html`
+            <button
+              key=${module.kind}
+              className="section-chip"
+              type="button"
+              onClick=${() => setQuery(module.title)}
+            >
+              <span>${module.kicker}</span>
+              <${StatusPill} status=${module.status} />
+            </button>
+          `)}
+        </section>
+
+        <section className="module-grid" aria-live="polite">
+          ${visibleModules.length
+            ? visibleModules.map((module) => html`
+                <${ModuleCard}
+                  key=${module.kind}
+                  module=${module}
+                  data=${dashboard}
+                  state=${runtimeState}
+                  secure=${secure}
+                  onAction=${handleModuleAction}
+                  busyAction=${loading.action}
+                />
+              `)
+            : html`<div className="empty-state wide">No modules match the current filter.</div>`}
+        </section>
+      </main>
+      <${ToastStack} toasts=${toasts} />
+    </div>
+  `;
 }
 
-function actionPayload(action) {
-  const selectedPlanUserId = fieldValue("planUserIdInput") || data.profile?.id || "";
-  const selectedTier = fieldValue("planTierInput") || "PRO";
-  const selectedProductId = fieldValue("planProductIdInput") || "manual_admin_pro";
-  const selectedExpiresAt = Number(fieldValue("planExpiresAtInput") || 0);
+function MetricCard({ item }) {
+  const Icon = {
+    health: item.status === "ok" ? CheckCircle2 : Gauge,
+    crashes: AlertTriangle,
+    sync: RefreshCw,
+    access: ShieldCheck,
+    release: LayoutDashboard,
+  }[item.id] || Gauge;
+  return html`
+    <article className=${`metric-card metric-${normalizeStatus(item.status)}`}>
+      <div className="metric-icon"><${Icon} size=${18} aria-hidden="true" /></div>
+      <span className="metric-label">${item.label}</span>
+      <strong>${item.value}</strong>
+      <small>${item.detail}${item.id === "health" && item.latencyMs ? ` | ${item.latencyMs} ms` : ""}</small>
+    </article>
+  `;
+}
+
+function SessionChip({ session, now, secure }) {
+  const tokenReady = Boolean(session.token);
+  const expired = Boolean(session.tokenExpiresAt && session.tokenExpiresAt <= now);
+  const status = !secure ? "risk" : tokenReady && !expired ? "ok" : "watch";
+  const label = tokenReady && !expired ? `${session.username} connected` : `${session.username} not connected`;
+  return html`
+    <span className=${`session-chip session-${status}`}>
+      ${secure ? html`<${ShieldCheck} size=${14} aria-hidden="true" />` : html`<${ShieldAlert} size=${14} aria-hidden="true" />`}
+      <span>${expired ? "Token expired" : label}</span>
+    </span>
+  `;
+}
+
+function ToastStack({ toasts }) {
+  return html`
+    <div className="toast-stack" role="status" aria-live="polite">
+      ${toasts.map((toast) => html`
+        <div className=${`toast toast-${normalizeStatus(toast.tone)}`} key=${toast.id}>
+          ${toast.message}
+        </div>
+      `)}
+    </div>
+  `;
+}
+
+function matchesQuery(module, query) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+  return `${module.title} ${module.kicker} ${module.kind}`.toLowerCase().includes(normalized);
+}
+
+function buildActionPayload(action, data, state) {
+  const selectedPlanUserId = readField("planUserIdInput") || data.profile?.id || "";
+  const selectedTier = readField("planTierInput") || "PRO";
+  const selectedProductId = readField("planProductIdInput") || "manual_admin_pro";
+  const selectedExpiresAt = Number(readField("planExpiresAtInput") || 0);
   const firstRelease = data.releases?.[0];
-  const firstReleaseCode = Number(firstRelease?.version || 0);
+  const firstBackup = data.backups?.[0];
+  const firstCrash = data.crashes?.[0];
+
   const payloads = {
+    "open-user": data.profile?.id ? data.profile : null,
+    "export-devices": data.devices.length ? data.devices : null,
+    "copy-audit": data.accessAudit.length ? data.accessAudit : null,
     "change-plan": selectedPlanUserId ? {
       userId: selectedPlanUserId,
       tier: selectedTier,
@@ -165,443 +588,102 @@ function actionPayload(action) {
       expiresAt: Number.isFinite(selectedExpiresAt) ? selectedExpiresAt : 0,
     } : null,
     "revoke-pro": selectedPlanUserId ? { userId: selectedPlanUserId } : null,
-    "push-template": {
-      id: `admin-template-${Date.now()}`,
-      name: "Admin dispatched template",
-      tier: "PRO",
-      countdownStyle: "circle",
-      color: "#2563EB",
-      locales: ["en", "zh"],
-      layoutJson: { countdownStyle: "circle", showSkipButton: true },
-    },
+    "download-backup": firstBackup || null,
+    "copy-backup": firstBackup?.summary || null,
+    "export-crashes": data.crashes.length
+      ? data.crashes.map((crash) => `- ${crash.group}: ${crash.count} events on ${crash.version}`).join("\n")
+      : null,
+    "copy-crash-key": firstCrash?.group || null,
+    "copy-stack": data.stack.length ? data.stack.join("\n") : null,
+    "version-matrix": data.versionAnalysis.length ? data.versionAnalysis : null,
+    "copy-sync-report": data.syncMetrics.length ? {
+      rangeDays: Number(state.range),
+      averagePayloadKb: Math.round(avg(data.syncSeries)),
+      samples: data.syncMetrics,
+    } : null,
+    "push-template": buildTemplatePayload(data),
+    "copy-template-json": data.templates.length ? data.templates : null,
+    "preview-template": buildTemplatePayload(data),
+    "copy-audio": data.audioMatrix.length ? data.audioMatrix : null,
+    "queue-i18n": data.i18nJobs.length ? data.i18nJobs : null,
+    "copy-telemetry": data.telemetry.length ? data.telemetry : null,
+    "upload-checksums": data.releases.length
+      ? data.releases.map((release) => ({ versionCode: release.version, sha256: release.sha }))
+      : null,
     "force-update": firstRelease ? {
-      versionCode: firstReleaseCode,
+      versionCode: Number(firstRelease.version || 0),
       versionName: firstRelease.name || "admin-policy",
       sha256: firstRelease.sha || "",
       rollout: "blocked",
       forceUpdate: true,
     } : null,
-    "save-allowlist": { origin: "admin.eye.chloemlla.com", protocol: "https", risk: "required" },
-    "copy-stack": data.stack.join("\n"),
-    "copy-audit": JSON.stringify(data.accessAudit, null, 2),
-    "copy-backup": JSON.stringify(data.backups?.[0]?.summary || {}, null, 2),
-    "copy-template-json": JSON.stringify(data.templates, null, 2),
-    "copy-audio": "preAlert=70; restStart=75; restEnd=65; pomodoroStart=60; pomodoroEnd=80; vibration=short",
-    "copy-telemetry": JSON.stringify(data.telemetry, null, 2),
-    "copy-sync-report": JSON.stringify({ averagePayloadKb: 84, p95Ms: 231, rangeDays: state.range }, null, 2),
-    "copy-rollout": JSON.stringify(data.releases, null, 2),
-    "copy-routes": JSON.stringify(data.routes, null, 2),
-    "copy-security": "HTTP admin traffic is blocked outside localhost. Move admin.eye.chloemlla.com to HTTPS-only.",
-    "export-crashes": data.crashes.map((crash) => `- ${crash.group}: ${crash.count} events on ${crash.version}`).join("\n"),
+    "copy-rollout": data.rolloutPlan.length ? data.rolloutPlan : null,
+    "copy-routes": data.routes.length ? data.routes : null,
+    "save-allowlist": buildAllowlistPayload(data),
+    "copy-security": "HTTP admin traffic is blocked outside localhost. Move admin access to HTTPS-only.",
   };
-  return payloads[action];
+
+  return cloneValue(payloads[action] || null);
 }
 
-async function refreshHealth() {
-  byId("healthValue").textContent = "Checking";
-  byId("healthDetail").textContent = "Probing /api/health";
-  const startedAt = performance.now();
-  try {
-    const response = await fetch(`${API_BASE}/health`, { headers: authHeaders() });
-    const duration = Math.round(performance.now() - startedAt);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
-    byId("healthValue").textContent = payload.status || "ok";
-    byId("healthDetail").textContent = `${payload.service || "project-lumen-api"} ${payload.version || ""} | ${duration} ms`;
-  } catch (error) {
-    byId("healthValue").textContent = "Offline";
-    byId("healthDetail").textContent = error.message;
-  }
-}
+function buildTemplatePayload(data) {
+  const existing = data.templateEditor || {};
+  const name = readField("templateNameInput") || existing.name || "";
+  const color = readField("templateColorInput") || existing.color || "";
+  const style = readField("templateStyleInput") || existing.style || "circle";
+  const tier = readField("templateTierInput") || existing.tier || "PRO";
+  const locales = parseLocaleList(readField("templateLocaleInput") || existing.locale || "");
+  const titleText = readField("templateTitleInput");
+  const subtitleText = readField("templateSubtitleInput");
+  const showSkipButton = (readField("templateSkipInput") || "show") === "show";
+  const normalizedColor = safeColor(color);
 
-function refreshAll() {
-    refreshHealth();
-    fetchDashboard();
-}
+  if (!name || !normalizedColor || !locales.length) return null;
 
-function saveToken() {
-    state.token = byId("adminTokenInput").value.trim();
-    state.tokenExpiresAt = state.token ? Date.now() + 50 * 60 * 1000 : 0;
-    localStorage.setItem("projectLumenAdminToken", state.token);
-    localStorage.setItem("projectLumenAdminTokenExpiresAt", String(state.tokenExpiresAt));
-    render();
-    toast(state.token ? "Admin token saved." : "Admin token cleared.");
-}
-
-async function loginAdmin() {
-    const username = byId("adminUsernameInput").value.trim();
-    const password = byId("adminPasswordInput").value;
-    if (!username || !password) {
-        toast("Username and password are required.");
-        return;
-    }
-    try {
-        const session = await apiJson("admin/auth/login", {
-            method: "POST",
-            body: JSON.stringify({ username, password }),
-            skipRefresh: true,
-        });
-        applySession(session);
-        byId("adminPasswordInput").value = "";
-        toast("Admin session established.");
-        await fetchDashboard();
-    } catch (error) {
-        toast(`Login failed: ${error.message}`);
-    }
-}
-
-async function refreshAdminSession() {
-    if (!state.refreshToken) {
-        toast("No refresh token is available.");
-        return false;
-    }
-    try {
-        const session = await apiJson("admin/auth/refresh", {
-            method: "POST",
-            body: JSON.stringify({ refreshToken: state.refreshToken }),
-            skipRefresh: true,
-        });
-        applySession(session);
-        toast("Admin token refreshed.");
-        return true;
-    } catch (error) {
-        clearSession();
-        toast(`Refresh failed: ${error.message}`);
-        return false;
-    }
-}
-
-async function fetchDashboard() {
-    if (!state.token) {
-        render();
-        toast("Login or paste an admin token to load live data.");
-        return;
-    }
-    try {
-        const snapshot = await apiJson("admin/dashboard");
-        Object.assign(data, mapDashboard(snapshot));
-        updateStaticLabels();
-        render();
-        toast("Dashboard refreshed from MongoDB.");
-    } catch (error) {
-        render();
-        toast(`Dashboard refresh failed: ${error.message}`);
-    }
-}
-
-async function recordAdminAction(action, payload) {
-    try {
-        const response = await apiJson("admin/actions", {
-            method: "POST",
-            body: JSON.stringify({ action, payload }),
-        });
-        toast(response.accepted ? `${action} recorded.` : `${action} rejected.`);
-        if (response.accepted) fetchDashboard();
-    } catch (error) {
-        toast(`Action failed: ${error.message}`);
-    }
-}
-
-async function apiJson(path, options = {}) {
-    const response = await fetch(`${API_BASE}/${path}`, {
-        method: options.method || "GET",
-        headers: {
-            Accept: "application/json",
-            ...(options.body ? { "Content-Type": "application/json" } : {}),
-            ...authHeaders(),
-        },
-        body: options.body,
-    });
-    if (response.status === 401 && !options.skipRefresh && await refreshAdminSession()) {
-        return apiJson(path, { ...options, skipRefresh: true });
-    }
-    const text = await response.text();
-    const payload = text ? JSON.parse(text) : {};
-    if (!response.ok) {
-        throw new Error(payload?.error?.message || `HTTP ${response.status}`);
-    }
-    return payload;
-}
-
-function applySession(session) {
-    state.username = session.operator?.username || state.username;
-    state.token = session.accessToken;
-    state.refreshToken = session.refreshToken;
-    state.tokenExpiresAt = session.expiresAt || 0;
-    byId("adminUsernameInput").value = state.username;
-    byId("adminTokenInput").value = state.token;
-    localStorage.setItem("projectLumenAdminUsername", state.username);
-    localStorage.setItem("projectLumenAdminToken", state.token);
-    localStorage.setItem("projectLumenAdminRefreshToken", state.refreshToken);
-    localStorage.setItem("projectLumenAdminTokenExpiresAt", String(state.tokenExpiresAt));
-}
-
-function clearSession() {
-    state.token = "";
-    state.refreshToken = "";
-    state.tokenExpiresAt = 0;
-    byId("adminTokenInput").value = "";
-    localStorage.removeItem("projectLumenAdminToken");
-    localStorage.removeItem("projectLumenAdminRefreshToken");
-    localStorage.removeItem("projectLumenAdminTokenExpiresAt");
-}
-
-function mapDashboard(snapshot) {
-    const profiles = snapshot.users?.profiles || [];
-    const profile = profiles[0] || {};
-    const apiMetrics = snapshot.observability?.apiMetrics || [];
-    const syncMetrics = snapshot.observability?.syncMetrics || [];
-    const crashGroups = snapshot.observability?.crashGroups || [];
-    const entitlements = snapshot.users?.entitlements || [];
-    return {
-        users: profiles.map((user) => ({
-            id: user.id || "",
-            email: user.email || "unknown",
-            planTier: user.planTier || "FREE",
-            lastSyncAt: formatTime(user.lastSyncAt),
-        })),
-        profile: {
-            id: profile.id || "",
-            email: profile.email || "No users yet",
-            registeredAt: formatTime(profile.registeredAt),
-            lastSyncAt: formatTime(profile.lastSyncAt),
-            planTier: profile.planTier || "not recorded",
-            featureFlags: profile.featureFlags || [],
-            localSecurity: "not reported",
-        },
-        devices: (snapshot.users?.devices || []).map((device) => ({
-            id: device.deviceInstallationId || "unknown",
-            fingerprint: device.deviceFingerprint || "",
-            model: device.model || "not reported",
-            versionCode: device.versionCode || 0,
-            lastSeen: formatTime(device.lastSeenAt),
-            config: device.localSecurityConfig || "not reported",
-        })),
-        accessAudit: (snapshot.users?.accessAudit || []).map((entry) => ({
-            time: formatTime(entry.at),
-            endpoint: entry.endpoint,
-            ip: entry.ip,
-            geo: entry.geo,
-            status: entry.status,
-        })),
-        purchaseAudit: (snapshot.users?.purchaseAudit || []).map((entry) => ({
-            time: formatTime(entry.at),
-            userId: entry.userId,
-            product: entry.productId,
-            status: entry.status,
-            token: entry.purchaseToken,
-            action: entry.action,
-        })),
-        entitlements: entitlements.map((entry) => ({
-            userId: entry.userId,
-            product: entry.productId,
-            tier: entry.tier,
-            status: entry.status,
-            expiresAt: formatTime(entry.expiresAt),
-            lastVerifiedAt: formatTime(entry.lastVerifiedAt),
-        })),
-        backups: (snapshot.users?.backups || []).map((backup) => ({
-            id: backup.id,
-            uploadedAt: formatTime(backup.uploadedAt),
-            summary: {
-                templates: backup.summary?.templates || 0,
-                eyeStatDays: backup.summary?.eyeStatDays || 0,
-                pomodoroDays: backup.summary?.pomodoroDays || 0,
-                reminderPlans: backup.summary?.reminderPlans || 0,
-                entitlements: backup.summary?.entitlements || 0,
-            },
-        })),
-        crashes: crashGroups.map((crash) => ({
-            group: crash.groupKey,
-            version: String(crash.versionCode),
-            count: crash.count,
-            affected: crash.affectedUsers,
-            risk: crash.risk || "watch",
-        })),
-        stack: snapshot.observability?.cleanStack || [],
-        apiMetrics,
-        syncMetrics,
-        apiSeries: apiMetrics.map((metric) => metric.p95Ms || 0),
-        syncSeries: syncMetrics.map((metric) => metric.averagePayloadKb || 0),
-        versionAnalysis: (snapshot.observability?.versionImpacts || []).map((item) => ({
-            version: String(item.versionCode || 0),
-            manufacturer: item.manufacturer || "unknown",
-            crashes: item.crashCount || 0,
-            affected: item.affectedUsers || 0,
-            trend: item.trend || "clear",
-            risk: item.risk || "ok",
-        })),
-        templates: (snapshot.content?.templates || []).map((template) => ({
-            name: template.name,
-            tier: template.tier,
-            style: template.countdownStyle,
-            color: template.color,
-            locale: (template.locales || []).join(", "),
-            layoutJson: template.layoutJson,
-        })),
-        templateEditor: (() => {
-            const template = (snapshot.content?.templates || [])[0] || {};
-            return {
-                name: template.name || "",
-                style: template.countdownStyle || "circle",
-                layoutJson: template.layoutJson || {},
-            };
-        })(),
-        audioMatrix: (snapshot.content?.audioMatrix || []).map((item) => ({
-            label: item.label,
-            value: item.label === "Vibration"
-                ? (item.enabled ? "on" : "off")
-                : `${item.enabled ? item.volumePercent : 0}%`,
-            meta: `${item.enabled ? "enabled" : "disabled"} | ${item.meta || ""} | ${formatTime(item.sampledAt)}`,
-        })),
-        i18nJobs: (snapshot.content?.i18nJobs || []).map((item) => ({
-            locale: item.locale,
-            templateCount: item.templateCount || 0,
-            premiumCount: item.premiumCount || 0,
-            status: item.status || "ready",
-            updatedAt: formatTime(item.updatedAt),
-        })),
-        telemetry: (snapshot.content?.telemetry || []).map((item) => ({
-            label: item.label,
-            value: item.value,
-            rangeDays: item.rangeDays,
-        })),
-        releases: (snapshot.release?.releases || []).map((release) => ({
-            version: String(release.versionCode),
-            name: release.versionName,
-            sha: release.sha256,
-            rollout: release.rollout,
-            force: release.forceUpdate,
-        })),
-        rolloutPlan: (snapshot.release?.rolloutPlan || []).map((item) => ({
-            title: item.title,
-            detail: item.detail,
-            status: item.status || "info",
-        })),
-        routes: (snapshot.release?.routes || []).map((route) => ({
-            module: route.module,
-            path: route.path,
-            status: route.state,
-            p95: `${route.p95Ms || 0} ms`,
-        })),
-        allowlist: (snapshot.release?.allowlist || []).map((entry) => ({
-            origin: entry.origin,
-            protocol: entry.protocol,
-            risk: entry.risk,
-        })),
-    };
-}
-
-function formatTime(value) {
-    if (!value) return "not recorded";
-    return new Date(value).toLocaleString();
-}
-
-function drawPendingCharts() {
-  requestAnimationFrame(() => {
-    document.querySelectorAll("canvas[data-chart]").forEach((canvas) => {
-      const type = canvas.dataset.chart;
-      const series = {
-        crashes: data.crashes.map((item) => item.count),
-        api: data.apiSeries,
-        sync: data.syncSeries,
-        telemetry: data.telemetry.map((item) => item.value),
-      }[type] || [];
-      const color = type === "crashes" ? "#b42318" : type === "telemetry" ? "#2563eb" : "#0f766e";
-      drawLineChart(canvas, series, color);
-    });
-  });
-}
-
-function drawLineChart(canvas, series, color) {
-  const context = canvas.getContext("2d");
-  const width = canvas.width;
-  const height = canvas.height;
-  const padding = 24;
-  const max = Math.max(...series, 1);
-  context.clearRect(0, 0, width, height);
-  context.strokeStyle = "#d8e0e5";
-  context.lineWidth = 1;
-  for (let index = 0; index < 4; index += 1) {
-    const y = padding + ((height - padding * 2) / 3) * index;
-    context.beginPath();
-    context.moveTo(padding, y);
-    context.lineTo(width - padding, y);
-    context.stroke();
-  }
-  context.strokeStyle = color;
-  context.lineWidth = 3;
-  context.beginPath();
-  series.forEach((value, index) => {
-    const point = chartPoint(value, index, series.length, max, width, height, padding);
-    if (index === 0) context.moveTo(point.x, point.y);
-    else context.lineTo(point.x, point.y);
-  });
-  context.stroke();
-  context.fillStyle = color;
-  series.forEach((value, index) => {
-    const point = chartPoint(value, index, series.length, max, width, height, padding);
-    context.beginPath();
-    context.arc(point.x, point.y, 4, 0, Math.PI * 2);
-    context.fill();
-  });
-}
-
-function chartPoint(value, index, count, max, width, height, padding) {
   return {
-    x: padding + ((width - padding * 2) / Math.max(count - 1, 1)) * index,
-    y: height - padding - (value / max) * (height - padding * 2),
+    id: existing.id || `admin-template-${Date.now()}`,
+    name,
+    tier,
+    countdownStyle: style,
+    color: normalizedColor,
+    locales,
+    layoutJson: {
+      ...(existing.layoutJson || {}),
+      titleText,
+      subtitleText,
+      countdownStyle: style,
+      showSkipButton,
+    },
   };
 }
 
-function authHeaders() {
-  return state.token ? { Authorization: `Bearer ${state.token}` } : {};
+function buildAllowlistPayload(data) {
+  const existing = data.allowlist?.[0] || {};
+  const origin = readField("allowlistOriginInput") || existing.origin || "";
+  const protocol = readField("allowlistProtocolInput") || existing.protocol || "https";
+  const risk = readField("allowlistRiskInput") || existing.risk || "required";
+  return origin ? { origin, protocol, risk } : null;
 }
 
-function isSecureAdminOrigin() {
-  return window.location.protocol === "https:" || LOCAL_HOSTS.has(window.location.hostname);
+function parseLocaleList(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
-function avg(values) {
-  return values.reduce((sum, value) => sum + value, 0) / Math.max(values.length, 1);
-}
-
-function fieldValue(id) {
+function readField(id) {
   return document.getElementById(id)?.value?.trim() || "";
 }
 
-function byId(id) {
-  return document.getElementById(id);
-}
-
-async function copyText(text) {
+async function copyText(text, notify) {
   try {
     await navigator.clipboard.writeText(text);
-    toast("Copied.");
+    notify("Copied.", "ok");
   } catch {
-    toast("Clipboard unavailable.");
+    notify("Clipboard unavailable.", "risk");
   }
 }
 
-function toast(message) {
-  const existing = document.querySelector(".toast");
-  if (existing) existing.remove();
-  const node = document.createElement("div");
-  node.className = "toast";
-  node.textContent = message;
-  Object.assign(node.style, {
-    position: "fixed",
-    right: "20px",
-    bottom: "20px",
-    zIndex: "20",
-    padding: "10px 12px",
-    border: "1px solid #b8c6cf",
-    borderRadius: "8px",
-    background: "#ffffff",
-    boxShadow: "0 10px 24px rgba(32,45,55,0.12)",
-    color: "#16212a",
-    fontWeight: "700",
-  });
-  document.body.appendChild(node);
-  setTimeout(() => node.remove(), 2400);
-}
+const rootElement = document.getElementById("root");
+createRoot(rootElement).render(html`<${AdminDashboardApp} />`);

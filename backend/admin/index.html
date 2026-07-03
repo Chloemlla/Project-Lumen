@@ -5,128 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>Project Lumen Admin</title>
+  <link rel="preconnect" href="https://esm.sh">
   <link rel="stylesheet" href="./assets/styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@19.1.0",
+        "react-dom/client": "https://esm.sh/react-dom@19.1.0/client",
+        "htm": "https://esm.sh/htm@3.1.1",
+        "lucide-react": "https://esm.sh/lucide-react@0.468.0?external=react"
+      }
+    }
+  </script>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar" aria-label="Admin sections">
-      <div class="brand-block">
-        <div class="brand-mark">PL</div>
-        <div>
-          <div class="brand-name">Project Lumen</div>
-          <div class="brand-subtitle">Admin Dashboard</div>
-        </div>
-      </div>
-
-      <nav class="nav-list" id="sectionNav"></nav>
-
-      <div class="runtime-box">
-        <div class="runtime-label">API base</div>
-        <code id="apiBaseLabel">/api</code>
-        <div class="runtime-status" id="transportStatus">Checking transport</div>
-      </div>
-    </aside>
-
-    <main class="workspace">
-      <header class="topbar">
-        <div>
-          <h1 id="sectionTitle">Operations Overview</h1>
-          <p id="sectionSubtitle">Users, observability, content, release, and security operations.</p>
-        </div>
-        <div class="topbar-actions">
-          <label class="token-field">
-            <span>Username</span>
-            <input id="adminUsernameInput" type="text" autocomplete="username" placeholder="admin">
-          </label>
-          <label class="token-field">
-            <span>Password</span>
-            <input id="adminPasswordInput" type="password" autocomplete="current-password" placeholder="Password">
-          </label>
-          <button class="button" id="loginButton" type="button">Login</button>
-          <label class="token-field">
-            <span>Admin token</span>
-            <input id="adminTokenInput" type="password" autocomplete="off" placeholder="Bearer token">
-          </label>
-          <button class="button secondary" id="saveTokenButton" type="button">Save</button>
-          <button class="button secondary" id="refreshSessionButton" type="button">Refresh token</button>
-          <button class="button" id="refreshButton" type="button">Refresh</button>
-        </div>
-      </header>
-
-      <section class="security-banner" id="securityBanner" hidden>
-        <div>
-          <strong>HTTPS required for admin operations.</strong>
-          <span>This dashboard disables sensitive actions on non-local HTTP origins.</span>
-        </div>
-        <button class="button danger" id="copySecurityNoteButton" type="button">Copy note</button>
-      </section>
-
-      <section class="status-grid" aria-label="Service summary">
-        <article class="metric-card">
-          <span class="metric-label">API health</span>
-          <strong id="healthValue">Unknown</strong>
-          <small id="healthDetail">No probe yet</small>
-        </article>
-        <article class="metric-card">
-          <span class="metric-label">Crash groups</span>
-          <strong id="crashMetric">0</strong>
-          <small>Grouped by exception and frame</small>
-        </article>
-        <article class="metric-card">
-          <span class="metric-label">Sync throughput</span>
-          <strong id="syncMetric">0 KB/s</strong>
-          <small>changes/push aggregate</small>
-        </article>
-        <article class="metric-card">
-          <span class="metric-label">Release policy</span>
-          <strong id="releaseMetric">Review</strong>
-          <small>Integrity and rollout state</small>
-        </article>
-      </section>
-
-      <section class="controls-strip">
-        <label class="search-field">
-          <span>Search modules</span>
-          <input id="moduleSearch" type="search" placeholder="Search users, crashes, templates, releases">
-        </label>
-        <label class="select-field">
-          <span>Environment</span>
-          <select id="environmentSelect">
-            <option value="production">Production</option>
-            <option value="staging">Staging</option>
-            <option value="local">Local</option>
-          </select>
-        </label>
-        <label class="select-field">
-          <span>Range</span>
-          <select id="rangeSelect">
-            <option value="7">Last 7 days</option>
-            <option value="30" selected>Last 30 days</option>
-            <option value="90">Last 90 days</option>
-          </select>
-        </label>
-      </section>
-
-      <section class="module-grid" id="moduleGrid" aria-live="polite"></section>
-    </main>
-  </div>
-
-  <template id="moduleTemplate">
-    <article class="module-card">
-      <div class="module-header">
-        <div>
-          <div class="module-kicker"></div>
-          <h2></h2>
-        </div>
-        <span class="status-pill"></span>
-      </div>
-      <div class="module-body"></div>
-      <div class="module-actions"></div>
-    </article>
-  </template>
-
-  <script src="./assets/data.js"></script>
-  <script src="./assets/modules.js"></script>
-  <script src="./assets/app.js"></script>
+  <div id="root"></div>
+  <noscript>
+    <div class="noscript-shell">JavaScript is required to run the Project Lumen admin dashboard.</div>
+  </noscript>
+  <script type="module" src="./assets/app.js"></script>
 </body>
 </html>

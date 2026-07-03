@@ -1,8 +1,8 @@
-window.LumenAdminData = {};
-
-Object.assign(window.LumenAdminData, {
+export const fallbackDashboardData = {
+  users: [],
   profile: {
-    email: "No users yet",
+    id: "",
+    email: "No users loaded",
     registeredAt: "not recorded",
     lastSyncAt: "not recorded",
     planTier: "not recorded",
@@ -12,14 +12,17 @@ Object.assign(window.LumenAdminData, {
   devices: [],
   accessAudit: [],
   purchaseAudit: [],
+  entitlements: [],
   backups: [],
   crashes: [],
   stack: [],
+  apiMetrics: [],
+  syncMetrics: [],
   apiSeries: [],
   syncSeries: [],
   versionAnalysis: [],
   templates: [],
-  templateEditor: { name: "", style: "circle", layoutJson: {} },
+  templateEditor: { name: "", style: "circle", color: "", tier: "PRO", layoutJson: {} },
   audioMatrix: [],
   i18nJobs: [],
   telemetry: [],
@@ -27,9 +30,9 @@ Object.assign(window.LumenAdminData, {
   rolloutPlan: [],
   routes: [],
   allowlist: [],
-});
+};
 
-window.LumenAdminSections = [
+export const adminSections = [
   {
     id: "users",
     title: "Users & Entitlements",
