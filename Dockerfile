@@ -15,6 +15,7 @@ COPY backend/admin/index.html ./
 COPY backend/admin/src ./src
 RUN npm install
 RUN npm run build
+RUN test -f dist/index.html
 
 FROM debian:bookworm-slim
 

@@ -83,9 +83,10 @@ developer machines when repository policy forbids local build/test execution.
 
 ### 6. Tests Required
 
-- GitHub workflow: `backend/admin` must run `npm install` and `npm run build`.
-- Docker workflow: image build must run the same admin build before copying
-  `dist/`.
+- GitHub workflow: `backend/admin` must run `npm install`, `npm run build`,
+  and upload the `backend/admin/dist/**` artifact.
+- Docker workflow: image build must run the same admin build, verify
+  `dist/index.html` exists, and copy `dist/`.
 - Manual review: verify sensitive actions are disabled on non-local HTTP and
   enabled on HTTPS/localhost.
 

@@ -290,6 +290,14 @@ jobs:
           npm install
           npm run build
 
+      - name: Upload admin dashboard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-lumen-admin-dashboard
+          path: backend/admin/dist/**
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Show Rust toolchain
         run: |
           rustc --version

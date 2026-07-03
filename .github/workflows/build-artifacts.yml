@@ -27,6 +27,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build admin dashboard artifact
+        working-directory: backend/admin
+        run: |
+          npm install
+          npm run build
+
+      - name: Upload admin dashboard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-lumen-admin-dashboard
+          path: backend/admin/dist/**
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
