@@ -11,6 +11,8 @@ data class RemoteTelemetryUpload(
     val aiPerformance: AiPerformanceTelemetry?,
     val developerDebug: DeveloperDebugTelemetry?,
     val deviceDiagnostics: DeviceDiagnosticsTelemetry?,
+    val pomodoroProductivity: PomodoroProductivityTelemetry?,
+    val userConfiguration: UserConfigurationTelemetry?,
 )
 
 data class DailyEyeHealthTelemetry(
@@ -21,9 +23,19 @@ data class DailyEyeHealthTelemetry(
     val maxContinuousWorkSeconds: Long,
     val distanceViolationCount: Int,
     val distanceCloseSeconds: Long,
+    val lowLightWarningCount: Int,
     val distanceViolations: List<DistanceViolationTelemetry>,
     val blinkMetrics: BlinkMetricsTelemetry,
     val restCompliance: RestComplianceTelemetry,
+)
+
+data class PomodoroProductivityTelemetry(
+    val statDate: String,
+    val completedTomatoCount: Int,
+    val restartCount: Int,
+    val completedFocusSessions: Int,
+    val totalFocusSeconds: Long,
+    val totalBreakSeconds: Long,
 )
 
 data class DistanceViolationTelemetry(
@@ -97,6 +109,20 @@ data class AiPerformanceTelemetry(
 data class DeveloperDebugTelemetry(
     val sensorDisturbance: SensorDisturbanceTelemetry?,
     val crashLogs: List<CrashLogTelemetry>,
+    val apiTraces: List<ApiTraceTelemetry>,
+)
+
+data class ApiTraceTelemetry(
+    val startedAt: Long,
+    val method: String,
+    val path: String,
+    val signed: Boolean,
+    val integrityRequested: Boolean,
+    val authorizationAttached: Boolean,
+    val statusCode: Int?,
+    val durationMillis: Long,
+    val errorType: String,
+    val errorMessage: String,
 )
 
 data class SensorDisturbanceTelemetry(
@@ -111,6 +137,59 @@ data class CrashLogTelemetry(
     val exceptionType: String,
     val rootCause: String,
     val stackTraceLines: List<String>,
+)
+
+data class UserConfigurationTelemetry(
+    val dailyGoal: DailyGoalTelemetry?,
+    val audioFeedback: AudioFeedbackTelemetry?,
+    val reminderPlans: List<ReminderPlanTelemetry>,
+    val tipTemplates: List<TipTemplateTelemetry>,
+)
+
+data class AudioFeedbackTelemetry(
+    val soundEnabled: Boolean,
+    val vibrationEnabled: Boolean,
+    val preAlertSoundEnabled: Boolean,
+    val restStartSoundEnabled: Boolean,
+    val pomodoroWorkStartSoundEnabled: Boolean,
+    val pomodoroWorkEndSoundEnabled: Boolean,
+    val preAlertVolumePercent: Int,
+    val restStartVolumePercent: Int,
+    val restEndVolumePercent: Int,
+    val pomodoroWorkStartVolumePercent: Int,
+    val pomodoroWorkEndVolumePercent: Int,
+)
+
+data class DailyGoalTelemetry(
+    val restBreakGoal: Int,
+    val maxContinuousWorkMinutes: Int,
+    val pomodoroGoal: Int,
+    val weeklyActiveDaysGoal: Int,
+    val updatedAt: Long,
+)
+
+data class ReminderPlanTelemetry(
+    val id: Long,
+    val enabled: Boolean,
+    val warnIntervalMinutes: Int,
+    val restDurationSeconds: Int,
+    val quietHoursEnabled: Boolean,
+    val quietMode: String,
+    val sortOrder: Int,
+    val updatedAt: Long,
+)
+
+data class TipTemplateTelemetry(
+    val id: Long,
+    val isBuiltin: Boolean,
+    val backgroundType: String,
+    val hasImage: Boolean,
+    val showSkipButton: Boolean,
+    val isPremium: Boolean,
+    val hasRemoteId: Boolean,
+    val countdownStyle: String,
+    val sortOrder: Int,
+    val updatedAt: Long,
 )
 
 data class RemoteTelemetryUploadResult(

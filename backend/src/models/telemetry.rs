@@ -15,6 +15,8 @@ pub struct TelemetryUploadRequest {
     pub ai_performance: Option<AiPerformanceTelemetry>,
     pub developer_debug: Option<DeveloperDebugTelemetry>,
     pub device_diagnostics: Option<DeviceDiagnosticsTelemetry>,
+    pub pomodoro_productivity: Option<PomodoroProductivityTelemetry>,
+    pub user_configuration: Option<UserConfigurationTelemetry>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -28,9 +30,22 @@ pub struct DailyEyeHealthTelemetry {
     pub distance_violation_count: i32,
     pub distance_close_seconds: i64,
     #[serde(default)]
+    pub low_light_warning_count: i32,
+    #[serde(default)]
     pub distance_violations: Vec<DistanceViolationTelemetry>,
     pub blink_metrics: BlinkMetricsTelemetry,
     pub rest_compliance: RestComplianceTelemetry,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PomodoroProductivityTelemetry {
+    pub stat_date: String,
+    pub completed_tomato_count: i32,
+    pub restart_count: i32,
+    pub completed_focus_sessions: i32,
+    pub total_focus_seconds: i64,
+    pub total_break_seconds: i64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -126,6 +141,23 @@ pub struct DeveloperDebugTelemetry {
     pub sensor_disturbance: Option<SensorDisturbanceTelemetry>,
     #[serde(default)]
     pub crash_logs: Vec<CrashLogTelemetry>,
+    #[serde(default)]
+    pub api_traces: Vec<ApiTraceTelemetry>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiTraceTelemetry {
+    pub started_at: i64,
+    pub method: String,
+    pub path: String,
+    pub signed: bool,
+    pub integrity_requested: bool,
+    pub authorization_attached: bool,
+    pub status_code: Option<i32>,
+    pub duration_millis: i64,
+    pub error_type: String,
+    pub error_message: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -145,6 +177,71 @@ pub struct CrashLogTelemetry {
     pub root_cause: String,
     #[serde(default)]
     pub stack_trace_lines: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserConfigurationTelemetry {
+    pub daily_goal: Option<DailyGoalTelemetry>,
+    pub audio_feedback: Option<AudioFeedbackTelemetry>,
+    #[serde(default)]
+    pub reminder_plans: Vec<ReminderPlanTelemetry>,
+    #[serde(default)]
+    pub tip_templates: Vec<TipTemplateTelemetry>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioFeedbackTelemetry {
+    pub sound_enabled: bool,
+    pub vibration_enabled: bool,
+    pub pre_alert_sound_enabled: bool,
+    pub rest_start_sound_enabled: bool,
+    pub pomodoro_work_start_sound_enabled: bool,
+    pub pomodoro_work_end_sound_enabled: bool,
+    pub pre_alert_volume_percent: i32,
+    pub rest_start_volume_percent: i32,
+    pub rest_end_volume_percent: i32,
+    pub pomodoro_work_start_volume_percent: i32,
+    pub pomodoro_work_end_volume_percent: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailyGoalTelemetry {
+    pub rest_break_goal: i32,
+    pub max_continuous_work_minutes: i32,
+    pub pomodoro_goal: i32,
+    pub weekly_active_days_goal: i32,
+    pub updated_at: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReminderPlanTelemetry {
+    pub id: i64,
+    pub enabled: bool,
+    pub warn_interval_minutes: i32,
+    pub rest_duration_seconds: i32,
+    pub quiet_hours_enabled: bool,
+    pub quiet_mode: String,
+    pub sort_order: i32,
+    pub updated_at: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TipTemplateTelemetry {
+    pub id: i64,
+    pub is_builtin: bool,
+    pub background_type: String,
+    pub has_image: bool,
+    pub show_skip_button: bool,
+    pub is_premium: bool,
+    pub has_remote_id: bool,
+    pub countdown_style: String,
+    pub sort_order: i32,
+    pub updated_at: i64,
 }
 
 #[derive(Serialize)]

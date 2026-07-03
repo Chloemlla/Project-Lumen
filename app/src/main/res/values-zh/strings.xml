@@ -182,9 +182,10 @@
     <string name="shizuku_group_sampling_guards">采样守卫</string>
     <string name="shizuku_group_diagnostics">诊断上传</string>
     <string name="enable_diagnostic_telemetry_upload">允许诊断上传</string>
-    <string name="diagnostic_telemetry_upload_summary">仅在此开关开启时，向 Project Lumen 后端上传已签名诊断信息。设备画像会被包含；崩溃报告和用户应用清单需要分别开启。</string>
+    <string name="diagnostic_telemetry_upload_summary">仅在此开关开启时，向 Project Lumen 后端上传已签名诊断信息。设备画像会被包含；崩溃报告、人脸帧和用户应用清单需要分别开启。</string>
     <string name="upload_diagnostics_now">立即上传诊断</string>
     <string name="enable_diagnostic_crash_upload">附带脱敏崩溃报告</string>
+    <string name="enable_diagnostic_face_analysis_upload">附带人脸分析帧</string>
     <string name="enable_shizuku_app_inventory_upload">附带 Shizuku 用户应用清单</string>
     <string name="shizuku_app_inventory_authorization_needed">应用清单需要 Shizuku 正在运行且已授权。</string>
     <string name="diagnostic_security_policy">安全策略：请求会签名并鉴权，后端会限流，超大的诊断负载会被拒绝。</string>
@@ -624,9 +625,8 @@
     <string name="eye_care_growth_cloud_sync">云同步与云备份</string>
     <string name="eye_care_growth_family_mode">家庭与儿童护眼模式</string>
     <string name="eye_care_growth_ai_guidance">AI 个性化建议</string>
-    <string name="eye_care_growth_status_detail">这些是从现有客户端能力延展出的产品方向。云端、家庭和 AI 流程在账号与后端 UI 完整前标记为规划中。</string>
+    <string name="eye_care_growth_status_detail">这些产品方向已连接到现有客户端操作，并在账号、云端、家庭与建议数据可用时显示后端状态。</string>
     <string name="eye_care_capability_active">已启用</string>
-    <string name="eye_care_capability_planned">规划中</string>
     <string name="eye_care_guide_title">护眼新手引导</string>
     <string name="eye_care_guide_message">按这个清单把现有防护能力串成每天可运行的护眼闭环。</string>
     <string name="eye_care_guide_step_recommended">应用基础防护方案</string>
@@ -657,6 +657,8 @@
     <string name="remote_cloud_latest_backup">最近备份</string>
     <string name="remote_cloud_email">邮箱</string>
     <string name="remote_cloud_code">验证码</string>
+    <string name="remote_cloud_product_id">商品 ID</string>
+    <string name="remote_cloud_purchase_token">购买令牌</string>
     <string name="remote_cloud_dev_code">开发验证码：%1$s</string>
     <string name="remote_cloud_request_code">获取验证码</string>
     <string name="remote_cloud_verify_code">验证登录</string>
@@ -666,4 +668,5 @@
     <string name="remote_cloud_sync_now">立即同步</string>
     <string name="remote_cloud_upload_backup">上传备份</string>
     <string name="remote_cloud_restore_backup">恢复备份</string>
+    <string name="remote_cloud_verify_purchase">校验购买</string>
 </resources>

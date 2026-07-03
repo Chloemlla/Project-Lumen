@@ -234,8 +234,8 @@ fn feature_flag_payload(updated_at: i64) -> Vec<Value> {
         }),
         json!({
             "key": "face_analysis_upload",
-            "enabled": false,
-            "payload": { "status": "planned", "requiresExplicitConsent": true },
+            "enabled": true,
+            "payload": { "status": "active", "endpoint": "/v1/face-analysis/frames", "requiresExplicitConsent": true },
             "updatedAt": updated_at,
             "version": CONFIG_STATIC_CURSOR
         }),

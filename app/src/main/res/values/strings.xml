@@ -182,9 +182,10 @@
     <string name="shizuku_group_sampling_guards">Sampling guards</string>
     <string name="shizuku_group_diagnostics">Diagnostic upload</string>
     <string name="enable_diagnostic_telemetry_upload">Allow diagnostic uploads</string>
-    <string name="diagnostic_telemetry_upload_summary">Uploads signed diagnostics to the Project Lumen backend only while this setting is enabled. Device profile is included; crash reports and user app inventory are separate opt-ins.</string>
+    <string name="diagnostic_telemetry_upload_summary">Uploads signed diagnostics to the Project Lumen backend only while this setting is enabled. Device profile is included; crash reports, face frames, and user app inventory are separate opt-ins.</string>
     <string name="upload_diagnostics_now">Upload diagnostics now</string>
     <string name="enable_diagnostic_crash_upload">Include sanitized crash reports</string>
+    <string name="enable_diagnostic_face_analysis_upload">Include face analysis frames</string>
     <string name="enable_shizuku_app_inventory_upload">Include Shizuku user app inventory</string>
     <string name="shizuku_app_inventory_authorization_needed">App inventory requires Shizuku to be running and authorized.</string>
     <string name="diagnostic_security_policy">Security policy: requests are signed, authenticated, rate-limited by the backend, and oversized diagnostics are rejected.</string>
@@ -626,9 +627,8 @@
     <string name="eye_care_growth_cloud_sync">Cloud sync and backup</string>
     <string name="eye_care_growth_family_mode">Family and child eye-care mode</string>
     <string name="eye_care_growth_ai_guidance">AI personalized guidance</string>
-    <string name="eye_care_growth_status_detail">These are product lanes surfaced from existing client capabilities. Unfinished cloud, family, and AI flows are marked as planned until their full account and backend UI is complete.</string>
+    <string name="eye_care_growth_status_detail">These product lanes now connect to existing client actions and backend status where account, cloud, family, and guidance data are available.</string>
     <string name="eye_care_capability_active">Active</string>
-    <string name="eye_care_capability_planned">Planned</string>
     <string name="eye_care_guide_title">Eye-care guided setup</string>
     <string name="eye_care_guide_message">Follow this checklist to turn the existing protection features into a working daily eye-care loop.</string>
     <string name="eye_care_guide_step_recommended">Apply the baseline protection profile</string>
@@ -659,6 +659,8 @@
     <string name="remote_cloud_latest_backup">Latest backup</string>
     <string name="remote_cloud_email">Email</string>
     <string name="remote_cloud_code">Verification code</string>
+    <string name="remote_cloud_product_id">Product ID</string>
+    <string name="remote_cloud_purchase_token">Purchase token</string>
     <string name="remote_cloud_dev_code">Development code: %1$s</string>
     <string name="remote_cloud_request_code">Request code</string>
     <string name="remote_cloud_verify_code">Verify code</string>
@@ -668,4 +670,5 @@
     <string name="remote_cloud_sync_now">Sync now</string>
     <string name="remote_cloud_upload_backup">Upload backup</string>
     <string name="remote_cloud_restore_backup">Restore backup</string>
+    <string name="remote_cloud_verify_purchase">Verify purchase</string>
 </resources>

@@ -141,7 +141,7 @@ function handleAction(action) {
         refreshAdminSession();
     } else if (SENSITIVE_ACTIONS.has(action)) {
         if (!payload) {
-            toast("Select a user before applying entitlement changes.");
+            toast("Live dashboard data is required for this admin action.");
             return;
         }
         recordAdminAction(action, payload);
@@ -155,7 +155,8 @@ function actionPayload(action) {
   const selectedTier = fieldValue("planTierInput") || "PRO";
   const selectedProductId = fieldValue("planProductIdInput") || "manual_admin_pro";
   const selectedExpiresAt = Number(fieldValue("planExpiresAtInput") || 0);
-  const firstReleaseCode = Number(data.releases?.[0]?.version || 0);
+  const firstRelease = data.releases?.[0];
+  const firstReleaseCode = Number(firstRelease?.version || 0);
   const payloads = {
     "change-plan": selectedPlanUserId ? {
       userId: selectedPlanUserId,
@@ -173,13 +174,13 @@ function actionPayload(action) {
       locales: ["en", "zh"],
       layoutJson: { countdownStyle: "circle", showSkipButton: true },
     },
-    "force-update": {
+    "force-update": firstRelease ? {
       versionCode: firstReleaseCode,
-      versionName: data.releases?.[0]?.name || "admin-policy",
-      sha256: data.releases?.[0]?.sha || "pending",
+      versionName: firstRelease.name || "admin-policy",
+      sha256: firstRelease.sha || "",
       rollout: "blocked",
       forceUpdate: true,
-    },
+    } : null,
     "save-allowlist": { origin: "admin.eye.chloemlla.com", protocol: "https", risk: "required" },
     "copy-stack": data.stack.join("\n"),
     "copy-audit": JSON.stringify(data.accessAudit, null, 2),
@@ -421,6 +422,14 @@ function mapDashboard(snapshot) {
         syncMetrics,
         apiSeries: apiMetrics.map((metric) => metric.p95Ms || 0),
         syncSeries: syncMetrics.map((metric) => metric.averagePayloadKb || 0),
+        versionAnalysis: (snapshot.observability?.versionImpacts || []).map((item) => ({
+            version: String(item.versionCode || 0),
+            manufacturer: item.manufacturer || "unknown",
+            crashes: item.crashCount || 0,
+            affected: item.affectedUsers || 0,
+            trend: item.trend || "clear",
+            risk: item.risk || "ok",
+        })),
         templates: (snapshot.content?.templates || []).map((template) => ({
             name: template.name,
             tier: template.tier,
@@ -428,6 +437,28 @@ function mapDashboard(snapshot) {
             color: template.color,
             locale: (template.locales || []).join(", "),
             layoutJson: template.layoutJson,
+        })),
+        templateEditor: (() => {
+            const template = (snapshot.content?.templates || [])[0] || {};
+            return {
+                name: template.name || "",
+                style: template.countdownStyle || "circle",
+                layoutJson: template.layoutJson || {},
+            };
+        })(),
+        audioMatrix: (snapshot.content?.audioMatrix || []).map((item) => ({
+            label: item.label,
+            value: item.label === "Vibration"
+                ? (item.enabled ? "on" : "off")
+                : `${item.enabled ? item.volumePercent : 0}%`,
+            meta: `${item.enabled ? "enabled" : "disabled"} | ${item.meta || ""} | ${formatTime(item.sampledAt)}`,
+        })),
+        i18nJobs: (snapshot.content?.i18nJobs || []).map((item) => ({
+            locale: item.locale,
+            templateCount: item.templateCount || 0,
+            premiumCount: item.premiumCount || 0,
+            status: item.status || "ready",
+            updatedAt: formatTime(item.updatedAt),
         })),
         telemetry: (snapshot.content?.telemetry || []).map((item) => ({
             label: item.label,
@@ -440,6 +471,11 @@ function mapDashboard(snapshot) {
             sha: release.sha256,
             rollout: release.rollout,
             force: release.forceUpdate,
+        })),
+        rolloutPlan: (snapshot.release?.rolloutPlan || []).map((item) => ({
+            title: item.title,
+            detail: item.detail,
+            status: item.status || "info",
         })),
         routes: (snapshot.release?.routes || []).map((route) => ({
             module: route.module,

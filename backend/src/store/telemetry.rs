@@ -158,6 +158,12 @@ fn sanitize_telemetry_upload(request: &mut TelemetryUploadRequest) {
             .distance_violations
             .truncate(MAX_DISTANCE_VIOLATIONS);
     }
+    if let Some(pomodoro_productivity) = &mut request.pomodoro_productivity {
+        truncate_string(
+            &mut pomodoro_productivity.stat_date,
+            MAX_SHORT_TEXT_LENGTH,
+        );
+    }
     if let Some(developer_debug) = &mut request.developer_debug {
         developer_debug.crash_logs.truncate(MAX_CRASH_LOGS);
         for crash_log in &mut developer_debug.crash_logs {
@@ -167,6 +173,14 @@ fn sanitize_telemetry_upload(request: &mut TelemetryUploadRequest) {
             for line in &mut crash_log.stack_trace_lines {
                 truncate_string(line, MAX_CRASH_LINE_LENGTH);
             }
+        }
+        developer_debug.api_traces.truncate(MAX_API_TRACES);
+        for trace in &mut developer_debug.api_traces {
+            truncate_string(&mut trace.method, MAX_API_METHOD_LENGTH);
+            truncate_string(&mut trace.path, MAX_API_PATH_LENGTH);
+            truncate_string(&mut trace.error_type, MAX_CRASH_FIELD_LENGTH);
+            truncate_string(&mut trace.error_message, MAX_CRASH_LINE_LENGTH);
+            trace.duration_millis = trace.duration_millis.max(0);
         }
     }
     if let Some(device_diagnostics) = &mut request.device_diagnostics {
@@ -200,6 +214,38 @@ fn sanitize_telemetry_upload(request: &mut TelemetryUploadRequest) {
             }
             app.version_code = app.version_code.map(|value| value.max(0));
             app.uid = app.uid.map(|value| value.max(0));
+        }
+    }
+    if let Some(user_configuration) = &mut request.user_configuration {
+        user_configuration
+            .reminder_plans
+            .truncate(MAX_CONFIGURATION_ITEMS);
+        for plan in &mut user_configuration.reminder_plans {
+            truncate_string(&mut plan.quiet_mode, MAX_SHORT_TEXT_LENGTH);
+            plan.warn_interval_minutes = plan.warn_interval_minutes.max(0);
+            plan.rest_duration_seconds = plan.rest_duration_seconds.max(0);
+        }
+        user_configuration
+            .tip_templates
+            .truncate(MAX_CONFIGURATION_ITEMS);
+        for template in &mut user_configuration.tip_templates {
+            truncate_string(&mut template.background_type, MAX_SHORT_TEXT_LENGTH);
+            truncate_string(&mut template.countdown_style, MAX_SHORT_TEXT_LENGTH);
+        }
+        if let Some(goal) = &mut user_configuration.daily_goal {
+            goal.rest_break_goal = goal.rest_break_goal.max(0);
+            goal.max_continuous_work_minutes = goal.max_continuous_work_minutes.max(0);
+            goal.pomodoro_goal = goal.pomodoro_goal.max(0);
+            goal.weekly_active_days_goal = goal.weekly_active_days_goal.max(0);
+        }
+        if let Some(audio) = &mut user_configuration.audio_feedback {
+            audio.pre_alert_volume_percent = audio.pre_alert_volume_percent.clamp(0, 100);
+            audio.rest_start_volume_percent = audio.rest_start_volume_percent.clamp(0, 100);
+            audio.rest_end_volume_percent = audio.rest_end_volume_percent.clamp(0, 100);
+            audio.pomodoro_work_start_volume_percent =
+                audio.pomodoro_work_start_volume_percent.clamp(0, 100);
+            audio.pomodoro_work_end_volume_percent =
+                audio.pomodoro_work_end_volume_percent.clamp(0, 100);
         }
     }
 }
@@ -269,8 +315,12 @@ const MAX_CRASH_LOGS: usize = 4;
 const MAX_CRASH_STACK_LINES: usize = 64;
 const MAX_CRASH_LINE_LENGTH: usize = 500;
 const MAX_CRASH_FIELD_LENGTH: usize = 240;
+const MAX_API_TRACES: usize = 12;
+const MAX_API_METHOD_LENGTH: usize = 12;
+const MAX_API_PATH_LENGTH: usize = 240;
 const MAX_PACKAGE_FIELD_LENGTH: usize = 160;
 const MAX_DIAGNOSTIC_USER_APPS: usize = 150;
+const MAX_CONFIGURATION_ITEMS: usize = 24;
 const TELEMETRY_RATE_LIMIT_WINDOW_MILLIS: i64 = 60 * 60 * 1_000;
 const TELEMETRY_UPLOADS_PER_HOUR_LIMIT: u64 = 60;
 const TELEMETRY_DEBUG_LATEST_LIMIT: i64 = 20;

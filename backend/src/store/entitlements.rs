@@ -60,7 +60,7 @@ impl AppStore {
         let entitlement_tier = tier_for_product(&request.product_id);
         let raw_payload_json = json!({
             "deviceInstallationId": request.device_installation_id.unwrap_or_default(),
-            "verificationMode": if accept_unverified { "unverified_accepted" } else { "pending_server_verification" }
+            "verificationMode": if accept_unverified { "unverified_accepted" } else { "google_play_verification_not_configured" }
         })
         .to_string();
 

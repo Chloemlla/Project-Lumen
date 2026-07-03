@@ -7,9 +7,12 @@ import android.hardware.camera2.CameraManager
 import android.os.Build
 import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.core.api.AiPerformanceTelemetry
+import com.projectlumen.app.core.api.ApiTraceTelemetry
+import com.projectlumen.app.core.api.AudioFeedbackTelemetry
 import com.projectlumen.app.core.api.BlinkMetricsTelemetry
 import com.projectlumen.app.core.api.CalibrationAnchorTelemetry
 import com.projectlumen.app.core.api.CrashLogTelemetry
+import com.projectlumen.app.core.api.DailyGoalTelemetry
 import com.projectlumen.app.core.api.DailyEyeHealthTelemetry
 import com.projectlumen.app.core.api.DeviceDiagnosticsTelemetry
 import com.projectlumen.app.core.api.DeviceProfileTelemetry
@@ -17,18 +20,30 @@ import com.projectlumen.app.core.api.DeveloperDebugTelemetry
 import com.projectlumen.app.core.api.DistanceViolationTelemetry
 import com.projectlumen.app.core.api.EnvironmentContextTelemetry
 import com.projectlumen.app.core.api.InstalledAppTelemetry
+import com.projectlumen.app.core.api.PomodoroProductivityTelemetry
 import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.api.ProjectLumenApiConfig
+import com.projectlumen.app.core.api.ProjectLumenApiDiagnostics
+import com.projectlumen.app.core.api.ProjectLumenApiTrace
+import com.projectlumen.app.core.api.RemoteFaceAnalysisFrameUpload
+import com.projectlumen.app.core.api.RemoteFaceAnalysisFrameUploadResult
 import com.projectlumen.app.core.api.RemoteTelemetryUpload
 import com.projectlumen.app.core.api.RemoteTelemetryUploadResult
+import com.projectlumen.app.core.api.ReminderPlanTelemetry
 import com.projectlumen.app.core.api.RestComplianceTelemetry
 import com.projectlumen.app.core.api.SensorDisturbanceTelemetry
+import com.projectlumen.app.core.api.TipTemplateTelemetry
+import com.projectlumen.app.core.api.UserConfigurationTelemetry
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
+import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
+import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
+import com.projectlumen.app.core.database.entities.ReminderPlanEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.repositories.RuntimeRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
@@ -88,6 +103,15 @@ class EyeCareTelemetryReporter(
         }.getOrNull()
     }
 
+    suspend fun uploadFaceAnalysisFrame(
+        upload: RemoteFaceAnalysisFrameUpload,
+    ): RemoteFaceAnalysisFrameUploadResult? {
+        return runCatching {
+            val accessToken = accessTokenProvider()?.trim()?.takeIf { it.isNotBlank() } ?: return null
+            apiClient.uploadFaceAnalysisFrame(accessToken, upload)
+        }.getOrNull()
+    }
+
     private suspend fun uploadCurrentSnapshotUnchecked(
         distanceViolation: DistanceViolationTelemetry? = null,
         averageBlinksPerMinute: Double? = null,
@@ -105,6 +129,26 @@ class EyeCareTelemetryReporter(
         } else {
             null
         }
+        val pomodoroStats = if (settings.statsEnabled) {
+            database.dailyPomodoroStatsDao().get(todayKey(nowMillis))
+        } else {
+            null
+        }
+        val dailyGoal = if (settings.statsEnabled) {
+            database.dailyGoalsDao().get() ?: DailyGoalEntity()
+        } else {
+            null
+        }
+        val reminderPlans = if (settings.diagnosticTelemetryUploadEnabled) {
+            database.reminderPlansDao().getActive()
+        } else {
+            emptyList()
+        }
+        val tipTemplates = if (settings.diagnosticTelemetryUploadEnabled) {
+            database.tipTemplatesDao().getAllIncludingDeleted()
+        } else {
+            emptyList()
+        }
         val upload = RemoteTelemetryUpload(
             deviceInstallationId = settings.deviceInstallationId,
             sourceApp = sanitizeLumenOpenSourceApp(sourceApp),
@@ -120,6 +164,8 @@ class EyeCareTelemetryReporter(
             aiPerformance = runtime.toAiPerformance(),
             developerDebug = runtime.toDeveloperDebug(settings),
             deviceDiagnostics = settings.toDeviceDiagnostics(nowMillis),
+            pomodoroProductivity = pomodoroStats?.toPomodoroProductivity(),
+            userConfiguration = buildUserConfiguration(settings, dailyGoal, reminderPlans, tipTemplates),
         )
         return apiClient.uploadTelemetry(accessToken, upload)
             .also { lastUploadAt.set(nowMillis) }
@@ -148,8 +194,11 @@ class EyeCareTelemetryReporter(
             developerDebug = DeveloperDebugTelemetry(
                 sensorDisturbance = null,
                 crashLogs = listOf(report.toCrashLogTelemetry()),
+                apiTraces = emptyList(),
             ),
             deviceDiagnostics = null,
+            pomodoroProductivity = null,
+            userConfiguration = null,
         )
         return apiClient.uploadTelemetry(accessToken, upload)
             .also { lastUploadAt.set(nowMillis) }
@@ -203,6 +252,7 @@ class EyeCareTelemetryReporter(
             maxContinuousWorkSeconds = maxContinuousWorkSeconds,
             distanceViolationCount = proximityWarningCount,
             distanceCloseSeconds = proximityCloseSeconds,
+            lowLightWarningCount = lowLightWarningCount,
             distanceViolations = listOfNotNull(latestDistanceViolation),
             blinkMetrics = BlinkMetricsTelemetry(
                 averageBlinksPerMinute = averageBlinksPerMinute,
@@ -215,6 +265,17 @@ class EyeCareTelemetryReporter(
                 skippedBreakCount = skipCount,
                 complianceRatePercent = complianceRate,
             ),
+        )
+    }
+
+    private fun DailyPomodoroStatsEntity.toPomodoroProductivity(): PomodoroProductivityTelemetry {
+        return PomodoroProductivityTelemetry(
+            statDate = statDate,
+            completedTomatoCount = completedTomatoCount,
+            restartCount = restartCount,
+            completedFocusSessions = completedFocusSessions,
+            totalFocusSeconds = totalFocusSeconds,
+            totalBreakSeconds = totalBreakSeconds,
         )
     }
 
@@ -317,10 +378,29 @@ class EyeCareTelemetryReporter(
         } else {
             null
         }
-        if (sensorDisturbance == null && crashLogs.isEmpty()) return null
+        val apiTraces = ProjectLumenApiDiagnostics.traces.value
+            .take(MAX_API_TRACE_COUNT)
+            .map { it.toTelemetry() }
+        if (sensorDisturbance == null && crashLogs.isEmpty() && apiTraces.isEmpty()) return null
         return DeveloperDebugTelemetry(
             sensorDisturbance = sensorDisturbance,
             crashLogs = crashLogs,
+            apiTraces = apiTraces,
+        )
+    }
+
+    private fun ProjectLumenApiTrace.toTelemetry(): ApiTraceTelemetry {
+        return ApiTraceTelemetry(
+            startedAt = startedAtMillis,
+            method = method.take(MAX_API_TRACE_METHOD_LENGTH),
+            path = path.take(MAX_API_TRACE_PATH_LENGTH),
+            signed = signed,
+            integrityRequested = integrityRequested,
+            authorizationAttached = authorizationAttached,
+            statusCode = statusCode,
+            durationMillis = durationMillis.coerceAtLeast(0L),
+            errorType = errorType.take(MAX_CRASH_FIELD_LENGTH),
+            errorMessage = errorMessage.take(MAX_CRASH_LINE_LENGTH),
         )
     }
 
@@ -335,6 +415,85 @@ class EyeCareTelemetryReporter(
                 .take(MAX_CRASH_STACK_LINES)
                 .map { it.take(MAX_CRASH_LINE_LENGTH) },
         )
+    }
+
+    private fun buildUserConfiguration(
+        settings: AppSettingsEntity,
+        dailyGoal: DailyGoalEntity?,
+        reminderPlans: List<ReminderPlanEntity>,
+        tipTemplates: List<TipTemplateEntity>,
+    ): UserConfigurationTelemetry? {
+        if (dailyGoal == null && reminderPlans.isEmpty() && tipTemplates.isEmpty()) return null
+        return UserConfigurationTelemetry(
+            dailyGoal = dailyGoal?.toTelemetry(),
+            audioFeedback = settings.toAudioFeedbackTelemetry(),
+            reminderPlans = reminderPlans
+                .take(MAX_CONFIGURATION_ITEMS)
+                .map { it.toTelemetry() },
+            tipTemplates = tipTemplates
+                .take(MAX_CONFIGURATION_ITEMS)
+                .map { it.toTelemetry() },
+        )
+    }
+
+    private fun AppSettingsEntity.toAudioFeedbackTelemetry(): AudioFeedbackTelemetry {
+        return AudioFeedbackTelemetry(
+            soundEnabled = soundEnabled,
+            vibrationEnabled = vibrationEnabled,
+            preAlertSoundEnabled = preAlertSoundEnabled,
+            restStartSoundEnabled = restStartSoundEnabled,
+            pomodoroWorkStartSoundEnabled = pomodoroWorkStartSoundEnabled,
+            pomodoroWorkEndSoundEnabled = pomodoroWorkEndSoundEnabled,
+            preAlertVolumePercent = preAlertVolumePercent.coerceIn(0, 100),
+            restStartVolumePercent = restStartVolumePercent.coerceIn(0, 100),
+            restEndVolumePercent = restEndVolumePercent.coerceIn(0, 100),
+            pomodoroWorkStartVolumePercent = pomodoroWorkStartVolumePercent.coerceIn(0, 100),
+            pomodoroWorkEndVolumePercent = pomodoroWorkEndVolumePercent.coerceIn(0, 100),
+        )
+    }
+
+    private fun DailyGoalEntity.toTelemetry(): DailyGoalTelemetry {
+        return DailyGoalTelemetry(
+            restBreakGoal = restBreakGoal.coerceAtLeast(0),
+            maxContinuousWorkMinutes = maxContinuousWorkMinutes.coerceAtLeast(0),
+            pomodoroGoal = pomodoroGoal.coerceAtLeast(0),
+            weeklyActiveDaysGoal = weeklyActiveDaysGoal.coerceAtLeast(0),
+            updatedAt = updatedAt.coerceAtLeast(0L),
+        )
+    }
+
+    private fun ReminderPlanEntity.toTelemetry(): ReminderPlanTelemetry {
+        return ReminderPlanTelemetry(
+            id = id,
+            enabled = enabled,
+            warnIntervalMinutes = warnIntervalMinutes.coerceAtLeast(0),
+            restDurationSeconds = restDurationSeconds.coerceAtLeast(0),
+            quietHoursEnabled = quietHoursEnabled,
+            quietMode = quietMode.take(MAX_SHORT_TELEMETRY_FIELD_LENGTH),
+            sortOrder = sortOrder,
+            updatedAt = updatedAt.coerceAtLeast(0L),
+        )
+    }
+
+    private fun TipTemplateEntity.toTelemetry(): TipTemplateTelemetry {
+        return TipTemplateTelemetry(
+            id = id,
+            isBuiltin = isBuiltin,
+            backgroundType = backgroundType.take(MAX_SHORT_TELEMETRY_FIELD_LENGTH),
+            hasImage = imagePath.isNotBlank(),
+            showSkipButton = showSkipButton,
+            isPremium = isPremium,
+            hasRemoteId = remoteId.isNotBlank(),
+            countdownStyle = countdownStyle().take(MAX_SHORT_TELEMETRY_FIELD_LENGTH),
+            sortOrder = sortOrder,
+            updatedAt = updatedAt.coerceAtLeast(0L),
+        )
+    }
+
+    private fun TipTemplateEntity.countdownStyle(): String {
+        return runCatching {
+            org.json.JSONObject(layoutJson).optString("countdownStyle")
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: "default"
     }
 
     private suspend fun AppSettingsEntity.toDeviceDiagnostics(nowMillis: Long): DeviceDiagnosticsTelemetry? {
@@ -393,6 +552,11 @@ class EyeCareTelemetryReporter(
         private const val MAX_CRASH_LINE_LENGTH = 320
         private const val MAX_CRASH_FIELD_LENGTH = 160
         private const val MAX_PACKAGE_FIELD_LENGTH = 160
+        private const val MAX_API_TRACE_COUNT = 12
+        private const val MAX_API_TRACE_METHOD_LENGTH = 12
+        private const val MAX_API_TRACE_PATH_LENGTH = 240
+        private const val MAX_CONFIGURATION_ITEMS = 24
+        private const val MAX_SHORT_TELEMETRY_FIELD_LENGTH = 64
         private const val COLLECTION_SOURCE_LOCAL = "local"
         private const val COLLECTION_SOURCE_SHIZUKU = "shizuku"
     }

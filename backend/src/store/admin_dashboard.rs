@@ -6,9 +6,9 @@ use crate::{
     models::{
         AdminAccessAuditEntry, AdminApiMetric, AdminBackupSnapshot, AdminBackupSummary,
         AdminContentSection, AdminDashboardResponse, AdminDeviceAsset, AdminEntitlementItem,
-        AdminObservabilitySection, AdminPurchaseAuditEntry, AdminReleaseSection,
-        AdminRouteStatusItem, AdminUserProfile, AdminUsersSection, DeviceDiagnosticsTelemetry,
-        DeviceProfileTelemetry,
+        AdminI18nJobItem, AdminObservabilitySection, AdminPurchaseAuditEntry, AdminReleaseItem,
+        AdminReleaseSection, AdminRolloutPlanItem, AdminRouteStatusItem, AdminUserProfile,
+        AdminUsersSection, AdminVersionImpactItem, DeviceDiagnosticsTelemetry, DeviceProfileTelemetry,
     },
 };
 use futures_util::TryStreamExt;
@@ -27,6 +27,7 @@ impl AppStore {
             self.latest_sync_by_user(&user_ids),
             self.admin_entitlements(),
         )?;
+        let feature_flags_by_user = self.feature_flags_by_user(&user_ids).await?;
         let tier_by_user = tier_by_user(&entitlements);
         let profiles = users
             .iter()
@@ -42,7 +43,10 @@ impl AppStore {
                     .get(&user.id)
                     .cloned()
                     .unwrap_or_else(|| "FREE".to_owned()),
-                feature_flags: Vec::new(),
+                feature_flags: feature_flags_by_user
+                    .get(&user.id)
+                    .cloned()
+                    .unwrap_or_default(),
             })
             .collect();
         let (
@@ -53,6 +57,7 @@ impl AppStore {
             api_metrics,
             sync_metrics,
             templates,
+            audio_matrix,
             telemetry,
             releases,
             allowlist,
@@ -65,6 +70,7 @@ impl AppStore {
             self.api_metrics(),
             self.sync_metrics(),
             self.template_catalog(),
+            self.audio_matrix(),
             self.telemetry(),
             self.releases(),
             self.security_allowlist(),
@@ -87,16 +93,20 @@ impl AppStore {
                 backups,
             },
             observability: AdminObservabilitySection {
+                version_impacts: version_impacts(&crash_groups, &devices),
                 crash_groups,
                 clean_stack,
                 api_metrics,
                 sync_metrics,
             },
             content: AdminContentSection {
+                i18n_jobs: i18n_jobs(&templates),
+                audio_matrix,
                 templates,
                 telemetry,
             },
             release: AdminReleaseSection {
+                rollout_plan: rollout_plan(&releases, &routes, &allowlist),
                 releases,
                 routes,
                 allowlist,
@@ -146,6 +156,66 @@ impl AppStore {
             }
         }
         Ok(latest)
+    }
+
+    async fn feature_flags_by_user(
+        &self,
+        user_ids: &[String],
+    ) -> Result<HashMap<String, Vec<String>>, ApiError> {
+        if user_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let options = FindOptions::builder()
+            .sort(doc! { "cursor": -1 })
+            .limit(500)
+            .build();
+        let rows: Vec<StoredSyncChange> = self
+            .sync_changes
+            .find(
+                doc! {
+                    "userId": { "$in": user_ids.to_vec() },
+                    "change.collection": "featureFlags",
+                    "change.operation": { "$ne": "DELETE" },
+                },
+                options,
+            )
+            .await
+            .map_err(database_error)?
+            .try_collect()
+            .await
+            .map_err(database_error)?;
+
+        let mut flags: HashMap<String, Vec<String>> = HashMap::new();
+        let mut seen: HashSet<String> = HashSet::new();
+        for row in rows {
+            let key = row
+                .change
+                .payload
+                .get("key")
+                .and_then(Value::as_str)
+                .or_else(|| row.change.payload.get("name").and_then(Value::as_str))
+                .unwrap_or(row.change.remote_id.as_str())
+                .trim()
+                .to_owned();
+            if key.is_empty() {
+                continue;
+            }
+            let enabled = row
+                .change
+                .payload
+                .get("enabled")
+                .and_then(Value::as_bool)
+                .unwrap_or(true);
+            let seen_key = format!("{}:{key}", row.user_id);
+            if enabled && seen.insert(seen_key) {
+                flags.entry(row.user_id).or_default().push(key);
+            }
+        }
+        for values in flags.values_mut() {
+            values.sort();
+            values.truncate(12);
+        }
+        Ok(flags)
     }
 
     async fn access_audit(&self) -> Result<Vec<AdminAccessAuditEntry>, ApiError> {
@@ -505,4 +575,155 @@ fn route_state(metric: &AdminApiMetric) -> &'static str {
     } else {
         "ok"
     }
+}
+
+fn version_impacts(
+    crash_groups: &[AdminCrashGroup],
+    devices: &[AdminDeviceAsset],
+) -> Vec<AdminVersionImpactItem> {
+    let mut manufacturer_by_version: HashMap<i64, HashMap<String, i64>> = HashMap::new();
+    for device in devices {
+        if device.version_code <= 0 {
+            continue;
+        }
+        let manufacturer = device
+            .model
+            .split_whitespace()
+            .next()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or("unknown")
+            .to_owned();
+        *manufacturer_by_version
+            .entry(device.version_code)
+            .or_default()
+            .entry(manufacturer)
+            .or_default() += 1;
+    }
+
+    let mut rows = crash_groups
+        .iter()
+        .map(|crash| {
+            let manufacturer = manufacturer_by_version
+                .get(&crash.version_code)
+                .and_then(|counts| counts.iter().max_by_key(|(_, count)| **count))
+                .map(|(manufacturer, _)| manufacturer.clone())
+                .unwrap_or_else(|| "unknown".to_owned());
+            AdminVersionImpactItem {
+                version_code: crash.version_code,
+                manufacturer,
+                crash_count: crash.count,
+                affected_users: crash.affected_users,
+                trend: version_trend(crash.count, crash.affected_users).to_owned(),
+                risk: crash.risk.clone(),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if rows.is_empty() {
+        rows = devices
+            .iter()
+            .filter(|device| device.version_code > 0)
+            .take(10)
+            .map(|device| AdminVersionImpactItem {
+                version_code: device.version_code,
+                manufacturer: device
+                    .model
+                    .split_whitespace()
+                    .next()
+                    .filter(|value| !value.trim().is_empty())
+                    .unwrap_or("unknown")
+                    .to_owned(),
+                crash_count: 0,
+                affected_users: 0,
+                trend: "no crash telemetry".to_owned(),
+                risk: "ok".to_owned(),
+            })
+            .collect();
+    }
+    rows.truncate(25);
+    rows
+}
+
+fn version_trend(crash_count: i64, affected_users: i64) -> &'static str {
+    if crash_count >= 10 || affected_users >= 5 {
+        "elevated"
+    } else if crash_count > 0 {
+        "watch"
+    } else {
+        "clear"
+    }
+}
+
+fn i18n_jobs(templates: &[AdminTemplateItem]) -> Vec<AdminI18nJobItem> {
+    let mut by_locale: HashMap<String, (usize, usize, i64)> = HashMap::new();
+    for template in templates {
+        for locale in &template.locales {
+            let key = locale.trim().to_owned();
+            if key.is_empty() {
+                continue;
+            }
+            let entry = by_locale.entry(key).or_insert((0, 0, 0));
+            entry.0 += 1;
+            if template.tier != "FREE" {
+                entry.1 += 1;
+            }
+            entry.2 = entry.2.max(template.updated_at);
+        }
+    }
+    let mut jobs = by_locale
+        .into_iter()
+        .map(|(locale, (template_count, premium_count, updated_at))| AdminI18nJobItem {
+            locale,
+            template_count,
+            premium_count,
+            status: if template_count == 0 {
+                "empty".to_owned()
+            } else {
+                "ready".to_owned()
+            },
+            updated_at,
+        })
+        .collect::<Vec<_>>();
+    jobs.sort_by(|left, right| left.locale.cmp(&right.locale));
+    jobs
+}
+
+fn rollout_plan(
+    releases: &[AdminReleaseItem],
+    routes: &[AdminRouteStatusItem],
+    allowlist: &[AdminSecurityAllowlistItem],
+) -> Vec<AdminRolloutPlanItem> {
+    let mut items = Vec::new();
+    if let Some(release) = releases.first() {
+        items.push(AdminRolloutPlanItem {
+            title: format!("{} ({})", release.version_name, release.channel),
+            detail: format!(
+                "versionCode {} rollout {} with {} assets and {} patches",
+                release.version_code,
+                release.rollout,
+                release.assets.len(),
+                release.patches.len()
+            ),
+            status: if release.force_update { "risk" } else { "watch" }.to_owned(),
+        });
+    }
+    let risky_routes = routes
+        .iter()
+        .filter(|route| matches!(route.state.as_str(), "risk" | "watch"))
+        .count();
+    items.push(AdminRolloutPlanItem {
+        title: "Route readiness".to_owned(),
+        detail: format!("{risky_routes} watched routes out of {}", routes.len()),
+        status: if risky_routes == 0 { "ok" } else { "watch" }.to_owned(),
+    });
+    let insecure_origins = allowlist
+        .iter()
+        .filter(|entry| !entry.protocol.eq_ignore_ascii_case("https"))
+        .count();
+    items.push(AdminRolloutPlanItem {
+        title: "Transport allowlist".to_owned(),
+        detail: format!("{insecure_origins} non-HTTPS origins require review"),
+        status: if insecure_origins == 0 { "ok" } else { "risk" }.to_owned(),
+    });
+    items
 }

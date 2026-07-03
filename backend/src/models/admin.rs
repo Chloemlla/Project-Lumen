@@ -149,6 +149,7 @@ pub struct AdminBackupSummary {
 pub struct AdminObservabilitySection {
     pub crash_groups: Vec<AdminCrashGroup>,
     pub clean_stack: Vec<String>,
+    pub version_impacts: Vec<AdminVersionImpactItem>,
     pub api_metrics: Vec<AdminApiMetric>,
     pub sync_metrics: Vec<AdminSyncMetric>,
 }
@@ -189,8 +190,21 @@ pub struct AdminSyncMetric {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AdminVersionImpactItem {
+    pub version_code: i64,
+    pub manufacturer: String,
+    pub crash_count: i64,
+    pub affected_users: i64,
+    pub trend: String,
+    pub risk: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AdminContentSection {
     pub templates: Vec<AdminTemplateItem>,
+    pub audio_matrix: Vec<AdminAudioMatrixItem>,
+    pub i18n_jobs: Vec<AdminI18nJobItem>,
     pub telemetry: Vec<AdminTelemetryItem>,
 }
 
@@ -218,8 +232,29 @@ pub struct AdminTelemetryItem {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AdminAudioMatrixItem {
+    pub label: String,
+    pub enabled: bool,
+    pub volume_percent: i32,
+    pub meta: String,
+    pub sampled_at: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminI18nJobItem {
+    pub locale: String,
+    pub template_count: usize,
+    pub premium_count: usize,
+    pub status: String,
+    pub updated_at: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AdminReleaseSection {
     pub releases: Vec<AdminReleaseItem>,
+    pub rollout_plan: Vec<AdminRolloutPlanItem>,
     pub routes: Vec<AdminRouteStatusItem>,
     pub allowlist: Vec<AdminSecurityAllowlistItem>,
 }
@@ -278,4 +313,12 @@ pub struct AdminSecurityAllowlistItem {
     pub protocol: String,
     pub risk: String,
     pub updated_at: i64,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminRolloutPlanItem {
+    pub title: String,
+    pub detail: String,
+    pub status: String,
 }

@@ -145,13 +145,16 @@ window.LumenAdminModules = (() => {
   }
 
   function renderVersionAnalysis() {
+    const rows = data.versionAnalysis || [];
     return `
       <canvas class="mini-chart" data-chart="crashes" width="540" height="180"></canvas>
-      ${table(["Version", "Manufacturer", "Crash rate", "Trend"], [
-        ["1462", "Xiaomi", "2.8%", tag("+41%", "risk")],
-        ["1462", "Samsung", "1.2%", tag("+8%", "watch")],
-        ["1451", "Google", "0.4%", tag("-12%", "ok")],
-      ])}
+      ${rows.length ? table(["Version", "Manufacturer", "Crashes", "Affected", "Trend"], rows.map((item) => [
+        item.version,
+        item.manufacturer,
+        item.crashes,
+        item.affected,
+        tag(item.trend, item.risk),
+      ])) : `<div class="empty-state">No version impact telemetry has been recorded.</div>`}
     `;
   }
 
@@ -193,43 +196,37 @@ window.LumenAdminModules = (() => {
   }
 
   function renderTemplateEditor() {
+    const template = data.templateEditor || {};
+    const layout = template.layoutJson || {};
     return `
       <div class="split-panel">
         <div>${formRows([
-          ["Rest title", "text", "Time to rest"],
-          ["Rest subtitle", "text", "Look away from the screen"],
-          ["Countdown style", "select", ["circle", "bar", "number"]],
-          ["Skip button", "select", ["show", "hide"]],
+          ["Rest title", "text", layout.titleText || template.name || ""],
+          ["Rest subtitle", "text", layout.subtitleText || ""],
+          ["Countdown style", "select", [template.style || "circle", "bar", "number"]],
+          ["Skip button", "select", [layout.showSkipButton === false ? "hide" : "show", layout.showSkipButton === false ? "show" : "hide"]],
         ])}</div>
-        <pre class="json-view">${escapeHtml(JSON.stringify({
-          countdownStyle: "circle",
-          titleSizeSp: 28,
-          subtitleSizeSp: 16,
-          showSkipButton: true,
-          safeAreaPaddingDp: 24,
-        }, null, 2))}</pre>
+        <pre class="json-view">${escapeHtml(JSON.stringify(layout, null, 2))}</pre>
       </div>
     `;
   }
 
   function renderAudioMatrix() {
-    const cells = [
-      ["Pre alert", "70%", "tone_soft"],
-      ["Rest start", "75%", "tone_bell"],
-      ["Rest end", "65%", "tone_clear"],
-      ["Pomodoro start", "60%", "tone_focus"],
-      ["Pomodoro end", "80%", "tone_done"],
-      ["Vibration", "on", "short pulse"],
-    ];
-    return `<div class="matrix">${cells.map(([label, value, meta]) => `<div class="matrix-cell"><div class="row-title">${label}</div><div class="row-meta">${value} | ${meta}</div></div>`).join("")}</div>`;
+    const cells = data.audioMatrix || [];
+    if (!cells.length) return `<div class="empty-state">No audio or haptic telemetry has been recorded.</div>`;
+    return `<div class="matrix">${cells.map((cell) => `<div class="matrix-cell"><div class="row-title">${escapeHtml(cell.label)}</div><div class="row-meta">${escapeHtml(cell.value)} | ${escapeHtml(cell.meta)}</div></div>`).join("")}</div>`;
   }
 
   function renderI18n() {
+    const jobs = data.i18nJobs || [];
+    if (!jobs.length) return `<div class="empty-state">No localized template dispatch data has been recorded.</div>`;
     return `
       <div class="list-stack">
-        ${row("Chinese template pack", "10 Pro templates ready for dispatch", tag("ready", "ok"))}
-        ${row("English fallback strings", "3 strings require review", tag("review", "watch"))}
-        ${row("Global sync change", "Queued to template collection", tag("pending", "info"))}
+        ${jobs.map((job) => row(
+          `${job.locale} template pack`,
+          `${job.templateCount} templates, ${job.premiumCount} premium`,
+          tag(job.status, job.status === "ready" ? "ok" : "watch"),
+        )).join("")}
       </div>
     `;
   }
@@ -258,11 +255,11 @@ window.LumenAdminModules = (() => {
   }
 
   function renderRollout() {
+    const items = data.rolloutPlan || [];
+    if (!items.length) return `<div class="empty-state">No release rollout policy has been recorded.</div>`;
     return `
       <div class="list-stack">
-        ${row("HTTP cleartext replacement", "Prioritize versions with HTTPS-only API transport", tag("security", "risk"))}
-        ${row("Gray release channel", "45% active rollout, no hard block", tag("active", "watch"))}
-        ${row("Universal APK checksum", "checksums.txt synchronized", tag("verified", "ok"))}
+        ${items.map((item) => row(item.title, item.detail, tag(statusLabel(item.status), item.status))).join("")}
       </div>
     `;
   }
@@ -290,7 +287,7 @@ window.LumenAdminModules = (() => {
       ["Transport", ctx.isSecureAdminOrigin() ? tag("secure", "ok") : tag("locked", "risk")],
       ["Token stored", ctx.state.token ? tag("yes", "ok") : tag("no", "watch")],
       ["Token expiry", expires],
-      ["Refresh strategy", "401-aware refresh hook; admin API refresh endpoint pending"],
+      ["Refresh strategy", "401-aware refresh hook backed by /api/admin/auth/refresh"],
     ]);
   }
 

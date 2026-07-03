@@ -58,7 +58,9 @@ impl AppStore {
             "push-template" => self.apply_template_push(payload, now).await,
             "force-update" => self.apply_force_update(payload, now).await,
             "save-allowlist" => self.apply_allowlist(payload, now).await,
-            _ => Ok(()),
+            _ => Err(ApiError::BadRequest(format!(
+                "Unsupported admin action: {action}"
+            ))),
         }
     }
 
