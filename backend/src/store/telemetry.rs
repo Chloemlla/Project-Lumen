@@ -154,7 +154,10 @@ fn sanitize_telemetry_upload(request: &mut TelemetryUploadRequest) {
         &mut request.device_profile.android_release,
         MAX_SHORT_TEXT_LENGTH,
     );
-    truncate_string(&mut request.device_profile.primary_abi, MAX_SHORT_TEXT_LENGTH);
+    truncate_string(
+        &mut request.device_profile.primary_abi,
+        MAX_SHORT_TEXT_LENGTH,
+    );
     truncate_string(
         &mut request.device_profile.build_fingerprint,
         MAX_BUILD_FINGERPRINT_LENGTH,

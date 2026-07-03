@@ -71,7 +71,9 @@ fn normalize_optional(value: String, max_chars: usize) -> String {
 fn normalize_device_fingerprint(value: String) -> Option<String> {
     let normalized = value.trim().to_ascii_lowercase();
     if normalized.len() == DEVICE_FINGERPRINT_LENGTH
-        && normalized.chars().all(|character| character.is_ascii_hexdigit())
+        && normalized
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
     {
         Some(normalized)
     } else {

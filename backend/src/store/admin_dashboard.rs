@@ -6,11 +6,10 @@ use crate::{
     models::{
         AdminAccessAuditEntry, AdminApiMetric, AdminBackupSnapshot, AdminBackupSummary,
         AdminContentSection, AdminCrashGroup, AdminDashboardResponse, AdminDeviceAsset,
-        AdminEntitlementItem, AdminI18nJobItem, AdminObservabilitySection,
-        AdminPurchaseAuditEntry, AdminReleaseItem, AdminReleaseSection, AdminRolloutPlanItem,
-        AdminRouteStatusItem, AdminSecurityAllowlistItem, AdminTemplateItem, AdminUserProfile,
-        AdminUsersSection, AdminVersionImpactItem, DeviceDiagnosticsTelemetry,
-        DeviceProfileTelemetry,
+        AdminEntitlementItem, AdminI18nJobItem, AdminObservabilitySection, AdminPurchaseAuditEntry,
+        AdminReleaseItem, AdminReleaseSection, AdminRolloutPlanItem, AdminRouteStatusItem,
+        AdminSecurityAllowlistItem, AdminTemplateItem, AdminUserProfile, AdminUsersSection,
+        AdminVersionImpactItem, DeviceDiagnosticsTelemetry, DeviceProfileTelemetry,
     },
 };
 use futures_util::TryStreamExt;
@@ -293,7 +292,12 @@ impl AppStore {
                 &mut devices_by_id,
                 AdminDeviceAsset {
                     user_id: row.user_id,
-                    device_fingerprint: row.payload.device_profile.device_fingerprint.trim().to_owned(),
+                    device_fingerprint: row
+                        .payload
+                        .device_profile
+                        .device_fingerprint
+                        .trim()
+                        .to_owned(),
                     device_installation_id,
                     model: device_model(&row.payload.device_profile),
                     version_code: row.payload.device_profile.app_version_code,
