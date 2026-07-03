@@ -189,8 +189,8 @@ class SecureCredentialStore(context: Context) {
     }
 
     private fun mmkvCryptKey(): String {
-        val existing = secureMetadata.getString(KEY_MMKV_CRYPT_KEY, null)?.takeIf { it.isNotBlank() }
-        if (existing != null) return existing
+        val existing = secureMetadata.getString(KEY_MMKV_CRYPT_KEY, null)
+        if (!existing.isNullOrBlank()) return existing
         val generated = UUID.randomUUID().toString() + UUID.randomUUID().toString()
         check(secureMetadata.edit().putString(KEY_MMKV_CRYPT_KEY, generated).commit()) {
             "Unable to persist MMKV encryption key."
