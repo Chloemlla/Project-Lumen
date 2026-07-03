@@ -28,6 +28,83 @@ apps/web/src/
 └─ types/           # local-only UI types (cross-cutting types live in packages/shared)
 ```
 
+## 2.1 Admin Dashboard Layout (`backend/admin/`)
+
+The backend admin dashboard is a React 19 + TypeScript Vite app whose source is
+served only after a workflow/Docker build emits static assets.
+
+### 1. Scope / Trigger
+
+- Trigger: any change to the admin dashboard UI, Vite config, Docker copy path,
+  or `LUMEN_ADMIN_STATIC_DIR`.
+- Source scope: `backend/admin/index.html`, `backend/admin/src/**/*.tsx`,
+  `backend/admin/src/**/*.ts`, `backend/admin/src/styles.css`.
+- Runtime scope: `backend/admin/dist/` is the build output and is ignored by git.
+
+### 2. Signatures
+
+```text
+cd backend/admin
+npm install
+npm run build
+```
+
+These commands are executed by GitHub Actions and Docker builds, not local
+developer machines when repository policy forbids local build/test execution.
+
+### 3. Contracts
+
+- Package contract: `backend/admin/package.json` owns React/Vite dependencies.
+- Build contract: `npm run build` runs `tsc -b && vite build`.
+- Runtime contract: Rust serves `LUMEN_ADMIN_STATIC_DIR`, whose default is
+  `backend/admin/dist`.
+- Docker contract: the image build must copy only the built `dist/` into the
+  runtime image path used by `LUMEN_ADMIN_STATIC_DIR`.
+- API contract: the dashboard calls `/api/health`, `/api/admin/auth/login`,
+  `/api/admin/auth/refresh`, `/api/admin/dashboard`, and
+  `/api/admin/actions`.
+
+### 4. Validation & Error Matrix
+
+- `dist/index.html` missing -> backend logs `admin dashboard index file does not exist`.
+- `/api/admin/dashboard` returns `401` -> dashboard attempts one refresh-token
+  flow when a refresh token is available, then clears session state on failure.
+- Non-local HTTP origin -> sensitive admin action buttons stay disabled.
+- Empty live data -> modules render empty states rather than static fake records.
+
+### 5. Good/Base/Bad Cases
+
+- Good: React component source is `.tsx`, runtime JSON is narrowed at the API
+  boundary, and tokens stay in memory for the current tab.
+- Base: `backend/admin/src/model/*` maps unknown API JSON into dashboard view
+  models before components render it.
+- Bad: committing hand-written runtime JS under `backend/admin/assets/`, serving
+  TSX source directly, or storing admin access/refresh tokens in `localStorage`.
+
+### 6. Tests Required
+
+- GitHub workflow: `backend/admin` must run `npm install` and `npm run build`.
+- Docker workflow: image build must run the same admin build before copying
+  `dist/`.
+- Manual review: verify sensitive actions are disabled on non-local HTTP and
+  enabled on HTTPS/localhost.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+LUMEN_ADMIN_STATIC_DIR=backend/admin
+<script type="module" src="./assets/app.js"></script>
+```
+
+#### Correct
+
+```text
+LUMEN_ADMIN_STATIC_DIR=backend/admin/dist
+<script type="module" src="/src/main.tsx"></script>
+```
+
 ## 3. Module organization
 
 - A feature owns its components, hooks, and local state; it imports shared UI from `components/` and shared types from `packages/shared`.

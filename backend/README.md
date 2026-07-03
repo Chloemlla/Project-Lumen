@@ -15,7 +15,7 @@ The service mounts all routes under `/api` by default.
 ```text
 LUMEN_BIND_ADDRESS=0.0.0.0:8080
 LUMEN_API_PREFIX=/api
-LUMEN_ADMIN_STATIC_DIR=backend/admin
+LUMEN_ADMIN_STATIC_DIR=backend/admin/dist
 LUMEN_MONGODB_URI=mongodb://localhost:27017
 LUMEN_MONGODB_DATABASE=project_lumen
 LUMEN_ADMIN_USERNAME=admin
@@ -47,13 +47,13 @@ Email login sends verification codes through Happy-TTS outemail when both `LUMEN
 
 ## Admin Dashboard
 
-The admin frontend is a zero-build static dashboard served by the Rust service:
+The admin frontend is a React 19 + TypeScript dashboard served by the Rust service after the Vite build emits static assets:
 
 ```text
 GET /admin
 ```
 
-It lives in `backend/admin/` and uses plain HTML, CSS, and JavaScript. It does not require React, npm, a bundler, or any frontend install step.
+Source lives in `backend/admin/` and uses TSX components. The GitHub workflow and Docker image build run `npm install` and `npm run build` in `backend/admin/`, then the backend serves `backend/admin/dist` at `/admin`.
 
 The dashboard includes the 20 operations modules needed for Project Lumen admin workflows:
 
@@ -62,7 +62,7 @@ The dashboard includes the 20 operations modules needed for Project Lumen admin 
 - Template CMS, visual template parameters, audio/haptics matrix, i18n dispatch, and anonymous macro telemetry.
 - OTA integrity registry, rollout policy, Rust route topology, HTTP allowlist review, and admin session security.
 
-Sensitive action buttons are disabled when the dashboard is opened over non-local HTTP. Production admin access should be served through HTTPS only.
+Sensitive action buttons are disabled when the dashboard is opened over non-local HTTP. Production admin access should be served through HTTPS only. Admin access and refresh tokens are kept in memory for the current tab rather than stored in `localStorage`.
 
 `LUMEN_ADMIN_AUTOMATION_TOKEN` is optional, must be at least 32 characters, and is accepted only by `POST /api/admin/actions`.
 Set it to the same value as the GitHub Actions secret `PROJECT_LUMEN_ADMIN_TOKEN` when release workflows need to sync `release-manifest.json` to MongoDB.

@@ -34,7 +34,7 @@ impl Config {
         Self {
             bind_address: env_value("LUMEN_BIND_ADDRESS", "0.0.0.0:8080"),
             api_prefix: normalize_prefix(&env_value("LUMEN_API_PREFIX", "/api")),
-            admin_static_dir: env_value("LUMEN_ADMIN_STATIC_DIR", "backend/admin"),
+            admin_static_dir: env_value("LUMEN_ADMIN_STATIC_DIR", "backend/admin/dist"),
             mongodb_uri: env_value("LUMEN_MONGODB_URI", "mongodb://localhost:27017"),
             mongodb_database: env_value("LUMEN_MONGODB_DATABASE", "project_lumen"),
             admin_username: env_value("LUMEN_ADMIN_USERNAME", "admin"),

@@ -1,14 +1,14 @@
 # Admin Dashboard
 
-Static admin dashboard for Project Lumen operations.
+React 19 + TypeScript admin dashboard for Project Lumen operations.
 
-This frontend intentionally uses only:
+Source lives in:
 
 - `index.html`
-- `assets/styles.css`
-- `assets/app.js`
+- `src/**/*.tsx`
+- `src/styles.css`
 
-There is no React, npm package, bundler, or frontend build step. The Rust API service serves it at `/admin`.
+The GitHub workflow and Docker build run the Vite build and emit `dist/`. The Rust API service serves the built `dist/` directory at `/admin`.
 
 The UI is structured around four operation areas:
 
@@ -26,3 +26,5 @@ Admin session flow:
 - Bearer token for `/api/admin/dashboard` and `/api/admin/actions`
 
 Sensitive actions are recorded through `/api/admin/actions`; supported actions also update MongoDB management collections for manual plan grants, Pro revocation, template dispatch, forced update policy, and security allowlist changes. A configured `LUMEN_ADMIN_AUTOMATION_TOKEN` is accepted by `/api/admin/actions` only for workflow automation.
+
+Admin access and refresh tokens are held in memory for the current tab. The dashboard remembers only the last username in `localStorage`.

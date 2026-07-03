@@ -1,4 +1,6 @@
-export const fallbackDashboardData = {
+import type { AdminSection, DashboardData } from "../types";
+
+export const fallbackDashboardData: DashboardData = {
   users: [],
   profile: {
     id: "",
@@ -22,7 +24,15 @@ export const fallbackDashboardData = {
   syncSeries: [],
   versionAnalysis: [],
   templates: [],
-  templateEditor: { name: "", style: "circle", color: "", tier: "PRO", layoutJson: {} },
+  templateEditor: {
+    id: "",
+    name: "",
+    tier: "PRO",
+    style: "circle",
+    color: "",
+    locale: "",
+    layoutJson: {},
+  },
   audioMatrix: [],
   i18nJobs: [],
   telemetry: [],
@@ -32,7 +42,7 @@ export const fallbackDashboardData = {
   allowlist: [],
 };
 
-export const adminSections = [
+export const adminSections: AdminSection[] = [
   {
     id: "users",
     title: "Users & Entitlements",

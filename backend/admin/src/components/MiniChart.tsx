@@ -1,27 +1,34 @@
-import { React, html } from "./ui.js";
+import { useEffect, useMemo, useRef } from "react";
 
-export function MiniChart({ series, tone = "accent", label = "Trend" }) {
-  const canvasRef = React.useRef(null);
-  const values = Array.isArray(series) ? series : [];
-  const seriesKey = values.join(",");
+type MiniChartProps = {
+  series: number[];
+  tone?: "accent" | "info" | "danger";
+  label: string;
+};
 
-  React.useEffect(() => {
+export function MiniChart({ series, tone = "accent", label }: MiniChartProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const seriesKey = useMemo(() => series.join(","), [series]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
 
-    const draw = () => drawLineChart(canvas, values, tone);
+    const draw = () => drawLineChart(canvas, series, tone);
     draw();
 
     const resizeObserver = new ResizeObserver(draw);
     resizeObserver.observe(canvas);
     return () => resizeObserver.disconnect();
-  }, [seriesKey, tone]);
+  }, [seriesKey, series, tone]);
 
-  return html`<canvas className="mini-chart" ref=${canvasRef} role="img" aria-label=${label}></canvas>`;
+  return <canvas className="mini-chart" ref={canvasRef} role="img" aria-label={label} />;
 }
 
-function drawLineChart(canvas, series, tone) {
+function drawLineChart(canvas: HTMLCanvasElement, series: number[], tone: string): void {
   const context = canvas.getContext("2d");
+  if (!context) return;
+
   const rect = canvas.getBoundingClientRect();
   const ratio = window.devicePixelRatio || 1;
   const width = Math.max(Math.floor(rect.width), 280);
@@ -77,13 +84,21 @@ function drawLineChart(canvas, series, tone) {
   });
 }
 
-function chartPoint(value, index, count, max, width, height, padding) {
+function chartPoint(
+  value: number,
+  index: number,
+  count: number,
+  max: number,
+  width: number,
+  height: number,
+  padding: number,
+) {
   return {
     x: padding + ((width - padding * 2) / Math.max(count - 1, 1)) * index,
     y: height - padding - (value / max) * (height - padding * 2),
   };
 }
 
-function token(styles, name) {
+function token(styles: CSSStyleDeclaration, name: string): string {
   return styles.getPropertyValue(name).trim();
 }
