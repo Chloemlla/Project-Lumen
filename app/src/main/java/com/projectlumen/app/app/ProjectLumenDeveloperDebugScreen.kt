@@ -20,10 +20,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BatterySaver
 import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Lock
@@ -38,11 +40,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +59,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -80,6 +88,10 @@ internal fun DeveloperDebugScreen(
     val remoteState = viewModel.remoteState.collectAsStateWithLifecycle().value
     val apiTraces = viewModel.apiDiagnostics.collectAsStateWithLifecycle().value
     val luxHistory = remember { mutableStateListOf<Float>() }
+    var purchaseProductId by rememberSaveable { mutableStateOf("project_lumen_pro") }
+    var purchaseToken by rememberSaveable { mutableStateOf("") }
+    val normalizedPurchaseProductId = purchaseProductId.trim()
+    val normalizedPurchaseToken = purchaseToken.trim()
     LaunchedEffect(runtime.ambientLastLux, uiState.nowMillis) {
         luxHistory += runtime.ambientLastLux.coerceAtLeast(0f)
         while (luxHistory.size > 60) luxHistory.removeAt(0)
@@ -239,6 +251,49 @@ internal fun DeveloperDebugScreen(
                     stringResource(R.string.developer_security_webview_disabled)
                 },
             )
+            SwitchRow(
+                R.string.enable_diagnostic_face_analysis_upload,
+                Icons.Outlined.PhotoCamera,
+                settings.diagnosticFaceAnalysisUploadEnabled,
+                labelMaxLines = Int.MAX_VALUE,
+            ) { enabled ->
+                viewModel.updateSettings { current ->
+                    current.copy(
+                        diagnosticTelemetryUploadEnabled = if (enabled) true else current.diagnosticTelemetryUploadEnabled,
+                        diagnosticFaceAnalysisUploadEnabled = enabled,
+                    )
+                }
+            }
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = purchaseProductId,
+                onValueChange = { purchaseProductId = it },
+                enabled = !remoteState.busy,
+                singleLine = true,
+                label = { Text(stringResource(R.string.remote_cloud_product_id)) },
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = purchaseToken,
+                onValueChange = { purchaseToken = it },
+                enabled = !remoteState.busy,
+                singleLine = true,
+                label = { Text(stringResource(R.string.remote_cloud_purchase_token)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+            )
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = remoteState.signedIn &&
+                    !remoteState.busy &&
+                    normalizedPurchaseProductId.isNotBlank() &&
+                    normalizedPurchaseToken.isNotBlank(),
+                onClick = {
+                    viewModel.verifyGooglePurchase(normalizedPurchaseProductId, normalizedPurchaseToken)
+                    purchaseToken = ""
+                },
+            ) {
+                DeveloperButtonLabel(Icons.Outlined.CheckCircle, R.string.remote_cloud_verify_purchase)
+            }
             DeveloperMetricRow(R.string.developer_api_last_operation, remoteState.lastOperation)
             if (remoteState.errorMessage.isNotBlank()) {
                 DeveloperMetricRow(R.string.developer_api_last_error, remoteState.errorMessage)

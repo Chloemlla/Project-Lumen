@@ -322,6 +322,8 @@ class ProjectLumenViewModel(
     fun syncRemoteNow() = remoteEntry.syncNow()
     fun uploadCloudBackup() = remoteEntry.uploadCloudBackup()
     fun restoreLatestCloudBackup() = remoteEntry.restoreLatestCloudBackup()
+    fun verifyGooglePurchase(productId: String, purchaseToken: String) =
+        remoteEntry.verifyGooglePurchase(productId, purchaseToken)
     fun signOutRemote() = remoteEntry.signOut()
 
     private fun previewSettings(

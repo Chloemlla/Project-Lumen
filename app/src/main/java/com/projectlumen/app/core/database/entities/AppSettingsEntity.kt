@@ -100,6 +100,7 @@ data class AppSettingsEntity(
     val diagnosticTelemetryUploadEnabled: Boolean = false,
     val diagnosticCrashReportUploadEnabled: Boolean = false,
     val shizukuAppInventoryUploadEnabled: Boolean = false,
+    val diagnosticFaceAnalysisUploadEnabled: Boolean = false,
     val translationEntryEnabled: Boolean = true,
     val developerModeEnabled: Boolean = false,
     val developerDebugOverlayEnabled: Boolean = false,

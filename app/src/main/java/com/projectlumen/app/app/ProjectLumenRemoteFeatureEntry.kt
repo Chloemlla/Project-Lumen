@@ -191,6 +191,35 @@ internal class ProjectLumenRemoteFeatureEntry(
         )
     }
 
+    fun verifyGooglePurchase(productId: String, purchaseToken: String) = launchRemote("Google purchase verified") {
+        val normalizedProductId = productId.trim()
+        val normalizedPurchaseToken = purchaseToken.trim()
+        require(normalizedProductId.isNotBlank()) { "Product ID is required." }
+        require(normalizedPurchaseToken.isNotBlank()) { "Purchase token is required." }
+        val verification = apiClient.verifyGooglePurchase(
+            accessToken = requireAccessToken(),
+            productId = normalizedProductId,
+            purchaseToken = normalizedPurchaseToken,
+            deviceInstallationId = credentials.deviceInstallationId(),
+        )
+        verification.entitlement?.let { entitlement ->
+            saveRemoteEntitlements(listOf(entitlement))
+        }
+        val entitlementCount = entitlementRepository.getAll().size
+        settingsRepository.update(verification.verifiedAt.takeIf { it > 0L } ?: System.currentTimeMillis()) { current ->
+            current.copy(
+                planTier = verification.tier,
+                entitlementExpiresAt = verification.entitlement?.expiresAt ?: current.entitlementExpiresAt,
+                lastEntitlementSyncAt = verification.verifiedAt,
+            )
+        }
+        _state.value = _state.value.copy(
+            cloudTier = verification.tier,
+            entitlementCount = entitlementCount,
+            lastOperation = "Google purchase ${verification.status}",
+        )
+    }
+
     fun signOut() {
         credentials.clear()
         _state.value = ProjectLumenRemoteUiState(

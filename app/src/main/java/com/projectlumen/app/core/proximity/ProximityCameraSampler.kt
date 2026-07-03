@@ -80,6 +80,35 @@ class ProximityCameraSampler(private val context: Context) {
         }
     }
 
+    suspend fun captureFaceAnalysisFrame(
+        maxDurationMillis: Long = 2_000L,
+    ): FaceAnalysisFrameCapture? {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            return null
+        }
+        val timeoutMillis = maxDurationMillis.coerceIn(750L, 2_500L)
+        val captureStartedAt = System.currentTimeMillis()
+        val capture = withTimeoutOrNull(timeoutMillis) { capturePreviewFrame() } ?: return null
+        val cameraLatencyMillis = System.currentTimeMillis() - captureStartedAt
+        val bitmap = BitmapFactory.decodeByteArray(capture.bytes, 0, capture.bytes.size) ?: return null
+        return try {
+            val sample = FaceDistanceAnalyzer(includeTopology = true)
+                .analyze(bitmap, capture.rotationDegrees)
+                ?.copy(cameraLatencyMillis = cameraLatencyMillis)
+            FaceAnalysisFrameCapture(
+                capturedAtMillis = capture.capturedAtMillis,
+                frameBytes = capture.bytes,
+                width = capture.width,
+                height = capture.height,
+                rotationDegrees = capture.rotationDegrees,
+                frameConversionMillis = capture.conversionMillis,
+                sample = sample,
+            )
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
     @SuppressLint("MissingPermission")
     private suspend fun capturePreviewFrame(): CapturedFrame? {
         val cameraManager = context.getSystemService(CameraManager::class.java)
@@ -123,7 +152,16 @@ class ProximityCameraSampler(private val context: Context) {
                 reader.setOnImageAvailableListener({ availableReader ->
                     val image = availableReader.acquireLatestImage() ?: return@setOnImageAvailableListener
                     val result = runCatching<CapturedFrame?> {
-                        CapturedFrame(image.toJpegBytes(), rotation)
+                        val conversionStartedAt = System.currentTimeMillis()
+                        val bytes = image.toJpegBytes()
+                        CapturedFrame(
+                            bytes = bytes,
+                            rotationDegrees = rotation,
+                            width = image.width,
+                            height = image.height,
+                            conversionMillis = System.currentTimeMillis() - conversionStartedAt,
+                            capturedAtMillis = conversionStartedAt,
+                        )
                     }
                     runCatching {
                         image.close()
@@ -314,5 +352,9 @@ class ProximityCameraSampler(private val context: Context) {
     private data class CapturedFrame(
         val bytes: ByteArray,
         val rotationDegrees: Int,
+        val width: Int,
+        val height: Int,
+        val conversionMillis: Long,
+        val capturedAtMillis: Long,
     )
 }

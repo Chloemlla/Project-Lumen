@@ -247,6 +247,10 @@ class DataBackupService(
                 "shizukuAppInventoryUploadEnabled",
                 current.shizukuAppInventoryUploadEnabled,
             ),
+            diagnosticFaceAnalysisUploadEnabled = json.optBoolean(
+                "diagnosticFaceAnalysisUploadEnabled",
+                current.diagnosticFaceAnalysisUploadEnabled,
+            ),
             translationEntryEnabled = json.optBoolean("translationEntryEnabled", current.translationEntryEnabled),
             developerModeEnabled = json.optBoolean("developerModeEnabled", current.developerModeEnabled),
             developerDebugOverlayEnabled = json.optBoolean(
@@ -468,6 +472,7 @@ class DataBackupService(
         .put("diagnosticTelemetryUploadEnabled", diagnosticTelemetryUploadEnabled)
         .put("diagnosticCrashReportUploadEnabled", diagnosticCrashReportUploadEnabled)
         .put("shizukuAppInventoryUploadEnabled", shizukuAppInventoryUploadEnabled)
+        .put("diagnosticFaceAnalysisUploadEnabled", diagnosticFaceAnalysisUploadEnabled)
         .put("translationEntryEnabled", translationEntryEnabled)
         .put("developerModeEnabled", developerModeEnabled)
         .put("developerDebugOverlayEnabled", developerDebugOverlayEnabled)

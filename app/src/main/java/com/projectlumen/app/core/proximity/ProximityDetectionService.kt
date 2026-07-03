@@ -8,10 +8,17 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Base64
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.constants.NotificationIds
+import com.projectlumen.app.core.api.RemoteCameraFramePayload
+import com.projectlumen.app.core.api.RemoteFaceAnalysisFace
+import com.projectlumen.app.core.api.RemoteFaceAnalysisFrameUpload
+import com.projectlumen.app.core.api.RemoteFaceAnalysisProcessingMetrics
+import com.projectlumen.app.core.api.RemoteFaceBoundingBox
+import com.projectlumen.app.core.api.RemoteFaceTopologyPoint
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.debug.DeveloperDebugFrameStore
@@ -222,6 +229,20 @@ class ProximityDetectionService : Service() {
                 force = calibrate || shouldWarn || blinkState.shouldWarn,
             )
         }.onFailure(app::recordCrash)
+        runCatching {
+            uploadFaceAnalysisFrameIfEnabled(app, latestSettings)
+        }.onFailure(app::recordCrash)
+    }
+
+    private suspend fun uploadFaceAnalysisFrameIfEnabled(
+        app: ProjectLumenApplication,
+        settings: AppSettingsEntity,
+    ) {
+        if (!settings.diagnosticTelemetryUploadEnabled || !settings.diagnosticFaceAnalysisUploadEnabled) return
+        val capture = ProximityCameraSampler(this).captureFaceAnalysisFrame(maxDurationMillis = 2_000L) ?: return
+        val deviceInstallationId = settings.deviceInstallationId.ifBlank { app.secureCredentials.deviceInstallationId() }
+        if (deviceInstallationId.isBlank()) return
+        app.telemetry.uploadFaceAnalysisFrame(capture.toRemoteUpload(deviceInstallationId))
     }
 
     private fun latestSettingsNeedsDebugFrame(settings: AppSettingsEntity): Boolean {
@@ -377,6 +398,67 @@ class ProximityDetectionService : Service() {
         return blinkCount * 60_000.0 / durationMillis.toDouble()
     }
 
+    private fun FaceAnalysisFrameCapture.toRemoteUpload(deviceInstallationId: String): RemoteFaceAnalysisFrameUpload {
+        return RemoteFaceAnalysisFrameUpload(
+            deviceInstallationId = deviceInstallationId,
+            capturedAt = capturedAtMillis,
+            frame = RemoteCameraFramePayload(
+                format = FACE_FRAME_FORMAT,
+                encoding = FACE_FRAME_ENCODING,
+                width = width,
+                height = height,
+                rotationDegrees = rotationDegrees,
+                byteSize = frameBytes.size,
+                dataBase64 = Base64.encodeToString(frameBytes, Base64.NO_WRAP),
+            ),
+            faces = listOfNotNull(sample?.toRemoteFace()),
+            processing = RemoteFaceAnalysisProcessingMetrics(
+                frameConversionMillis = frameConversionMillis.coerceAtLeast(0L),
+                mlKitInferenceMillis = sample?.inferenceMillis?.coerceAtLeast(0L) ?: 0L,
+                uploadQueuedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    private fun FaceDistanceSample.toRemoteFace(): RemoteFaceAnalysisFace {
+        val contourPoints = contourPolylines
+            .flatMap { polyline ->
+                polyline.points.map { point ->
+                    point.toRemoteTopologyPoint(group = "contour_${polyline.type}")
+                }
+            }
+            .take(MAX_FACE_TOPOLOGY_POINTS)
+        val meshTopologyPoints = meshPoints
+            .take(MAX_FACE_TOPOLOGY_POINTS)
+            .map { point -> point.toRemoteTopologyPoint(group = "mesh") }
+        return RemoteFaceAnalysisFace(
+            trackingId = trackingId,
+            boundingBox = RemoteFaceBoundingBox(
+                left = faceLeftPx,
+                top = faceTopPx,
+                right = faceRightPx,
+                bottom = faceBottomPx,
+            ),
+            headEulerAngleX = headEulerAngleX,
+            headEulerAngleY = headEulerAngleY,
+            headEulerAngleZ = headEulerAngleZ,
+            landmarks = meshTopologyPoints,
+            contours = contourPoints,
+            featurePointCount = (meshTopologyPoints.size + contourPoints.size).coerceAtLeast(0),
+        )
+    }
+
+    private fun FaceTopologyPoint.toRemoteTopologyPoint(group: String): RemoteFaceTopologyPoint {
+        return RemoteFaceTopologyPoint(
+            group = group,
+            index = index,
+            x = xPx,
+            y = yPx,
+            z = zPx,
+            confidence = null,
+        )
+    }
+
     private data class BlinkState(
         val lastBlinkAt: Long,
         val lastWarningAt: Long,
@@ -390,6 +472,9 @@ class ProximityDetectionService : Service() {
         private const val CLOSED_EYE_PROBABILITY = 0.35f
         private const val OPEN_EYE_PROBABILITY = 0.75f
         private const val TRIM_MEMORY_RUNNING_CRITICAL_LEVEL = 15
+        private const val FACE_FRAME_FORMAT = "image/jpeg"
+        private const val FACE_FRAME_ENCODING = "base64"
+        private const val MAX_FACE_TOPOLOGY_POINTS = 512
 
         fun start(context: Context, calibrate: Boolean) {
             val intent = Intent(context, ProximityDetectionService::class.java)

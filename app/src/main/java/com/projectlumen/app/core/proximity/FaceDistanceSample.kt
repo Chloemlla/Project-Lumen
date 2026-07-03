@@ -10,6 +10,10 @@ data class FaceDistanceSample(
     val faceTopPx: Int = 0,
     val faceRightPx: Int = 0,
     val faceBottomPx: Int = 0,
+    val trackingId: Int? = null,
+    val headEulerAngleX: Float? = null,
+    val headEulerAngleY: Float? = null,
+    val headEulerAngleZ: Float? = null,
     val inferenceMillis: Long = 0L,
     val cameraLatencyMillis: Long = 0L,
     val leftEyeOpenProbability: Float? = null,
@@ -36,4 +40,14 @@ data class FaceMeshTriangle(
     val firstPointIndex: Int,
     val secondPointIndex: Int,
     val thirdPointIndex: Int,
+)
+
+data class FaceAnalysisFrameCapture(
+    val capturedAtMillis: Long,
+    val frameBytes: ByteArray,
+    val width: Int,
+    val height: Int,
+    val rotationDegrees: Int,
+    val frameConversionMillis: Long,
+    val sample: FaceDistanceSample?,
 )

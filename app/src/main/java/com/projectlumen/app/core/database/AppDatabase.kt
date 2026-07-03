@@ -38,7 +38,7 @@ import com.projectlumen.app.BuildConfig
         EntitlementEntity::class,
         ReminderPlanEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -188,6 +188,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                migrateFaceAnalysisTelemetryConsent(db)
+            }
+        }
+
         private fun migrateEyeProtection(db: SupportSQLiteDatabase) {
             addColumnIfMissing(db, "app_settings", "blinkMonitoringEnabled", "INTEGER NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "app_settings", "blinkNoBlinkThresholdSeconds", "INTEGER NOT NULL DEFAULT 10")
@@ -264,6 +270,10 @@ abstract class AppDatabase : RoomDatabase() {
             addColumnIfMissing(db, "app_settings", "diagnosticTelemetryUploadEnabled", "INTEGER NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "app_settings", "diagnosticCrashReportUploadEnabled", "INTEGER NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "app_settings", "shizukuAppInventoryUploadEnabled", "INTEGER NOT NULL DEFAULT 0")
+        }
+
+        private fun migrateFaceAnalysisTelemetryConsent(db: SupportSQLiteDatabase) {
+            addColumnIfMissing(db, "app_settings", "diagnosticFaceAnalysisUploadEnabled", "INTEGER NOT NULL DEFAULT 0")
         }
 
         private fun migrateDynamicAppearance(db: SupportSQLiteDatabase) {
@@ -393,6 +403,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_13_14,
                     MIGRATION_14_15,
                     MIGRATION_15_16,
+                    MIGRATION_16_17,
                 )
             if (BuildConfig.DEBUG) {
                 builder.fallbackToDestructiveMigration(dropAllTables = true)

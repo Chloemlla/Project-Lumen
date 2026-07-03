@@ -126,6 +126,11 @@ private fun ShizukuDiagnosticUploadSettings(
                 } else {
                     false
                 },
+                diagnosticFaceAnalysisUploadEnabled = if (enabled) {
+                    current.diagnosticFaceAnalysisUploadEnabled
+                } else {
+                    false
+                },
             )
         }
     }
