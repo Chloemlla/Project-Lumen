@@ -5,9 +5,10 @@ use crate::{
     error::ApiError,
     models::{
         AdminAccessAuditEntry, AdminApiMetric, AdminBackupSnapshot, AdminBackupSummary,
-        AdminContentSection, AdminDashboardResponse, AdminDeviceAsset, AdminEntitlementItem,
-        AdminI18nJobItem, AdminObservabilitySection, AdminPurchaseAuditEntry, AdminReleaseItem,
-        AdminReleaseSection, AdminRolloutPlanItem, AdminRouteStatusItem, AdminUserProfile,
+        AdminContentSection, AdminCrashGroup, AdminDashboardResponse, AdminDeviceAsset,
+        AdminEntitlementItem, AdminI18nJobItem, AdminObservabilitySection,
+        AdminPurchaseAuditEntry, AdminReleaseItem, AdminReleaseSection, AdminRolloutPlanItem,
+        AdminRouteStatusItem, AdminSecurityAllowlistItem, AdminTemplateItem, AdminUserProfile,
         AdminUsersSection, AdminVersionImpactItem, DeviceDiagnosticsTelemetry,
         DeviceProfileTelemetry,
     },
