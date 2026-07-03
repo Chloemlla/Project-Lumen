@@ -261,6 +261,13 @@ internal fun HomeScreen(
         StateCard(uiState.runtime, uiState.nowMillis)
         TodayStatsCard(uiState.eyeStats.firstOrNull())
         GoalProgressCard(uiState)
+        HomeConvenienceCard(
+            uiState = uiState,
+            onApplyRecommended = { applyRecommendedEyeCareSettings(viewModel) },
+            onStartBreak = viewModel::startBreak,
+            onStartPomodoro = { runReminderAction(viewModel::startPomodoro) },
+            onPauseOneHour = viewModel::pauseForOneHour,
+        )
         EyeCareGuidedSetupCard(
             uiState = uiState,
             permissionRequirements = permissionRequirements,

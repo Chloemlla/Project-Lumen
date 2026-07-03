@@ -65,6 +65,17 @@
     <string name="skip_count">跳过</string>
     <string name="completed_breaks">完成休息</string>
     <string name="quick_actions">快捷操作</string>
+    <string name="home_convenience_title">便捷工具</string>
+    <string name="home_convenience_message">在首页直接完成最常用的护眼与专注操作。</string>
+    <string name="home_convenience_apply_recommended">应用推荐设置</string>
+    <string name="home_convenience_rest_now">立即休息</string>
+    <string name="home_convenience_focus_now">立即专注</string>
+    <string name="home_convenience_quiet_hour">安静一小时</string>
+    <string name="home_convenience_copy_summary">复制今日</string>
+    <string name="home_convenience_share_summary">分享今日</string>
+    <string name="home_convenience_summary_copied">今日摘要已复制。</string>
+    <string name="home_convenience_share_title">分享今日摘要</string>
+    <string name="home_convenience_summary_text">Project Lumen 今日摘要\n状态：%1$s\n工作：%2$d 分钟\n休息：%3$d 分钟\n完成休息：%4$d\n跳过：%5$d\n专注次数：%6$d</string>
     <string name="reminder_disabled_hint">用眼休息提醒已在设置中关闭。</string>
     <string name="reminder_idle_hint">当前没有正在运行的提醒。</string>
     <string name="other_timer_running_hint">另一个计时器正在运行，请先停止后再开始。</string>

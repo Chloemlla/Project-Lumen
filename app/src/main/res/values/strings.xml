@@ -65,6 +65,17 @@
     <string name="skip_count">Skipped</string>
     <string name="completed_breaks">Breaks</string>
     <string name="quick_actions">Quick actions</string>
+    <string name="home_convenience_title">Convenience tools</string>
+    <string name="home_convenience_message">Handle the most common eye-care and focus tasks from Home.</string>
+    <string name="home_convenience_apply_recommended">Apply recommended setup</string>
+    <string name="home_convenience_rest_now">Rest now</string>
+    <string name="home_convenience_focus_now">Focus now</string>
+    <string name="home_convenience_quiet_hour">Quiet for one hour</string>
+    <string name="home_convenience_copy_summary">Copy today</string>
+    <string name="home_convenience_share_summary">Share today</string>
+    <string name="home_convenience_summary_copied">Today summary copied.</string>
+    <string name="home_convenience_share_title">Share today summary</string>
+    <string name="home_convenience_summary_text">Project Lumen today\nStatus: %1$s\nWork: %2$d min\nRest: %3$d min\nBreaks: %4$d\nSkipped: %5$d\nFocus sessions: %6$d</string>
     <string name="reminder_disabled_hint">Eye break reminders are disabled in Settings.</string>
     <string name="reminder_idle_hint">No reminder is running.</string>
     <string name="other_timer_running_hint">Another timer is running. Stop it before starting this one.</string>
