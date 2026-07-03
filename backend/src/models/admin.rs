@@ -204,6 +204,7 @@ pub struct AdminTemplateItem {
     pub color: String,
     pub locales: Vec<String>,
     pub layout_json: Value,
+    pub updated_at: i64,
 }
 
 #[derive(Clone, Serialize)]
@@ -228,10 +229,37 @@ pub struct AdminReleaseSection {
 pub struct AdminReleaseItem {
     pub version_code: i64,
     pub version_name: String,
+    pub channel: String,
+    pub release_url: String,
     pub sha256: String,
+    pub assets: Vec<AdminReleaseAssetItem>,
+    pub patches: Vec<AdminReleasePatchItem>,
     pub rollout: String,
     pub force_update: bool,
     pub created_at: i64,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminReleaseAssetItem {
+    pub abi: String,
+    pub name: String,
+    pub url: String,
+    pub sha256: String,
+    pub size_bytes: i64,
+    pub content_type: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminReleasePatchItem {
+    pub from_version_code: i64,
+    pub from_sha256: String,
+    pub to_sha256: String,
+    pub patch_url: String,
+    pub patch_sha256: String,
+    pub algorithm: String,
+    pub size_bytes: i64,
 }
 
 #[derive(Clone, Serialize)]

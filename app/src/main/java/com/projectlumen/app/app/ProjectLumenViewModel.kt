@@ -124,6 +124,7 @@ class ProjectLumenViewModel(
         settingsRepository = repositories.settings,
         entitlementRepository = repositories.entitlements,
         featureFlagRepository = repositories.featureFlags,
+        tipTemplateRepository = repositories.tipTemplates,
     )
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
 

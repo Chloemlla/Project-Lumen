@@ -14,6 +14,9 @@ interface TipTemplatesDao {
     @Query("SELECT * FROM tip_templates WHERE id = :id AND deletedAt = 0")
     suspend fun get(id: Long): TipTemplateEntity?
 
+    @Query("SELECT * FROM tip_templates WHERE remoteId = :remoteId LIMIT 1")
+    suspend fun getByRemoteId(remoteId: String): TipTemplateEntity?
+
     @Query("SELECT COUNT(*) FROM tip_templates WHERE deletedAt = 0")
     suspend fun count(): Int
 

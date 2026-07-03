@@ -15,6 +15,7 @@ import com.projectlumen.app.core.security.ProjectLumenRequestSigner
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.net.URLEncoder
 
 class ProjectLumenApiClient(
     context: Context,
@@ -97,14 +98,35 @@ class ProjectLumenApiClient(
         accessToken = accessToken,
     ) { it.toRemoteFeatureFlagSnapshot() }
 
+    suspend fun fetchConfigSync(
+        cursor: Long = 0L,
+        version: Long = 1L,
+        channel: String = "stable",
+    ): RemoteConfigSyncSnapshot = request(
+        method = "GET",
+        path = "v1/config/sync?cursor=$cursor&version=$version&channel=${queryEncode(channel)}",
+    ) { it.toRemoteConfigSyncSnapshot() }
+
     suspend fun checkRemoteRelease(
-        accessToken: String,
         currentVersionCode: Long,
         abi: String = "universal",
         channel: String = "stable",
+        rolloutKey: String = "",
+        accessToken: String? = null,
     ): RemoteReleaseCheck = request(
         method = "GET",
-        path = "v1/releases/check?currentVersionCode=$currentVersionCode&abi=$abi&channel=$channel",
+        path = buildString {
+            append("v1/releases/check?currentVersionCode=")
+            append(currentVersionCode)
+            append("&abi=")
+            append(queryEncode(abi))
+            append("&channel=")
+            append(queryEncode(channel))
+            if (rolloutKey.isNotBlank()) {
+                append("&rolloutKey=")
+                append(queryEncode(rolloutKey))
+            }
+        },
         accessToken = accessToken,
     ) { it.toRemoteReleaseCheck() }
 
@@ -279,6 +301,10 @@ class ProjectLumenApiClient(
     }
 
     private fun resolveUrl(path: String) = "${baseUrl.trimEnd('/')}/${path.trimStart('/')}".toHttpUrl()
+
+    private fun queryEncode(value: String): String {
+        return URLEncoder.encode(value, "UTF-8").replace("+", "%20")
+    }
 
     private fun readResponseText(response: Response): String {
         return response.body?.string().orEmpty()

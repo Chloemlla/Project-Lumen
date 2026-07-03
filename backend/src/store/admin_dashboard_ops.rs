@@ -2,8 +2,9 @@ use super::{database_error, time::now_millis, AppStore};
 use crate::{
     error::ApiError,
     models::{
-        AdminApiMetric, AdminCrashGroup, AdminReleaseItem, AdminSecurityAllowlistItem,
-        AdminSyncMetric, AdminTelemetryItem, AdminTemplateItem,
+        AdminApiMetric, AdminCrashGroup, AdminReleaseAssetItem, AdminReleaseItem,
+        AdminReleasePatchItem, AdminSecurityAllowlistItem, AdminSyncMetric, AdminTelemetryItem,
+        AdminTemplateItem,
     },
 };
 use futures_util::TryStreamExt;
@@ -96,6 +97,7 @@ impl AppStore {
                 color: row.color,
                 locales: row.locales,
                 layout_json: row.layout_json,
+                updated_at: row.updated_at,
             })
             .try_collect()
             .await
@@ -180,7 +182,34 @@ impl AppStore {
             .map_ok(|row| AdminReleaseItem {
                 version_code: row.version_code,
                 version_name: row.version_name,
+                channel: row.channel,
+                release_url: row.release_url,
                 sha256: row.sha256,
+                assets: row
+                    .assets
+                    .into_iter()
+                    .map(|asset| AdminReleaseAssetItem {
+                        abi: asset.abi,
+                        name: asset.name,
+                        url: asset.url,
+                        sha256: asset.sha256,
+                        size_bytes: asset.size_bytes,
+                        content_type: asset.content_type,
+                    })
+                    .collect(),
+                patches: row
+                    .patches
+                    .into_iter()
+                    .map(|patch| AdminReleasePatchItem {
+                        from_version_code: patch.from_version_code,
+                        from_sha256: patch.from_sha256,
+                        to_sha256: patch.to_sha256,
+                        patch_url: patch.patch_url,
+                        patch_sha256: patch.patch_sha256,
+                        algorithm: patch.algorithm,
+                        size_bytes: patch.size_bytes,
+                    })
+                    .collect(),
                 rollout: row.rollout,
                 force_update: row.force_update,
                 created_at: row.created_at,

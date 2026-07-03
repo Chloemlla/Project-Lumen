@@ -77,6 +77,7 @@ class SecureCredentialStore(context: Context) {
                 KEY_USER_ID,
                 KEY_USER_EMAIL,
                 KEY_REMOTE_SYNC_CURSOR,
+                KEY_REMOTE_CONFIG_CURSOR,
             ),
         )
     }
@@ -89,6 +90,16 @@ class SecureCredentialStore(context: Context) {
     fun saveRemoteSyncCursor(cursor: Long) {
         migrateLegacyCredentialsIfNeeded()
         encryptedMmkv.encode(KEY_REMOTE_SYNC_CURSOR, cursor.coerceAtLeast(0L))
+    }
+
+    fun remoteConfigCursor(): Long {
+        migrateLegacyCredentialsIfNeeded()
+        return encryptedMmkv.decodeLong(KEY_REMOTE_CONFIG_CURSOR, 0L).coerceAtLeast(0L)
+    }
+
+    fun saveRemoteConfigCursor(cursor: Long) {
+        migrateLegacyCredentialsIfNeeded()
+        encryptedMmkv.encode(KEY_REMOTE_CONFIG_CURSOR, cursor.coerceAtLeast(0L))
     }
 
     fun deviceInstallationId(seed: String? = null): String {
@@ -163,6 +174,7 @@ class SecureCredentialStore(context: Context) {
         private const val KEY_USER_ID = "user_id"
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_REMOTE_SYNC_CURSOR = "remote_sync_cursor"
+        private const val KEY_REMOTE_CONFIG_CURSOR = "remote_config_cursor"
         private const val KEY_DEVICE_INSTALLATION_ID = "device_installation_id"
         private const val KEY_MMKV_CRYPT_KEY = "mmkv_crypt_key"
         private const val KEY_MMKV_MIGRATION_COMPLETE = "mmkv_migration_complete"

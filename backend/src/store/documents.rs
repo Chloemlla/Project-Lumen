@@ -208,10 +208,44 @@ pub(crate) struct AdminReleaseRecord {
     pub id: String,
     pub version_code: i64,
     pub version_name: String,
+    #[serde(default = "default_release_channel")]
+    pub channel: String,
+    #[serde(default)]
+    pub release_url: String,
     pub sha256: String,
+    #[serde(default)]
+    pub assets: Vec<AdminReleaseAssetRecord>,
+    #[serde(default)]
+    pub patches: Vec<AdminReleasePatchRecord>,
     pub rollout: String,
     pub force_update: bool,
     pub created_at: i64,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminReleaseAssetRecord {
+    pub abi: String,
+    pub name: String,
+    pub url: String,
+    pub sha256: String,
+    #[serde(default)]
+    pub size_bytes: i64,
+    #[serde(default)]
+    pub content_type: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdminReleasePatchRecord {
+    pub from_version_code: i64,
+    pub from_sha256: String,
+    pub to_sha256: String,
+    pub patch_url: String,
+    pub patch_sha256: String,
+    pub algorithm: String,
+    #[serde(default)]
+    pub size_bytes: i64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -223,6 +257,10 @@ pub(crate) struct AdminSecurityAllowlistRecord {
     pub protocol: String,
     pub risk: String,
     pub updated_at: i64,
+}
+
+fn default_release_channel() -> String {
+    "stable".to_owned()
 }
 
 impl UserRecord {

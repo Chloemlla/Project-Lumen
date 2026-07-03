@@ -25,6 +25,8 @@ data class ReleaseAsset(
     val downloadUrl: String,
     val contentType: String? = null,
     val sha256: String? = null,
+    val abi: String? = null,
+    val sizeBytes: Long? = null,
 )
 
 data class ReleaseInfo(
@@ -34,9 +36,25 @@ data class ReleaseInfo(
     val htmlUrl: String,
     val publishedAtUtcMillis: Long,
     val assets: List<ReleaseAsset>,
+    val versionCode: Long = 0L,
+    val rollout: String = "",
+    val forceUpdate: Boolean = false,
+    val channel: String = "stable",
+    val patches: List<ReleasePatch> = emptyList(),
+)
+
+data class ReleasePatch(
+    val fromVersionCode: Long,
+    val fromSha256: String,
+    val toSha256: String,
+    val patchUrl: String,
+    val patchSha256: String,
+    val algorithm: String,
+    val sizeBytes: Long? = null,
 )
 
 enum class UpdateMatchReason {
+    VERSION_CODE,
     SEMANTIC_VERSION,
     PUBLISHED_AT,
 }

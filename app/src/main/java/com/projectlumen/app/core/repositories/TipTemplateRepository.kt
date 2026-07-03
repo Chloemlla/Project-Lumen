@@ -9,6 +9,8 @@ class TipTemplateRepository(private val dao: TipTemplatesDao) {
 
     suspend fun get(id: Long): TipTemplateEntity? = dao.get(id)
 
+    suspend fun getByRemoteId(remoteId: String): TipTemplateEntity? = dao.getByRemoteId(remoteId)
+
     suspend fun upsert(template: TipTemplateEntity) {
         dao.upsert(template)
     }

@@ -3,14 +3,19 @@ package com.projectlumen.app.app
 import android.os.Build
 import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.core.api.ProjectLumenApiClient
+import com.projectlumen.app.core.api.RemoteConfigPolicy
+import com.projectlumen.app.core.api.RemoteConfigTemplate
 import com.projectlumen.app.core.api.RemoteEntitlement
 import com.projectlumen.app.core.api.RemoteFeatureFlag
 import com.projectlumen.app.core.api.RemoteSyncChange
 import com.projectlumen.app.core.database.entities.EntitlementEntity
 import com.projectlumen.app.core.database.entities.FeatureFlagEntity
+import com.projectlumen.app.core.database.entities.TipTemplateEntity
+import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.repositories.EntitlementRepository
 import com.projectlumen.app.core.repositories.FeatureFlagRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
+import com.projectlumen.app.core.repositories.TipTemplateRepository
 import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.services.DataBackupService
 import kotlinx.coroutines.CoroutineScope
@@ -48,6 +53,7 @@ internal class ProjectLumenRemoteFeatureEntry(
     private val settingsRepository: SettingsRepository,
     private val entitlementRepository: EntitlementRepository,
     private val featureFlagRepository: FeatureFlagRepository,
+    private val tipTemplateRepository: TipTemplateRepository,
 ) {
     private val _state = MutableStateFlow(ProjectLumenRemoteUiState())
     val state: StateFlow<ProjectLumenRemoteUiState> = _state.asStateFlow()
@@ -120,6 +126,7 @@ internal class ProjectLumenRemoteFeatureEntry(
         val featureFlags = apiClient.fetchFeatureFlags(accessToken)
         saveRemoteEntitlements(entitlements.entitlements)
         saveRemoteFeatureFlags(featureFlags.flags, featureFlags.fetchedAt)
+        val configApplied = syncRemoteConfig()
         settingsRepository.update { current ->
             current.copy(
                 planTier = entitlements.tier,
@@ -131,13 +138,14 @@ internal class ProjectLumenRemoteFeatureEntry(
             sessionAvailable = true,
             cloudTier = entitlements.tier,
             entitlementCount = entitlements.entitlements.size,
-            lastOperation = "Account, entitlements, feature flags, and plan tier refreshed",
+            lastOperation = "Account, entitlements, feature flags, config ($configApplied), and plan tier refreshed",
         )
     }
 
     fun syncNow() = launchRemote("Sync completed") {
         val accessToken = requireAccessToken()
         val deviceId = credentials.deviceInstallationId()
+        val configApplied = syncRemoteConfig()
         val startingCursor = credentials.remoteSyncCursor()
         val beforePush = apiClient.fetchSyncChanges(accessToken, startingCursor)
         val pulledBeforePush = applyRemoteSyncChanges(beforePush.changes, deviceId)
@@ -155,7 +163,7 @@ internal class ProjectLumenRemoteFeatureEntry(
         credentials.saveRemoteSyncCursor(nextCursor)
         _state.value = _state.value.copy(
             syncCursor = nextCursor,
-            lastOperation = "Pulled ${pulledBeforePush + pulledAfterPush} remote changes; pushed ${pushResult.accepted} local records",
+            lastOperation = "Applied $configApplied config updates; pulled ${pulledBeforePush + pulledAfterPush} remote changes; pushed ${pushResult.accepted} local records",
         )
     }
 
@@ -262,7 +270,17 @@ internal class ProjectLumenRemoteFeatureEntry(
         )
     }
 
-    private suspend fun saveRemoteFeatureFlags(flags: List<RemoteFeatureFlag>, fetchedAt: Long) {
+    private suspend fun syncRemoteConfig(): Int {
+        val currentCursor = credentials.remoteConfigCursor()
+        val snapshot = apiClient.fetchConfigSync(cursor = currentCursor)
+        val appliedFlags = saveRemoteFeatureFlags(snapshot.featureFlags, snapshot.serverTime)
+        val appliedPolicies = saveRemoteConfigPolicies(snapshot.policies)
+        val appliedTemplates = saveRemoteConfigTemplates(snapshot.templates)
+        credentials.saveRemoteConfigCursor(maxOf(currentCursor, snapshot.cursor))
+        return appliedFlags + appliedPolicies + appliedTemplates
+    }
+
+    private suspend fun saveRemoteFeatureFlags(flags: List<RemoteFeatureFlag>, fetchedAt: Long): Int {
         flags.forEach { flag ->
             featureFlagRepository.upsert(
                 FeatureFlagEntity(
@@ -273,6 +291,64 @@ internal class ProjectLumenRemoteFeatureEntry(
                 ),
             )
         }
+        return flags.size
+    }
+
+    private suspend fun saveRemoteConfigPolicies(policies: List<RemoteConfigPolicy>): Int {
+        policies.forEach { policy ->
+            featureFlagRepository.upsert(
+                FeatureFlagEntity(
+                    key = "policy_${policy.key}",
+                    enabled = policy.enabled,
+                    payloadJson = policy.payload.toString(),
+                    updatedAt = policy.updatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
+                ),
+            )
+        }
+        return policies.size
+    }
+
+    private suspend fun saveRemoteConfigTemplates(templates: List<RemoteConfigTemplate>): Int {
+        var applied = 0
+        templates.forEachIndexed { index, template ->
+            val remoteId = template.id.trim()
+            val name = template.name.trim()
+            if (remoteId.isBlank() || name.isBlank()) return@forEachIndexed
+            val existing = tipTemplateRepository.getByRemoteId(remoteId)
+            val nowMillis = System.currentTimeMillis()
+            val layoutJson = JSONObject(template.layoutJson.toString())
+                .put("countdownStyle", template.countdownStyle)
+                .put("locales", JSONArray(template.locales))
+            val updatedAt = template.updatedAt.takeIf { it > 0L } ?: nowMillis
+            val entity = (existing ?: TipTemplateEntity(
+                name = name,
+                isBuiltin = false,
+                remoteId = remoteId,
+                sortOrder = 10_000 + index,
+                createdAt = updatedAt,
+                updatedAt = updatedAt,
+            )).copy(
+                name = name,
+                isBuiltin = false,
+                backgroundType = TemplateBackgroundType.SOLID.name,
+                backgroundValue = template.color,
+                primaryColor = template.color,
+                titleText = layoutJson.optString("titleText", existing?.titleText ?: "Time to rest"),
+                subtitleText = layoutJson.optString(
+                    "subtitleText",
+                    existing?.subtitleText ?: "Look away from the screen and relax your eyes.",
+                ),
+                showSkipButton = layoutJson.optBoolean("showSkipButton", existing?.showSkipButton ?: true),
+                layoutJson = layoutJson.toString(),
+                isPremium = !template.tier.equals("FREE", ignoreCase = true),
+                remoteId = remoteId,
+                updatedAt = updatedAt,
+                deletedAt = 0L,
+            )
+            tipTemplateRepository.upsert(entity)
+            applied += 1
+        }
+        return applied
     }
 
     private suspend fun applyRemoteSyncChanges(

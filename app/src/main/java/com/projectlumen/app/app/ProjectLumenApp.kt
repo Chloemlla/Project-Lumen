@@ -128,7 +128,7 @@ fun ProjectLumenApp(
         LocaleController.wrap(baseContext, uiState.settings.languageCode)
     }
     val coroutineScope = rememberCoroutineScope()
-    val updateChecker = remember(baseContext) { UpdateChecker(baseContext, PROJECT_LUMEN_RELEASE_API) }
+    val updateChecker = remember(baseContext) { UpdateChecker(baseContext) }
     val updateInstaller = remember { UpdateInstaller(baseContext) }
     var pendingWebUrl by rememberSaveable { mutableStateOf<String?>(null) }
     var updateDialogState by remember { mutableStateOf<UpdateDialogState>(UpdateDialogState.Hidden) }

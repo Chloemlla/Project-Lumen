@@ -116,16 +116,78 @@ internal fun JSONObject.toRemoteFeatureFlag(): RemoteFeatureFlag =
         payload = optJSONObject("payload") ?: JSONObject(),
     )
 
+internal fun JSONObject.toRemoteConfigSyncSnapshot(): RemoteConfigSyncSnapshot =
+    RemoteConfigSyncSnapshot(
+        schemaVersion = optLong("schemaVersion", 1L),
+        cursor = optLong("cursor"),
+        serverTime = optLong("serverTime"),
+        channel = optString("channel", "stable"),
+        featureFlags = optJSONArray("featureFlags").toObjectList { it.toRemoteFeatureFlag() },
+        templates = optJSONArray("templates").toObjectList { it.toRemoteConfigTemplate() },
+        policies = optJSONArray("policies").toObjectList { it.toRemoteConfigPolicy() },
+    )
+
+internal fun JSONObject.toRemoteConfigTemplate(): RemoteConfigTemplate =
+    RemoteConfigTemplate(
+        id = optString("id"),
+        name = optString("name"),
+        tier = optString("tier", "FREE"),
+        countdownStyle = optString("countdownStyle", "circle"),
+        color = optString("color", "#2563EB"),
+        locales = optJSONArray("locales").toStringList(),
+        layoutJson = optJSONObject("layoutJson") ?: JSONObject(),
+        updatedAt = optLong("updatedAt"),
+    )
+
+internal fun JSONObject.toRemoteConfigPolicy(): RemoteConfigPolicy =
+    RemoteConfigPolicy(
+        key = optString("key"),
+        enabled = optBoolean("enabled", true),
+        payload = optJSONObject("payload") ?: JSONObject(),
+        updatedAt = optLong("updatedAt"),
+    )
+
 internal fun JSONObject.toRemoteReleaseCheck(): RemoteReleaseCheck =
     RemoteReleaseCheck(
         updateAvailable = optBoolean("updateAvailable"),
         currentVersionCode = optLong("currentVersionCode"),
         versionCode = optLong("versionCode"),
         versionName = optString("versionName"),
+        tagName = optString("tagName"),
+        releaseUrl = optString("releaseUrl"),
+        abi = optString("abi", "universal"),
+        channel = optString("channel", "stable"),
+        fullApkUrl = optString("fullApkUrl"),
+        fullApkSha256 = optString("fullApkSha256"),
+        fullApkSizeBytes = optLong("fullApkSizeBytes"),
         sha256 = optString("sha256"),
         rollout = optString("rollout"),
         forceUpdate = optBoolean("forceUpdate"),
         checkedAt = optLong("checkedAt"),
+        createdAt = optLong("createdAt"),
+        assets = optJSONArray("assets").toObjectList { it.toRemoteReleaseAsset() },
+        patches = optJSONArray("patches").toObjectList { it.toRemoteReleasePatch() },
+    )
+
+internal fun JSONObject.toRemoteReleaseAsset(): RemoteReleaseAsset =
+    RemoteReleaseAsset(
+        abi = optString("abi", "universal"),
+        name = optString("name"),
+        url = optString("url"),
+        sha256 = optString("sha256"),
+        sizeBytes = optLong("sizeBytes"),
+        contentType = optString("contentType"),
+    )
+
+internal fun JSONObject.toRemoteReleasePatch(): RemoteReleasePatch =
+    RemoteReleasePatch(
+        fromVersionCode = optLong("fromVersionCode"),
+        fromSha256 = optString("fromSha256"),
+        toSha256 = optString("toSha256"),
+        patchUrl = optString("patchUrl"),
+        patchSha256 = optString("patchSha256"),
+        algorithm = optString("algorithm"),
+        sizeBytes = optLong("sizeBytes"),
     )
 
 internal fun JSONObject.toRemoteDeviceRegistrationResult(): RemoteDeviceRegistrationResult =
@@ -145,6 +207,15 @@ private inline fun <T> JSONArray?.toObjectList(transform: (JSONObject) -> T): Li
     return buildList {
         for (index in 0 until length()) {
             optJSONObject(index)?.let { add(transform(it)) }
+        }
+    }
+}
+
+private fun JSONArray?.toStringList(): List<String> {
+    if (this == null) return emptyList()
+    return buildList {
+        for (index in 0 until length()) {
+            optString(index).takeIf { it.isNotBlank() }?.let(::add)
         }
     }
 }

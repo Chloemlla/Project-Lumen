@@ -155,6 +155,62 @@ jobs:
             sha256sum *.apk > checksums.txt
           )
 
+          TAG_NAME="v${VERSION}"
+          RELEASE_BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG_NAME}"
+          python3 - "$VERSION" "${{ env.PROJECT_LUMEN_VERSION_CODE }}" "$TAG_NAME" "$RELEASE_BASE_URL" "${GITHUB_REPOSITORY}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          version_name, version_code, tag_name, release_base_url, repository = sys.argv[1:6]
+          asset_dir = pathlib.Path("release-assets")
+          checksums = {}
+          for line in (asset_dir / "checksums.txt").read_text(encoding="utf-8").splitlines():
+              parts = line.split()
+              if len(parts) >= 2:
+                  checksums[pathlib.Path(parts[-1]).name] = parts[0].lower()
+
+          def abi_for(name):
+              for abi in ("armeabi-v7a", "arm64-v8a", "x86", "x86_64"):
+                  if name.endswith(f"_{abi}.apk"):
+                      return abi
+              return "universal"
+
+          assets = []
+          for apk in sorted(asset_dir.glob("*.apk")):
+              name = apk.name
+              assets.append({
+                  "abi": abi_for(name),
+                  "name": name,
+                  "url": f"{release_base_url}/{name}",
+                  "sha256": checksums[name],
+                  "sizeBytes": apk.stat().st_size,
+                  "contentType": "application/vnd.android.package-archive",
+              })
+
+          primary = next((asset for asset in assets if asset["abi"] == "universal"), assets[0])
+          manifest = {
+              "schemaVersion": 1,
+              "versionCode": int(version_code),
+              "versionName": version_name,
+              "tagName": tag_name,
+              "channel": "stable",
+              "rollout": "100%",
+              "forceUpdate": False,
+              "releaseUrl": f"https://github.com/{repository}/releases/tag/{tag_name}",
+              "sha256": primary["sha256"],
+              "fullApkUrl": primary["url"],
+              "fullApkSha256": primary["sha256"],
+              "fullApkSizeBytes": primary["sizeBytes"],
+              "assets": assets,
+              "patches": [],
+          }
+          (asset_dir / "release-manifest.json").write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
@@ -174,6 +230,34 @@ jobs:
           prerelease: false
           name: "Project-Lumen ${{ env.PROJECT_LUMEN_VERSION_NAME }}-${{ env.PROJECT_LUMEN_SHORT_HASH }}"
           files: release-assets/*
+
+      - name: Sync release manifest to backend
+        if: success() && github.event_name != 'pull_request'
+        env:
+          PROJECT_LUMEN_API_BASE_URL: ${{ secrets.PROJECT_LUMEN_API_BASE_URL }}
+          PROJECT_LUMEN_ADMIN_TOKEN: ${{ secrets.PROJECT_LUMEN_ADMIN_TOKEN }}
+        run: |
+          if [ -z "$PROJECT_LUMEN_API_BASE_URL" ] || [ -z "$PROJECT_LUMEN_ADMIN_TOKEN" ]; then
+            echo "Backend release sync skipped; PROJECT_LUMEN_API_BASE_URL or PROJECT_LUMEN_ADMIN_TOKEN is not configured."
+            exit 0
+          fi
+          python3 - <<'PY'
+          import json
+          import pathlib
+
+          manifest_path = pathlib.Path("release-assets/release-manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          payload = {"action": "force-update", "payload": manifest}
+          pathlib.Path("release-assets/backend-release-action.json").write_text(
+              json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+              encoding="utf-8",
+          )
+          PY
+          curl -fsS \
+            -H "Authorization: Bearer ${PROJECT_LUMEN_ADMIN_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data-binary @release-assets/backend-release-action.json \
+            "${PROJECT_LUMEN_API_BASE_URL%/}/admin/actions"
 
   backend:
     name: Rust backend verification
