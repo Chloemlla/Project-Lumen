@@ -32,10 +32,16 @@ LUMEN_OUTEMAIL_DISPLAY_NAME=Project Lumen
 LUMEN_OUTEMAIL_DOMAIN=
 LUMEN_OUTEMAIL_TIMEOUT_SECONDS=10
 LUMEN_ACCESS_TOKEN_TTL_SECONDS=604800
+LUMEN_REQUEST_SIGNING_SECRET=project-lumen-local-request-signing-key
+LUMEN_REQUEST_TIMESTAMP_SKEW_SECONDS=300
+LUMEN_REQUIRE_REQUEST_SIGNING=true
+LUMEN_REQUIRE_PLAY_INTEGRITY=false
 LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false
 ```
 
 `LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false` is intentionally fail-closed for Google Play purchases until real platform verification credentials are wired in.
+
+`LUMEN_REQUEST_SIGNING_SECRET` must match the Android release build secret supplied as `PROJECT_LUMEN_REQUEST_SIGNING_SECRET`; otherwise signed client requests fail with HTTP 403. Keep the default value for local development only.
 
 Email login sends verification codes through Happy-TTS outemail when both `LUMEN_OUTEMAIL_BASE_URL` and `LUMEN_OUTEMAIL_API_KEY` are configured. The API key is sent as a Bearer token to `POST /api/outemail/send`; when the key is empty, `/api/v1/auth/email/start` keeps returning `devCode` for development use.
 

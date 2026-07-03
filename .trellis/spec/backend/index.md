@@ -50,6 +50,7 @@ Before marking work done, verify against [`quality-guidelines.md`](./quality-gui
 | [Error Handling](./error-handling.md) | Error vocabulary, wrapping at boundaries, API error shape | ✅ Filled |
 | [Database Guidelines](./database-guidelines.md) | Postgres store, typed SQL, access via ports | ✅ Filled |
 | [Logging Guidelines](./logging-guidelines.md) | Structured logging, levels, **secret redaction** | ✅ Filled (⏳ lib to confirm) |
+| [Backend Deployment Security](./deployment-security.md) | Request signing / Play Integrity deployment env contracts | ✅ Filled |
 
 > ⏳ items are recommendations from `docs/design/05-tech-stack-and-conventions.md` to finalize before the relevant code lands. They are decisions, not blanks.
 
