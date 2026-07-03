@@ -25,4 +25,4 @@ Admin session flow:
 - `POST /api/admin/auth/refresh`
 - Bearer token for `/api/admin/dashboard` and `/api/admin/actions`
 
-Sensitive actions are recorded through `/api/admin/actions`; supported actions also update MongoDB management collections for manual plan grants, Pro revocation, template dispatch, forced update policy, and security allowlist changes.
+Sensitive actions are recorded through `/api/admin/actions`; supported actions also update MongoDB management collections for manual plan grants, Pro revocation, template dispatch, forced update policy, and security allowlist changes. A configured `LUMEN_ADMIN_AUTOMATION_TOKEN` is accepted by `/api/admin/actions` only for workflow automation.

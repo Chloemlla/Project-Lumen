@@ -9,6 +9,7 @@ pub struct Config {
     pub mongodb_database: String,
     pub admin_username: String,
     pub admin_password: String,
+    pub admin_automation_token: String,
     pub admin_access_token_ttl_seconds: u64,
     pub admin_refresh_token_ttl_seconds: u64,
     pub login_code: String,
@@ -32,6 +33,7 @@ impl Config {
             mongodb_database: env_value("LUMEN_MONGODB_DATABASE", "project_lumen"),
             admin_username: env_value("LUMEN_ADMIN_USERNAME", "admin"),
             admin_password: env_value("LUMEN_ADMIN_PASSWORD", "change-me"),
+            admin_automation_token: env_value("LUMEN_ADMIN_AUTOMATION_TOKEN", ""),
             admin_access_token_ttl_seconds: env_u64("LUMEN_ADMIN_ACCESS_TOKEN_TTL_SECONDS", 3_600),
             admin_refresh_token_ttl_seconds: env_u64(
                 "LUMEN_ADMIN_REFRESH_TOKEN_TTL_SECONDS",

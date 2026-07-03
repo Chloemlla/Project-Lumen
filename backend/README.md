@@ -20,6 +20,7 @@ LUMEN_MONGODB_URI=mongodb://localhost:27017
 LUMEN_MONGODB_DATABASE=project_lumen
 LUMEN_ADMIN_USERNAME=admin
 LUMEN_ADMIN_PASSWORD=change-me
+LUMEN_ADMIN_AUTOMATION_TOKEN=
 LUMEN_ADMIN_ACCESS_TOKEN_TTL_SECONDS=3600
 LUMEN_ADMIN_REFRESH_TOKEN_TTL_SECONDS=604800
 LUMEN_DEV_LOGIN_CODE=000000
@@ -48,6 +49,9 @@ The dashboard includes the 20 operations modules needed for Project Lumen admin 
 - OTA integrity registry, rollout policy, Rust route topology, HTTP allowlist review, and admin session security.
 
 Sensitive action buttons are disabled when the dashboard is opened over non-local HTTP. Production admin access should be served through HTTPS only.
+
+`LUMEN_ADMIN_AUTOMATION_TOKEN` is optional, must be at least 32 characters, and is accepted only by `POST /api/admin/actions`.
+Set it to the same value as the GitHub Actions secret `PROJECT_LUMEN_ADMIN_TOKEN` when release workflows need to sync `release-manifest.json` to MongoDB.
 
 Admin API endpoints:
 
@@ -88,6 +92,7 @@ GET  /api/v1/me
 POST /api/v1/devices/register
 GET  /api/v1/entitlements
 GET  /api/v1/config/feature-flags
+GET  /api/v1/config/sync?cursor=cursor&version=1&channel=stable
 POST /api/v1/purchases/google/verify
 GET  /api/v1/sync/changes?since=cursor
 POST /api/v1/sync/push

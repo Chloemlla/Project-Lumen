@@ -114,6 +114,7 @@ fn log_startup_config(config: &Config) {
         mongodb_database = %config.mongodb_database,
         admin_username = %config.admin_username,
         admin_password_configured = !config.admin_password.trim().is_empty(),
+        admin_automation_token_configured = !config.admin_automation_token.trim().is_empty(),
         admin_access_token_ttl_seconds = config.admin_access_token_ttl_seconds,
         admin_refresh_token_ttl_seconds = config.admin_refresh_token_ttl_seconds,
         login_code_configured = !config.login_code.trim().is_empty(),

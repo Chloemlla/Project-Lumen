@@ -1,5 +1,5 @@
 use crate::{
-    admin_context::require_admin,
+    admin_context::{require_admin, require_admin_action_operator},
     error::ApiError,
     models::{
         AdminActionRequest, AdminActionResponse, AdminDashboardResponse, AdminLoginRequest,
@@ -65,7 +65,7 @@ async fn record_action(
     headers: HeaderMap,
     Json(payload): Json<AdminActionRequest>,
 ) -> Result<Json<AdminActionResponse>, ApiError> {
-    let operator = require_admin(&headers, &state).await?;
+    let operator = require_admin_action_operator(&headers, &state).await?;
     Ok(Json(
         state
             .store
