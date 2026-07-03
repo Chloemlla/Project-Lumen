@@ -59,7 +59,9 @@ developer machines when repository policy forbids local build/test execution.
 - Runtime contract: Rust serves `LUMEN_ADMIN_STATIC_DIR`, whose default is
   `backend/admin/dist`.
 - Docker contract: the image build must copy only the built `dist/` into the
-  runtime image path used by `LUMEN_ADMIN_STATIC_DIR`.
+  runtime image path used by `LUMEN_ADMIN_STATIC_DIR`, and keep the built files
+  available at the legacy `/app/backend/admin` path because the deployment
+  script inherits existing container environment variables.
 - API contract: the dashboard calls `/api/health`, `/api/admin/auth/login`,
   `/api/admin/auth/refresh`, `/api/admin/dashboard`, and
   `/api/admin/actions`.
@@ -86,7 +88,8 @@ developer machines when repository policy forbids local build/test execution.
 - GitHub workflow: `backend/admin` must run `npm install`, `npm run build`,
   and upload the `backend/admin/dist/**` artifact.
 - Docker workflow: image build must run the same admin build, verify
-  `dist/index.html` exists, and copy `dist/`.
+  `dist/index.html` exists, and copy `dist/` to both current and legacy runtime
+  paths.
 - Manual review: verify sensitive actions are disabled on non-local HTTP and
   enabled on HTTPS/localhost.
 

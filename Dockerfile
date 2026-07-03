@@ -30,6 +30,7 @@ ENV LUMEN_BIND_ADDRESS=0.0.0.0:8080 \
 
 COPY --from=backend-builder /workspace/backend/target/release/project-lumen-api /usr/local/bin/project-lumen-api
 COPY --from=admin-builder /workspace/backend/admin/dist /app/backend/admin/dist
+COPY --from=admin-builder /workspace/backend/admin/dist /app/backend/admin
 
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/project-lumen-api"]
