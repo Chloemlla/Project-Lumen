@@ -66,10 +66,14 @@ data class EnvironmentContextTelemetry(
 )
 
 data class DeviceProfileTelemetry(
+    val deviceFingerprint: String,
     val manufacturer: String,
     val model: String,
+    val deviceName: String,
     val androidRelease: String,
     val androidSdk: Int,
+    val primaryAbi: String,
+    val buildFingerprint: String,
     val frontCameraResolution: String,
     val appVersionName: String,
     val appVersionCode: Long,

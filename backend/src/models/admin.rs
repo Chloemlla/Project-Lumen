@@ -85,6 +85,7 @@ pub struct AdminUserProfile {
 pub struct AdminDeviceAsset {
     pub user_id: String,
     pub device_installation_id: String,
+    pub device_fingerprint: String,
     pub model: String,
     pub version_code: i64,
     pub last_seen_at: i64,

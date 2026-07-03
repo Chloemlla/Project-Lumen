@@ -68,7 +68,14 @@ window.LumenAdminModules = (() => {
 
   function renderDevices() {
     if (!data.devices.length) return `<div class="empty-state">No registered device assets have been recorded.</div>`;
-    return `<div class="list-stack">${data.devices.map((device) => row(device.model, `${device.id} | versionCode ${device.versionCode} | ${device.config}`, tag(device.lastSeen, "info"))).join("")}</div>`;
+    return `<div class="list-stack">${data.devices.map((device) => row(device.model, `${device.id} | fingerprint ${shortFingerprint(device.fingerprint)} | versionCode ${device.versionCode} | ${device.config}`, tag(device.lastSeen, "info"))).join("")}</div>`;
+  }
+
+  function shortFingerprint(value) {
+    const normalized = String(value || "").trim();
+    if (!normalized) return "not reported";
+    if (normalized.length <= 24) return escapeHtml(normalized);
+    return `${escapeHtml(normalized.slice(0, 12))}...${escapeHtml(normalized.slice(-12))}`;
   }
 
   function renderAccessAudit() {

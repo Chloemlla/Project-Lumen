@@ -26,16 +26,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class ProjectLumenViewModel(
-    database: AppDatabase,
+    private val database: AppDatabase,
     notifications: NotificationService,
     audio: AudioService,
     export: ExportService,
     backup: DataBackupService,
     apiClient: ProjectLumenApiClient,
-    secureCredentials: SecureCredentialStore,
+    private val secureCredentials: SecureCredentialStore,
     eyeCarePreferences: EyeCarePreferencesDataStore,
     startTimerService: () -> Unit,
     stopTimerService: () -> Unit,
@@ -56,6 +57,8 @@ class ProjectLumenViewModel(
     private val repositories = ProjectLumenRepositories(database, eyeCarePreferences, secureCredentials)
     private val now = MutableStateFlow(System.currentTimeMillis())
     private var crashStateStore: ProjectLumenStateStore? = null
+    private val installProfile = secureCredentials.installProfile()
+    private val deviceFingerprint = secureCredentials.deviceInstallationId()
     private val crashReportingHandler = CoroutineExceptionHandler { _, throwable ->
         crashStateStore?.recordCrash(throwable) ?: recordCrashReport(throwable)
     }
@@ -127,8 +130,12 @@ class ProjectLumenViewModel(
         tipTemplateRepository = repositories.tipTemplates,
     )
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    private val _onboardingState = MutableStateFlow(
+        ProjectLumenOnboardingState(deviceFingerprint = deviceFingerprint),
+    )
 
     val webPageRequests = _webPageRequests.asSharedFlow()
+    val onboardingState = _onboardingState.asStateFlow()
     val backupImportPreview = backupEntry.importPreview
     internal val remoteState = remoteEntry.state
     val shizukuState = shizuku.state
@@ -138,6 +145,7 @@ class ProjectLumenViewModel(
     init {
         CrashBreadcrumbs.record("ProjectLumenViewModel.init")
         reportingScope.launch {
+            val hadExistingLocalUse = hasExistingLocalUse()
             repositories.settings.ensureDefault()
             repositories.runtime.ensureDefault()
             repositories.dailyGoals.ensureDefault()
@@ -146,6 +154,7 @@ class ProjectLumenViewModel(
             val settings = repositories.settings.getOrDefault()
             settingsEntry.applyStartupMonitoring(settings)
             runtimeEntry.refreshActiveNotifications(settings, repositories.runtime.getOrDefault())
+            refreshOnboardingState(hadExistingLocalUse)
             runCatching { uploadTelemetrySnapshot() }
         }
         runtimeEntry.startClock(now)
@@ -277,6 +286,26 @@ class ProjectLumenViewModel(
         stateStore.clearCrashReport()
     }
 
+    fun completeOnboarding(applyRecommendedSetup: Boolean) {
+        secureCredentials.markOnboardingCompleted()
+        _onboardingState.value = _onboardingState.value.copy(visible = false)
+        if (!applyRecommendedSetup) return
+        updateSettings { current ->
+            current.copy(
+                reminderEnabled = true,
+                statsEnabled = true,
+                notificationEnabled = true,
+                keepAliveEnabled = true,
+                preAlertEnabled = true,
+                pomodoroEnabled = true,
+                globalOverlayEnabled = true,
+                proximityMonitoringEnabled = true,
+                blinkMonitoringEnabled = true,
+                ambientLightMonitoringEnabled = true,
+            )
+        }
+    }
+
     fun selectTemplate(templateId: Long) {
         CrashBreadcrumbs.record("Action selectTemplate id=$templateId")
         val state = stateStore.uiState.value
@@ -343,6 +372,31 @@ class ProjectLumenViewModel(
         )
     }
 
+    private suspend fun hasExistingLocalUse(): Boolean {
+        val hasSettings = repositories.settings.get() != null
+        val hasEyeStats = database.dailyEyeStatsDao().getAll().isNotEmpty()
+        val hasPomodoroStats = database.dailyPomodoroStatsDao().getAll().isNotEmpty()
+        val hasRemoteSession = secureCredentials.load() != null
+        return hasSettings || hasEyeStats || hasPomodoroStats || hasRemoteSession
+    }
+
+    private fun refreshOnboardingState(hadExistingLocalUse: Boolean) {
+        val nowMillis = System.currentTimeMillis()
+        val firstInstallAt = installProfile.packageFirstInstallAt
+        val freshPackageInstall = firstInstallAt <= 0L ||
+            nowMillis - firstInstallAt <= FRESH_INSTALL_WINDOW_MILLIS
+        val newInstallDetected = !installProfile.hadDeviceCredentialBeforeLaunch &&
+            (freshPackageInstall || installProfile.firstSeenAt >= nowMillis - FIRST_SEEN_GRACE_MILLIS)
+        val shouldShow = installProfile.onboardingCompletedAt <= 0L &&
+            !installProfile.hadDeviceCredentialBeforeLaunch &&
+            !hadExistingLocalUse
+        _onboardingState.value = ProjectLumenOnboardingState(
+            visible = shouldShow,
+            deviceFingerprint = deviceFingerprint,
+            newInstallDetected = newInstallDetected,
+        )
+    }
+
     private inline fun reportIfThrows(block: () -> Unit) {
         runCatching(block).onFailure(stateStore::recordCrash)
     }
@@ -350,5 +404,10 @@ class ProjectLumenViewModel(
     private inline fun traceAction(name: String, block: () -> Unit) {
         CrashBreadcrumbs.record("Action $name")
         block()
+    }
+
+    private companion object {
+        private const val FRESH_INSTALL_WINDOW_MILLIS = 3L * 24L * 60L * 60L * 1_000L
+        private const val FIRST_SEEN_GRACE_MILLIS = 5L * 60L * 1_000L
     }
 }

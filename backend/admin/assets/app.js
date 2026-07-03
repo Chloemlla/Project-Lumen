@@ -371,6 +371,7 @@ function mapDashboard(snapshot) {
         },
         devices: (snapshot.users?.devices || []).map((device) => ({
             id: device.deviceInstallationId || "unknown",
+            fingerprint: device.deviceFingerprint || "",
             model: device.model || "not reported",
             versionCode: device.versionCode || 0,
             lastSeen: formatTime(device.lastSeenAt),

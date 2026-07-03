@@ -1,11 +1,21 @@
 package com.projectlumen.app.core.security
 
 import android.content.Context
+import android.os.Build
+import android.provider.Settings
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.projectlumen.app.core.api.AuthSession
 import com.projectlumen.app.core.mmkv.ProjectLumenMmkv
+import java.security.MessageDigest
 import java.util.UUID
+
+data class DeviceInstallProfile(
+    val hadDeviceCredentialBeforeLaunch: Boolean,
+    val firstSeenAt: Long,
+    val packageFirstInstallAt: Long,
+    val onboardingCompletedAt: Long,
+)
 
 data class StoredAuthSession(
     val accessToken: String,
@@ -102,13 +112,37 @@ class SecureCredentialStore(context: Context) {
         encryptedMmkv.encode(KEY_REMOTE_CONFIG_CURSOR, cursor.coerceAtLeast(0L))
     }
 
-    fun deviceInstallationId(seed: String? = null): String {
+    fun installProfile(nowMillis: Long = System.currentTimeMillis()): DeviceInstallProfile {
+        migrateLegacyCredentialsIfNeeded()
+        val hadDeviceCredential = encryptedMmkv.containsKey(KEY_DEVICE_INSTALLATION_ID)
+        val firstSeenAt = encryptedMmkv.decodeLong(KEY_FIRST_SEEN_AT, 0L).takeIf { it > 0L }
+            ?: nowMillis.also { encryptedMmkv.encode(KEY_FIRST_SEEN_AT, it) }
+        return DeviceInstallProfile(
+            hadDeviceCredentialBeforeLaunch = hadDeviceCredential,
+            firstSeenAt = firstSeenAt,
+            packageFirstInstallAt = packageFirstInstallAt(),
+            onboardingCompletedAt = encryptedMmkv.decodeLong(KEY_ONBOARDING_COMPLETED_AT, 0L),
+        )
+    }
+
+    fun markOnboardingCompleted(nowMillis: Long = System.currentTimeMillis()) {
+        migrateLegacyCredentialsIfNeeded()
+        encryptedMmkv.encode(KEY_ONBOARDING_COMPLETED_AT, nowMillis.coerceAtLeast(1L))
+    }
+
+    fun deviceInstallationId(): String {
         migrateLegacyCredentialsIfNeeded()
         val existing = encryptedMmkv.decodeString(KEY_DEVICE_INSTALLATION_ID)
             ?.takeIf { it.isNotBlank() }
-        if (existing != null) return existing
-        val generated = seed?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
+        if (
+            isDeviceFingerprint(existing) &&
+            encryptedMmkv.decodeInt(KEY_DEVICE_FINGERPRINT_VERSION, 0) >= DEVICE_FINGERPRINT_VERSION
+        ) {
+            return existing
+        }
+        val generated = generateDeviceFingerprint()
         encryptedMmkv.encode(KEY_DEVICE_INSTALLATION_ID, generated)
+        encryptedMmkv.encode(KEY_DEVICE_FINGERPRINT_VERSION, DEVICE_FINGERPRINT_VERSION)
         return generated
     }
 
@@ -164,6 +198,49 @@ class SecureCredentialStore(context: Context) {
         return generated
     }
 
+    private fun generateDeviceFingerprint(): String {
+        val androidId = runCatching {
+            Settings.Secure.getString(appContext.contentResolver, Settings.Secure.ANDROID_ID)
+        }.getOrNull().orEmpty()
+        val material = listOf(
+            "project-lumen-device-v2",
+            appContext.packageName,
+            androidId,
+            Build.BRAND.orEmpty(),
+            Build.MANUFACTURER.orEmpty(),
+            Build.MODEL.orEmpty(),
+            Build.DEVICE.orEmpty(),
+            Build.PRODUCT.orEmpty(),
+            Build.VERSION.RELEASE.orEmpty(),
+            Build.VERSION.SDK_INT.toString(),
+            Build.SUPPORTED_ABIS.firstOrNull().orEmpty(),
+            Build.FINGERPRINT.orEmpty(),
+        ).joinToString("|") { it.trim().lowercase() }
+        return sha256Hex(material)
+    }
+
+    private fun packageFirstInstallAt(): Long {
+        return runCatching {
+            appContext.packageManager.getPackageInfo(appContext.packageName, 0).firstInstallTime
+        }.getOrDefault(0L)
+    }
+
+    private fun isDeviceFingerprint(value: String?): Boolean {
+        return value?.length == DEVICE_FINGERPRINT_LENGTH &&
+            value.all { it in '0'..'9' || it in 'a'..'f' }
+    }
+
+    private fun sha256Hex(value: String): String {
+        val bytes = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+        val output = CharArray(bytes.size * 2)
+        bytes.forEachIndexed { index, byte ->
+            val unsigned = byte.toInt() and 0xff
+            output[index * 2] = HEX_CHARS[unsigned ushr 4]
+            output[index * 2 + 1] = HEX_CHARS[unsigned and 0x0f]
+        }
+        return String(output)
+    }
+
     private companion object {
         private const val STORE_NAME = "project_lumen_secure_credentials"
         private const val KEY_ACCESS_TOKEN = "access_token"
@@ -176,7 +253,13 @@ class SecureCredentialStore(context: Context) {
         private const val KEY_REMOTE_SYNC_CURSOR = "remote_sync_cursor"
         private const val KEY_REMOTE_CONFIG_CURSOR = "remote_config_cursor"
         private const val KEY_DEVICE_INSTALLATION_ID = "device_installation_id"
+        private const val KEY_DEVICE_FINGERPRINT_VERSION = "device_fingerprint_version"
+        private const val KEY_FIRST_SEEN_AT = "first_seen_at"
+        private const val KEY_ONBOARDING_COMPLETED_AT = "onboarding_completed_at"
         private const val KEY_MMKV_CRYPT_KEY = "mmkv_crypt_key"
         private const val KEY_MMKV_MIGRATION_COMPLETE = "mmkv_migration_complete"
+        private const val DEVICE_FINGERPRINT_LENGTH = 64
+        private const val DEVICE_FINGERPRINT_VERSION = 2
+        private const val HEX_CHARS = "0123456789abcdef"
     }
 }

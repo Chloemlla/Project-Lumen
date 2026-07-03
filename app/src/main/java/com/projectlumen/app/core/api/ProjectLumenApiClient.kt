@@ -74,6 +74,7 @@ class ProjectLumenApiClient(
     suspend fun registerDevice(
         accessToken: String,
         deviceInstallationId: String,
+        deviceFingerprint: String,
         model: String,
         versionCode: Long,
         localSecurityConfig: String,
@@ -83,6 +84,7 @@ class ProjectLumenApiClient(
         accessToken = accessToken,
         body = JSONObject()
             .put("deviceInstallationId", deviceInstallationId)
+            .put("deviceFingerprint", deviceFingerprint)
             .put("model", model)
             .put("versionCode", versionCode)
             .put("localSecurityConfig", localSecurityConfig),

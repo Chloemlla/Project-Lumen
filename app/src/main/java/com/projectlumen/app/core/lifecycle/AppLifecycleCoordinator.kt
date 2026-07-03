@@ -97,7 +97,7 @@ class AppLifecycleCoordinator(
 
     private suspend fun registerDeviceAsset(settings: AppSettingsEntity) {
         val deviceInstallationId = app.secureCredentials
-            .deviceInstallationId(settings.deviceInstallationId.takeIf { it.isNotBlank() })
+            .deviceInstallationId()
             .takeIf { it.isNotBlank() }
             ?: return
         val accessToken = accessTokenForDeviceRegistration(deviceInstallationId) ?: return
@@ -105,6 +105,7 @@ class AppLifecycleCoordinator(
             app.apiClient.registerDevice(
                 accessToken = accessToken,
                 deviceInstallationId = deviceInstallationId,
+                deviceFingerprint = deviceInstallationId,
                 model = deviceAssetModel(),
                 versionCode = BuildConfig.VERSION_CODE.toLong(),
                 localSecurityConfig = localSecurityConfig(settings),

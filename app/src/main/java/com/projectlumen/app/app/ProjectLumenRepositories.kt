@@ -20,7 +20,7 @@ internal class ProjectLumenRepositories(
     val settings = SettingsRepository(
         database.appSettingsDao(),
         eyeCarePreferences,
-        { seed -> secureCredentials.deviceInstallationId(seed) },
+        { secureCredentials.deviceInstallationId() },
     )
     val runtime = RuntimeRepository(database.runtimeStateDao())
     val statistics = StatisticsRepository(

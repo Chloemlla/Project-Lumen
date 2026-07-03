@@ -44,7 +44,7 @@ class ProjectLumenApplication : Application() {
     val audio: AudioService by lazy { AudioService(this) }
     val export: ExportService by lazy { ExportService(this) }
     val backup: DataBackupService by lazy {
-        DataBackupService(this, database, eyeCarePreferences, secureCredentials::deviceInstallationId)
+        DataBackupService(this, database, eyeCarePreferences) { secureCredentials.deviceInstallationId() }
     }
     val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient(this) }
     val crashReports: CrashReportStore by lazy { CrashReportStore(this) }
@@ -178,7 +178,7 @@ class ProjectLumenApplication : Application() {
         return SettingsRepository(
             database.appSettingsDao(),
             eyeCarePreferences,
-            secureCredentials::deviceInstallationId,
+            { secureCredentials.deviceInstallationId() },
         )
     }
 

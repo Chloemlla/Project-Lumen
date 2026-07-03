@@ -44,6 +44,7 @@ Before marking work done, verify against [`quality-guidelines.md`](./quality-gui
 | Guide | Description | Status |
 |-------|-------------|--------|
 | [Repository Session Flow Contracts](./repository-session-flow-contracts.md) | Concrete API/env/secret/workspace/session/activity/diff contracts | Filled |
+| [Android Device Fingerprint Contract](./android-device-fingerprint.md) | Android deterministic 64-character device fingerprint registration and telemetry contract | Filled |
 | [Directory Structure](./directory-structure.md) | **Context-first atomic 4+2 architecture** — bounded contexts, layers, deps, I/O isolation | ✅ Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Invariants, 7 code smells, testing, forbidden patterns | ✅ Filled |
 | [Error Handling](./error-handling.md) | Error vocabulary, wrapping at boundaries, API error shape | ✅ Filled |

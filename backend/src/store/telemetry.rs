@@ -135,13 +135,29 @@ fn sanitize_telemetry_upload(request: &mut TelemetryUploadRequest) {
         .truncate(MAX_ENVIRONMENT_CONTEXTS);
 
     truncate_string(
+        &mut request.device_profile.device_fingerprint,
+        DEVICE_FINGERPRINT_LENGTH,
+    );
+    if !is_device_fingerprint(&request.device_profile.device_fingerprint) {
+        request.device_profile.device_fingerprint.clear();
+    }
+    truncate_string(
         &mut request.device_profile.manufacturer,
         MAX_SHORT_TEXT_LENGTH,
     );
     truncate_string(&mut request.device_profile.model, MAX_SHORT_TEXT_LENGTH);
     truncate_string(
+        &mut request.device_profile.device_name,
+        MAX_SHORT_TEXT_LENGTH,
+    );
+    truncate_string(
         &mut request.device_profile.android_release,
         MAX_SHORT_TEXT_LENGTH,
+    );
+    truncate_string(&mut request.device_profile.primary_abi, MAX_SHORT_TEXT_LENGTH);
+    truncate_string(
+        &mut request.device_profile.build_fingerprint,
+        MAX_BUILD_FINGERPRINT_LENGTH,
     );
     truncate_string(
         &mut request.device_profile.front_camera_resolution,
@@ -303,9 +319,16 @@ fn is_package_segment(value: &str, first_segment: bool) -> bool {
     chars.all(|character| character.is_ascii_alphanumeric() || character == '_')
 }
 
+fn is_device_fingerprint(value: &str) -> bool {
+    value.len() == DEVICE_FINGERPRINT_LENGTH
+        && value.chars().all(|character| character.is_ascii_hexdigit())
+}
+
 const MAX_DEVICE_INSTALLATION_ID_LENGTH: usize = 128;
+const DEVICE_FINGERPRINT_LENGTH: usize = 64;
 const MAX_SOURCE_APP_LENGTH: usize = 64;
 const MAX_SHORT_TEXT_LENGTH: usize = 160;
+const MAX_BUILD_FINGERPRINT_LENGTH: usize = 256;
 const MAX_ENVIRONMENT_CONTEXTS: usize = 16;
 const MAX_DISTANCE_VIOLATIONS: usize = 16;
 const MAX_CRASH_LOGS: usize = 4;

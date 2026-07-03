@@ -86,10 +86,18 @@ pub struct EnvironmentContextTelemetry {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceProfileTelemetry {
+    #[serde(default)]
+    pub device_fingerprint: String,
     pub manufacturer: String,
     pub model: String,
+    #[serde(default)]
+    pub device_name: String,
     pub android_release: String,
     pub android_sdk: i32,
+    #[serde(default)]
+    pub primary_abi: String,
+    #[serde(default)]
+    pub build_fingerprint: String,
     pub front_camera_resolution: String,
     pub app_version_name: String,
     pub app_version_code: i64,

@@ -232,6 +232,7 @@ impl AppStore {
             email,
             created_at: now_millis(),
             device_installation_id,
+            device_fingerprint: String::new(),
             device_asset_model: String::new(),
             device_asset_version_code: 0,
             device_asset_last_seen_at: 0,

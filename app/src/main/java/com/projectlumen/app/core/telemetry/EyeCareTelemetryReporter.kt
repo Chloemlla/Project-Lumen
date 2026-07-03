@@ -159,7 +159,7 @@ class EyeCareTelemetryReporter(
             } else {
                 emptyList()
             },
-            deviceProfile = buildDeviceProfile(),
+            deviceProfile = buildDeviceProfile(settings.deviceInstallationId),
             calibrationAnchor = if (settings.statsEnabled) settings.toCalibrationAnchor() else null,
             aiPerformance = runtime.toAiPerformance(),
             developerDebug = runtime.toDeveloperDebug(settings),
@@ -188,7 +188,7 @@ class EyeCareTelemetryReporter(
             recordedAt = nowMillis,
             dailyHealth = null,
             environmentContext = emptyList(),
-            deviceProfile = buildDeviceProfile(),
+            deviceProfile = buildDeviceProfile(deviceInstallationId),
             calibrationAnchor = null,
             aiPerformance = null,
             developerDebug = DeveloperDebugTelemetry(
@@ -314,12 +314,16 @@ class EyeCareTelemetryReporter(
         }
     }
 
-    private fun buildDeviceProfile(): DeviceProfileTelemetry {
+    private fun buildDeviceProfile(deviceFingerprint: String): DeviceProfileTelemetry {
         return DeviceProfileTelemetry(
+            deviceFingerprint = deviceFingerprint,
             manufacturer = Build.MANUFACTURER.orEmpty(),
             model = Build.MODEL.orEmpty(),
+            deviceName = Build.DEVICE.orEmpty(),
             androidRelease = Build.VERSION.RELEASE.orEmpty(),
             androidSdk = Build.VERSION.SDK_INT,
+            primaryAbi = Build.SUPPORTED_ABIS.firstOrNull().orEmpty(),
+            buildFingerprint = Build.FINGERPRINT.orEmpty(),
             frontCameraResolution = frontCameraResolution(),
             appVersionName = BuildConfig.VERSION_NAME,
             appVersionCode = BuildConfig.VERSION_CODE.toLong(),

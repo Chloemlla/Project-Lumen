@@ -194,6 +194,7 @@ internal fun JSONObject.toRemoteDeviceRegistrationResult(): RemoteDeviceRegistra
     RemoteDeviceRegistrationResult(
         accepted = optBoolean("accepted"),
         deviceInstallationId = optString("deviceInstallationId"),
+        deviceFingerprint = optString("deviceFingerprint"),
         registeredAt = optLong("registeredAt"),
     )
 

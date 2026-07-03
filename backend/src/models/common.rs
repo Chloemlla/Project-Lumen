@@ -27,6 +27,8 @@ pub struct MeResponse {
 #[serde(rename_all = "camelCase")]
 pub struct DeviceRegistrationRequest {
     pub device_installation_id: String,
+    #[serde(default)]
+    pub device_fingerprint: String,
     pub model: String,
     pub version_code: i64,
     pub local_security_config: String,
@@ -37,5 +39,6 @@ pub struct DeviceRegistrationRequest {
 pub struct DeviceRegistrationResponse {
     pub accepted: bool,
     pub device_installation_id: String,
+    pub device_fingerprint: String,
     pub registered_at: i64,
 }

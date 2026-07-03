@@ -115,9 +115,11 @@ internal class ProjectLumenRemoteFeatureEntry(
 
     private suspend fun refreshAccountWithAccessToken(accessToken: String) {
         val user = apiClient.fetchMe(accessToken)
+        val deviceFingerprint = credentials.deviceInstallationId()
         apiClient.registerDevice(
             accessToken = accessToken,
-            deviceInstallationId = credentials.deviceInstallationId(),
+            deviceInstallationId = deviceFingerprint,
+            deviceFingerprint = deviceFingerprint,
             model = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
             versionCode = BuildConfig.VERSION_CODE.toLong(),
             localSecurityConfig = "signedRequests=true;playIntegrity=conditional;pinning=configured",

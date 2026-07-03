@@ -258,6 +258,7 @@ impl AppStore {
                 AdminDeviceAsset {
                     user_id: user.id.clone(),
                     device_installation_id: device_installation_id.to_owned(),
+                    device_fingerprint: user.device_fingerprint.trim().to_owned(),
                     model: non_empty_or(user.device_asset_model.trim(), "not reported").to_owned(),
                     version_code: user.device_asset_version_code.max(0),
                     last_seen_at: user.device_asset_last_seen_at.max(user.created_at),
@@ -292,6 +293,7 @@ impl AppStore {
                 &mut devices_by_id,
                 AdminDeviceAsset {
                     user_id: row.user_id,
+                    device_fingerprint: row.payload.device_profile.device_fingerprint.trim().to_owned(),
                     device_installation_id,
                     model: device_model(&row.payload.device_profile),
                     version_code: row.payload.device_profile.app_version_code,
@@ -325,6 +327,7 @@ impl AppStore {
                 AdminDeviceAsset {
                     user_id: row.user_id,
                     device_installation_id,
+                    device_fingerprint: String::new(),
                     model: "not reported".to_owned(),
                     version_code: 0,
                     last_seen_at: row.uploaded_at,

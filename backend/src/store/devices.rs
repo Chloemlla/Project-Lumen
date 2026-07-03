@@ -16,6 +16,9 @@ impl AppStore {
             "deviceInstallationId",
             MAX_DEVICE_INSTALLATION_ID_LENGTH,
         )?;
+        let device_fingerprint = normalize_device_fingerprint(request.device_fingerprint)
+            .or_else(|| normalize_device_fingerprint(device_installation_id.clone()))
+            .unwrap_or_default();
         let model = normalize_optional(request.model, MAX_DEVICE_MODEL_LENGTH);
         let local_security_config =
             normalize_optional(request.local_security_config, MAX_SECURITY_CONFIG_LENGTH);
@@ -29,6 +32,7 @@ impl AppStore {
                 doc! {
                     "$set": {
                         "deviceInstallationId": &device_installation_id,
+                        "deviceFingerprint": &device_fingerprint,
                         "deviceAssetModel": model,
                         "deviceAssetVersionCode": version_code,
                         "deviceAssetLastSeenAt": registered_at,
@@ -46,6 +50,7 @@ impl AppStore {
         Ok(DeviceRegistrationResponse {
             accepted: true,
             device_installation_id,
+            device_fingerprint,
             registered_at,
         })
     }
@@ -63,6 +68,18 @@ fn normalize_optional(value: String, max_chars: usize) -> String {
     value.trim().chars().take(max_chars).collect()
 }
 
+fn normalize_device_fingerprint(value: String) -> Option<String> {
+    let normalized = value.trim().to_ascii_lowercase();
+    if normalized.len() == DEVICE_FINGERPRINT_LENGTH
+        && normalized.chars().all(|character| character.is_ascii_hexdigit())
+    {
+        Some(normalized)
+    } else {
+        None
+    }
+}
+
 const MAX_DEVICE_INSTALLATION_ID_LENGTH: usize = 128;
+const DEVICE_FINGERPRINT_LENGTH: usize = 64;
 const MAX_DEVICE_MODEL_LENGTH: usize = 160;
 const MAX_SECURITY_CONFIG_LENGTH: usize = 160;

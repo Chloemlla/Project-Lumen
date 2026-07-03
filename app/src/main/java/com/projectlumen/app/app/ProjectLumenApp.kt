@@ -110,6 +110,7 @@ fun ProjectLumenApp(
     openLaunchRequest: LumenOpenLaunchRequest? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val onboardingState by viewModel.onboardingState.collectAsStateWithLifecycle()
     val configuredThemeMode = runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }
         .getOrDefault(AppThemeMode.SYSTEM)
     val templateAppearanceEnabled = !uiState.settings.useDynamicColors
@@ -270,6 +271,13 @@ fun ProjectLumenApp(
                 WebViewScreen(
                     url = url,
                     onDismiss = { pendingWebUrl = null },
+                )
+                return@ProjectLumenTheme
+            }
+            if (onboardingState.visible) {
+                ProjectLumenOnboardingScreen(
+                    state = onboardingState,
+                    onComplete = viewModel::completeOnboarding,
                 )
                 return@ProjectLumenTheme
             }

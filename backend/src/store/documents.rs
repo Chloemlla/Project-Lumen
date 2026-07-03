@@ -11,6 +11,8 @@ pub struct UserRecord {
     pub created_at: i64,
     pub device_installation_id: String,
     #[serde(default)]
+    pub device_fingerprint: String,
+    #[serde(default)]
     pub device_asset_model: String,
     #[serde(default)]
     pub device_asset_version_code: i64,

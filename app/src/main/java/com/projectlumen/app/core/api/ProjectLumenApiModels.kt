@@ -173,5 +173,6 @@ data class RemoteReleasePatch(
 data class RemoteDeviceRegistrationResult(
     val accepted: Boolean,
     val deviceInstallationId: String,
+    val deviceFingerprint: String,
     val registeredAt: Long,
 )
