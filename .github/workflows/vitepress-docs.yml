@@ -1,0 +1,69 @@
+name: Build Project Lumen VitePress Docs
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - ".github/workflows/vitepress-docs.yml"
+      - "docs/**"
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - ".github/workflows/vitepress-docs.yml"
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: vitepress-docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build VitePress site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Install docs dependencies
+        working-directory: docs
+        run: npm install
+
+      - name: Build docs
+        working-directory: docs
+        env:
+          VITEPRESS_BASE: /Project-Lumen/
+        run: npm run docs:build
+
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-lumen-vitepress-docs
+          path: docs/.vitepress/dist/**
+          retention-days: 14
+
+      - name: Configure GitHub Pages
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/.vitepress/dist
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/deploy-pages@v4

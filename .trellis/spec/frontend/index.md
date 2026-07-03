@@ -17,6 +17,7 @@ Before writing frontend code, confirm:
 - [ ] New shared component/hook is justified (a second consumer exists), else keep it feature-local.
 - [ ] Network/WS data is validated (Zod) before being treated as typed.
 - [ ] No secret/token touches client storage or logs.
+- [ ] VitePress docs changes follow [`docs-site.md`](./docs-site.md); build/test commands stay in GitHub Actions.
 
 ## Quality Check
 
@@ -38,6 +39,7 @@ Before marking work done (see [`quality-guidelines.md`](./quality-guidelines.md)
 | [State Management](./state-management.md) | Server vs live vs UI state | ✅ Filled |
 | [Type Safety](./type-safety.md) | Shared types, Zod validation, forbidden casts | ✅ Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Forbidden/required patterns, 7 smells, tests | ✅ Filled (⏳ test setup to confirm) |
+| [VitePress Docs Site](./docs-site.md) | Docs package, Pages base path, workflow-only build | ✅ Filled |
 
 > ⏳ items are recommendations from `docs/design/05-tech-stack-and-conventions.md` to finalize before the relevant code lands.
 
