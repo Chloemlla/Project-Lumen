@@ -1,6 +1,7 @@
 package com.projectlumen.app.core.crash
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -56,12 +57,18 @@ class CrashReportStore(context: Context) {
     }
 
     private fun CrashReport.toJson(): JSONObject = JSONObject().apply {
+        put("reportId", reportId)
         put("crashedAtMillis", crashedAtMillis)
         put("crashedAtText", crashedAtText)
         put("exceptionType", exceptionType)
         put("rootCause", rootCause)
+        put("threadName", threadName)
+        put("processName", processName)
         put("systemInfo", systemInfo)
         put("stackTrace", stackTrace)
+        put("recentEvents", JSONArray().apply {
+            recentEvents.forEach { event -> put(event) }
+        })
     }
 
     private companion object {

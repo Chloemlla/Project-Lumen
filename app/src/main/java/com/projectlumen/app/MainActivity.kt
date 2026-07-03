@@ -16,6 +16,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.projectlumen.app.app.CrashReportScreen
 import com.projectlumen.app.app.ProjectLumenApp
 import com.projectlumen.app.app.ProjectLumenViewModel
+import com.projectlumen.app.core.crash.CrashBreadcrumbs
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.openapi.LumenOpenIntents
 import com.projectlumen.app.openapi.LumenOpenLaunchRequest
@@ -30,6 +31,7 @@ open class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashBreadcrumbs.record("MainActivity.onCreate")
         enableEdgeToEdge()
         handleOpenIntent(intent)
         setContent {
@@ -95,12 +97,14 @@ open class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        CrashBreadcrumbs.record("MainActivity.onNewIntent")
         setIntent(intent)
         handleOpenIntent(intent)
     }
 
     private fun handleOpenIntent(intent: Intent?) {
         val request = LumenOpenIntents.parseLaunchRequest(intent, callingPackage) ?: return
+        CrashBreadcrumbs.record("Open API launch target=${request.target}")
         openLaunchRequest.value = request
         val app = application as ProjectLumenApplication
         lifecycleScope.launch(Dispatchers.IO) {

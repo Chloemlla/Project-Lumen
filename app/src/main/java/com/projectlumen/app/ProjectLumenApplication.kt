@@ -6,6 +6,7 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.projectlumen.app.core.api.ProjectLumenApiClient
+import com.projectlumen.app.core.crash.CrashBreadcrumbs
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
@@ -65,12 +66,14 @@ class ProjectLumenApplication : Application() {
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
+        CrashBreadcrumbs.record("Application.attachBaseContext")
         installCrashReporter()
         initializeMmkvOrRecordCrash()
     }
 
     override fun onCreate() {
         super.onCreate()
+        CrashBreadcrumbs.record("Application.onCreate")
         installCrashReporter()
         initializeMmkvOrRecordCrash()
         AppIntegrityGuard.enforce(this)
@@ -97,10 +100,12 @@ class ProjectLumenApplication : Application() {
         }
         crashExceptionHandler = handler
         Thread.setDefaultUncaughtExceptionHandler(handler)
+        CrashBreadcrumbs.record("Crash reporter installed")
     }
 
     private fun initializeMmkvOrRecordCrash() {
         runCatching { ProjectLumenMmkv.initialize(this) }
+            .onSuccess { CrashBreadcrumbs.record("MMKV initialized") }
             .onFailure(::recordCrash)
     }
 
@@ -109,6 +114,7 @@ class ProjectLumenApplication : Application() {
     }
 
     fun recordCrash(throwable: Throwable): CrashReport {
+        CrashBreadcrumbs.record("Crash captured: ${throwable::class.java.name}")
         val report = runCatching { CrashReport.fromThrowable(throwable) }
             .getOrElse { CrashReport.fromThrowableFallback(throwable, it) }
         startupCrashReport = report

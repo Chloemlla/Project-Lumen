@@ -76,6 +76,7 @@ import java.time.format.DateTimeFormatter
 
 private val crashReportScreenTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 private const val CRASH_STACK_COLLAPSED_LINES = 18
+private const val CRASH_EVENT_VISIBLE_COUNT = 12
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -130,6 +131,7 @@ internal fun CrashReportScreen(
 
             CrashReportCard {
                 CrashReportSectionHeader(Icons.Outlined.Info, stringResource(R.string.crash_report_summary))
+                CrashReportInfoTile(stringResource(R.string.crash_report_id), report.reportId)
                 CrashReportInfoTile(stringResource(R.string.crash_report_time), formattedTime)
                 CrashReportInfoTile(
                     label = stringResource(R.string.crash_report_root_cause),
@@ -137,6 +139,8 @@ internal fun CrashReportScreen(
                     emphasis = true,
                 )
                 CrashReportInfoTile(stringResource(R.string.crash_report_exception_type), report.exceptionType)
+                CrashReportInfoTile(stringResource(R.string.crash_report_thread), report.threadName)
+                CrashReportInfoTile(stringResource(R.string.crash_report_process), report.processName)
             }
 
             CrashReportCard {
@@ -147,6 +151,17 @@ internal fun CrashReportScreen(
                 ) {
                     systemInfo.forEach { (label, value) ->
                         CrashReportMetadataPill(label = label, value = value)
+                    }
+                }
+            }
+
+            if (report.recentEvents.isNotEmpty()) {
+                CrashReportCard {
+                    CrashReportSectionHeader(Icons.Outlined.Info, stringResource(R.string.crash_report_recent_events))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        report.recentEvents.takeLast(CRASH_EVENT_VISIBLE_COUNT).forEach { event ->
+                            CrashReportEventRow(event)
+                        }
                     }
                 }
             }
@@ -210,6 +225,16 @@ internal fun CrashReportScreen(
             }
 
             CrashReportActionPanel(
+                onCopyId = {
+                    context.getSystemService(ClipboardManager::class.java)
+                        ?.setPrimaryClip(
+                            ClipData.newPlainText(
+                                context.getString(R.string.crash_report_id),
+                                report.reportId,
+                            ),
+                        )
+                    Toast.makeText(context, context.getString(R.string.crash_report_id_copied), Toast.LENGTH_SHORT).show()
+                },
                 onCopy = {
                     context.getSystemService(ClipboardManager::class.java)
                         ?.setPrimaryClip(
@@ -379,7 +404,27 @@ private fun CrashReportMetadataPill(label: String, value: String) {
 }
 
 @Composable
+private fun CrashReportEventRow(event: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Text(
+            text = event,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+@Composable
 private fun CrashReportActionPanel(
+    onCopyId: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
     onClear: () -> Unit,
@@ -409,6 +454,11 @@ private fun CrashReportActionPanel(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
+            }
+            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCopyId) {
+                Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(stringResource(R.string.crash_report_copy_id))
             }
             Button(modifier = Modifier.fillMaxWidth(), onClick = onCopy) {
                 Icon(Icons.Outlined.ContentCopy, contentDescription = null)

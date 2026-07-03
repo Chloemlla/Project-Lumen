@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.api.ProjectLumenApiDiagnostics
+import com.projectlumen.app.core.crash.CrashBreadcrumbs
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
@@ -134,6 +135,7 @@ class ProjectLumenViewModel(
     val uiState = stateStore.uiState
 
     init {
+        CrashBreadcrumbs.record("ProjectLumenViewModel.init")
         reportingScope.launch {
             repositories.settings.ensureDefault()
             repositories.runtime.ensureDefault()
@@ -152,65 +154,74 @@ class ProjectLumenViewModel(
         _webPageRequests.tryEmit(url)
     }
 
-    fun startReminder() = runtimeEntry.startReminder()
-    fun pauseReminder() = runtimeEntry.pauseReminder()
-    fun pauseForOneHour() = runtimeEntry.pauseForOneHour()
-    fun resumeReminder() = runtimeEntry.resumeReminder()
-    fun stopAll() = runtimeEntry.stopAll()
-    fun startBreak() = runtimeEntry.startBreak()
-    fun skipBreak() = runtimeEntry.skipBreak()
-    fun startPomodoro() = runtimeEntry.startPomodoro()
-    fun stopPomodoro() = runtimeEntry.stopPomodoro()
+    fun startReminder() = traceAction("startReminder") { runtimeEntry.startReminder() }
+    fun pauseReminder() = traceAction("pauseReminder") { runtimeEntry.pauseReminder() }
+    fun pauseForOneHour() = traceAction("pauseForOneHour") { runtimeEntry.pauseForOneHour() }
+    fun resumeReminder() = traceAction("resumeReminder") { runtimeEntry.resumeReminder() }
+    fun stopAll() = traceAction("stopAll") { runtimeEntry.stopAll() }
+    fun startBreak() = traceAction("startBreak") { runtimeEntry.startBreak() }
+    fun skipBreak() = traceAction("skipBreak") { runtimeEntry.skipBreak() }
+    fun startPomodoro() = traceAction("startPomodoro") { runtimeEntry.startPomodoro() }
+    fun stopPomodoro() = traceAction("stopPomodoro") { runtimeEntry.stopPomodoro() }
 
     fun updateSettings(transform: (AppSettingsEntity) -> AppSettingsEntity) {
+        CrashBreadcrumbs.record("Action updateSettings")
         val nowMillis = System.currentTimeMillis()
         previewSettings(nowMillis, transform)
         settingsEntry.updateSettings(transform, nowMillis)
     }
 
     fun setReminderEnabled(enabled: Boolean) {
+        CrashBreadcrumbs.record("Action setReminderEnabled=$enabled")
         val nowMillis = System.currentTimeMillis()
         previewSettings(nowMillis) { it.copy(reminderEnabled = enabled) }
         settingsEntry.setReminderEnabled(enabled, nowMillis)
     }
 
     fun setPomodoroEnabled(enabled: Boolean) {
+        CrashBreadcrumbs.record("Action setPomodoroEnabled=$enabled")
         val nowMillis = System.currentTimeMillis()
         previewSettings(nowMillis) { it.copy(pomodoroEnabled = enabled) }
         settingsEntry.setPomodoroEnabled(enabled, nowMillis)
     }
 
     fun setNotificationsEnabled(enabled: Boolean) {
+        CrashBreadcrumbs.record("Action setNotificationsEnabled=$enabled")
         val nowMillis = System.currentTimeMillis()
         previewSettings(nowMillis) { it.copy(notificationEnabled = enabled) }
         settingsEntry.setNotificationsEnabled(enabled, nowMillis)
     }
 
     fun setKeepAliveEnabled(enabled: Boolean) {
+        CrashBreadcrumbs.record("Action setKeepAliveEnabled=$enabled")
         val nowMillis = System.currentTimeMillis()
         previewSettings(nowMillis) { it.copy(keepAliveEnabled = enabled) }
         settingsEntry.setKeepAliveEnabled(enabled, nowMillis)
     }
 
     fun setProximityMonitoringEnabled(enabled: Boolean) {
+        CrashBreadcrumbs.record("Action setProximityMonitoringEnabled=$enabled")
         val nowMillis = System.currentTimeMillis()
         previewSettings(nowMillis) { it.copy(proximityMonitoringEnabled = enabled) }
         settingsEntry.setProximityMonitoringEnabled(enabled, nowMillis)
     }
 
     fun setBlinkMonitoringEnabled(enabled: Boolean) {
+        CrashBreadcrumbs.record("Action setBlinkMonitoringEnabled=$enabled")
         val nowMillis = System.currentTimeMillis()
         previewSettings(nowMillis) { it.copy(blinkMonitoringEnabled = enabled) }
         settingsEntry.setBlinkMonitoringEnabled(enabled, nowMillis)
     }
 
     fun setAmbientLightMonitoringEnabled(enabled: Boolean) {
+        CrashBreadcrumbs.record("Action setAmbientLightMonitoringEnabled=$enabled")
         val nowMillis = System.currentTimeMillis()
         previewSettings(nowMillis) { it.copy(ambientLightMonitoringEnabled = enabled) }
         settingsEntry.setAmbientLightMonitoringEnabled(enabled, nowMillis)
     }
 
     fun setAutoBrightnessEnabled(enabled: Boolean) {
+        CrashBreadcrumbs.record("Action setAutoBrightnessEnabled=$enabled")
         val nowMillis = System.currentTimeMillis()
         previewSettings(nowMillis) { it.copy(autoBrightnessEnabled = enabled) }
         settingsEntry.setAutoBrightnessEnabled(enabled, nowMillis)
@@ -266,6 +277,7 @@ class ProjectLumenViewModel(
     }
 
     fun selectTemplate(templateId: Long) {
+        CrashBreadcrumbs.record("Action selectTemplate id=$templateId")
         val state = stateStore.uiState.value
         val template = state.templates.firstOrNull { it.id == templateId } ?: return
         if (template.isPremium && planTier(state.settings) < PlanTier.PRO) return
@@ -330,5 +342,10 @@ class ProjectLumenViewModel(
 
     private inline fun reportIfThrows(block: () -> Unit) {
         runCatching(block).onFailure(stateStore::recordCrash)
+    }
+
+    private inline fun traceAction(name: String, block: () -> Unit) {
+        CrashBreadcrumbs.record("Action $name")
+        block()
     }
 }

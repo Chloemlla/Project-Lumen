@@ -448,10 +448,14 @@
     <string name="crash_report_title">Crash report saved</string>
     <string name="crash_report_message">Project Lumen recovered from a crash. Review, copy, or share this report before continuing.</string>
     <string name="crash_report_summary">Summary</string>
+    <string name="crash_report_id">Report ID</string>
+    <string name="crash_report_thread">Thread</string>
+    <string name="crash_report_process">Process</string>
     <string name="crash_report_time">Time</string>
     <string name="crash_report_root_cause">Root cause</string>
     <string name="crash_report_exception_type">Exception type</string>
     <string name="crash_report_system_info">System info</string>
+    <string name="crash_report_recent_events">Recent app events</string>
     <string name="crash_report_stack_trace">Stack trace</string>
     <plurals name="crash_report_stack_hint">
         <item quantity="one">%1$d stack line captured. The preview is shortened for readability.</item>
@@ -459,7 +463,9 @@
     </plurals>
     <string name="crash_report_show_full_stack">Show full</string>
     <string name="crash_report_collapse_stack">Collapse</string>
-    <string name="crash_report_privacy_note">Local paths and content URIs are sanitized before the report is shown or shared.</string>
+    <string name="crash_report_privacy_note">Local paths, content URIs, and recent event details are sanitized before the report is shown or shared.</string>
+    <string name="crash_report_copy_id">Copy report ID</string>
+    <string name="crash_report_id_copied">Report ID copied.</string>
     <string name="crash_report_copy">Copy report</string>
     <string name="crash_report_copied">Crash report copied.</string>
     <string name="crash_report_cleared">Crash report cleared.</string>
