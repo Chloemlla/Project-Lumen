@@ -299,8 +299,6 @@ class ProjectLumenViewModel(
                 preAlertEnabled = true,
                 pomodoroEnabled = true,
                 globalOverlayEnabled = true,
-                proximityMonitoringEnabled = true,
-                blinkMonitoringEnabled = true,
                 ambientLightMonitoringEnabled = true,
             )
         }

@@ -1,6 +1,9 @@
 package com.projectlumen.app.core.proximity
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -21,6 +24,9 @@ class ProximityDetectionWorker(
         val monitoringEnabled = settings?.proximityMonitoringEnabled == true || settings?.blinkMonitoringEnabled == true
         val timeTriggerAllowed = settings?.developerModeEnabled != true || settings.developerTimeTriggerEnabled
         val gateAllowed = settings == null || calibrate || ProximityTriggerGate(applicationContext).canRun(settings)
+        if ((calibrate || monitoringEnabled) && !hasCameraPermission(applicationContext)) {
+            return Result.success()
+        }
         if (!calibrate && settings != null && monitoringEnabled && app.shizuku.shouldDeferSampling(settings)) {
             val retryDelaySeconds = if (settings.developerModeEnabled) {
                 settings.developerTickIntervalSeconds.coerceIn(10, 30 * 60)
@@ -69,6 +75,13 @@ class ProximityDetectionWorker(
 
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_SAMPLE_WORK)
+        }
+
+        private fun hasCameraPermission(context: Context): Boolean {
+            return ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.CAMERA,
+            ) == PackageManager.PERMISSION_GRANTED
         }
 
         private fun com.projectlumen.app.core.database.entities.AppSettingsEntity.proximityIntervalSeconds(): Int {

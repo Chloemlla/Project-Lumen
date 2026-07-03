@@ -38,6 +38,7 @@ Before marking work done (see [`quality-guidelines.md`](./quality-guidelines.md)
 | [Hook Guidelines](./hook-guidelines.md) | TanStack Query, WS activity-stream hook | ✅ Filled |
 | [State Management](./state-management.md) | Server vs live vs UI state | ✅ Filled |
 | [Type Safety](./type-safety.md) | Shared types, Zod validation, forbidden casts | ✅ Filled |
+| [Android Foreground Services](./android-foreground-services.md) | Android client foreground service startup validation and permission gates | ✅ Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Forbidden/required patterns, 7 smells, tests | ✅ Filled (⏳ test setup to confirm) |
 | [VitePress Docs Site](./docs-site.md) | Docs package, Pages base path, workflow-only build | ✅ Filled |
 

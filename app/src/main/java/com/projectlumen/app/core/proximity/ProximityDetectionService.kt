@@ -43,16 +43,10 @@ class ProximityDetectionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val app = application as ProjectLumenApplication
-        ServiceCompat.startForeground(
-            this,
-            NotificationIds.PROXIMITY_FOREGROUND,
-            app.notifications.buildProximityForegroundNotification(),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-            } else {
-                0
-            },
-        )
+        if (!hasCameraPermission() || !startCameraForeground(app, startId)) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         val calibrate = intent?.getBooleanExtra(EXTRA_CALIBRATE, false) == true
         val now = System.currentTimeMillis()
         scope.launch {
@@ -106,12 +100,39 @@ class ProximityDetectionService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private fun hasCameraPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA,
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun startCameraForeground(app: ProjectLumenApplication, startId: Int): Boolean {
+        return runCatching {
+            ServiceCompat.startForeground(
+                this,
+                NotificationIds.PROXIMITY_FOREGROUND,
+                app.notifications.buildProximityForegroundNotification(),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+                } else {
+                    0
+                },
+            )
+            true
+        }.getOrElse { throwable ->
+            app.recordCrash(throwable)
+            stopSelf(startId)
+            false
+        }
+    }
+
     private suspend fun runDetection(app: ProjectLumenApplication, calibrate: Boolean) {
         val runtimeRepository = app.runtimeRepository()
         val settingsRepository = app.settingsRepository()
         val settings = settingsRepository.get() ?: return
         if (!calibrate && !settings.proximityMonitoringEnabled && !settings.blinkMonitoringEnabled) return
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return
+        if (!hasCameraPermission()) return
         if (!calibrate && app.shizuku.shouldDeferSampling(settings)) {
             clearActiveState(app)
             return
@@ -479,7 +500,11 @@ class ProximityDetectionService : Service() {
         fun start(context: Context, calibrate: Boolean) {
             val intent = Intent(context, ProximityDetectionService::class.java)
                 .putExtra(EXTRA_CALIBRATE, calibrate)
-            ContextCompat.startForegroundService(context, intent)
+            runCatching {
+                ContextCompat.startForegroundService(context, intent)
+            }.onFailure { throwable ->
+                (context.applicationContext as? ProjectLumenApplication)?.recordCrash(throwable)
+            }
         }
     }
 }
