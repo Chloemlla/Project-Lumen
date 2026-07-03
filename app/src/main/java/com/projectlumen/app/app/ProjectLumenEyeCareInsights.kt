@@ -362,10 +362,10 @@ internal fun EyeCareGrowthCapabilityCard(
     onConfigureReports: () -> Unit,
     onConfigureCloud: () -> Unit,
     onConfigureFamilyMode: () -> Unit,
-    onConfigureAiGuidance: () -> Unit,
+    onConfigureGuidance: () -> Unit,
     onSyncCloud: () -> Unit,
     onApplyFamilyMode: () -> Unit,
-    onApplyAiGuidance: () -> Unit,
+    onApplyGuidance: () -> Unit,
     onExportReport: () -> Unit,
 ) {
     val proEnabled = planTier(uiState.settings) >= PlanTier.PRO
@@ -390,47 +390,58 @@ internal fun EyeCareGrowthCapabilityCard(
                 icon = Icons.Outlined.Style,
                 titleRes = R.string.eye_care_growth_pro_templates,
                 active = proEnabled && hasPremiumTemplates,
+                inactiveActionRes = R.string.eye_care_capability_configure,
                 onConfigure = onOpenTemplates,
             )
             CapabilityLine(
                 icon = Icons.Outlined.BarChart,
                 titleRes = R.string.eye_care_growth_advanced_reports,
                 active = advancedReportsReady,
+                inactiveActionRes = R.string.eye_care_capability_enable,
                 onConfigure = onConfigureReports,
             )
             CapabilityLine(
                 icon = Icons.Outlined.Sync,
                 titleRes = R.string.eye_care_growth_cloud_sync,
                 active = cloudSyncReady,
+                inactiveActionRes = R.string.eye_care_capability_sign_in,
                 onConfigure = onConfigureCloud,
             )
             CapabilityLine(
                 icon = Icons.Outlined.Lock,
                 titleRes = R.string.eye_care_growth_family_mode,
                 active = familyModeReady,
+                inactiveActionRes = R.string.eye_care_capability_review,
                 onConfigure = onConfigureFamilyMode,
             )
             CapabilityLine(
                 icon = Icons.Outlined.Info,
                 titleRes = R.string.eye_care_growth_ai_guidance,
                 active = aiGuidanceReady,
-                onConfigure = onConfigureAiGuidance,
+                inactiveActionRes = R.string.eye_care_capability_review,
+                onConfigure = onConfigureGuidance,
             )
             LumenFlowRow {
                 OutlinedButton(onClick = onOpenTemplates) {
-                    ButtonLabel(Icons.Outlined.Style, R.string.eye_care_growth_pro_templates)
+                    ButtonLabel(Icons.Outlined.Style, R.string.nav_templates)
                 }
-                OutlinedButton(onClick = onExportReport) {
-                    ButtonLabel(Icons.Outlined.BarChart, R.string.eye_care_growth_advanced_reports)
+                OutlinedButton(onClick = if (advancedReportsReady) onExportReport else onConfigureReports) {
+                    ButtonLabel(
+                        Icons.Outlined.BarChart,
+                        if (advancedReportsReady) R.string.eye_care_growth_advanced_reports else R.string.eye_care_capability_enable,
+                    )
                 }
-                OutlinedButton(enabled = cloudSyncReady, onClick = onSyncCloud) {
-                    ButtonLabel(Icons.Outlined.Sync, R.string.remote_cloud_sync_now)
+                OutlinedButton(onClick = if (cloudSyncReady) onSyncCloud else onConfigureCloud) {
+                    ButtonLabel(
+                        Icons.Outlined.Sync,
+                        if (cloudSyncReady) R.string.remote_cloud_sync_now else R.string.eye_care_capability_sign_in,
+                    )
                 }
                 Button(onClick = onApplyFamilyMode) {
-                    ButtonLabel(Icons.Outlined.Lock, R.string.eye_care_growth_family_mode)
+                    ButtonLabel(Icons.Outlined.Lock, R.string.eye_care_apply_family_profile)
                 }
-                Button(onClick = onApplyAiGuidance) {
-                    ButtonLabel(Icons.Outlined.Info, R.string.eye_care_growth_ai_guidance)
+                Button(onClick = onApplyGuidance) {
+                    ButtonLabel(Icons.Outlined.Info, R.string.eye_care_apply_local_guidance)
                 }
             }
         }
@@ -908,6 +919,7 @@ private fun CapabilityLine(
     icon: ImageVector,
     @StringRes titleRes: Int,
     active: Boolean,
+    @StringRes inactiveActionRes: Int,
     onConfigure: () -> Unit,
 ) {
     Row(
@@ -930,7 +942,7 @@ private fun CapabilityLine(
             StatusPill(Icons.Outlined.CheckCircle, R.string.eye_care_capability_active)
         } else {
             OutlinedButton(onClick = onConfigure) {
-                ButtonLabel(Icons.Outlined.Schedule, R.string.eye_care_guide_pending)
+                ButtonLabel(Icons.Outlined.Schedule, inactiveActionRes)
             }
         }
     }

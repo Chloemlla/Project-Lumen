@@ -624,9 +624,15 @@
     <string name="eye_care_growth_advanced_reports">高级健康报告</string>
     <string name="eye_care_growth_cloud_sync">云同步与云备份</string>
     <string name="eye_care_growth_family_mode">家庭与儿童护眼模式</string>
-    <string name="eye_care_growth_ai_guidance">AI 个性化建议</string>
+    <string name="eye_care_growth_ai_guidance">本地个性化建议</string>
     <string name="eye_care_growth_status_detail">这些产品方向已连接到现有客户端操作，并在账号、云端、家庭与建议数据可用时显示后端状态。</string>
     <string name="eye_care_capability_active">已启用</string>
+    <string name="eye_care_capability_configure">配置</string>
+    <string name="eye_care_capability_enable">开启</string>
+    <string name="eye_care_capability_sign_in">登录</string>
+    <string name="eye_care_capability_review">查看</string>
+    <string name="eye_care_apply_family_profile">应用家庭方案</string>
+    <string name="eye_care_apply_local_guidance">应用本地建议</string>
     <string name="eye_care_guide_title">护眼新手引导</string>
     <string name="eye_care_guide_message">按这个清单把现有防护能力串成每天可运行的护眼闭环。</string>
     <string name="eye_care_guide_step_recommended">应用基础防护方案</string>

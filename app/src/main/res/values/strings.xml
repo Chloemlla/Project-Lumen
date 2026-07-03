@@ -626,9 +626,15 @@
     <string name="eye_care_growth_advanced_reports">Advanced health reports</string>
     <string name="eye_care_growth_cloud_sync">Cloud sync and backup</string>
     <string name="eye_care_growth_family_mode">Family and child eye-care mode</string>
-    <string name="eye_care_growth_ai_guidance">AI personalized guidance</string>
+    <string name="eye_care_growth_ai_guidance">Local personalized guidance</string>
     <string name="eye_care_growth_status_detail">These product lanes now connect to existing client actions and backend status where account, cloud, family, and guidance data are available.</string>
     <string name="eye_care_capability_active">Active</string>
+    <string name="eye_care_capability_configure">Configure</string>
+    <string name="eye_care_capability_enable">Enable</string>
+    <string name="eye_care_capability_sign_in">Sign in</string>
+    <string name="eye_care_capability_review">Review</string>
+    <string name="eye_care_apply_family_profile">Apply family profile</string>
+    <string name="eye_care_apply_local_guidance">Apply local guidance</string>
     <string name="eye_care_guide_title">Eye-care guided setup</string>
     <string name="eye_care_guide_message">Follow this checklist to turn the existing protection features into a working daily eye-care loop.</string>
     <string name="eye_care_guide_step_recommended">Apply the baseline protection profile</string>

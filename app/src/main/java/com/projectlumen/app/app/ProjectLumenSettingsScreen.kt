@@ -207,7 +207,7 @@ private enum class GrowthConfigTarget {
     REPORTS,
     CLOUD,
     FAMILY,
-    AI,
+    GUIDANCE,
 }
 
 @Composable
@@ -298,7 +298,7 @@ internal fun SettingsScreen(
             GrowthConfigTarget.REPORTS -> settings.statsEnabled
             GrowthConfigTarget.CLOUD -> remoteState.signedIn
             GrowthConfigTarget.FAMILY -> isFamilyEyeCareModeActive(uiState)
-            GrowthConfigTarget.AI -> settings.statsEnabled && settings.reminderEnabled
+            GrowthConfigTarget.GUIDANCE -> settings.statsEnabled && settings.reminderEnabled
         }
     }
     val restSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -423,7 +423,7 @@ internal fun SettingsScreen(
             onExportReport = viewModel::shareMonthlyReportPdf,
         )
         GrowthConfigAnchor(GrowthConfigTarget.REPORTS, settingsScrollState, growthAnchorPositions)
-        GrowthConfigAnchor(GrowthConfigTarget.AI, settingsScrollState, growthAnchorPositions)
+        GrowthConfigAnchor(GrowthConfigTarget.GUIDANCE, settingsScrollState, growthAnchorPositions)
         SettingsSection(R.string.section_general, Icons.Outlined.Settings) {
             Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall)
             LumenFlowRow {
@@ -530,14 +530,14 @@ internal fun SettingsScreen(
             onConfigureReports = { scrollToGrowthTarget(GrowthConfigTarget.REPORTS) },
             onConfigureCloud = { scrollToGrowthTarget(GrowthConfigTarget.CLOUD) },
             onConfigureFamilyMode = { scrollToGrowthTarget(GrowthConfigTarget.FAMILY) },
-            onConfigureAiGuidance = { scrollToGrowthTarget(GrowthConfigTarget.AI) },
+            onConfigureGuidance = { scrollToGrowthTarget(GrowthConfigTarget.GUIDANCE) },
             onSyncCloud = viewModel::syncRemoteNow,
             onApplyFamilyMode = {
                 markGrowthApplyStarted(GrowthConfigTarget.FAMILY)
                 applyFamilyEyeCareMode(viewModel)
             },
-            onApplyAiGuidance = {
-                markGrowthApplyStarted(GrowthConfigTarget.AI)
+            onApplyGuidance = {
+                markGrowthApplyStarted(GrowthConfigTarget.GUIDANCE)
                 applyPersonalizedEyeCareGuidance(viewModel, uiState)
             },
             onExportReport = viewModel::shareMonthlyReportPdf,
