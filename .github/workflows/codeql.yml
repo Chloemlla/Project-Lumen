@@ -32,8 +32,9 @@ jobs:
           - language: java-kotlin
             build-mode: manual
           - language: rust
-            build-mode: manual
+            build-mode: none
           - language: actions
+            build-mode: default
 
     steps:
       - name: Checkout repository
@@ -54,10 +55,6 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-cleanup: on-success
 
-      - name: Set up Rust
-        if: matrix.language == 'rust'
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Initialize CodeQL for compiled code
         if: matrix.build-mode == 'manual'
         uses: github/codeql-action/init@v4
@@ -65,8 +62,15 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
+      - name: Initialize CodeQL without build
+        if: matrix.build-mode == 'none'
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
       - name: Initialize CodeQL
-        if: matrix.build-mode != 'manual'
+        if: matrix.build-mode == 'default'
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
@@ -74,10 +78,6 @@ jobs:
       - name: Build Android app for CodeQL
         if: matrix.language == 'java-kotlin'
         run: gradle assembleDebug --no-daemon --warning-mode all
-
-      - name: Build Rust backend for CodeQL
-        if: matrix.language == 'rust'
-        run: cargo build --manifest-path backend/Cargo.toml --locked
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
