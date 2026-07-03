@@ -11,7 +11,8 @@ object ProjectLumenMmkv {
     fun initialize(context: Context) {
         if (initialized) return
         initializationFailure = null
-        runCatching { MMKV.initialize(context.applicationContext) }
+        val storageContext = context.applicationContext ?: context
+        runCatching { MMKV.initialize(storageContext) }
             .onSuccess { initialized = true }
             .onFailure { throwable ->
                 initializationFailure = throwable
