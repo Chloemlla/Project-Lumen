@@ -15,6 +15,7 @@ import com.projectlumen.app.core.database.entities.FeatureFlagEntity
 import com.projectlumen.app.core.database.entities.ReminderPlanEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
+import com.projectlumen.app.core.repositories.FeatureFlagRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
 import java.io.File
 import org.json.JSONArray
@@ -109,7 +110,7 @@ class DataBackupService(
             .put("dailyEyeStats", database.dailyEyeStatsDao().getAll().toJsonArray { it.toJson() })
             .put("dailyPomodoroStats", database.dailyPomodoroStatsDao().getAll().toJsonArray { it.toJson() })
             .put("entitlements", database.entitlementsDao().getAll().toJsonArray { it.toJson() })
-            .put("featureFlags", database.featureFlagsDao().getAll().toJsonArray { it.toJson() })
+            .put("featureFlags", featureFlagRepository().getAll().toJsonArray { it.toJson() })
             .put("reminderPlans", database.reminderPlansDao().getActive().toJsonArray { it.toJson() })
     }
 
@@ -123,6 +124,10 @@ class DataBackupService(
 
     private fun settingsRepository(): SettingsRepository {
         return SettingsRepository(database.appSettingsDao(), eyeCarePreferences, deviceInstallationIdProvider)
+    }
+
+    private fun featureFlagRepository(): FeatureFlagRepository {
+        return FeatureFlagRepository(database.featureFlagsDao())
     }
 
     private suspend fun importSettings(json: JSONObject?) {
@@ -361,7 +366,7 @@ class DataBackupService(
         if (array == null) return
         for (index in 0 until array.length()) {
             val flag = array.optJSONObject(index)?.toFeatureFlag() ?: continue
-            database.featureFlagsDao().upsert(flag)
+            featureFlagRepository().upsert(flag)
         }
     }
 

@@ -77,8 +77,7 @@ class LightMonitorService : Service(), SensorEventListener {
 
     private suspend fun handleLux(lux: Float, nowMillis: Long) {
         val app = application as ProjectLumenApplication
-        val db = app.database
-        val settings = db.appSettingsDao().get() ?: return
+        val settings = app.settingsRepository().get() ?: return
         if (!settings.ambientLightMonitoringEnabled && !settings.autoBrightnessEnabled) {
             stopSelf()
             return
@@ -150,7 +149,7 @@ class LightMonitorService : Service(), SensorEventListener {
     }
 
     private suspend fun incrementLowLightStats(app: ProjectLumenApplication, nowMillis: Long) {
-        if (app.database.appSettingsDao().get()?.statsEnabled == false) return
+        if (app.settingsRepository().get()?.statsEnabled == false) return
         val date = todayKey(nowMillis)
         val dao = app.database.dailyEyeStatsDao()
         val current = dao.get(date) ?: DailyEyeStatsEntity(statDate = date)

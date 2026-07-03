@@ -144,7 +144,7 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
     private fun tickOverlay() {
         overlayTicking = true
         scope.launch {
-            val settings = (application as ProjectLumenApplication).database.appSettingsDao().get()
+            val settings = (application as ProjectLumenApplication).settingsRepository().get()
             handler.post {
                 if (
                     settings?.developerModeEnabled == true &&

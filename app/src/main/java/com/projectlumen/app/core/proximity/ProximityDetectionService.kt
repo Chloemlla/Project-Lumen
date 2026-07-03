@@ -90,9 +90,9 @@ class ProximityDetectionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private suspend fun runDetection(app: ProjectLumenApplication, calibrate: Boolean) {
-        val db = app.database
         val runtimeRepository = app.runtimeRepository()
-        val settings = app.settingsRepository().get() ?: return
+        val settingsRepository = app.settingsRepository()
+        val settings = settingsRepository.get() ?: return
         if (!calibrate && !settings.proximityMonitoringEnabled && !settings.blinkMonitoringEnabled) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return
         if (!calibrate && app.shizuku.shouldDeferSampling(settings)) {
@@ -119,14 +119,12 @@ class ProximityDetectionService : Service() {
         )
         val sample = samples.maxByOrNull { it.faceWidthPercent }
         val latestSettings = if (calibrate && sample != null && (sample.eyeDistancePx > 0f || sample.faceWidthPercent > 0)) {
-            val updated = settings.copy(
-                proximityBaselineEyeDistancePx = sample.eyeDistancePx,
-                proximityBaselineFaceWidthPercent = sample.faceWidthPercent,
-                updatedAt = System.currentTimeMillis(),
-            )
-            db.appSettingsDao().upsert(updated)
-            app.eyeCarePreferences.saveFromSettings(updated)
-            updated
+            settingsRepository.update {
+                it.copy(
+                    proximityBaselineEyeDistancePx = sample.eyeDistancePx,
+                    proximityBaselineFaceWidthPercent = sample.faceWidthPercent,
+                )
+            }
         } else {
             settings
         }
@@ -257,7 +255,7 @@ class ProximityDetectionService : Service() {
         nowMillis: Long,
         transform: (DailyEyeStatsEntity) -> DailyEyeStatsEntity,
     ) {
-        if (app.database.appSettingsDao().get()?.statsEnabled == false) return
+        if (app.settingsRepository().get()?.statsEnabled == false) return
         val date = todayKey(nowMillis)
         val dao = app.database.dailyEyeStatsDao()
         val current = dao.get(date) ?: DailyEyeStatsEntity(statDate = date)
