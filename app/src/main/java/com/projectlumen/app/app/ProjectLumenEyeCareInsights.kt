@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.enums.PlanTier
+import com.projectlumen.app.core.enums.QuietMode
 import kotlin.math.roundToInt
 
 internal data class EyeCareInsightSummary(
@@ -354,8 +355,21 @@ internal fun EyeCareSetupAndPrivacyCard(
 }
 
 @Composable
-internal fun EyeCareGrowthCapabilityCard(uiState: ProjectLumenUiState) {
+internal fun EyeCareGrowthCapabilityCard(
+    uiState: ProjectLumenUiState,
+    remoteState: ProjectLumenRemoteUiState,
+    onOpenTemplates: () -> Unit,
+    onSyncCloud: () -> Unit,
+    onApplyFamilyMode: () -> Unit,
+    onApplyAiGuidance: () -> Unit,
+    onExportReport: () -> Unit,
+) {
     val proEnabled = planTier(uiState.settings) >= PlanTier.PRO
+    val hasPremiumTemplates = uiState.templates.any { it.isPremium }
+    val advancedReportsReady = uiState.settings.statsEnabled && uiState.eyeStats.isNotEmpty()
+    val cloudSyncReady = remoteState.signedIn
+    val familyModeReady = isFamilyEyeCareModeActive(uiState)
+    val aiGuidanceReady = uiState.settings.statsEnabled && uiState.eyeStats.any { it.workingSeconds > 0L }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -371,29 +385,45 @@ internal fun EyeCareGrowthCapabilityCard(uiState: ProjectLumenUiState) {
             CapabilityLine(
                 icon = Icons.Outlined.Style,
                 titleRes = R.string.eye_care_growth_pro_templates,
-                active = proEnabled,
+                active = proEnabled && hasPremiumTemplates,
             )
             CapabilityLine(
                 icon = Icons.Outlined.BarChart,
                 titleRes = R.string.eye_care_growth_advanced_reports,
-                active = uiState.settings.statsEnabled,
+                active = advancedReportsReady,
             )
             CapabilityLine(
                 icon = Icons.Outlined.Sync,
                 titleRes = R.string.eye_care_growth_cloud_sync,
-                active = false,
+                active = cloudSyncReady,
             )
             CapabilityLine(
                 icon = Icons.Outlined.Lock,
                 titleRes = R.string.eye_care_growth_family_mode,
-                active = false,
+                active = familyModeReady,
             )
             CapabilityLine(
                 icon = Icons.Outlined.Info,
                 titleRes = R.string.eye_care_growth_ai_guidance,
-                active = false,
+                active = aiGuidanceReady,
             )
-            StatusLine(Icons.Outlined.Info, stringResource(R.string.eye_care_growth_status_detail))
+            LumenFlowRow {
+                OutlinedButton(onClick = onOpenTemplates) {
+                    ButtonLabel(Icons.Outlined.Style, R.string.eye_care_growth_pro_templates)
+                }
+                OutlinedButton(onClick = onExportReport) {
+                    ButtonLabel(Icons.Outlined.BarChart, R.string.eye_care_growth_advanced_reports)
+                }
+                OutlinedButton(enabled = cloudSyncReady, onClick = onSyncCloud) {
+                    ButtonLabel(Icons.Outlined.Sync, R.string.remote_cloud_sync_now)
+                }
+                Button(onClick = onApplyFamilyMode) {
+                    ButtonLabel(Icons.Outlined.Lock, R.string.eye_care_growth_family_mode)
+                }
+                Button(onClick = onApplyAiGuidance) {
+                    ButtonLabel(Icons.Outlined.Info, R.string.eye_care_growth_ai_guidance)
+                }
+            }
         }
     }
 }
@@ -435,6 +465,124 @@ internal fun applyRecommendedEyeCareSettings(viewModel: ProjectLumenViewModel) {
             pomodoroGoal = 4,
             weeklyActiveDaysGoal = 5,
         )
+    }
+}
+
+internal fun applyFamilyEyeCareMode(viewModel: ProjectLumenViewModel) {
+    viewModel.updateSettings { current ->
+        current.copy(
+            reminderEnabled = true,
+            warnIntervalMinutes = 15,
+            restDurationSeconds = 30,
+            statsEnabled = true,
+            notificationEnabled = true,
+            keepAliveEnabled = true,
+            preAlertEnabled = true,
+            preAlertSeconds = 90,
+            askBeforeBreak = true,
+            disableSkip = true,
+            timeoutAutoBreak = true,
+            quietHoursEnabled = true,
+            quietStartMinute = 1260,
+            quietEndMinute = 420,
+            quietMode = QuietMode.PAUSE_TIMER.name,
+            proximityMonitoringEnabled = true,
+            proximityCheckIntervalMinutes = 3,
+            proximityCaptureSeconds = 2,
+            proximityDistanceMultiplierPercent = 145,
+            proximityAlertCooldownSeconds = 90,
+            blinkMonitoringEnabled = true,
+            blinkNoBlinkThresholdSeconds = 8,
+            blinkAlertCooldownSeconds = 60,
+            ambientLightMonitoringEnabled = true,
+            ambientLightLowLuxThreshold = 20,
+            autoBrightnessEnabled = false,
+            globalOverlayEnabled = true,
+            overlayRestDurationSeconds = 30,
+            overlayStrictDistancePercent = 175,
+        )
+    }
+    viewModel.updateDailyGoal { current ->
+        current.copy(
+            restBreakGoal = 10,
+            maxContinuousWorkMinutes = 30,
+            pomodoroGoal = 3,
+            weeklyActiveDaysGoal = 5,
+        )
+    }
+}
+
+internal fun applyPersonalizedEyeCareGuidance(
+    viewModel: ProjectLumenViewModel,
+    uiState: ProjectLumenUiState,
+) {
+    val recentEyeStats = uiState.eyeStats.take(14)
+    val completedBreaks = recentEyeStats.sumOf { it.completedBreakCount }
+    val skips = recentEyeStats.sumOf { it.skipCount }
+    val totalBreakDecisions = completedBreaks + skips
+    val skipRate = if (totalBreakDecisions > 0) {
+        (skips * 100) / totalBreakDecisions
+    } else {
+        0
+    }.coerceIn(0, 100)
+    val maxContinuousMinutes = ((recentEyeStats.maxOfOrNull { it.maxContinuousWorkSeconds } ?: 0L) / 60L).toInt()
+    val proximityWarnings = recentEyeStats.sumOf { it.proximityWarningCount }
+    val dryEyeWarnings = recentEyeStats.sumOf { it.eyeDryWarningCount }
+    val lowLightWarnings = recentEyeStats.sumOf { it.lowLightWarningCount }
+    val goalContinuousMinutes = uiState.dailyGoal.maxContinuousWorkMinutes.coerceIn(15, 120)
+
+    viewModel.updateSettings { current ->
+        val suggestedInterval = when {
+            maxContinuousMinutes > goalContinuousMinutes + 15 -> (goalContinuousMinutes - 10).coerceIn(10, 45)
+            maxContinuousMinutes > goalContinuousMinutes -> (goalContinuousMinutes - 5).coerceIn(10, 60)
+            else -> current.warnIntervalMinutes.coerceIn(15, 45)
+        }
+        val suggestedRestSeconds = if (skipRate >= 40) {
+            current.restDurationSeconds.coerceIn(15, 20)
+        } else {
+            current.restDurationSeconds.coerceAtLeast(20)
+        }
+        current.copy(
+            reminderEnabled = true,
+            warnIntervalMinutes = suggestedInterval,
+            restDurationSeconds = suggestedRestSeconds,
+            statsEnabled = true,
+            notificationEnabled = true,
+            keepAliveEnabled = true,
+            preAlertEnabled = true,
+            preAlertSeconds = if (skipRate >= 40) 45 else current.preAlertSeconds.coerceAtLeast(60),
+            askBeforeBreak = skipRate < 40,
+            disableSkip = false,
+            proximityMonitoringEnabled = current.proximityMonitoringEnabled || proximityWarnings > 0,
+            proximityCheckIntervalMinutes = if (proximityWarnings > 0) {
+                current.proximityCheckIntervalMinutes.coerceAtMost(3)
+            } else {
+                current.proximityCheckIntervalMinutes
+            },
+            proximityDistanceMultiplierPercent = if (proximityWarnings > 0) {
+                current.proximityDistanceMultiplierPercent.coerceAtLeast(140)
+            } else {
+                current.proximityDistanceMultiplierPercent
+            },
+            blinkMonitoringEnabled = current.blinkMonitoringEnabled || dryEyeWarnings > 0,
+            blinkNoBlinkThresholdSeconds = if (dryEyeWarnings > 0) {
+                current.blinkNoBlinkThresholdSeconds.coerceAtMost(8)
+            } else {
+                current.blinkNoBlinkThresholdSeconds
+            },
+            ambientLightMonitoringEnabled = current.ambientLightMonitoringEnabled || lowLightWarnings > 0,
+            ambientLightLowLuxThreshold = if (lowLightWarnings > 0) {
+                current.ambientLightLowLuxThreshold.coerceAtLeast(20)
+            } else {
+                current.ambientLightLowLuxThreshold
+            },
+            globalOverlayEnabled = current.globalOverlayEnabled || skipRate < 25,
+        )
+    }
+    if (maxContinuousMinutes > goalContinuousMinutes) {
+        viewModel.updateDailyGoal { current ->
+            current.copy(maxContinuousWorkMinutes = (goalContinuousMinutes - 5).coerceIn(15, 120))
+        }
     }
 }
 
@@ -770,9 +918,23 @@ private fun CapabilityLine(
         )
         StatusPill(
             if (active) Icons.Outlined.CheckCircle else Icons.Outlined.Schedule,
-            if (active) R.string.eye_care_capability_active else R.string.eye_care_capability_planned,
+            if (active) R.string.eye_care_capability_active else R.string.eye_care_guide_pending,
         )
     }
+}
+
+private fun isFamilyEyeCareModeActive(uiState: ProjectLumenUiState): Boolean {
+    val settings = uiState.settings
+    return settings.reminderEnabled &&
+        settings.warnIntervalMinutes <= 15 &&
+        settings.restDurationSeconds >= 30 &&
+        settings.disableSkip &&
+        settings.timeoutAutoBreak &&
+        settings.proximityMonitoringEnabled &&
+        settings.blinkMonitoringEnabled &&
+        settings.ambientLightMonitoringEnabled &&
+        settings.globalOverlayEnabled &&
+        uiState.dailyGoal.maxContinuousWorkMinutes <= 30
 }
 
 @Composable

@@ -416,7 +416,15 @@ internal fun SettingsScreen(
             onRestoreBackup = viewModel::restoreLatestCloudBackup,
             onSignOut = viewModel::signOutRemote,
         )
-        EyeCareGrowthCapabilityCard(uiState)
+        EyeCareGrowthCapabilityCard(
+            uiState = uiState,
+            remoteState = remoteState,
+            onOpenTemplates = openTemplates,
+            onSyncCloud = viewModel::syncRemoteNow,
+            onApplyFamilyMode = { applyFamilyEyeCareMode(viewModel) },
+            onApplyAiGuidance = { applyPersonalizedEyeCareGuidance(viewModel, uiState) },
+            onExportReport = viewModel::shareMonthlyReportPdf,
+        )
         SettingsSection(R.string.about_update_status, Icons.Outlined.Sync, initiallyExpanded = false) {
             if (checkingUpdate) {
                 StatusLine(Icons.Outlined.Sync, stringResource(R.string.about_update_checking))
