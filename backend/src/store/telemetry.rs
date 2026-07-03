@@ -159,10 +159,7 @@ fn sanitize_telemetry_upload(request: &mut TelemetryUploadRequest) {
             .truncate(MAX_DISTANCE_VIOLATIONS);
     }
     if let Some(pomodoro_productivity) = &mut request.pomodoro_productivity {
-        truncate_string(
-            &mut pomodoro_productivity.stat_date,
-            MAX_SHORT_TEXT_LENGTH,
-        );
+        truncate_string(&mut pomodoro_productivity.stat_date, MAX_SHORT_TEXT_LENGTH);
     }
     if let Some(developer_debug) = &mut request.developer_debug {
         developer_debug.crash_logs.truncate(MAX_CRASH_LOGS);

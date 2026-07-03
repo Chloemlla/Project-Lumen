@@ -8,7 +8,8 @@ use crate::{
         AdminContentSection, AdminDashboardResponse, AdminDeviceAsset, AdminEntitlementItem,
         AdminI18nJobItem, AdminObservabilitySection, AdminPurchaseAuditEntry, AdminReleaseItem,
         AdminReleaseSection, AdminRolloutPlanItem, AdminRouteStatusItem, AdminUserProfile,
-        AdminUsersSection, AdminVersionImpactItem, DeviceDiagnosticsTelemetry, DeviceProfileTelemetry,
+        AdminUsersSection, AdminVersionImpactItem, DeviceDiagnosticsTelemetry,
+        DeviceProfileTelemetry,
     },
 };
 use futures_util::TryStreamExt;
@@ -672,17 +673,19 @@ fn i18n_jobs(templates: &[AdminTemplateItem]) -> Vec<AdminI18nJobItem> {
     }
     let mut jobs = by_locale
         .into_iter()
-        .map(|(locale, (template_count, premium_count, updated_at))| AdminI18nJobItem {
-            locale,
-            template_count,
-            premium_count,
-            status: if template_count == 0 {
-                "empty".to_owned()
-            } else {
-                "ready".to_owned()
+        .map(
+            |(locale, (template_count, premium_count, updated_at))| AdminI18nJobItem {
+                locale,
+                template_count,
+                premium_count,
+                status: if template_count == 0 {
+                    "empty".to_owned()
+                } else {
+                    "ready".to_owned()
+                },
+                updated_at,
             },
-            updated_at,
-        })
+        )
         .collect::<Vec<_>>();
     jobs.sort_by(|left, right| left.locale.cmp(&right.locale));
     jobs
@@ -704,7 +707,12 @@ fn rollout_plan(
                 release.assets.len(),
                 release.patches.len()
             ),
-            status: if release.force_update { "risk" } else { "watch" }.to_owned(),
+            status: if release.force_update {
+                "risk"
+            } else {
+                "watch"
+            }
+            .to_owned(),
         });
     }
     let risky_routes = routes

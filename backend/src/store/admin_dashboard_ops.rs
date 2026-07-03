@@ -26,7 +26,8 @@ impl AppStore {
             .sort(doc! { "lastSeenAt": -1 })
             .limit(25)
             .build();
-        let stored: Vec<AdminCrashGroup> = self.admin_crash_reports
+        let stored: Vec<AdminCrashGroup> = self
+            .admin_crash_reports
             .find(doc! {}, options)
             .await
             .map_err(database_error)?
@@ -52,7 +53,8 @@ impl AppStore {
             .sort(doc! { "sampledAt": -1 })
             .limit(25)
             .build();
-        let stored: Vec<AdminApiMetric> = self.admin_api_metrics
+        let stored: Vec<AdminApiMetric> = self
+            .admin_api_metrics
             .find(doc! {}, options)
             .await
             .map_err(database_error)?
@@ -79,7 +81,8 @@ impl AppStore {
             .sort(doc! { "sampledAt": -1 })
             .limit(25)
             .build();
-        let stored: Vec<AdminSyncMetric> = self.admin_sync_metrics
+        let stored: Vec<AdminSyncMetric> = self
+            .admin_sync_metrics
             .find(doc! {}, options)
             .await
             .map_err(database_error)?
@@ -125,16 +128,17 @@ impl AppStore {
             let version_code = row.payload.device_profile.app_version_code;
             for crash in debug.crash_logs {
                 let group_key = crash_group_key(&crash.exception_type, &crash.root_cause);
-                let accumulator = groups
-                    .entry(group_key.clone())
-                    .or_insert_with(|| CrashAccumulator {
-                        group_key,
-                        version_code,
-                        count: 0,
-                        affected_users: HashSet::new(),
-                        clean_stack: crash.stack_trace_lines.clone(),
-                        last_seen_at: crash.crashed_at.max(row.received_at),
-                    });
+                let accumulator =
+                    groups
+                        .entry(group_key.clone())
+                        .or_insert_with(|| CrashAccumulator {
+                            group_key,
+                            version_code,
+                            count: 0,
+                            affected_users: HashSet::new(),
+                            clean_stack: crash.stack_trace_lines.clone(),
+                            last_seen_at: crash.crashed_at.max(row.received_at),
+                        });
                 accumulator.count += 1;
                 accumulator.affected_users.insert(row.user_id.clone());
                 accumulator.last_seen_at = accumulator
@@ -308,8 +312,7 @@ impl AppStore {
         }
         payload_sizes.sort_unstable();
         let total_bytes: i64 = payload_sizes.iter().sum();
-        let average_payload_kb =
-            bytes_to_kb(total_bytes / payload_sizes.len().max(1) as i64);
+        let average_payload_kb = bytes_to_kb(total_bytes / payload_sizes.len().max(1) as i64);
         let largest_payload_kb = bytes_to_kb(*payload_sizes.last().unwrap_or(&0));
         Ok(vec![AdminSyncMetric {
             endpoint: "/api/v1/sync/push".to_owned(),
