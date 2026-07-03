@@ -23,6 +23,7 @@ import com.projectlumen.app.core.api.RemoteTelemetryUpload
 import com.projectlumen.app.core.api.RemoteTelemetryUploadResult
 import com.projectlumen.app.core.api.RestComplianceTelemetry
 import com.projectlumen.app.core.api.SensorDisturbanceTelemetry
+import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
@@ -73,6 +74,20 @@ class EyeCareTelemetryReporter(
         }.getOrNull()
     }
 
+    suspend fun uploadCrashReport(
+        report: CrashReport,
+        force: Boolean = true,
+        sourceApp: String = LumenOpenContracts.SOURCE_APP_PROJECT_LUMEN,
+    ): RemoteTelemetryUploadResult? {
+        return runCatching {
+            uploadCrashReportUnchecked(
+                report = report,
+                force = force,
+                sourceApp = sourceApp,
+            )
+        }.getOrNull()
+    }
+
     private suspend fun uploadCurrentSnapshotUnchecked(
         distanceViolation: DistanceViolationTelemetry? = null,
         averageBlinksPerMinute: Double? = null,
@@ -105,6 +120,36 @@ class EyeCareTelemetryReporter(
             aiPerformance = runtime.toAiPerformance(),
             developerDebug = runtime.toDeveloperDebug(settings),
             deviceDiagnostics = settings.toDeviceDiagnostics(nowMillis),
+        )
+        return apiClient.uploadTelemetry(accessToken, upload)
+            .also { lastUploadAt.set(nowMillis) }
+    }
+
+    private suspend fun uploadCrashReportUnchecked(
+        report: CrashReport,
+        force: Boolean = true,
+        sourceApp: String = LumenOpenContracts.SOURCE_APP_PROJECT_LUMEN,
+    ): RemoteTelemetryUploadResult? {
+        val accessToken = accessTokenProvider()?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val nowMillis = System.currentTimeMillis()
+        if (!force && nowMillis - lastUploadAt.get() < MIN_UPLOAD_INTERVAL_MILLIS) return null
+        val settings = settingsRepository.get() ?: return null
+        if (!settings.diagnosticTelemetryUploadEnabled || !settings.diagnosticCrashReportUploadEnabled) return null
+        val deviceInstallationId = settings.deviceInstallationId.trim().takeIf { it.isNotBlank() } ?: return null
+        val upload = RemoteTelemetryUpload(
+            deviceInstallationId = deviceInstallationId,
+            sourceApp = sanitizeLumenOpenSourceApp(sourceApp),
+            recordedAt = nowMillis,
+            dailyHealth = null,
+            environmentContext = emptyList(),
+            deviceProfile = buildDeviceProfile(),
+            calibrationAnchor = null,
+            aiPerformance = null,
+            developerDebug = DeveloperDebugTelemetry(
+                sensorDisturbance = null,
+                crashLogs = listOf(report.toCrashLogTelemetry()),
+            ),
+            deviceDiagnostics = null,
         )
         return apiClient.uploadTelemetry(accessToken, upload)
             .also { lastUploadAt.set(nowMillis) }
@@ -257,18 +302,7 @@ class EyeCareTelemetryReporter(
         if (!settings.diagnosticTelemetryUploadEnabled) return null
         val crashLogs = if (settings.diagnosticCrashReportUploadEnabled) {
             CrashReportStore(context).load()?.let { report ->
-                listOf(
-                    CrashLogTelemetry(
-                        crashedAt = report.crashedAtMillis,
-                        exceptionType = report.exceptionType.take(MAX_CRASH_FIELD_LENGTH),
-                        rootCause = report.rootCause.take(MAX_CRASH_FIELD_LENGTH),
-                        stackTraceLines = report.stackTrace
-                            .lines()
-                            .filter { it.isNotBlank() }
-                            .take(MAX_CRASH_STACK_LINES)
-                            .map { it.take(MAX_CRASH_LINE_LENGTH) },
-                    ),
-                )
+                listOf(report.toCrashLogTelemetry())
             }.orEmpty()
         } else {
             emptyList()
@@ -287,6 +321,19 @@ class EyeCareTelemetryReporter(
         return DeveloperDebugTelemetry(
             sensorDisturbance = sensorDisturbance,
             crashLogs = crashLogs,
+        )
+    }
+
+    private fun CrashReport.toCrashLogTelemetry(): CrashLogTelemetry {
+        return CrashLogTelemetry(
+            crashedAt = crashedAtMillis,
+            exceptionType = exceptionType.take(MAX_CRASH_FIELD_LENGTH),
+            rootCause = rootCause.take(MAX_CRASH_FIELD_LENGTH),
+            stackTraceLines = stackTrace
+                .lines()
+                .filter { it.isNotBlank() }
+                .take(MAX_CRASH_STACK_LINES)
+                .map { it.take(MAX_CRASH_LINE_LENGTH) },
         )
     }
 

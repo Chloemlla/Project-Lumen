@@ -31,6 +31,11 @@ import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.telemetry.EyeCareTelemetryReporter
 import com.projectlumen.app.core.toast.LumenToast
 import com.projectlumen.app.openapi.LumenOpenRuntimeController
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class ProjectLumenApplication : Application() {
     val database: AppDatabase by lazy { AppDatabase.create(this) }
@@ -59,7 +64,11 @@ class ProjectLumenApplication : Application() {
     }
     val shizuku: ShizukuCapabilityManager by lazy { ShizukuCapabilityManager(this) }
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val crashReportUploadInFlight = AtomicBoolean(false)
     private var crashExceptionHandler: Thread.UncaughtExceptionHandler? = null
+    @Volatile
+    private var crashReportUploadsReady = false
     @Volatile
     var startupCrashReport: CrashReport? = null
         private set
@@ -79,6 +88,8 @@ class ProjectLumenApplication : Application() {
         notifications.ensureChannels()
         LumenToast.install(this)
         ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)
+        crashReportUploadsReady = true
+        scheduleStoredCrashReportUpload()
     }
 
     private fun installCrashReporter() {
@@ -90,6 +101,7 @@ class ProjectLumenApplication : Application() {
             val report = runCatching { CrashReport.fromThrowable(throwable) }
                 .getOrElse { CrashReport.fromThrowableFallback(throwable, it) }
             runCatching { crashReports.save(report) }
+            scheduleCrashReportUpload(report)
             if (defaultExceptionHandler != null && defaultExceptionHandler !== handler) {
                 defaultExceptionHandler.uncaughtException(thread, throwable)
             } else {
@@ -118,11 +130,43 @@ class ProjectLumenApplication : Application() {
             .getOrElse { CrashReport.fromThrowableFallback(throwable, it) }
         startupCrashReport = report
         runCatching { CrashReportStore(this).save(report) }
+            .onSuccess { scheduleCrashReportUpload(report) }
         return report
     }
 
     fun clearStartupCrashReport() {
         startupCrashReport = null
+    }
+
+    fun scheduleStoredCrashReportUpload() {
+        scheduleCrashReportUpload()
+    }
+
+    fun scheduleCrashReportUpload(report: CrashReport? = null) {
+        if (!crashReportUploadsReady) return
+        if (!crashReportUploadInFlight.compareAndSet(false, true)) return
+        applicationScope.launch {
+            try {
+                val reportToUpload = report ?: runCatching { crashReports.load() }.getOrNull() ?: return@launch
+                val result = runCatching { telemetry.uploadCrashReport(reportToUpload, force = true) }.getOrNull()
+                if (result?.accepted == true) {
+                    clearUploadedCrashReport(reportToUpload)
+                    CrashBreadcrumbs.record("Crash report uploaded")
+                }
+            } finally {
+                crashReportUploadInFlight.set(false)
+            }
+        }
+    }
+
+    private fun clearUploadedCrashReport(report: CrashReport) {
+        val storedReport = runCatching { crashReports.load() }.getOrNull()
+        if (storedReport?.reportId == report.reportId) {
+            runCatching { crashReports.clear() }
+        }
+        if (startupCrashReport?.reportId == report.reportId) {
+            clearStartupCrashReport()
+        }
     }
 
     fun startTimerService() {

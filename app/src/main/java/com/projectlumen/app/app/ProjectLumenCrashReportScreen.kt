@@ -251,6 +251,7 @@ internal fun CrashReportScreen(
                 onClear = {
                     if (clearStoredReportOnContinue) {
                         (context.applicationContext as? ProjectLumenApplication)?.let { application ->
+                            application.scheduleCrashReportUpload(report)
                             application.crashReports.clear()
                             application.clearStartupCrashReport()
                         }

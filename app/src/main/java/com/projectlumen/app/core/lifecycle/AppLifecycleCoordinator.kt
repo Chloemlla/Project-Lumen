@@ -29,6 +29,7 @@ class AppLifecycleCoordinator(
     private val runtimeRepository = app.runtimeRepository()
 
     override fun onStart(owner: LifecycleOwner) {
+        app.scheduleStoredCrashReportUpload()
         scope.launch {
             val nowMillis = System.currentTimeMillis()
             val settings = settingsRepository.getOrDefault()
