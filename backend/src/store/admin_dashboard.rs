@@ -82,6 +82,7 @@ impl AppStore {
             .map(|group| group.clean_stack.clone())
             .unwrap_or_default();
         let routes = route_status(&api_metrics);
+        let version_impacts = version_impacts(&crash_groups, &devices);
 
         Ok(AdminDashboardResponse {
             generated_at: now_millis(),
@@ -94,7 +95,7 @@ impl AppStore {
                 backups,
             },
             observability: AdminObservabilitySection {
-                version_impacts: version_impacts(&crash_groups, &devices),
+                version_impacts,
                 crash_groups,
                 clean_stack,
                 api_metrics,

@@ -135,6 +135,7 @@ class SecureCredentialStore(context: Context) {
         val existing = encryptedMmkv.decodeString(KEY_DEVICE_INSTALLATION_ID)
             ?.takeIf { it.isNotBlank() }
         if (
+            existing != null &&
             isDeviceFingerprint(existing) &&
             encryptedMmkv.decodeInt(KEY_DEVICE_FINGERPRINT_VERSION, 0) >= DEVICE_FINGERPRINT_VERSION
         ) {
