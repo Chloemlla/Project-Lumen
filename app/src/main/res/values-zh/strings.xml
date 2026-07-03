@@ -650,6 +650,7 @@
     <string name="remote_cloud_account">账号</string>
     <string name="remote_cloud_signed_out">未登录</string>
     <string name="remote_cloud_stored_session">已加载本地会话</string>
+    <string name="remote_cloud_busy">正在处理远端请求…</string>
     <string name="remote_cloud_tier">云端权益</string>
     <string name="remote_cloud_entitlements">权益数量</string>
     <string name="remote_cloud_sync_cursor">同步游标</string>

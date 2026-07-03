@@ -652,6 +652,7 @@
     <string name="remote_cloud_account">Account</string>
     <string name="remote_cloud_signed_out">Not signed in</string>
     <string name="remote_cloud_stored_session">Stored session available</string>
+    <string name="remote_cloud_busy">Working on the remote request…</string>
     <string name="remote_cloud_tier">Cloud tier</string>
     <string name="remote_cloud_entitlements">Entitlements</string>
     <string name="remote_cloud_sync_cursor">Sync cursor</string>
