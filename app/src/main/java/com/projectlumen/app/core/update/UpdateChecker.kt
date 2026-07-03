@@ -4,24 +4,27 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.os.Build
 import android.provider.Settings
+import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.api.ProjectLumenApiConfig
-import com.projectlumen.app.core.security.ProjectLumenRequestSigner
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import com.projectlumen.app.core.api.RemoteReleaseAsset
+import com.projectlumen.app.core.api.RemoteReleaseCheck
+import com.projectlumen.app.core.api.RemoteReleasePatch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
 import java.net.URLEncoder
 import java.net.URL
 import java.time.Instant
+import javax.net.ssl.HttpsURLConnection
 
 class UpdateChecker(
     private val context: Context,
     private val backendBaseUrl: String = ProjectLumenApiConfig.baseUrl,
+    private val apiClient: ProjectLumenApiClient = ProjectLumenApiClient(context, backendBaseUrl),
     private val githubReleaseApiUrl: String = PROJECT_LUMEN_RELEASE_API,
     private val channel: String = DEFAULT_CHANNEL,
 ) {
-    fun checkForUpdate(currentBuild: BuildMetadata = BuildMetadata.current()): UpdateCandidate? {
+    suspend fun checkForUpdate(currentBuild: BuildMetadata = BuildMetadata.current()): UpdateCandidate? {
         when (val backendResult = runCatching { fetchBackendReleaseManifest(currentBuild) }.getOrNull()) {
             is BackendReleaseResult.Update -> return backendResult.candidate
             BackendReleaseResult.NoUpdate -> return null
@@ -48,41 +51,27 @@ class UpdateChecker(
         )
     }
 
-    private fun fetchBackendReleaseManifest(currentBuild: BuildMetadata): BackendReleaseResult {
-        val requestUrl = buildBackendReleaseCheckUrl(currentBuild)
-        val connection = openHttpConnection(requestUrl).apply {
-            requestMethod = "GET"
-            connectTimeout = REQUEST_TIMEOUT_MILLIS
-            readTimeout = REQUEST_TIMEOUT_MILLIS
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", USER_AGENT)
-            ProjectLumenRequestSigner.headers("GET", requestUrl.toHttpUrl(), null)
-                .forEach { (name, value) -> setRequestProperty(name, value) }
-        }
-        try {
-            if (connection.responseCode !in 200..299) {
-                throw IOException("Backend release manifest request failed with HTTP ${connection.responseCode}")
-            }
-            val payload = connection.inputStream.bufferedReader().use { it.readText() }
-            val json = JSONObject(payload)
-            if (!json.optBoolean("updateAvailable")) return BackendReleaseResult.NoUpdate
-            val versionCode = json.optLong("versionCode", 0L)
-            if (versionCode <= currentBuild.versionCode.toLong()) return BackendReleaseResult.NoUpdate
+    private suspend fun fetchBackendReleaseManifest(currentBuild: BuildMetadata): BackendReleaseResult {
+        val remoteRelease = apiClient.checkRemoteRelease(
+            currentVersionCode = currentBuild.versionCode.toLong(),
+            abi = Build.SUPPORTED_ABIS.firstOrNull()?.takeIf { it.isNotBlank() } ?: "universal",
+            channel = channel.ifBlank { DEFAULT_CHANNEL },
+            rolloutKey = deviceRolloutKey(),
+        )
+        if (!remoteRelease.updateAvailable) return BackendReleaseResult.NoUpdate
+        if (remoteRelease.versionCode <= currentBuild.versionCode.toLong()) return BackendReleaseResult.NoUpdate
 
-            val release = parseBackendReleaseInfo(json)
-            val matchedAsset = selectBestAsset(release.assets)
-                ?: throw IOException("Backend release manifest did not include a verified APK asset.")
-            return BackendReleaseResult.Update(
-                UpdateCandidate(
-                    currentBuild = currentBuild,
-                    release = release,
-                    matchedAsset = matchedAsset,
-                    matchReason = UpdateMatchReason.VERSION_CODE,
-                ),
-            )
-        } finally {
-            connection.disconnect()
-        }
+        val release = remoteRelease.toReleaseInfo()
+        val matchedAsset = selectBestAsset(release.assets)
+            ?: throw IOException("Backend release manifest did not include a verified APK asset.")
+        return BackendReleaseResult.Update(
+            UpdateCandidate(
+                currentBuild = currentBuild,
+                release = release,
+                matchedAsset = matchedAsset,
+                matchReason = UpdateMatchReason.VERSION_CODE,
+            ),
+        )
     }
 
     private fun fetchLatestGitHubRelease(): ReleaseInfo? {
@@ -122,18 +111,17 @@ class UpdateChecker(
         }
     }
 
-    private fun parseBackendReleaseInfo(json: JSONObject): ReleaseInfo {
-        val versionName = json.optString("versionName").ifBlank { json.optLong("versionCode").toString() }
-        val tagName = json.optString("tagName").ifBlank { "v$versionName" }
-        val releaseUrl = json.optString("releaseUrl")
-        val createdAt = json.optLong("createdAt").takeIf { it > 0L }
-            ?: json.optLong("checkedAt").takeIf { it > 0L }
+    private fun RemoteReleaseCheck.toReleaseInfo(): ReleaseInfo {
+        val resolvedVersionName = versionName.ifBlank { versionCode.toString() }
+        val resolvedTagName = tagName.ifBlank { "v$resolvedVersionName" }
+        val createdAt = createdAt.takeIf { it > 0L }
+            ?: checkedAt.takeIf { it > 0L }
             ?: System.currentTimeMillis()
-        val releaseAssets = parseBackendReleaseAssets(json)
-        val selectedSha256 = json.optString("fullApkSha256").ifBlank { json.optString("sha256") }
-        val selectedAssetUrl = json.optString("fullApkUrl")
+        val releaseAssets = assets.mapNotNull { it.toReleaseAsset() }
+        val selectedSha256 = fullApkSha256.ifBlank { sha256 }
+        val selectedAssetUrl = fullApkUrl
         val selectedAssetName = selectedAssetUrl.substringAfterLast('/').ifBlank {
-            "Project-Lumen_android_${versionName}_${json.optString("abi", "universal")}.apk"
+            "Project-Lumen_android_${resolvedVersionName}_${abi.ifBlank { "universal" }}.apk"
         }
         val assets = if (selectedAssetUrl.isNotBlank() && selectedSha256.isNotBlank()) {
             val selected = ReleaseAsset(
@@ -141,8 +129,8 @@ class UpdateChecker(
                 downloadUrl = selectedAssetUrl,
                 contentType = "application/vnd.android.package-archive",
                 sha256 = selectedSha256.lowercase(),
-                abi = json.optString("abi", "universal"),
-                sizeBytes = json.optLong("fullApkSizeBytes").takeIf { it > 0L },
+                abi = abi.ifBlank { "universal" },
+                sizeBytes = fullApkSizeBytes.takeIf { it > 0L },
             )
             (listOf(selected) + releaseAssets)
                 .distinctBy { it.downloadUrl.lowercase() }
@@ -150,93 +138,49 @@ class UpdateChecker(
             releaseAssets
         }
         return ReleaseInfo(
-            tagName = tagName,
-            releaseName = json.optString("releaseName").ifBlank { tagName },
-            body = buildBackendReleaseBody(json),
+            tagName = resolvedTagName,
+            releaseName = resolvedTagName,
+            body = buildBackendReleaseBody(this),
             htmlUrl = releaseUrl,
             publishedAtUtcMillis = createdAt,
             assets = assets,
-            versionCode = json.optLong("versionCode"),
-            rollout = json.optString("rollout"),
-            forceUpdate = json.optBoolean("forceUpdate"),
-            channel = json.optString("channel", DEFAULT_CHANNEL),
-            patches = parseBackendReleasePatches(json.optJSONArray("patches")),
+            versionCode = versionCode,
+            rollout = rollout,
+            forceUpdate = forceUpdate,
+            channel = channel.ifBlank { DEFAULT_CHANNEL },
+            patches = patches.mapNotNull { it.toReleasePatch() },
         )
     }
 
-    private fun parseBackendReleaseAssets(json: JSONObject): List<ReleaseAsset> {
-        return json.optJSONArray("assets")
-            ?.let { array ->
-                buildList {
-                    for (index in 0 until array.length()) {
-                        val asset = array.optJSONObject(index) ?: continue
-                        val url = asset.optString("url").ifBlank { asset.optString("downloadUrl") }
-                        val sha256 = asset.optString("sha256")
-                        if (url.isBlank() || sha256.isBlank()) continue
-                        add(
-                            ReleaseAsset(
-                                name = asset.optString("name").ifBlank {
-                                    url.substringAfterLast('/').ifBlank { "Project-Lumen_android.apk" }
-                                },
-                                downloadUrl = url,
-                                contentType = asset.optString("contentType").takeIf { it.isNotBlank() },
-                                sha256 = sha256.lowercase(),
-                                abi = asset.optString("abi").takeIf { it.isNotBlank() },
-                                sizeBytes = asset.optLong("sizeBytes").takeIf { it > 0L },
-                            ),
-                        )
-                    }
-                }
-            }
-            .orEmpty()
+    private fun RemoteReleaseAsset.toReleaseAsset(): ReleaseAsset? {
+        if (url.isBlank() || sha256.isBlank()) return null
+        return ReleaseAsset(
+            name = name.ifBlank { url.substringAfterLast('/').ifBlank { "Project-Lumen_android.apk" } },
+            downloadUrl = url,
+            contentType = contentType.takeIf { it.isNotBlank() },
+            sha256 = sha256.lowercase(),
+            abi = abi.takeIf { it.isNotBlank() },
+            sizeBytes = sizeBytes.takeIf { it > 0L },
+        )
     }
 
-    private fun parseBackendReleasePatches(array: JSONArray?): List<ReleasePatch> {
-        if (array == null) return emptyList()
-        return buildList {
-            for (index in 0 until array.length()) {
-                val patch = array.optJSONObject(index) ?: continue
-                val patchUrl = patch.optString("patchUrl")
-                val patchSha256 = patch.optString("patchSha256")
-                if (patchUrl.isBlank() || patchSha256.isBlank()) continue
-                add(
-                    ReleasePatch(
-                        fromVersionCode = patch.optLong("fromVersionCode"),
-                        fromSha256 = patch.optString("fromSha256").lowercase(),
-                        toSha256 = patch.optString("toSha256").lowercase(),
-                        patchUrl = patchUrl,
-                        patchSha256 = patchSha256.lowercase(),
-                        algorithm = patch.optString("algorithm").ifBlank { "bsdiff" },
-                        sizeBytes = patch.optLong("sizeBytes").takeIf { it > 0L },
-                    ),
-                )
-            }
-        }
+    private fun RemoteReleasePatch.toReleasePatch(): ReleasePatch? {
+        if (patchUrl.isBlank() || patchSha256.isBlank()) return null
+        return ReleasePatch(
+            fromVersionCode = fromVersionCode,
+            fromSha256 = fromSha256.lowercase(),
+            toSha256 = toSha256.lowercase(),
+            patchUrl = patchUrl,
+            patchSha256 = patchSha256.lowercase(),
+            algorithm = algorithm.ifBlank { "bsdiff" },
+            sizeBytes = sizeBytes.takeIf { it > 0L },
+        )
     }
 
-    private fun buildBackendReleaseBody(json: JSONObject): String {
-        val rollout = json.optString("rollout").takeIf { it.isNotBlank() } ?: "100%"
-        val channel = json.optString("channel", DEFAULT_CHANNEL)
-        val forceUpdate = json.optBoolean("forceUpdate")
-        return "Channel: $channel\nRollout: $rollout\nForce update: $forceUpdate"
-    }
-
-    private fun buildBackendReleaseCheckUrl(currentBuild: BuildMetadata): String {
-        val abi = Build.SUPPORTED_ABIS.firstOrNull()?.takeIf { it.isNotBlank() } ?: "universal"
-        val rolloutKey = deviceRolloutKey()
-        return buildString {
-            append(backendBaseUrl.trimEnd('/'))
-            append("/v1/releases/check?currentVersionCode=")
-            append(currentBuild.versionCode)
-            append("&abi=")
-            append(queryEncode(abi))
-            append("&channel=")
-            append(queryEncode(channel.ifBlank { DEFAULT_CHANNEL }))
-            if (rolloutKey.isNotBlank()) {
-                append("&rolloutKey=")
-                append(queryEncode(rolloutKey))
-            }
-        }
+    private fun buildBackendReleaseBody(release: RemoteReleaseCheck): String {
+        val rollout = release.rollout.takeIf { it.isNotBlank() } ?: "100%"
+        val channel = release.channel.ifBlank { DEFAULT_CHANNEL }
+        return "Channel: $channel\nRollout: $rollout\nForce update: ${release.forceUpdate}"
     }
 
     private fun deviceRolloutKey(): String {
@@ -334,15 +278,15 @@ class UpdateChecker(
             .trim()
     }
 
-    private fun openHttpConnection(url: String): HttpURLConnection {
+    private fun openHttpConnection(url: String): HttpsURLConnection {
         val parsedUrl = URL(url)
         if (parsedUrl.protocol != "https") {
             throw IOException("Update endpoints must use HTTPS.")
         }
         val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
         val network = connectivityManager?.activeNetwork
-            ?: return parsedUrl.openConnection() as HttpURLConnection
-        return network.openConnection(parsedUrl) as HttpURLConnection
+            ?: return parsedUrl.openConnection() as HttpsURLConnection
+        return network.openConnection(parsedUrl) as HttpsURLConnection
     }
 
     private fun compareReleaseVersion(remoteTagName: String, localVersion: VersionDescriptor): Int {
