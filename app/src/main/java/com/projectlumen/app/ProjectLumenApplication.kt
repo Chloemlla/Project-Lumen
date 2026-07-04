@@ -182,6 +182,10 @@ class ProjectLumenApplication : Application() {
         )
     }
 
+    fun nativeProtectionSummary(): String {
+        return AppIntegrityGuard.nativeProtectionSummary(this)
+    }
+
     fun runtimeRepository(): RuntimeRepository {
         return RuntimeRepository(database.runtimeStateDao())
     }

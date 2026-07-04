@@ -1,5 +1,6 @@
 package com.projectlumen.app.core.security
 
+import com.projectlumen.app.BuildConfig
 import okhttp3.HttpUrl
 import java.security.MessageDigest
 import java.util.UUID
@@ -47,10 +48,14 @@ object ProjectLumenRequestSigner {
     }
 
     private fun hmacSha256Hex(payload: String): String {
-        val secret = NativeSecurityBridge.requestSigningSecretOrNull()
+        val nativeSecret = NativeSecurityBridge.requestSigningSecretOrNull()
             ?.trim()
             ?.takeIf { it.isNotBlank() }
-            ?: FALLBACK_REQUEST_SIGNING_SECRET
+        val secret = nativeSecret ?: if (BuildConfig.DEBUG) {
+            FALLBACK_REQUEST_SIGNING_SECRET
+        } else {
+            error("Project Lumen native request signing bridge is unavailable.")
+        }
         require(secret.isNotBlank()) { "Project Lumen request signing secret is not configured." }
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))

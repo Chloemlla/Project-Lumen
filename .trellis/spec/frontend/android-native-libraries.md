@@ -122,6 +122,8 @@ Java_com_projectlumen_app_core_security_NativeSecurityBridge_isNativeEnvironment
 - Native checks must verify expected package and release certificate before trusting the environment.
 - When `debug_allowed == JNI_FALSE`, native checks must reject a non-zero `TracerPid`, suspicious debug/injection environment variables, known hook library mappings, suspicious task names, suspicious file-descriptor targets, and known Frida/Xposed/Substrate socket artifacts.
 - Debuggable local builds are bypassed by `AppIntegrityGuard`; do not make native checks block ordinary debug development paths unless the caller explicitly opts in.
+- Release request signing must fail closed when `NativeSecurityBridge.requestSigningSecretOrNull()` is unavailable; only debug builds may use the documented local fallback signing secret.
+- TODO1 remote device registration must include native bridge availability, native environment verdict, request-signing policy, and App Integrity state in `localSecurityConfig`.
 
 ### 4. Validation & Error Matrix
 
@@ -132,11 +134,15 @@ Java_com_projectlumen_app_core_security_NativeSecurityBridge_isNativeEnvironment
 | `TracerPid` is non-zero with debug disallowed | Native bridge returns `JNI_FALSE`. |
 | Frida/Xposed/Substrate/Riru/Zygisk artifacts appear in maps, cmdline, task comm, fd symlinks, or Unix socket metadata | Native bridge returns `JNI_FALSE`. |
 | Debug build calls `AppIntegrityGuard.enforce` | Guard returns before native enforcement. |
+| Release API request cannot load `lumen_security` | Request signing throws before sending a fallback-signed request. |
+| Remote device registration succeeds | `localSecurityConfig` reports native bridge/protection state for backend/admin inspection. |
 
 ### 5. Good/Base/Bad Cases
 
 - Good: add detection paths as small native helpers and keep all checks side-effect free.
+- Good: keep TODO1 remote signing and device registration tied to native bridge status.
 - Base: Java-side `Debug.isDebuggerConnected()` remains a complementary signal, not a replacement for native checks.
+- Bad: release builds silently falling back to `project-lumen-local-request-signing-key` when native loading fails.
 - Bad: calling `ptrace` or killing the process from the native bridge; return a verdict and let `AppIntegrityGuard` own enforcement.
 
 ### 6. Tests Required
@@ -144,6 +150,7 @@ Java_com_projectlumen_app_core_security_NativeSecurityBridge_isNativeEnvironment
 - GitHub workflow: Android build must still compile `lumen_security`.
 - Manual review: check that new needles are lower-case and searched through the case-normalized helper.
 - Manual review: check that release-only enforcement remains gated by `BuildConfig.DEBUG` and `APP_INTEGRITY_ENFORCEMENT_ENABLED`.
+- Manual review: check release request signing has no non-native fallback path.
 
 ### 7. Wrong vs Correct
 

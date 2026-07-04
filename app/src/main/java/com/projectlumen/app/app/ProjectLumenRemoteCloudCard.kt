@@ -37,6 +37,7 @@ import com.projectlumen.app.R
 @Composable
 internal fun RemoteCloudAccountCard(
     state: ProjectLumenRemoteUiState,
+    cloudSyncAllowed: Boolean,
     onCheckHealth: () -> Unit,
     onStartEmailLogin: (String) -> Unit,
     onVerifyEmailLogin: (String) -> Unit,
@@ -94,10 +95,14 @@ internal fun RemoteCloudAccountCard(
             )
             if (state.signedIn) {
                 MetricRow(R.string.remote_cloud_tier, state.cloudTier.ifBlank { "-" })
+                MetricRow(R.string.remote_cloud_required_tier, stringResource(R.string.remote_cloud_commercial_plus))
                 MetricRow(R.string.remote_cloud_entitlements, state.entitlementCount.toString())
                 MetricRow(R.string.remote_cloud_sync_cursor, state.syncCursor.toString())
                 if (state.latestBackupUploadedAt > 0L) {
                     MetricRow(R.string.remote_cloud_latest_backup, state.latestBackupUploadedAt.toString())
+                }
+                if (!cloudSyncAllowed) {
+                    StatusLine(Icons.Outlined.Lock, stringResource(R.string.remote_cloud_commercial_required))
                 }
             }
             if (state.lastOperation.isNotBlank()) {
@@ -157,13 +162,13 @@ internal fun RemoteCloudAccountCard(
             AnimatedVisibility(visible = state.signedIn) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     LumenFlowRow {
-                        Button(enabled = !state.busy, onClick = onSyncNow) {
+                        Button(enabled = !state.busy && cloudSyncAllowed, onClick = onSyncNow) {
                             ButtonLabel(Icons.Outlined.Sync, R.string.remote_cloud_sync_now)
                         }
-                        OutlinedButton(enabled = !state.busy, onClick = onUploadBackup) {
+                        OutlinedButton(enabled = !state.busy && cloudSyncAllowed, onClick = onUploadBackup) {
                             ButtonLabel(Icons.Outlined.CloudUpload, R.string.remote_cloud_upload_backup)
                         }
-                        OutlinedButton(enabled = !state.busy, onClick = onRestoreBackup) {
+                        OutlinedButton(enabled = !state.busy && cloudSyncAllowed, onClick = onRestoreBackup) {
                             ButtonLabel(Icons.Outlined.Refresh, R.string.remote_cloud_restore_backup)
                         }
                     }

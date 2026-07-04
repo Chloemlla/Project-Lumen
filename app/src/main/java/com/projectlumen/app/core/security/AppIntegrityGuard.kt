@@ -29,6 +29,21 @@ object AppIntegrityGuard {
         }
     }
 
+    fun nativeProtectionSummary(context: Context): String {
+        val appContext = context.applicationContext
+        val nativeAllowed = NativeSecurityBridge.isNativeEnvironmentAllowedOrNull(
+            packageName = appContext.packageName,
+            signingCertSha256 = signingCertificateSha256(appContext),
+            debugAllowed = BuildConfig.DEBUG,
+        )
+        return buildList {
+            add("nativeBridge=${if (NativeSecurityBridge.isAvailable) "available" else "unavailable"}")
+            add("nativeEnvironment=${nativeAllowed?.let { if (it) "allowed" else "blocked" } ?: "unknown"}")
+            add("requestSigning=${if (BuildConfig.DEBUG) "native_or_debug_fallback" else "native_required"}")
+            add("appIntegrity=${if (BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED) "enabled" else "disabled"}")
+        }.joinToString(separator = ";")
+    }
+
     @Suppress("DEPRECATION")
     private fun signingCertificateSha256(context: Context): String {
         val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {

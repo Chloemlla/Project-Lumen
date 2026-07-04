@@ -649,6 +649,7 @@
     <string name="eye_care_capability_configure">配置</string>
     <string name="eye_care_capability_enable">开启</string>
     <string name="eye_care_capability_sign_in">登录</string>
+    <string name="eye_care_capability_upgrade">升级</string>
     <string name="eye_care_capability_review">查看</string>
     <string name="eye_care_apply_family_profile">应用家庭方案</string>
     <string name="eye_care_apply_local_guidance">应用本地建议</string>
@@ -709,6 +710,9 @@
     <string name="remote_cloud_stored_session">已加载本地会话</string>
     <string name="remote_cloud_busy">正在处理远端请求…</string>
     <string name="remote_cloud_tier">云端权益</string>
+    <string name="remote_cloud_required_tier">所需权益</string>
+    <string name="remote_cloud_commercial_plus">商业版 Plus</string>
+    <string name="remote_cloud_commercial_required">云同步和云备份需要商业版 Plus 权益。</string>
     <string name="remote_cloud_entitlements">权益数量</string>
     <string name="remote_cloud_sync_cursor">同步游标</string>
     <string name="remote_cloud_latest_backup">最近备份</string>

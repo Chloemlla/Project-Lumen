@@ -11,6 +11,7 @@ import com.projectlumen.app.core.api.RemoteSyncChange
 import com.projectlumen.app.core.database.entities.EntitlementEntity
 import com.projectlumen.app.core.database.entities.FeatureFlagEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
+import com.projectlumen.app.core.enums.PlanTier
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.repositories.EntitlementRepository
 import com.projectlumen.app.core.repositories.FeatureFlagRepository
@@ -54,6 +55,7 @@ internal class ProjectLumenRemoteFeatureEntry(
     private val entitlementRepository: EntitlementRepository,
     private val featureFlagRepository: FeatureFlagRepository,
     private val tipTemplateRepository: TipTemplateRepository,
+    private val nativeProtectionSummary: () -> String,
 ) {
     private val _state = MutableStateFlow(ProjectLumenRemoteUiState())
     val state: StateFlow<ProjectLumenRemoteUiState> = _state.asStateFlow()
@@ -122,7 +124,7 @@ internal class ProjectLumenRemoteFeatureEntry(
             deviceFingerprint = deviceFingerprint,
             model = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
             versionCode = BuildConfig.VERSION_CODE.toLong(),
-            localSecurityConfig = "signedRequests=true;pinning=configured",
+            localSecurityConfig = localSecurityConfig(),
         )
         val entitlements = apiClient.fetchEntitlements(accessToken)
         val featureFlags = apiClient.fetchFeatureFlags(accessToken)
@@ -145,6 +147,7 @@ internal class ProjectLumenRemoteFeatureEntry(
     }
 
     fun syncNow() = launchRemote("Sync completed") {
+        requireCloudSyncEntitlement()
         val accessToken = requireAccessToken()
         val deviceId = credentials.deviceInstallationId()
         val configApplied = syncRemoteConfig()
@@ -170,6 +173,7 @@ internal class ProjectLumenRemoteFeatureEntry(
     }
 
     fun uploadCloudBackup() = launchRemote("Cloud backup uploaded") {
+        requireCloudSyncEntitlement()
         val metadata = apiClient.uploadBackup(
             accessToken = requireAccessToken(),
             deviceInstallationId = credentials.deviceInstallationId(),
@@ -183,6 +187,7 @@ internal class ProjectLumenRemoteFeatureEntry(
     }
 
     fun restoreLatestCloudBackup() = launchRemote("Latest backup restored") {
+        requireCloudSyncEntitlement()
         val remoteBackup = apiClient.fetchLatestBackup(requireAccessToken())
             ?: error("No cloud backup is available.")
         val summary = backup.importBackupJson(remoteBackup.backup)
@@ -274,6 +279,21 @@ internal class ProjectLumenRemoteFeatureEntry(
             lastOperation = "Session refreshed",
         )
         return refreshed.accessToken
+    }
+
+    private suspend fun requireCloudSyncEntitlement() {
+        val tier = planTier(settingsRepository.getOrDefault())
+        require(tier >= PlanTier.PLUS) {
+            "Commercial Edition Plus is required for cloud sync and cloud backup."
+        }
+    }
+
+    private fun localSecurityConfig(): String {
+        return listOf(
+            "signedRequests=native",
+            "pinning=configured",
+            nativeProtectionSummary(),
+        ).joinToString(separator = ";")
     }
 
     private suspend fun saveRemoteEntitlements(entitlements: List<RemoteEntitlement>) {

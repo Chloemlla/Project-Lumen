@@ -224,6 +224,7 @@ internal fun SettingsScreen(
     val overlayPermissionNeeded = permissionRequirements.overlay
     val writeSettingsPermissionNeeded = permissionRequirements.writeSettings
     val shizukuNativeBrightnessEnabled = settings.shizukuAdvancedModeEnabled && settings.shizukuNativeEyeProtectionEnabled
+    val cloudSyncAllowed = planTier(settings) >= PlanTier.PLUS
     val backupImportPreview by viewModel.backupImportPreview.collectAsStateWithLifecycle()
     val remoteState by viewModel.remoteState.collectAsStateWithLifecycle()
     val shizukuState by viewModel.shizukuState.collectAsStateWithLifecycle()
@@ -662,6 +663,7 @@ internal fun SettingsScreen(
         SettingsScrollAnchor(GrowthConfigTarget.CLOUD, settingsScrollState, growthAnchorPositions)
         RemoteCloudAccountCard(
             state = remoteState,
+            cloudSyncAllowed = cloudSyncAllowed,
             onCheckHealth = viewModel::checkRemoteHealth,
             onStartEmailLogin = viewModel::startRemoteEmailLogin,
             onVerifyEmailLogin = viewModel::verifyRemoteEmailLogin,

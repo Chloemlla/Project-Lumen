@@ -97,6 +97,7 @@ open class MainActivity : ComponentActivity() {
                             stopShizukuResilience = app::stopShizukuResilience,
                             shizuku = app.shizuku,
                             simulateDeveloperLowMemory = app::simulateDeveloperLowMemory,
+                            nativeProtectionSummary = app::nativeProtectionSummary,
                             uploadTelemetrySnapshot = { app.telemetry.uploadCurrentSnapshot(force = true) },
                             recordCrashReport = app::recordCrash,
                         ) as T

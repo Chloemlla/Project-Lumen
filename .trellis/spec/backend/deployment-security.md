@@ -95,6 +95,66 @@ packaging {
 
 The correct path keeps production request signatures verifiable by the backend without weakening the security middleware.
 
+## Scenario: Commercial Edition Cloud Entitlement Boundary
+
+### 1. Scope / Trigger
+
+- Trigger: backend routes expose TODO1 cloud sync or cloud backup capabilities.
+- Applies when changing `/api/v1/sync/*`, `/api/v1/backups*`, entitlement resolution, purchase verification, or Android cloud UI gating.
+
+### 2. Signatures
+
+- Backend guard: `require_plus_entitlement(headers, state)`.
+- Store query: `AppStore::user_has_tier_at_least(user_id, "PLUS")`.
+- Protected routes:
+  - `GET /api/v1/sync/changes`
+  - `POST /api/v1/sync/push`
+  - `POST /api/v1/backups`
+  - `GET /api/v1/backups/latest`
+- Forbidden reason code: `commercial_plus_required`.
+
+### 3. Contracts
+
+- These routes require both a valid bearer user session and an active Plus-or-higher entitlement.
+- Active entitlement means `status == "active"` and `expiresAt <= 0 || expiresAt > now`.
+- `PLUS` and `TEAM` satisfy the guard; `FREE`, `PRO`, expired, pending, and revoked entitlements do not.
+- Login, `/me`, entitlement fetch, purchase verification, health, release checks, and feature flag fetch must remain reachable so users can obtain or restore entitlement.
+- Android UI gating is advisory only; backend route guards are the authoritative protection boundary.
+
+### 4. Validation & Error Matrix
+
+- Missing/invalid bearer token -> HTTP 401.
+- Valid user with no active Plus/Team entitlement -> HTTP 403 with `commercial_plus_required`.
+- Valid user with active Pro only -> HTTP 403 with `commercial_plus_required`.
+- Valid user with expired Plus entitlement -> HTTP 403 with `commercial_plus_required`.
+- Valid user with active Plus or Team -> route proceeds to sync/backup store operation.
+
+### 5. Good/Base/Bad Cases
+
+- Good: cloud sync and backup routes call `require_plus_entitlement` before reading or writing user cloud data.
+- Base: entitlement refresh and purchase verification stay outside the Plus guard.
+- Bad: relying only on disabled Android buttons while backend routes accept any authenticated user.
+
+### 6. Tests Required
+
+- Backend route tests: active Plus/Team succeeds; Free/Pro/expired entitlement returns 403 and `commercial_plus_required`.
+- Android review: cloud sync, upload backup, and restore backup are disabled in UI and rejected in feature-entry code below Plus.
+- GitHub workflow: Rust tests and Android checks run in CI, not locally when repository policy forbids local build/test execution.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```rust
+let user = require_user(&headers, &state).await?;
+```
+
+#### Correct
+
+```rust
+let user = require_plus_entitlement(&headers, &state).await?;
+```
+
 ## Scenario: Android Certificate Pinning Activation
 
 ### 1. Scope / Trigger

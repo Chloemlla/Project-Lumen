@@ -21,7 +21,7 @@ impl AppStore {
             .try_collect()
             .await
             .map_err(database_error)?;
-        let tier = resolve_active_tier(&entitlements);
+        let tier = resolve_active_tier(&entitlements, now_millis());
         let entitlement_dtos = entitlements
             .into_iter()
             .map(EntitlementRecord::to_dto)
@@ -32,6 +32,23 @@ impl AppStore {
             synced_at: now_millis(),
             entitlements: entitlement_dtos,
         })
+    }
+
+    pub async fn user_has_tier_at_least(
+        &self,
+        user_id: &str,
+        required_tier: &str,
+    ) -> Result<bool, ApiError> {
+        let entitlements: Vec<EntitlementRecord> = self
+            .entitlements
+            .find(doc! { "userId": user_id }, None)
+            .await
+            .map_err(database_error)?
+            .try_collect()
+            .await
+            .map_err(database_error)?;
+        let active_tier = resolve_active_tier(&entitlements, now_millis());
+        Ok(tier_rank(&active_tier) >= tier_rank(required_tier))
     }
 
     pub async fn verify_google_purchase(
@@ -93,10 +110,13 @@ impl AppStore {
     }
 }
 
-fn resolve_active_tier(entitlements: &[EntitlementRecord]) -> String {
+fn resolve_active_tier(entitlements: &[EntitlementRecord], now: i64) -> String {
     entitlements
         .iter()
-        .filter(|entitlement| entitlement.status == "active")
+        .filter(|entitlement| {
+            entitlement.status == "active" &&
+                (entitlement.expires_at <= 0 || entitlement.expires_at > now)
+        })
         .map(|entitlement| entitlement.tier.as_str())
         .max_by_key(|tier| tier_rank(*tier))
         .unwrap_or("FREE")

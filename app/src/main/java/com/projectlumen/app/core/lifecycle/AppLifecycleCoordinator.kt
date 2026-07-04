@@ -155,7 +155,7 @@ class AppLifecycleCoordinator(
             "diagnostics:off"
         }
         val shizuku = if (settings.shizukuAdvancedModeEnabled) "shizuku:on" else "shizuku:off"
-        return "$diagnostics; $shizuku"
+        return "$diagnostics; $shizuku; ${app.nativeProtectionSummary()}"
     }
 
     private fun RuntimeStateEntity.resumeAfterBackgroundPause(

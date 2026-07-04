@@ -51,6 +51,7 @@ class ProjectLumenViewModel(
     stopShizukuResilience: () -> Unit,
     private val shizuku: ShizukuCapabilityManager,
     private val simulateDeveloperLowMemory: () -> Unit,
+    nativeProtectionSummary: () -> String,
     private val uploadTelemetrySnapshot: suspend () -> Unit,
     private val recordCrashReport: (Throwable) -> CrashReport,
 ) : ViewModel() {
@@ -128,6 +129,7 @@ class ProjectLumenViewModel(
         entitlementRepository = repositories.entitlements,
         featureFlagRepository = repositories.featureFlags,
         tipTemplateRepository = repositories.tipTemplates,
+        nativeProtectionSummary = nativeProtectionSummary,
     )
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
     private val _onboardingState = MutableStateFlow(

@@ -651,6 +651,7 @@
     <string name="eye_care_capability_configure">Configure</string>
     <string name="eye_care_capability_enable">Enable</string>
     <string name="eye_care_capability_sign_in">Sign in</string>
+    <string name="eye_care_capability_upgrade">Upgrade</string>
     <string name="eye_care_capability_review">Review</string>
     <string name="eye_care_apply_family_profile">Apply family profile</string>
     <string name="eye_care_apply_local_guidance">Apply local guidance</string>
@@ -711,6 +712,9 @@
     <string name="remote_cloud_stored_session">Stored session available</string>
     <string name="remote_cloud_busy">Working on the remote request…</string>
     <string name="remote_cloud_tier">Cloud tier</string>
+    <string name="remote_cloud_required_tier">Required tier</string>
+    <string name="remote_cloud_commercial_plus">Commercial Edition Plus</string>
+    <string name="remote_cloud_commercial_required">Commercial Edition Plus is required for cloud sync and cloud backup.</string>
     <string name="remote_cloud_entitlements">Entitlements</string>
     <string name="remote_cloud_sync_cursor">Sync cursor</string>
     <string name="remote_cloud_latest_backup">Latest backup</string>
