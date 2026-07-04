@@ -17,6 +17,7 @@ Before writing frontend code, confirm:
 - [ ] New shared component/hook is justified (a second consumer exists), else keep it feature-local.
 - [ ] Network/WS data is validated (Zod) before being treated as typed.
 - [ ] No secret/token touches client storage or logs.
+- [ ] Android launcher shortcut changes follow [`android-launcher-shortcuts.md`](./android-launcher-shortcuts.md).
 - [ ] VitePress docs changes follow [`docs-site.md`](./docs-site.md); build/test commands stay in GitHub Actions.
 
 ## Quality Check
@@ -39,6 +40,7 @@ Before marking work done (see [`quality-guidelines.md`](./quality-guidelines.md)
 | [State Management](./state-management.md) | Server vs live vs UI state | ✅ Filled |
 | [Type Safety](./type-safety.md) | Shared types, Zod validation, forbidden casts | ✅ Filled |
 | [Android Foreground Services](./android-foreground-services.md) | Android client foreground service startup validation and permission gates | ✅ Filled |
+| [Android Launcher Shortcuts](./android-launcher-shortcuts.md) | Android long-press app icon shortcut contracts | ✅ Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Forbidden/required patterns, 7 smells, tests | ✅ Filled (⏳ test setup to confirm) |
 | [VitePress Docs Site](./docs-site.md) | Docs package, Pages base path, workflow-only build | ✅ Filled |
 
