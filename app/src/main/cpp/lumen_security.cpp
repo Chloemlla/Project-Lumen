@@ -23,6 +23,8 @@
 #define LUMEN_EXPECTED_PACKAGE "com.projectlumen.app"
 #endif
 
+extern "C" char **environ;
+
 namespace {
 
 std::string jstring_to_string(JNIEnv *env, jstring value) {
@@ -122,7 +124,6 @@ bool has_debug_environment() {
         "substrate",
     };
 
-    extern char **environ;
     for (char **current = environ; current != nullptr && *current != nullptr; ++current) {
         if (contains_any(*current, environment_keys)) return true;
     }
