@@ -114,8 +114,8 @@ fn resolve_active_tier(entitlements: &[EntitlementRecord], now: i64) -> String {
     entitlements
         .iter()
         .filter(|entitlement| {
-            entitlement.status == "active" &&
-                (entitlement.expires_at <= 0 || entitlement.expires_at > now)
+            entitlement.status == "active"
+                && (entitlement.expires_at <= 0 || entitlement.expires_at > now)
         })
         .map(|entitlement| entitlement.tier.as_str())
         .max_by_key(|tier| tier_rank(*tier))
