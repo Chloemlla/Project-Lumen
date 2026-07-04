@@ -67,6 +67,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.R
+import com.projectlumen.app.core.api.CertificatePinPolicy
 import com.projectlumen.app.core.api.ProjectLumenApiConfig
 import com.projectlumen.app.core.api.ProjectLumenApiTrace
 import com.projectlumen.app.core.crash.CrashReport
@@ -220,8 +221,8 @@ internal fun DeveloperDebugScreen(
                 R.string.developer_security_api_pins,
                 securityPinStatus(
                     pinCount = configuredPinCount(ProjectLumenApiConfig.apiCertificatePins),
-                    required = !BuildConfig.DEBUG,
-                    optional = false,
+                    required = false,
+                    optional = true,
                 ),
             )
             DeveloperMetricRow(R.string.developer_security_translation_base, ProjectLumenApiConfig.translationBaseUrl)
@@ -564,9 +565,7 @@ private fun securityPinStatus(pinCount: Int, required: Boolean, optional: Boolea
 }
 
 private fun configuredPinCount(pins: String): Int {
-    return pins
-        .split(',', ';', '\n')
-        .count { it.trim().isNotBlank() }
+    return CertificatePinPolicy.parse(pins).size
 }
 
 @Composable

@@ -43,6 +43,8 @@ LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false
 
 `LUMEN_REQUEST_SIGNING_SECRET` must match the Android release build secret supplied as `PROJECT_LUMEN_REQUEST_SIGNING_SECRET`; otherwise signed client requests fail with HTTP 403. Keep the default value for local development only.
 
+Android builds always require HTTPS and Android/OkHttp system trust for backend communication. `PROJECT_LUMEN_API_CERTIFICATE_PINS` and `PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS` are optional hardening inputs; they are compiled into the APK only when `PROJECT_LUMEN_API_CERTIFICATE_PINNING_ENABLED=true` or `PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINNING_ENABLED=true`, and the build fails if pinning is enabled without pins. Leave pinning disabled when certificates are managed by a public CA or CDN, and enable it only when the release process can provide both current and backup `sha256/` pins for the active host.
+
 Email login sends verification codes through Happy-TTS outemail when both `LUMEN_OUTEMAIL_BASE_URL` and `LUMEN_OUTEMAIL_API_KEY` are configured. The API key is sent as a Bearer token to `POST /api/outemail/send`; when the key is empty, `/api/v1/auth/email/start` keeps returning `devCode` for development use.
 
 ## Admin Dashboard

@@ -534,9 +534,9 @@
     <string name="developer_security_translation_pins">翻译证书 Pin</string>
     <string name="developer_security_pins_ready">已配置 %1$d 个 Pin</string>
     <string name="developer_security_pins_partial">已配置 %1$d 个 Pin；缺少备用 Pin</string>
-    <string name="developer_security_pins_optional">可选；未配置</string>
-    <string name="developer_security_pins_missing">缺失；Release 后端 API 请求会被阻断</string>
-    <string name="developer_security_pins_debug_missing">Debug 构建未配置</string>
+    <string name="developer_security_pins_optional">可选；使用 HTTPS 系统信任链</string>
+    <string name="developer_security_pins_missing">缺失；此构建要求显式证书 Pin</string>
+    <string name="developer_security_pins_debug_missing">未配置；使用 HTTPS 系统信任链</string>
     <string name="developer_security_request_signing">请求签名</string>
     <string name="developer_security_request_signing_enabled">已启用 HMAC-SHA256 请求头</string>
     <string name="developer_security_play_integrity">Play Integrity</string>

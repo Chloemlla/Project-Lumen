@@ -36,6 +36,10 @@ fun projectLumenBuildConfigString(value: String): String {
         .replace("\"", "\\\"")
 }
 
+fun projectLumenBooleanFlag(value: String?): Boolean {
+    return value?.trim()?.lowercase() in setOf("1", "true", "yes", "on")
+}
+
 android {
     namespace = "com.projectlumen.app"
     compileSdk = 37
@@ -88,6 +92,11 @@ android {
             .orNull
             ?.takeIf { it.isNotBlank() }
         ?: ""
+    val projectLumenApiCertificatePinningEnabled = projectLumenBooleanFlag(
+        providers.environmentVariable("PROJECT_LUMEN_API_CERTIFICATE_PINNING_ENABLED")
+            .orNull
+            ?: providers.gradleProperty("PROJECT_LUMEN_API_CERTIFICATE_PINNING_ENABLED").orNull,
+    )
     val projectLumenTranslationCertificatePins = providers.environmentVariable("PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS")
         .orNull
         ?.takeIf { it.isNotBlank() }
@@ -95,6 +104,11 @@ android {
             .orNull
             ?.takeIf { it.isNotBlank() }
         ?: ""
+    val projectLumenTranslationCertificatePinningEnabled = projectLumenBooleanFlag(
+        providers.environmentVariable("PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINNING_ENABLED")
+            .orNull
+            ?: providers.gradleProperty("PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINNING_ENABLED").orNull,
+    )
     val projectLumenPlayIntegrityCloudProjectNumber = providers.environmentVariable("PROJECT_LUMEN_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
         .orNull
         ?.toLongOrNull()
@@ -123,6 +137,16 @@ android {
             .orNull
             ?.takeIf { it.isNotBlank() }
         ?: ""
+    val projectLumenEffectiveApiCertificatePins =
+        if (projectLumenApiCertificatePinningEnabled) projectLumenApiCertificatePins else ""
+    val projectLumenEffectiveTranslationCertificatePins =
+        if (projectLumenTranslationCertificatePinningEnabled) projectLumenTranslationCertificatePins else ""
+    require(!projectLumenApiCertificatePinningEnabled || projectLumenEffectiveApiCertificatePins.isNotBlank()) {
+        "PROJECT_LUMEN_API_CERTIFICATE_PINNING_ENABLED=true requires PROJECT_LUMEN_API_CERTIFICATE_PINS."
+    }
+    require(!projectLumenTranslationCertificatePinningEnabled || projectLumenEffectiveTranslationCertificatePins.isNotBlank()) {
+        "PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINNING_ENABLED=true requires PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS."
+    }
 
     defaultConfig {
         buildConfigField("long", "BUILD_TIME_UTC_MILLIS", "${projectLumenBuildTimeUtcMillis}L")
@@ -131,8 +155,8 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"${projectLumenBuildConfigString(projectLumenApiBaseUrl)}\"")
         buildConfigField("String", "TRANSLATION_API_BASE_URL", "\"${projectLumenBuildConfigString(projectLumenTranslationApiBaseUrl)}\"")
         buildConfigField("String", "TELEMETRY_ACCESS_TOKEN", "\"${projectLumenBuildConfigString(projectLumenTelemetryAccessToken)}\"")
-        buildConfigField("String", "API_CERTIFICATE_PINS", "\"${projectLumenBuildConfigString(projectLumenApiCertificatePins)}\"")
-        buildConfigField("String", "TRANSLATION_CERTIFICATE_PINS", "\"${projectLumenBuildConfigString(projectLumenTranslationCertificatePins)}\"")
+        buildConfigField("String", "API_CERTIFICATE_PINS", "\"${projectLumenBuildConfigString(projectLumenEffectiveApiCertificatePins)}\"")
+        buildConfigField("String", "TRANSLATION_CERTIFICATE_PINS", "\"${projectLumenBuildConfigString(projectLumenEffectiveTranslationCertificatePins)}\"")
         buildConfigField("long", "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER", "${projectLumenPlayIntegrityCloudProjectNumber}L")
         buildConfigField("boolean", "APP_INTEGRITY_ENFORCEMENT_ENABLED", projectLumenReleaseCertSha256.isNotBlank().toString())
         buildConfigField("String", "OPEN_API_TRUSTED_SIGNATURE_SHA256", "\"${projectLumenBuildConfigString(projectLumenOpenApiTrustedSignatureSha256)}\"")

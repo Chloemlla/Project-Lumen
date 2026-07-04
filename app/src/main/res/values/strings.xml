@@ -536,9 +536,9 @@
     <string name="developer_security_translation_pins">Translation certificate pins</string>
     <string name="developer_security_pins_ready">%1$d pins configured</string>
     <string name="developer_security_pins_partial">%1$d pin configured; backup pin missing</string>
-    <string name="developer_security_pins_optional">Optional; not configured</string>
-    <string name="developer_security_pins_missing">Missing; release backend API calls will be blocked</string>
-    <string name="developer_security_pins_debug_missing">Missing in debug build</string>
+    <string name="developer_security_pins_optional">Optional; using HTTPS system trust</string>
+    <string name="developer_security_pins_missing">Missing; explicit pinning is required by this build</string>
+    <string name="developer_security_pins_debug_missing">Missing; using HTTPS system trust</string>
     <string name="developer_security_request_signing">Request signing</string>
     <string name="developer_security_request_signing_enabled">HMAC-SHA256 headers enabled</string>
     <string name="developer_security_play_integrity">Play Integrity</string>
