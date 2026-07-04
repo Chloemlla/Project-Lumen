@@ -75,7 +75,11 @@ export function buildActionPayload(
         ? {
             versionCode: Number(firstRelease.version || 0),
             versionName: firstRelease.name || "admin-policy",
+            channel: firstRelease.channel || "stable",
+            releaseUrl: firstRelease.releaseUrl || "",
             sha256: firstRelease.sha || "",
+            assets: toJsonValue(firstRelease.assets),
+            patches: toJsonValue(firstRelease.patches),
             rollout: "blocked",
             forceUpdate: true,
           }

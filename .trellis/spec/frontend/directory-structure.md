@@ -63,14 +63,22 @@ developer machines when repository policy forbids local build/test execution.
   available at the legacy `/app/backend/admin` path because the deployment
   script inherits existing container environment variables.
 - API contract: the dashboard calls `/api/health`, `/api/admin/auth/login`,
-  `/api/admin/auth/refresh`, `/api/admin/dashboard`, and
-  `/api/admin/actions`.
+  `/api/admin/auth/refresh`, `/api/admin/me`, `/api/admin/dashboard`, and
+  `/api/admin/actions`. Client-only utilities such as backup JSON download must
+  not be routed through `/api/admin/actions`.
+- `/api/admin/actions` server actions are exactly `change-plan`, `revoke-pro`,
+  `push-template`, `force-update`, and `save-allowlist`; any other button action
+  must be handled client-side as copy, download, token refresh, or health probe.
 
 ### 4. Validation & Error Matrix
 
 - `dist/index.html` missing -> backend logs `admin dashboard index file does not exist`.
 - `/api/admin/dashboard` returns `401` -> dashboard attempts one refresh-token
   flow when a refresh token is available, then clears session state on failure.
+- Pasted admin token -> dashboard validates it with `/api/admin/me` before
+  treating it as an active session token.
+- Unsupported `/api/admin/actions` action -> backend returns `400`; the client
+  must not POST unsupported local utility actions such as `download-backup`.
 - Non-local HTTP origin -> sensitive admin action buttons stay disabled.
 - Empty live data -> modules render empty states rather than static fake records.
 
@@ -90,6 +98,9 @@ developer machines when repository policy forbids local build/test execution.
 - Docker workflow: image build must run the same admin build, verify
   `dist/index.html` exists, and copy `dist/` to both current and legacy runtime
   paths.
+- Cross-layer action check: every action sent through `/api/admin/actions` must
+  match the backend `apply_admin_action` allowlist, and client-only actions must
+  never rely on an unsupported backend action name.
 - Manual review: verify sensitive actions are disabled on non-local HTTP and
   enabled on HTTPS/localhost.
 

@@ -173,9 +173,32 @@ export type TelemetryItem = {
 export type ReleaseItem = {
   version: string;
   name: string;
+  channel: string;
+  releaseUrl: string;
   sha: string;
+  assets: ReleaseAssetItem[];
+  patches: ReleasePatchItem[];
   rollout: string;
   force: boolean;
+};
+
+export type ReleaseAssetItem = {
+  abi: string;
+  name: string;
+  url: string;
+  sha256: string;
+  sizeBytes: number;
+  contentType: string;
+};
+
+export type ReleasePatchItem = {
+  fromVersionCode: number;
+  fromSha256: string;
+  toSha256: string;
+  patchUrl: string;
+  patchSha256: string;
+  algorithm: string;
+  sizeBytes: number;
 };
 
 export type RolloutPlanItem = {

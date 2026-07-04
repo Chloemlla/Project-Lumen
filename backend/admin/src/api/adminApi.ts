@@ -19,7 +19,7 @@ type RequestOptions = {
 };
 
 export async function requestJson(path: string, options: RequestOptions = {}): Promise<unknown> {
-  const response = await fetch(`${API_BASE}/${path}`, {
+  const response = await fetch(apiUrl(path), {
     method: options.method || "GET",
     headers: {
       Accept: "application/json",
@@ -29,7 +29,7 @@ export async function requestJson(path: string, options: RequestOptions = {}): P
     body: options.body,
   });
   const text = await response.text();
-  const payload: unknown = text ? JSON.parse(text) : {};
+  const payload = parseJsonPayload(text, response.status);
   if (!response.ok) {
     throw new AdminHttpError(response.status, errorMessage(payload, `HTTP ${response.status}`));
   }
@@ -57,4 +57,17 @@ function readError(payload: unknown): Record<string, unknown> {
   if (!isRecord(payload)) return {};
   const error = payload.error;
   return isRecord(error) ? error : {};
+}
+
+function apiUrl(path: string): string {
+  return `${API_BASE}/${path.replace(/^\/+/, "")}`;
+}
+
+function parseJsonPayload(text: string, status: number): unknown {
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new AdminHttpError(status, text.slice(0, 180) || "Invalid JSON response");
+  }
 }

@@ -19,7 +19,9 @@ import {
   readUnknown,
 } from "./jsonAccess";
 
-export const API_BASE = import.meta.env.VITE_LUMEN_API_BASE || `${window.location.origin}/api`;
+const RAW_API_BASE = import.meta.env.VITE_LUMEN_API_BASE || `${window.location.origin}/api`;
+
+export const API_BASE = RAW_API_BASE.replace(/\/+$/, "");
 
 export const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -27,6 +29,14 @@ export const SENSITIVE_ACTIONS = new Set([
   "change-plan",
   "revoke-pro",
   "download-backup",
+  "push-template",
+  "force-update",
+  "save-allowlist",
+]);
+
+export const SERVER_ADMIN_ACTIONS = new Set([
+  "change-plan",
+  "revoke-pro",
   "push-template",
   "force-update",
   "save-allowlist",
@@ -190,7 +200,26 @@ export function mapDashboard(snapshot: unknown): DashboardData {
     releases: readArray(release, "releases").map((item) => ({
       version: String(readNumber(item, "versionCode")),
       name: readString(item, "versionName", "unknown"),
+      channel: readString(item, "channel", "stable"),
+      releaseUrl: readString(item, "releaseUrl"),
       sha: readString(item, "sha256"),
+      assets: readArray(item, "assets").map((asset) => ({
+        abi: readString(asset, "abi", "universal"),
+        name: readString(asset, "name", "Project-Lumen_android_universal.apk"),
+        url: readString(asset, "url"),
+        sha256: readString(asset, "sha256"),
+        sizeBytes: readNumber(asset, "sizeBytes"),
+        contentType: readString(asset, "contentType", "application/vnd.android.package-archive"),
+      })),
+      patches: readArray(item, "patches").map((patch) => ({
+        fromVersionCode: readNumber(patch, "fromVersionCode"),
+        fromSha256: readString(patch, "fromSha256"),
+        toSha256: readString(patch, "toSha256"),
+        patchUrl: readString(patch, "patchUrl"),
+        patchSha256: readString(patch, "patchSha256"),
+        algorithm: readString(patch, "algorithm", "bsdiff"),
+        sizeBytes: readNumber(patch, "sizeBytes"),
+      })),
       rollout: readString(item, "rollout", "not recorded"),
       force: readBoolean(item, "forceUpdate"),
     })),

@@ -9,11 +9,13 @@ export function OtaModule({ data }: { data: DashboardData }) {
 
   return (
     <DataTable
-      headers={["versionCode", "Release", "SHA256", "Rollout", "Policy"]}
+      headers={["versionCode", "Release", "Channel", "SHA256", "Assets", "Rollout", "Policy"]}
       rows={data.releases.map((release) => [
         release.version,
         release.name,
+        <Tag text={release.channel} status={release.channel === "stable" ? "ok" : "info"} />,
         <code>{release.sha || "not recorded"}</code>,
+        String(release.assets.length),
         release.rollout,
         <Tag text={release.force ? "force update" : "normal"} status={release.force ? "risk" : "ok"} />,
       ])}

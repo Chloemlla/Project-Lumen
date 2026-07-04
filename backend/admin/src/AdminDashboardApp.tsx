@@ -15,6 +15,7 @@ import { adminSections } from "./data/adminSections";
 import { buildActionPayload } from "./model/actionPayloads";
 import {
   SENSITIVE_ACTIONS,
+  SERVER_ADMIN_ACTIONS,
   buildDashboardSummary,
   clearLegacyStoredTokens,
   createDashboardData,
@@ -24,7 +25,7 @@ import {
   moduleStatusCounts,
   parseAdminSession,
 } from "./model/dashboardModel";
-import { readBoolean, readNumber, readString } from "./model/jsonAccess";
+import { isRecord, readBoolean, readNumber, readString } from "./model/jsonAccess";
 import type { AdminSession, HealthState, JsonValue, LoadingState, ToastItem } from "./types";
 
 const USERNAME_STORAGE_KEY = "projectLumenAdminUsername";
@@ -250,15 +251,28 @@ export function AdminDashboardApp() {
       notify("Admin token cleared from this tab.", "watch");
       return;
     }
-    const nextSession = {
-      username: authForm.username.trim() || sessionRef.current.username || INITIAL_USERNAME,
-      token,
-      refreshToken: "",
-      tokenExpiresAt: Date.now() + 50 * 60 * 1000,
-    };
-    applySession(nextSession);
-    notify("Admin token loaded for this tab.", "ok");
-    await fetchDashboard();
+    updateLoading({ login: true });
+    try {
+      const operator = await requestJson("admin/me", { token });
+      const nextSession = {
+        username: readString(
+          operator,
+          "username",
+          authForm.username.trim() || sessionRef.current.username || INITIAL_USERNAME,
+        ),
+        token,
+        refreshToken: "",
+        tokenExpiresAt: Date.now() + 50 * 60 * 1000,
+      };
+      applySession(nextSession);
+      notify("Admin token validated for this tab.", "ok");
+      await fetchDashboard();
+    } catch (error) {
+      clearSession();
+      notify(`Token validation failed: ${messageFromError(error)}`, "risk");
+    } finally {
+      updateLoading({ login: false });
+    }
   }
 
   async function refreshAll() {
@@ -307,12 +321,21 @@ export function AdminDashboardApp() {
       now,
     };
     const payload = buildActionPayload(action, dashboard, runtimeState);
-    if (SENSITIVE_ACTIONS.has(action)) {
+    if (SERVER_ADMIN_ACTIONS.has(action)) {
       if (payload === null) {
         notify("Live dashboard data or required form input is missing for this admin action.", "watch");
         return;
       }
       await recordAdminAction(action, payload);
+      return;
+    }
+
+    if (action === "download-backup") {
+      if (payload === null) {
+        notify("No backup snapshot is available to download.", "watch");
+        return;
+      }
+      downloadJsonFile(payload, backupDownloadName(payload), notify);
       return;
     }
 
@@ -408,6 +431,33 @@ export function AdminDashboardApp() {
       <ToastStack toasts={toasts} />
     </div>
   );
+}
+
+function downloadJsonFile(
+  payload: JsonValue,
+  fileName: string,
+  notify: (message: string, tone?: ToastItem["tone"]) => void,
+): void {
+  try {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    notify("Backup JSON downloaded.", "ok");
+  } catch (error) {
+    notify(`Download failed: ${messageFromError(error)}`, "risk");
+  }
+}
+
+function backupDownloadName(payload: JsonValue): string {
+  const id = isRecord(payload) ? String(payload.id || "backup") : "backup";
+  const safeId = id.replace(/[^a-z0-9_.-]+/gi, "-").replace(/^-+|-+$/g, "") || "backup";
+  return `project-lumen-${safeId}.json`;
 }
 
 function matchesQuery(module: { title: string; kicker: string; kind: string }, query: string): boolean {
