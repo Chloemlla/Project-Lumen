@@ -1,8 +1,13 @@
 #include <jni.h>
 
 #include <android/log.h>
+#include <array>
+#include <cctype>
+#include <cstdlib>
 #include <dirent.h>
 #include <fstream>
+#include <limits.h>
+#include <sstream>
 #include <string>
 #include <unistd.h>
 
@@ -28,9 +33,98 @@ std::string jstring_to_string(JNIEnv *env, jstring value) {
     return result;
 }
 
-bool contains_any(const std::string &value, const char *needles[], size_t count) {
-    for (size_t i = 0; i < count; ++i) {
-        if (value.find(needles[i]) != std::string::npos) return true;
+std::string lower_ascii(std::string value) {
+    for (char &character : value) {
+        character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
+    }
+    return value;
+}
+
+template <size_t Count>
+bool contains_any(const std::string &value, const std::array<const char *, Count> &needles) {
+    const std::string normalized = lower_ascii(value);
+    for (const char *needle : needles) {
+        if (normalized.find(needle) != std::string::npos) return true;
+    }
+    return false;
+}
+
+std::string read_text_file(const std::string &path, size_t limit = 8192) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) return "";
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    if (content.size() > limit) content.resize(limit);
+    for (char &character : content) {
+        if (character == '\0') character = '\n';
+    }
+    return content;
+}
+
+std::string read_symlink_target(const std::string &path) {
+    char target[PATH_MAX] = {};
+    const ssize_t length = readlink(path.c_str(), target, sizeof(target) - 1);
+    if (length <= 0) return "";
+    target[length] = '\0';
+    return std::string(target);
+}
+
+template <size_t Count>
+bool scan_task_comm_for_artifacts(const std::array<const char *, Count> &needles) {
+    DIR *task_dir = opendir("/proc/self/task");
+    if (task_dir == nullptr) return false;
+    bool found = false;
+    while (dirent *entry = readdir(task_dir)) {
+        if (entry->d_name[0] == '.') continue;
+        const std::string comm_path = std::string("/proc/self/task/") + entry->d_name + "/comm";
+        if (contains_any(read_text_file(comm_path), needles)) {
+            found = true;
+            break;
+        }
+    }
+    closedir(task_dir);
+    return found;
+}
+
+template <size_t Count>
+bool scan_fd_targets_for_artifacts(const std::array<const char *, Count> &needles) {
+    DIR *fd_dir = opendir("/proc/self/fd");
+    if (fd_dir == nullptr) return false;
+    bool found = false;
+    while (dirent *entry = readdir(fd_dir)) {
+        if (entry->d_name[0] == '.') continue;
+        const std::string fd_path = std::string("/proc/self/fd/") + entry->d_name;
+        if (contains_any(read_symlink_target(fd_path), needles)) {
+            found = true;
+            break;
+        }
+    }
+    closedir(fd_dir);
+    return found;
+}
+
+template <size_t Count>
+bool scan_text_file_for_artifacts(
+    const std::string &path,
+    const std::array<const char *, Count> &needles,
+    size_t limit = 128 * 1024
+) {
+    return contains_any(read_text_file(path, limit), needles);
+}
+
+bool has_debug_environment() {
+    static constexpr std::array<const char *, 5> environment_keys = {
+        "ld_preload",
+        "ld_audit",
+        "frida",
+        "xposed",
+        "substrate",
+    };
+
+    extern char **environ;
+    for (char **current = environ; current != nullptr && *current != nullptr; ++current) {
+        if (contains_any(*current, environment_keys)) return true;
     }
     return false;
 }
@@ -53,38 +147,29 @@ bool has_tracer_pid() {
 }
 
 bool has_hooking_artifacts() {
-    static const char *needles[] = {
+    static constexpr std::array<const char *, 15> needles = {
         "frida",
+        "frida-agent",
+        "frida-gadget",
+        "frida-server",
         "gum-js-loop",
         "gadget",
+        "gmain",
+        "linjector",
+        "riru",
+        "zygisk",
         "xposed",
         "edxp",
         "lsposed",
         "substrate",
+        "substrate-loader",
     };
 
-    std::ifstream maps("/proc/self/maps");
-    std::string line;
-    while (std::getline(maps, line)) {
-        if (contains_any(line, needles, sizeof(needles) / sizeof(needles[0]))) return true;
-    }
-
-    DIR *task_dir = opendir("/proc/self/task");
-    if (task_dir == nullptr) return false;
-    bool found = false;
-    while (dirent *entry = readdir(task_dir)) {
-        if (entry->d_name[0] == '.') continue;
-        std::string comm_path = std::string("/proc/self/task/") + entry->d_name + "/comm";
-        std::ifstream comm(comm_path);
-        std::string name;
-        std::getline(comm, name);
-        if (contains_any(name, needles, sizeof(needles) / sizeof(needles[0]))) {
-            found = true;
-            break;
-        }
-    }
-    closedir(task_dir);
-    return found;
+    return scan_text_file_for_artifacts("/proc/self/maps", needles) ||
+        scan_text_file_for_artifacts("/proc/self/cmdline", needles) ||
+        scan_text_file_for_artifacts("/proc/net/unix", needles) ||
+        scan_task_comm_for_artifacts(needles) ||
+        scan_fd_targets_for_artifacts(needles);
 }
 
 }  // namespace
@@ -112,6 +197,7 @@ Java_com_projectlumen_app_core_security_NativeSecurityBridge_isNativeEnvironment
     if (actual_package != LUMEN_EXPECTED_PACKAGE) return JNI_FALSE;
     if (!expected_cert.empty() && actual_cert != expected_cert) return JNI_FALSE;
     if (debug_allowed == JNI_FALSE && has_tracer_pid()) return JNI_FALSE;
+    if (debug_allowed == JNI_FALSE && has_debug_environment()) return JNI_FALSE;
     if (debug_allowed == JNI_FALSE && has_hooking_artifacts()) return JNI_FALSE;
     return JNI_TRUE;
 }

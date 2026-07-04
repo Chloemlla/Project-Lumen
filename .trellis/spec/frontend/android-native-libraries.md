@@ -86,3 +86,75 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
     CMAKE_VERSION="$(sed -n 's/^projectLumenCmakeVersion=//p' gradle.properties | tail -n 1)"
     yes | sdkmanager "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
 ```
+
+---
+
+## Scenario: Native Integrity Bridge
+
+### 1. Scope / Trigger
+
+- Trigger: any change to `lumen_security.cpp`, `NativeSecurityBridge.kt`, or `AppIntegrityGuard.kt`.
+- Scope: release builds with `APP_INTEGRITY_ENFORCEMENT_ENABLED=true` must reject obvious debugger, injection, and runtime hooking environments before protected API signing behavior is trusted.
+
+### 2. Signatures
+
+```kotlin
+NativeSecurityBridge.isNativeEnvironmentAllowedOrNull(
+    packageName = appContext.packageName,
+    signingCertSha256 = signingCertificateSha256(appContext),
+    debugAllowed = false,
+)
+```
+
+```cpp
+Java_com_projectlumen_app_core_security_NativeSecurityBridge_isNativeEnvironmentAllowed(
+    JNIEnv *env,
+    jobject,
+    jstring package_name,
+    jstring signing_cert_sha256,
+    jboolean debug_allowed
+)
+```
+
+### 3. Contracts
+
+- Keep the JNI method signature stable unless Kotlin call sites are updated in the same change.
+- Native checks must verify expected package and release certificate before trusting the environment.
+- When `debug_allowed == JNI_FALSE`, native checks must reject a non-zero `TracerPid`, suspicious debug/injection environment variables, known hook library mappings, suspicious task names, suspicious file-descriptor targets, and known Frida/Xposed/Substrate socket artifacts.
+- Debuggable local builds are bypassed by `AppIntegrityGuard`; do not make native checks block ordinary debug development paths unless the caller explicitly opts in.
+
+### 4. Validation & Error Matrix
+
+| Condition | Expected behavior |
+|---|---|
+| Package name does not match `LUMEN_EXPECTED_PACKAGE` | Native bridge returns `JNI_FALSE`. |
+| Release certificate is configured and does not match | Native bridge returns `JNI_FALSE`. |
+| `TracerPid` is non-zero with debug disallowed | Native bridge returns `JNI_FALSE`. |
+| Frida/Xposed/Substrate/Riru/Zygisk artifacts appear in maps, cmdline, task comm, fd symlinks, or Unix socket metadata | Native bridge returns `JNI_FALSE`. |
+| Debug build calls `AppIntegrityGuard.enforce` | Guard returns before native enforcement. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: add detection paths as small native helpers and keep all checks side-effect free.
+- Base: Java-side `Debug.isDebuggerConnected()` remains a complementary signal, not a replacement for native checks.
+- Bad: calling `ptrace` or killing the process from the native bridge; return a verdict and let `AppIntegrityGuard` own enforcement.
+
+### 6. Tests Required
+
+- GitHub workflow: Android build must still compile `lumen_security`.
+- Manual review: check that new needles are lower-case and searched through the case-normalized helper.
+- Manual review: check that release-only enforcement remains gated by `BuildConfig.DEBUG` and `APP_INTEGRITY_ENFORCEMENT_ENABLED`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```cpp
+if (detected) abort();
+```
+
+#### Correct
+
+```cpp
+if (debug_allowed == JNI_FALSE && has_hooking_artifacts()) return JNI_FALSE;
+```
