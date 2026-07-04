@@ -259,6 +259,23 @@ internal fun SettingsScreen(
             coroutineScope.launch { scrollState.animateScrollTo(position) }
         }
     }
+    fun isPermissionTargetConfigured(target: PermissionSetupTarget): Boolean {
+        return when (target) {
+            PermissionSetupTarget.STATISTICS -> settings.statsEnabled
+            PermissionSetupTarget.DIAGNOSTICS -> settings.diagnosticTelemetryUploadEnabled
+            PermissionSetupTarget.NOTIFICATIONS -> settings.notificationEnabled && !notificationPermissionNeeded
+            PermissionSetupTarget.EXACT_ALARM -> settings.notificationEnabled && !exactAlarmSettingsNeeded
+            PermissionSetupTarget.FULL_SCREEN -> settings.notificationEnabled && !fullScreenIntentSettingsNeeded
+            PermissionSetupTarget.KEEP_ALIVE -> settings.keepAliveEnabled
+            PermissionSetupTarget.DISTANCE_CAMERA -> settings.proximityMonitoringEnabled && !cameraPermissionNeeded
+            PermissionSetupTarget.BLINK_CAMERA -> settings.blinkMonitoringEnabled && !cameraPermissionNeeded
+            PermissionSetupTarget.AMBIENT_LIGHT -> settings.ambientLightMonitoringEnabled
+            PermissionSetupTarget.BRIGHTNESS -> settings.autoBrightnessEnabled &&
+                (!writeSettingsPermissionNeeded || shizukuNativeBrightnessEnabled)
+            PermissionSetupTarget.OVERLAY -> settings.globalOverlayEnabled && !overlayPermissionNeeded
+            PermissionSetupTarget.SHIZUKU -> settings.shizukuAdvancedModeEnabled && shizukuState.ready
+        }
+    }
     fun startPermissionSetup(target: PermissionSetupTarget) {
         if (isPermissionTargetConfigured(target)) {
             scrollToPermissionTarget(target, returnAfterCompletion = false)
@@ -396,23 +413,6 @@ internal fun SettingsScreen(
             GrowthConfigTarget.CLOUD -> remoteState.signedIn
             GrowthConfigTarget.FAMILY -> isFamilyEyeCareModeActive(uiState)
             GrowthConfigTarget.GUIDANCE -> settings.statsEnabled && settings.reminderEnabled
-        }
-    }
-    fun isPermissionTargetConfigured(target: PermissionSetupTarget): Boolean {
-        return when (target) {
-            PermissionSetupTarget.STATISTICS -> settings.statsEnabled
-            PermissionSetupTarget.DIAGNOSTICS -> settings.diagnosticTelemetryUploadEnabled
-            PermissionSetupTarget.NOTIFICATIONS -> settings.notificationEnabled && !notificationPermissionNeeded
-            PermissionSetupTarget.EXACT_ALARM -> settings.notificationEnabled && !exactAlarmSettingsNeeded
-            PermissionSetupTarget.FULL_SCREEN -> settings.notificationEnabled && !fullScreenIntentSettingsNeeded
-            PermissionSetupTarget.KEEP_ALIVE -> settings.keepAliveEnabled
-            PermissionSetupTarget.DISTANCE_CAMERA -> settings.proximityMonitoringEnabled && !cameraPermissionNeeded
-            PermissionSetupTarget.BLINK_CAMERA -> settings.blinkMonitoringEnabled && !cameraPermissionNeeded
-            PermissionSetupTarget.AMBIENT_LIGHT -> settings.ambientLightMonitoringEnabled
-            PermissionSetupTarget.BRIGHTNESS -> settings.autoBrightnessEnabled &&
-                (!writeSettingsPermissionNeeded || shizukuNativeBrightnessEnabled)
-            PermissionSetupTarget.OVERLAY -> settings.globalOverlayEnabled && !overlayPermissionNeeded
-            PermissionSetupTarget.SHIZUKU -> settings.shizukuAdvancedModeEnabled && shizukuState.ready
         }
     }
     val restSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
