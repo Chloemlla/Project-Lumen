@@ -43,7 +43,11 @@ impl IntoResponse for ApiError {
 
         let reason_code = self.reason_code();
         let message = self.to_string();
-        (status, Json(ErrorResponse::new(status.as_u16(), reason_code, message))).into_response()
+        (
+            status,
+            Json(ErrorResponse::new(status.as_u16(), reason_code, message)),
+        )
+            .into_response()
     }
 }
 

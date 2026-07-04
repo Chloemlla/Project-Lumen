@@ -84,9 +84,9 @@ fn required_header<'a>(
     invalid_reason_code: &'static str,
     invalid_message: &'static str,
 ) -> Result<&'a str, ApiError> {
-    let value = headers.get(name).ok_or_else(|| {
-        ApiError::forbidden_reason(missing_reason_code, missing_message)
-    })?;
+    let value = headers
+        .get(name)
+        .ok_or_else(|| ApiError::forbidden_reason(missing_reason_code, missing_message))?;
     let value = value
         .to_str()
         .map(str::trim)
