@@ -1,0 +1,36 @@
+name: Set up Android native toolchain
+description: Install the Android NDK and CMake versions declared in gradle.properties.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Install NDK and CMake
+      shell: bash
+      run: |
+        set -e
+
+        NDK_VERSION="$(sed -n 's/^projectLumenNdkVersion=//p' gradle.properties | tail -n 1)"
+        CMAKE_VERSION="$(sed -n 's/^projectLumenCmakeVersion=//p' gradle.properties | tail -n 1)"
+
+        if [ -z "$NDK_VERSION" ] || [ -z "$CMAKE_VERSION" ]; then
+          echo "projectLumenNdkVersion and projectLumenCmakeVersion must be set in gradle.properties." >&2
+          exit 1
+        fi
+
+        SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+        SDKMANAGER=""
+        if [ -n "$SDK_ROOT" ] && [ -x "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+        else
+          SDKMANAGER="$(command -v sdkmanager || true)"
+        fi
+
+        if [ -z "$SDKMANAGER" ]; then
+          echo "sdkmanager was not found after Android SDK setup." >&2
+          exit 1
+        fi
+
+        yes | "$SDKMANAGER" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"

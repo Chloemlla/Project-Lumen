@@ -55,12 +55,9 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-cleanup: on-success
 
-      - name: Install Android native toolchain
+      - name: Set up Android native toolchain
         if: matrix.language == 'java-kotlin'
-        run: |
-          NDK_VERSION="$(sed -n 's/^projectLumenNdkVersion=//p' gradle.properties | tail -n 1)"
-          CMAKE_VERSION="$(sed -n 's/^projectLumenCmakeVersion=//p' gradle.properties | tail -n 1)"
-          yes | sdkmanager "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+        uses: ./.github/actions/setup-android-native-toolchain
 
       - name: Initialize CodeQL for compiled code
         if: matrix.build-mode == 'manual'

@@ -35,6 +35,11 @@ android {
 target_link_options(lumen_security PRIVATE "-Wl,-z,max-page-size=16384")
 ```
 
+```yaml
+- name: Set up Android native toolchain
+  uses: ./.github/actions/setup-android-native-toolchain
+```
+
 ```bash
 python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*.apk
 ```
@@ -43,6 +48,7 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 
 - `gradle.properties` owns `projectLumenNdkVersion` and `projectLumenCmakeVersion`; do not hard-code those versions separately in workflows.
 - GitHub Actions must install the NDK/CMake versions from `gradle.properties` before any Android Gradle build that compiles native code.
+- GitHub Actions must use `.github/actions/setup-android-native-toolchain` for Android native toolchain setup so `sdkmanager` is available and all workflows share one install path.
 - Native libraries must be packaged uncompressed with 16 KB ZIP data offsets.
 - Every `PT_LOAD` segment in every APK `.so` must have an alignment that is at least 16 KB and divisible by 16 KB.
 - Third-party AARs with native libraries are covered by the APK-level verification script because they are not relinked by the app's CMake build.
@@ -56,6 +62,7 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 | Any ELF `PT_LOAD` alignment is below 16 KB or not divisible by 16 KB | 16 KB alignment verification fails. |
 | New native dependency is not 16 KB ready | Release workflow fails before publishing assets. |
 | Workflow installs a different NDK/CMake than Gradle requests | Fix workflow to read `gradle.properties`; do not add a second version constant. |
+| `sdkmanager` is not available after Android SDK setup | Native toolchain setup fails before any Gradle build with a clear `sdkmanager was not found` message. |
 
 ### 5. Good/Base/Bad Cases
 
@@ -66,6 +73,7 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 ### 6. Tests Required
 
 - GitHub workflow: after `gradle assembleRelease`, run `scripts/verify_android_16kb_alignment.py` against all release APK outputs.
+- GitHub workflow: before any Android Gradle build that compiles native code, use `.github/actions/setup-android-native-toolchain` so SDK setup and NDK/CMake installation stay shared.
 - Manual review: when adding/updating native AAR dependencies, confirm the workflow passes the APK-level check rather than assuming Gradle/NDK relinks the dependency.
 
 ### 7. Wrong vs Correct
@@ -80,11 +88,8 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 #### Correct
 
 ```yaml
-- name: Install Android native toolchain
-  run: |
-    NDK_VERSION="$(sed -n 's/^projectLumenNdkVersion=//p' gradle.properties | tail -n 1)"
-    CMAKE_VERSION="$(sed -n 's/^projectLumenCmakeVersion=//p' gradle.properties | tail -n 1)"
-    yes | sdkmanager "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+- name: Set up Android native toolchain
+  uses: ./.github/actions/setup-android-native-toolchain
 ```
 
 ---

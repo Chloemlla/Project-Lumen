@@ -30,11 +30,8 @@ jobs:
           cache-read-only: false
           cache-cleanup: on-success
 
-      - name: Install Android native toolchain
-        run: |
-          NDK_VERSION="$(sed -n 's/^projectLumenNdkVersion=//p' gradle.properties | tail -n 1)"
-          CMAKE_VERSION="$(sed -n 's/^projectLumenCmakeVersion=//p' gradle.properties | tail -n 1)"
-          yes | sdkmanager "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+      - name: Set up Android native toolchain
+        uses: ./.github/actions/setup-android-native-toolchain
 
       - name: Read app version
         run: |
