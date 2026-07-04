@@ -550,9 +550,6 @@
     <string name="developer_security_pins_debug_missing">Missing; using HTTPS system trust</string>
     <string name="developer_security_request_signing">Request signing</string>
     <string name="developer_security_request_signing_enabled">HMAC-SHA256 headers enabled</string>
-    <string name="developer_security_play_integrity">Play Integrity</string>
-    <string name="developer_security_play_integrity_configured">Cloud project configured</string>
-    <string name="developer_security_play_integrity_disabled">Not configured; token header omitted</string>
     <string name="developer_security_credentials">Encrypted credentials</string>
     <string name="developer_security_credentials_present">Access token present in Keystore-backed storage</string>
     <string name="developer_security_credentials_empty">No stored access token</string>
@@ -570,7 +567,7 @@
     <string name="developer_api_trace_no_status">No HTTP response · %1$d ms · %2$s</string>
     <string name="developer_api_trace_url">URL</string>
     <string name="developer_api_trace_security">Security context</string>
-    <string name="developer_api_trace_security_value">signed=%1$s · integrity=%2$s · auth=%3$s</string>
+    <string name="developer_api_trace_security_value">signed=%1$s · auth=%2$s</string>
     <string name="developer_api_trace_request">Request body</string>
     <string name="developer_api_trace_response">Response body</string>
     <string name="developer_api_trace_error">Error</string>

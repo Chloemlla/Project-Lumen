@@ -399,7 +399,6 @@ class EyeCareTelemetryReporter(
             method = method.take(MAX_API_TRACE_METHOD_LENGTH),
             path = path.take(MAX_API_TRACE_PATH_LENGTH),
             signed = signed,
-            integrityRequested = integrityRequested,
             authorizationAttached = authorizationAttached,
             statusCode = statusCode,
             durationMillis = durationMillis.coerceAtLeast(0L),

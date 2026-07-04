@@ -64,11 +64,6 @@ async fn openapi(State(state): State<AppState>) -> Json<Value> {
                     "in": "header",
                     "name": "x-lumen-signature",
                     "description": "HMAC signature generated from method, path, query, body hash, timestamp, and nonce."
-                },
-                "playIntegrity": {
-                    "type": "apiKey",
-                    "in": "header",
-                    "name": "x-lumen-integrity"
                 }
             }
         }

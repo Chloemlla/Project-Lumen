@@ -25,7 +25,6 @@ pub struct Config {
     pub request_signing_secret: String,
     pub request_timestamp_skew_seconds: u64,
     pub require_request_signing: bool,
-    pub require_play_integrity: bool,
     pub accept_unverified_purchases: bool,
 }
 
@@ -63,7 +62,6 @@ impl Config {
             request_timestamp_skew_seconds: env_u64("LUMEN_REQUEST_TIMESTAMP_SKEW_SECONDS", 300)
                 .min(300),
             require_request_signing: env_bool("LUMEN_REQUIRE_REQUEST_SIGNING", true),
-            require_play_integrity: env_bool("LUMEN_REQUIRE_PLAY_INTEGRITY", false),
             accept_unverified_purchases: env_bool("LUMEN_ACCEPT_UNVERIFIED_PURCHASES", false),
         }
     }

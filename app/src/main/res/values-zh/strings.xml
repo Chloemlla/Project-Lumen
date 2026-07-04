@@ -548,9 +548,6 @@
     <string name="developer_security_pins_debug_missing">未配置；使用 HTTPS 系统信任链</string>
     <string name="developer_security_request_signing">请求签名</string>
     <string name="developer_security_request_signing_enabled">已启用 HMAC-SHA256 请求头</string>
-    <string name="developer_security_play_integrity">Play Integrity</string>
-    <string name="developer_security_play_integrity_configured">已配置云项目</string>
-    <string name="developer_security_play_integrity_disabled">未配置；不发送 Token 请求头</string>
     <string name="developer_security_credentials">加密凭证</string>
     <string name="developer_security_credentials_present">Keystore 托管存储中存在 Access Token</string>
     <string name="developer_security_credentials_empty">暂无已保存 Access Token</string>
@@ -568,7 +565,7 @@
     <string name="developer_api_trace_no_status">无 HTTP 响应 · %1$d ms · %2$s</string>
     <string name="developer_api_trace_url">URL</string>
     <string name="developer_api_trace_security">安全上下文</string>
-    <string name="developer_api_trace_security_value">签名=%1$s · Integrity=%2$s · 鉴权=%3$s</string>
+    <string name="developer_api_trace_security_value">签名=%1$s · 鉴权=%2$s</string>
     <string name="developer_api_trace_request">请求体</string>
     <string name="developer_api_trace_response">返回体</string>
     <string name="developer_api_trace_error">错误</string>

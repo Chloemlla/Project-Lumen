@@ -121,7 +121,6 @@ data class ApiTraceTelemetry(
     val method: String,
     val path: String,
     val signed: Boolean,
-    val integrityRequested: Boolean,
     val authorizationAttached: Boolean,
     val statusCode: Int?,
     val durationMillis: Long,

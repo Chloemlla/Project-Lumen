@@ -235,14 +235,6 @@ internal fun DeveloperDebugScreen(
                 ),
             )
             DeveloperMetricRow(R.string.developer_security_request_signing, stringResource(R.string.developer_security_request_signing_enabled))
-            DeveloperMetricRow(
-                R.string.developer_security_play_integrity,
-                if (BuildConfig.PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER > 0L) {
-                    stringResource(R.string.developer_security_play_integrity_configured)
-                } else {
-                    stringResource(R.string.developer_security_play_integrity_disabled)
-                },
-            )
             DeveloperMetricRow(R.string.developer_security_credentials, secureCredentialStatus(context))
             DeveloperMetricRow(
                 R.string.developer_security_webview_bridge,
@@ -395,7 +387,6 @@ private fun DeveloperApiTraceCard(trace: ProjectLumenApiTrace) {
             stringResource(
                 R.string.developer_api_trace_security_value,
                 trace.signed.toString(),
-                trace.integrityRequested.toString(),
                 trace.authorizationAttached.toString(),
             ),
         )

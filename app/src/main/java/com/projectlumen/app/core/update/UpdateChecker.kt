@@ -20,7 +20,7 @@ import javax.net.ssl.HttpsURLConnection
 class UpdateChecker(
     private val context: Context,
     private val backendBaseUrl: String = ProjectLumenApiConfig.baseUrl,
-    private val apiClient: ProjectLumenApiClient = ProjectLumenApiClient(context, backendBaseUrl),
+    private val apiClient: ProjectLumenApiClient = ProjectLumenApiClient(backendBaseUrl),
     private val githubReleaseApiUrl: String = PROJECT_LUMEN_RELEASE_API,
     private val channel: String = DEFAULT_CHANNEL,
 ) {

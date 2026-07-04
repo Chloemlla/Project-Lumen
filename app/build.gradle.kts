@@ -109,13 +109,6 @@ android {
             .orNull
             ?: providers.gradleProperty("PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINNING_ENABLED").orNull,
     )
-    val projectLumenPlayIntegrityCloudProjectNumber = providers.environmentVariable("PROJECT_LUMEN_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
-        .orNull
-        ?.toLongOrNull()
-        ?: providers.gradleProperty("PROJECT_LUMEN_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER")
-            .orNull
-            ?.toLongOrNull()
-        ?: 0L
     val projectLumenRequestSigningSecret = providers.environmentVariable("PROJECT_LUMEN_REQUEST_SIGNING_SECRET")
         .orNull
         ?.takeIf { it.isNotBlank() }
@@ -157,7 +150,6 @@ android {
         buildConfigField("String", "TELEMETRY_ACCESS_TOKEN", "\"${projectLumenBuildConfigString(projectLumenTelemetryAccessToken)}\"")
         buildConfigField("String", "API_CERTIFICATE_PINS", "\"${projectLumenBuildConfigString(projectLumenEffectiveApiCertificatePins)}\"")
         buildConfigField("String", "TRANSLATION_CERTIFICATE_PINS", "\"${projectLumenBuildConfigString(projectLumenEffectiveTranslationCertificatePins)}\"")
-        buildConfigField("long", "PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER", "${projectLumenPlayIntegrityCloudProjectNumber}L")
         buildConfigField("boolean", "APP_INTEGRITY_ENFORCEMENT_ENABLED", projectLumenReleaseCertSha256.isNotBlank().toString())
         buildConfigField("String", "OPEN_API_TRUSTED_SIGNATURE_SHA256", "\"${projectLumenBuildConfigString(projectLumenOpenApiTrustedSignatureSha256)}\"")
 
@@ -311,7 +303,6 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.4")
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
-    implementation("com.google.android.play:integrity:1.4.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")

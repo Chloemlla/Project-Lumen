@@ -160,7 +160,6 @@ pub struct ApiTraceTelemetry {
     pub method: String,
     pub path: String,
     pub signed: bool,
-    pub integrity_requested: bool,
     pub authorization_attached: bool,
     pub status_code: Option<i32>,
     pub duration_millis: i64,

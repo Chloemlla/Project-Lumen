@@ -46,7 +46,7 @@ class ProjectLumenApplication : Application() {
     val backup: DataBackupService by lazy {
         DataBackupService(this, database, eyeCarePreferences) { secureCredentials.deviceInstallationId() }
     }
-    val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient(this) }
+    val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient() }
     val crashReports: CrashReportStore by lazy { CrashReportStore(this) }
     val secureCredentials: SecureCredentialStore by lazy { SecureCredentialStore(this) }
     val openApiController: LumenOpenRuntimeController by lazy { LumenOpenRuntimeController(this) }

@@ -122,7 +122,7 @@ internal class ProjectLumenRemoteFeatureEntry(
             deviceFingerprint = deviceFingerprint,
             model = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
             versionCode = BuildConfig.VERSION_CODE.toLong(),
-            localSecurityConfig = "signedRequests=true;playIntegrity=conditional;pinning=configured",
+            localSecurityConfig = "signedRequests=true;pinning=configured",
         )
         val entitlements = apiClient.fetchEntitlements(accessToken)
         val featureFlags = apiClient.fetchFeatureFlags(accessToken)

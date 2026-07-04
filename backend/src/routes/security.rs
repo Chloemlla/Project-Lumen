@@ -17,14 +17,13 @@ const MAX_SIGNED_BODY_BYTES: usize = 10 * 1024 * 1024;
 const HEADER_TIMESTAMP: &str = "x-lumen-timestamp";
 const HEADER_NONCE: &str = "x-lumen-nonce";
 const HEADER_SIGNATURE: &str = "x-lumen-signature";
-const HEADER_INTEGRITY: &str = "x-lumen-integrity";
 
 pub async fn enforce_api_security(
     State(state): State<AppState>,
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, ApiError> {
-    if !state.config.require_request_signing && !state.config.require_play_integrity {
+    if !state.config.require_request_signing {
         return Ok(next.run(request).await);
     }
 
@@ -32,13 +31,6 @@ pub async fn enforce_api_security(
     let body_bytes = to_bytes(body, MAX_SIGNED_BODY_BYTES)
         .await
         .map_err(|_| ApiError::BadRequest("Request body is too large.".to_owned()))?;
-
-    if state.config.require_play_integrity && requires_integrity(parts.uri.path()) {
-        let integrity_token = required_header(&parts.headers, HEADER_INTEGRITY)?;
-        if integrity_token.len() < 32 {
-            return Err(ApiError::Forbidden);
-        }
-    }
 
     if state.config.require_request_signing {
         let timestamp = required_header(&parts.headers, HEADER_TIMESTAMP)?;
@@ -120,13 +112,6 @@ fn validate_signature(secret: &str, canonical: &str, signature: &str) -> Result<
         return Err(ApiError::Forbidden);
     }
     Ok(())
-}
-
-fn requires_integrity(path: &str) -> bool {
-    path.contains("/v1/auth/")
-        || path.ends_with("/v1/purchases/google/verify")
-        || path.ends_with("/v1/devices/register")
-        || path.ends_with("/v1/telemetry")
 }
 
 fn now_millis() -> i64 {

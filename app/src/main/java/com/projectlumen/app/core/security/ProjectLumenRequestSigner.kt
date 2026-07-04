@@ -10,7 +10,6 @@ object ProjectLumenRequestSigner {
     const val HEADER_TIMESTAMP = "X-Lumen-Timestamp"
     const val HEADER_NONCE = "X-Lumen-Nonce"
     const val HEADER_SIGNATURE = "X-Lumen-Signature"
-    const val HEADER_INTEGRITY = "X-Lumen-Integrity"
 
     fun headers(method: String, url: HttpUrl, bodyText: String?): Map<String, String> {
         val timestamp = (System.currentTimeMillis() / 1_000L).toString()

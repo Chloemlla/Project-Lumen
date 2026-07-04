@@ -1,6 +1,5 @@
 package com.projectlumen.app.core.api
 
-import android.content.Context
 import android.os.SystemClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -10,7 +9,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import com.projectlumen.app.core.security.ProjectLumenIntegrityProvider
 import com.projectlumen.app.core.security.ProjectLumenRequestSigner
 import org.json.JSONArray
 import org.json.JSONObject
@@ -18,13 +16,11 @@ import java.io.IOException
 import java.net.URLEncoder
 
 class ProjectLumenApiClient(
-    context: Context,
     private val baseUrl: String = ProjectLumenApiConfig.baseUrl,
     private val httpClient: OkHttpClient = SecureOkHttpFactory.create(
         baseUrl = ProjectLumenApiConfig.normalizeApiBaseUrl(baseUrl),
         certificatePins = ProjectLumenApiConfig.apiCertificatePins,
     ),
-    private val integrityProvider: ProjectLumenIntegrityProvider = ProjectLumenIntegrityProvider(context),
 ) {
     private val resolvedBaseUrl = ProjectLumenApiConfig.normalizeApiBaseUrl(baseUrl)
 
@@ -226,7 +222,6 @@ class ProjectLumenApiClient(
         val requestBody = bodyText?.toRequestBody(JSON_MEDIA_TYPE)
         val startedAtMillis = System.currentTimeMillis()
         val startedAtElapsed = SystemClock.elapsedRealtime()
-        val integrityRequested = requiresIntegrityToken(path)
         val requestBuilder = Request.Builder()
             .url(url)
             .method(method, requestBody)
@@ -237,11 +232,6 @@ class ProjectLumenApiClient(
             ?.let { requestBuilder.header("Authorization", "Bearer $it") }
         ProjectLumenRequestSigner.headers(method, url, bodyText)
             .forEach { (name, value) -> requestBuilder.header(name, value) }
-        if (integrityRequested) {
-            integrityProvider.tokenForRequest(path, bodyText)
-                ?.takeIf { it.isNotBlank() }
-                ?.let { requestBuilder.header(ProjectLumenRequestSigner.HEADER_INTEGRITY, it) }
-        }
         val request = requestBuilder.build()
         var traceRecorded = false
 
@@ -260,7 +250,6 @@ class ProjectLumenApiClient(
                     if (query.isBlank()) "" else "?$query"
                 },
                 signed = true,
-                integrityRequested = integrityRequested,
                 authorizationAttached = !accessToken.isNullOrBlank(),
                 requestBodyText = bodyText,
                 statusCode = statusCode,
@@ -313,14 +302,6 @@ class ProjectLumenApiClient(
 
     private fun readResponseText(response: Response): String {
         return response.body?.string().orEmpty()
-    }
-
-    private fun requiresIntegrityToken(path: String): Boolean {
-        val normalizedPath = path.substringBefore('?').trimStart('/')
-        return normalizedPath.startsWith("v1/auth/") ||
-            normalizedPath == "v1/purchases/google/verify" ||
-            normalizedPath == "v1/devices/register" ||
-            normalizedPath == "v1/telemetry"
     }
 
     private fun parseErrorMessage(responseText: String, responseCode: Int): String {
