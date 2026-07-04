@@ -100,8 +100,8 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-cleanup: on-success
 
-      - name: Set up Android native toolchain
-        uses: ./.github/actions/setup-android-native-toolchain
+      # - name: Set up Android native toolchain
+      #   uses: ./.github/actions/setup-android-native-toolchain
 
       - name: Read app version
         run: |

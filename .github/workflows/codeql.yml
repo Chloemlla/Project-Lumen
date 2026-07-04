@@ -55,9 +55,9 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-cleanup: on-success
 
-      - name: Set up Android native toolchain
-        if: matrix.language == 'java-kotlin'
-        uses: ./.github/actions/setup-android-native-toolchain
+      # - name: Set up Android native toolchain
+      #   if: matrix.language == 'java-kotlin'
+      #   uses: ./.github/actions/setup-android-native-toolchain
 
       - name: Initialize CodeQL for compiled code
         if: matrix.build-mode == 'manual'
