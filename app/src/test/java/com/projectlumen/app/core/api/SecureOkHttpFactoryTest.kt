@@ -1,7 +1,6 @@
 package com.projectlumen.app.core.api
 
-import okhttp3.CertificatePinner
-import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
@@ -23,7 +22,7 @@ class SecureOkHttpFactoryTest {
             certificatePins = "",
         )
 
-        assertEquals(CertificatePinner.DEFAULT, client.certificatePinner)
+        assertTrue(client.certificatePinner.findMatchingPins("eye.chloemlla.com").isEmpty())
     }
 
     @Test

@@ -21,16 +21,14 @@ internal object SecureOkHttpFactory {
             throw IllegalArgumentException("Project Lumen certificate pins are required for ${url.host}.")
         }
 
-        val certificatePinner = if (pins.isEmpty()) {
-            CertificatePinner.DEFAULT
-        } else {
-            CertificatePinner.Builder().apply {
-                pins.forEach { pin -> add(url.host, pin) }
-            }.build()
-        }
-
         return OkHttpClient.Builder().apply {
-            certificatePinner(certificatePinner)
+            if (pins.isNotEmpty()) {
+                certificatePinner(
+                    CertificatePinner.Builder().apply {
+                        pins.forEach { pin -> add(url.host, pin) }
+                    }.build(),
+                )
+            }
         }
             .connectTimeout(ProjectLumenApiConfig.REQUEST_TIMEOUT_MILLIS.toLong(), TimeUnit.MILLISECONDS)
             .readTimeout(ProjectLumenApiConfig.REQUEST_TIMEOUT_MILLIS.toLong(), TimeUnit.MILLISECONDS)
