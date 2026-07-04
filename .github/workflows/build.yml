@@ -33,7 +33,7 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-cleanup: on-success
 
-      # - name: Install Android native toolchain
+      # - name: Set up Android native toolchain
       #   uses: ./.github/actions/setup-android-native-toolchain
 
       - name: Read app version
@@ -51,36 +51,6 @@ jobs:
           echo "PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS=$BUILD_TIME_UTC_MILLIS" >> "$GITHUB_ENV"
           echo "PROJECT_LUMEN_COMMIT_HASH=$COMMIT_HASH" >> "$GITHUB_ENV"
           echo "PROJECT_LUMEN_SHORT_HASH=$SHORT_HASH" >> "$GITHUB_ENV"
-
-      - name: Run state machine unit tests
-        env:
-          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
-          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
-          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
-          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
-          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
-        run: gradle testDebugUnitTest --no-daemon --warning-mode all
-
-      - name: Run Android lint
-        env:
-          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
-          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
-          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
-          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
-          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
-        run: gradle lintDebug --no-daemon --warning-mode all
-
-      - name: Upload verification reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: project-lumen-verification-reports
-          path: |
-            app/build/reports/tests/**
-            app/build/reports/lint-results-debug.html
-            app/build/reports/lint-results-debug.xml
-            build/reports/problems/**
-          retention-days: 14
 
       - name: Write signing config
         env:
@@ -131,9 +101,6 @@ jobs:
           PROJECT_LUMEN_RELEASE_CERT_SHA256: ${{ secrets.PROJECT_LUMEN_RELEASE_CERT_SHA256 }}
           PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256: ${{ secrets.PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256 }}
         run: gradle assembleRelease --no-daemon --warning-mode all
-
-      # - name: Verify 16 KB native library alignment
-      #   run: python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*.apk
 
       - name: Prepare release assets
         run: |
@@ -218,13 +185,6 @@ jobs:
           )
           PY
 
-      - name: Upload release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: project-lumen-release-apk
-          path: release-assets/*
-          retention-days: 30
-
       - name: Automatic release
         if: success() && github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
@@ -236,7 +196,14 @@ jobs:
           tag_name: "v${{ env.PROJECT_LUMEN_VERSION_NAME }}-${{ env.PROJECT_LUMEN_SHORT_HASH }}"
           prerelease: false
           name: "Project-Lumen ${{ env.PROJECT_LUMEN_VERSION_NAME }}-${{ env.PROJECT_LUMEN_SHORT_HASH }}"
+
           files: release-assets/*
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-lumen-release-apk
+          path: release-assets/*
+          retention-days: 30
 
       - name: Sync release manifest to backend
         if: success() && github.event_name != 'pull_request'
@@ -278,6 +245,36 @@ jobs:
             -H "Content-Type: application/json" \
             --data-binary @release-assets/backend-release-action.json \
             "$ADMIN_ACTIONS_URL"
+
+      - name: Run state machine unit tests
+        env:
+          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
+          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
+          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
+          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
+          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
+        run: gradle testDebugUnitTest --no-daemon --warning-mode all
+
+      - name: Run Android lint
+        env:
+          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
+          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
+          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
+          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
+          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
+        run: gradle lintDebug --no-daemon --warning-mode all
+
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-lumen-verification-reports
+          path: |
+            app/build/reports/tests/**
+            app/build/reports/lint-results-debug.html
+            app/build/reports/lint-results-debug.xml
+            build/reports/problems/**
+          retention-days: 14
 
   backend:
     name: Rust backend verification
