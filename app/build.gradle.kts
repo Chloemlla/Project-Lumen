@@ -43,7 +43,7 @@ fun projectLumenBooleanFlag(value: String?): Boolean {
 android {
     namespace = "com.projectlumen.app"
     compileSdk = 37
-    ndkVersion = "28.2.13676358"
+    ndkVersion = providers.gradleProperty("projectLumenNdkVersion").get()
 
     val projectLumenVersionName = providers.environmentVariable("PROJECT_LUMEN_VERSION_NAME")
         .orNull
@@ -224,7 +224,7 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+            version = providers.gradleProperty("projectLumenCmakeVersion").get()
         }
     }
 

@@ -34,7 +34,10 @@ jobs:
           cache-cleanup: on-success
 
       - name: Install Android native toolchain
-        run: sdkmanager "ndk;28.2.13676358" "cmake;3.22.1"
+        run: |
+          NDK_VERSION="$(sed -n 's/^projectLumenNdkVersion=//p' gradle.properties | tail -n 1)"
+          CMAKE_VERSION="$(sed -n 's/^projectLumenCmakeVersion=//p' gradle.properties | tail -n 1)"
+          yes | sdkmanager "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
 
       - name: Read app version
         run: |
