@@ -65,6 +65,15 @@
     <string name="skip_count">Skipped</string>
     <string name="completed_breaks">Breaks</string>
     <string name="quick_actions">Quick actions</string>
+    <string name="shortcut_dashboard_short_label">Stats</string>
+    <string name="shortcut_dashboard_long_label">Open health stats</string>
+    <string name="shortcut_dashboard_disabled">Health stats shortcut is unavailable.</string>
+    <string name="shortcut_rest_short_label">Rest now</string>
+    <string name="shortcut_rest_long_label">Start eye rest</string>
+    <string name="shortcut_rest_disabled">Eye rest shortcut is unavailable.</string>
+    <string name="shortcut_visual_monitor_short_label">Monitor</string>
+    <string name="shortcut_visual_monitor_long_label">Open visual monitor</string>
+    <string name="shortcut_visual_monitor_disabled">Visual monitor shortcut is unavailable.</string>
     <string name="home_convenience_title">Convenience tools</string>
     <string name="home_convenience_message">Handle the most common eye-care and focus tasks from Home.</string>
     <string name="home_convenience_apply_recommended">Apply recommended setup</string>

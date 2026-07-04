@@ -65,6 +65,15 @@
     <string name="skip_count">跳过</string>
     <string name="completed_breaks">完成休息</string>
     <string name="quick_actions">快捷操作</string>
+    <string name="shortcut_dashboard_short_label">统计</string>
+    <string name="shortcut_dashboard_long_label">打开健康统计</string>
+    <string name="shortcut_dashboard_disabled">健康统计快捷入口不可用。</string>
+    <string name="shortcut_rest_short_label">立即休息</string>
+    <string name="shortcut_rest_long_label">开始用眼休息</string>
+    <string name="shortcut_rest_disabled">用眼休息快捷入口不可用。</string>
+    <string name="shortcut_visual_monitor_short_label">监测</string>
+    <string name="shortcut_visual_monitor_long_label">打开视觉监测</string>
+    <string name="shortcut_visual_monitor_disabled">视觉监测快捷入口不可用。</string>
     <string name="home_convenience_title">便捷工具</string>
     <string name="home_convenience_message">在首页直接完成最常用的护眼与专注操作。</string>
     <string name="home_convenience_apply_recommended">应用推荐设置</string>

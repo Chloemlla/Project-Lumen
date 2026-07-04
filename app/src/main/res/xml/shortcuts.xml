@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_notification_lumen"
+        android:shortcutDisabledMessage="@string/shortcut_dashboard_disabled"
+        android:shortcutId="dashboard"
+        android:shortcutLongLabel="@string/shortcut_dashboard_long_label"
+        android:shortcutShortLabel="@string/shortcut_dashboard_short_label">
+        <intent
+            android:action="com.project.lumen.action.VIEW_DASHBOARD"
+            android:targetClass="com.projectlumen.app.MainActivity"
+            android:targetPackage="com.projectlumen.app">
+            <extra
+                android:name="com.project.lumen.extra.SOURCE_APP"
+                android:value="project_lumen" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_notification_lumen"
+        android:shortcutDisabledMessage="@string/shortcut_rest_disabled"
+        android:shortcutId="rest_now"
+        android:shortcutLongLabel="@string/shortcut_rest_long_label"
+        android:shortcutShortLabel="@string/shortcut_rest_short_label">
+        <intent
+            android:action="com.project.lumen.action.TRIGGER_REST"
+            android:targetClass="com.projectlumen.app.MainActivity"
+            android:targetPackage="com.projectlumen.app">
+            <extra
+                android:name="com.project.lumen.extra.SOURCE_APP"
+                android:value="project_lumen" />
+        </intent>
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_notification_lumen"
+        android:shortcutDisabledMessage="@string/shortcut_visual_monitor_disabled"
+        android:shortcutId="visual_monitor"
+        android:shortcutLongLabel="@string/shortcut_visual_monitor_long_label"
+        android:shortcutShortLabel="@string/shortcut_visual_monitor_short_label">
+        <intent
+            android:action="com.project.lumen.action.START_VISUAL_MONITOR"
+            android:targetClass="com.projectlumen.app.MainActivity"
+            android:targetPackage="com.projectlumen.app">
+            <extra
+                android:name="com.project.lumen.extra.SOURCE_APP"
+                android:value="project_lumen" />
+        </intent>
+    </shortcut>
+</shortcuts>
