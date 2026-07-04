@@ -408,9 +408,10 @@ internal fun EyeCareGrowthCapabilityCard(
     onExportReport: () -> Unit,
 ) {
     val proEnabled = planTier(uiState.settings) >= PlanTier.PRO
+    val cloudSyncAllowed = planTier(uiState.settings) >= PlanTier.PLUS
     val hasPremiumTemplates = uiState.templates.any { it.isPremium }
     val advancedReportsReady = uiState.settings.statsEnabled
-    val cloudSyncReady = remoteState.signedIn
+    val cloudSyncReady = remoteState.signedIn && cloudSyncAllowed
     val familyModeReady = isFamilyEyeCareModeActive(uiState)
     val aiGuidanceReady = uiState.settings.statsEnabled && uiState.settings.reminderEnabled
     val activeCapabilities = listOf(
@@ -466,7 +467,11 @@ internal fun EyeCareGrowthCapabilityCard(
                 icon = Icons.Outlined.Sync,
                 titleRes = R.string.eye_care_growth_cloud_sync,
                 active = cloudSyncReady,
-                inactiveActionRes = R.string.eye_care_capability_sign_in,
+                inactiveActionRes = if (remoteState.signedIn) {
+                    R.string.eye_care_capability_upgrade
+                } else {
+                    R.string.eye_care_capability_sign_in
+                },
                 onConfigure = onConfigureCloud,
             )
             CapabilityLine(
@@ -496,7 +501,11 @@ internal fun EyeCareGrowthCapabilityCard(
                 OutlinedButton(onClick = if (cloudSyncReady) onSyncCloud else onConfigureCloud) {
                     ButtonLabel(
                         Icons.Outlined.Sync,
-                        if (cloudSyncReady) R.string.remote_cloud_sync_now else R.string.eye_care_capability_sign_in,
+                        when {
+                            cloudSyncReady -> R.string.remote_cloud_sync_now
+                            remoteState.signedIn -> R.string.eye_care_capability_upgrade
+                            else -> R.string.eye_care_capability_sign_in
+                        },
                     )
                 }
                 Button(onClick = onApplyFamilyMode) {

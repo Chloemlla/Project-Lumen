@@ -1,5 +1,5 @@
 use crate::{
-    auth_context::require_user,
+    auth_context::require_plus_entitlement,
     error::ApiError,
     models::{SyncChangesQuery, SyncChangesResponse, SyncPushRequest, SyncPushResponse},
     state::AppState,
@@ -22,7 +22,7 @@ async fn changes(
     headers: HeaderMap,
     Query(query): Query<SyncChangesQuery>,
 ) -> Result<Json<SyncChangesResponse>, ApiError> {
-    let user = require_user(&headers, &state).await?;
+    let user = require_plus_entitlement(&headers, &state).await?;
     Ok(Json(
         state
             .store
@@ -36,6 +36,6 @@ async fn push(
     headers: HeaderMap,
     Json(payload): Json<SyncPushRequest>,
 ) -> Result<Json<SyncPushResponse>, ApiError> {
-    let user = require_user(&headers, &state).await?;
+    let user = require_plus_entitlement(&headers, &state).await?;
     Ok(Json(state.store.push_changes(&user.id, payload).await?))
 }
