@@ -88,35 +88,36 @@ object ProjectLumenApiDiagnostics {
             val trimmed = text.trim()
             when {
                 trimmed.startsWith("{") -> redactObject(JSONObject(trimmed)).toString()
-                trimmed.startsWith("[") -> redactArray(JSONArray(trimmed)).toString()
+                trimmed.startsWith("[") -> redactArray(JSONArray(trimmed), parentKey = null).toString()
                 else -> null
             }
         }.getOrNull()
     }
 
-    private fun redactObject(source: JSONObject): JSONObject {
+    private fun redactObject(source: JSONObject, parentKey: String? = null): JSONObject {
         val redacted = JSONObject()
         val keys = source.keys()
         while (keys.hasNext()) {
             val key = keys.next()
-            redacted.put(key, redactValue(key, source.opt(key)))
+            redacted.put(key, redactValue(parentKey, key, source.opt(key)))
         }
         return redacted
     }
 
-    private fun redactArray(source: JSONArray): JSONArray {
+    private fun redactArray(source: JSONArray, parentKey: String?): JSONArray {
         val redacted = JSONArray()
         for (index in 0 until source.length()) {
-            redacted.put(redactValue("", source.opt(index)))
+            redacted.put(redactValue(parentKey, "", source.opt(index)))
         }
         return redacted
     }
 
-    private fun redactValue(key: String, value: Any?): Any? {
+    private fun redactValue(parentKey: String?, key: String, value: Any?): Any? {
+        if (parentKey == "error" && key in ERROR_METADATA_KEYS) return value
         if (key.isSensitiveJsonKey()) return REDACTED_VALUE
         return when (value) {
-            is JSONObject -> redactObject(value)
-            is JSONArray -> redactArray(value)
+            is JSONObject -> redactObject(value, parentKey = key)
+            is JSONArray -> redactArray(value, parentKey = key)
             else -> value
         }
     }
@@ -147,6 +148,7 @@ object ProjectLumenApiDiagnostics {
         "rawpayload",
         "backup",
     )
+    private val ERROR_METADATA_KEYS = setOf("code", "reasonCode", "message")
     private val SENSITIVE_TEXT_PATTERNS = listOf(
         Regex("(?i)(\"(?:accessToken|refreshToken|purchaseToken|devCode|code|email)\"\\s*:\\s*\")([^\"]*)(\")"),
         Regex("(?i)((?:Bearer\\s+))([^\\s\"]+)(\")?"),

@@ -307,7 +307,14 @@ class ProjectLumenApiClient(
     private fun parseErrorMessage(responseText: String, responseCode: Int): String {
         val json = runCatching { JSONObject(responseText) }.getOrNull()
         val error = json?.optJSONObject("error")
-        return error?.optString("message")?.takeIf { it.isNotBlank() }
+        val message = error?.optString("message")?.takeIf { it.isNotBlank() }
+        val reasonCode = error?.optString("reasonCode")?.takeIf { it.isNotBlank() }
+        return when {
+            reasonCode != null && message != null -> "$reasonCode: $message"
+            reasonCode != null -> reasonCode
+            message != null -> message
+            else -> null
+        }
             ?: "Project Lumen API request failed with HTTP $responseCode"
     }
 

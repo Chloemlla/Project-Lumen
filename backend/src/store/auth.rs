@@ -136,7 +136,10 @@ impl AppStore {
             .await
             .map_err(|error| {
                 if is_duplicate_key(&error) {
-                    ApiError::Forbidden
+                    ApiError::forbidden_reason(
+                        "REQUEST_SIGNATURE_NONCE_REUSED",
+                        "Request signing nonce was already used.",
+                    )
                 } else {
                     database_error(error)
                 }
