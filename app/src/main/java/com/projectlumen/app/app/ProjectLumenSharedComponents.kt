@@ -365,9 +365,13 @@ internal fun SettingsSection(
     @StringRes titleRes: Int,
     icon: ImageVector,
     initiallyExpanded: Boolean = true,
+    forceExpanded: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     var expanded by rememberSaveable(titleRes) { mutableStateOf(initiallyExpanded) }
+    LaunchedEffect(forceExpanded) {
+        if (forceExpanded) expanded = true
+    }
     val arrowRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = tween(180),

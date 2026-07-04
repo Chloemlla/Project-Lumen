@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_privacy_permission_summary">在一个位置管理敏感能力。开关会启用关联功能，“配置”会跳到对应设置段或 Android 权限页。</string>
+    <string name="settings_privacy_quick_tiles">控制中心</string>
+    <string name="settings_permission_fix_next">处理下一项权限</string>
+    <string name="settings_permission_configure">配置</string>
+    <string name="settings_permission_resolve">处理</string>
+    <string name="settings_permission_ready">就绪</string>
+    <string name="settings_permission_action_needed">需要处理</string>
+    <string name="settings_permission_off">关闭</string>
+    <string name="settings_permission_return_hint">完成权限或设置后，Project Lumen 会自动刷新状态并回到这里。</string>
+    <string name="settings_privacy_statistics_detail">在本地保存休息、专注、距离和环境光趋势，用于报告和建议。</string>
+    <string name="settings_privacy_diagnostics_detail">仅在开启时上传诊断；崩溃报告、人脸帧和应用清单仍需分别同意。</string>
+    <string name="settings_privacy_keep_alive_detail">当 Android 将应用移到后台时，保持当前计时可见并更可靠。</string>
+    <string name="settings_privacy_camera_distance_detail">摄像头权限仅用于本地距离估算和安全距离校准。</string>
+    <string name="settings_privacy_camera_blink_detail">摄像头权限仅用于本地眨眼和眼干估算。</string>
+    <string name="settings_privacy_ambient_light_detail">仅在本地读取环境光，用于昏暗环境提醒和自动亮度辅助。</string>
+</resources>

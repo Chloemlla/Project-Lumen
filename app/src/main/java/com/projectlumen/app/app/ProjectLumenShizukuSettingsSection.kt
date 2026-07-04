@@ -39,8 +39,14 @@ internal fun ShizukuAdvancedSettingsSection(
     settings: AppSettingsEntity,
     state: ShizukuCapabilityState,
     viewModel: ProjectLumenViewModel,
+    forceExpanded: Boolean = false,
 ) {
-    SettingsSection(R.string.section_shizuku_advanced, Icons.Outlined.Lock, initiallyExpanded = false) {
+    SettingsSection(
+        R.string.section_shizuku_advanced,
+        Icons.Outlined.Lock,
+        initiallyExpanded = false,
+        forceExpanded = forceExpanded,
+    ) {
         Text(
             stringResource(R.string.shizuku_advanced_summary),
             style = MaterialTheme.typography.bodyMedium,

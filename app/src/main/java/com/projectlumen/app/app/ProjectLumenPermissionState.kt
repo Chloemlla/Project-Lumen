@@ -37,7 +37,7 @@ internal fun rememberPermissionRequirements(): PermissionRequirements {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    return remember(context, refreshKey) {
+    return refreshKey.let {
         context.permissionRequirements()
     }
 }

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_privacy_permission_summary">Review sensitive capabilities in one place. Switches enable the linked feature, and Configure jumps to the exact setting or Android permission screen.</string>
+    <string name="settings_privacy_quick_tiles">Control center</string>
+    <string name="settings_permission_fix_next">Fix next permission</string>
+    <string name="settings_permission_configure">Configure</string>
+    <string name="settings_permission_resolve">Resolve</string>
+    <string name="settings_permission_ready">Ready</string>
+    <string name="settings_permission_action_needed">Action needed</string>
+    <string name="settings_permission_off">Off</string>
+    <string name="settings_permission_return_hint">After the permission or setting is completed, Project Lumen refreshes the status and returns here automatically.</string>
+    <string name="settings_privacy_statistics_detail">Stores local rest, focus, distance, and ambient-light trends for reports and guidance.</string>
+    <string name="settings_privacy_diagnostics_detail">Uploads diagnostics only when enabled; crash reports, face frames, and app inventory stay separate opt-ins.</string>
+    <string name="settings_privacy_keep_alive_detail">Keeps active timers visible and reliable when Android moves the app to the background.</string>
+    <string name="settings_privacy_camera_distance_detail">Uses the camera permission only for local distance estimates and safe-distance calibration.</string>
+    <string name="settings_privacy_camera_blink_detail">Uses the camera permission only for local blink and dry-eye estimates.</string>
+    <string name="settings_privacy_ambient_light_detail">Reads ambient light locally to warn about dark environments and support brightness automation.</string>
+</resources>

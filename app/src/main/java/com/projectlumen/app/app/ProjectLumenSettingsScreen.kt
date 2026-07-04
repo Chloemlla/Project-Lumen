@@ -49,9 +49,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -61,16 +59,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -145,9 +140,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -199,7 +191,6 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -208,28 +199,6 @@ private enum class GrowthConfigTarget {
     CLOUD,
     FAMILY,
     GUIDANCE,
-}
-
-@Composable
-private fun GrowthConfigAnchor(
-    target: GrowthConfigTarget,
-    scrollState: ScrollState?,
-    anchorPositions: MutableMap<GrowthConfigTarget, Int>,
-) {
-    val topOffsetPx = with(LocalDensity.current) { 96.dp.toPx().roundToInt() }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(0.dp)
-            .onGloballyPositioned { coordinates ->
-                val activeScrollState = scrollState ?: return@onGloballyPositioned
-                anchorPositions[target] = (
-                    activeScrollState.value +
-                        coordinates.positionInRoot().y.roundToInt() -
-                        topOffsetPx
-                    ).coerceAtLeast(0)
-            },
-    )
 }
 
 @Composable
@@ -261,9 +230,12 @@ internal fun SettingsScreen(
     val coroutineScope = rememberCoroutineScope()
     val settingsScrollState = LocalLumenPageScrollState.current
     val growthAnchorPositions = remember { mutableStateMapOf<GrowthConfigTarget, Int>() }
+    val permissionAnchorPositions = remember { mutableStateMapOf<PermissionSetupTarget, Int>() }
     var activeGrowthConfigTarget by rememberSaveable { mutableStateOf<GrowthConfigTarget?>(null) }
     var growthReturnScrollPosition by rememberSaveable { mutableIntStateOf(0) }
     var showGrowthConfiguredDialog by rememberSaveable { mutableStateOf(false) }
+    var activePermissionSetupTarget by rememberSaveable { mutableStateOf<PermissionSetupTarget?>(null) }
+    var permissionReturnScrollPosition by rememberSaveable { mutableIntStateOf(0) }
     var pendingBackupImportUri by remember { mutableStateOf<Uri?>(null) }
     var showProximityCalibrationDialog by rememberSaveable { mutableStateOf(false) }
     val proximityCalibrated = settings.proximityBaselineEyeDistancePx > 0f ||
@@ -277,6 +249,131 @@ internal fun SettingsScreen(
         when {
             needsExactAlarmSettings(context) -> openExactAlarmSettings(context)
             needsFullScreenIntentSettings(context) -> openFullScreenIntentSettings(context)
+        }
+    }
+    fun scrollToPermissionTarget(target: PermissionSetupTarget, returnAfterCompletion: Boolean) {
+        val scrollState = settingsScrollState ?: return
+        activePermissionSetupTarget = if (returnAfterCompletion) target else null
+        permissionReturnScrollPosition = scrollState.value
+        permissionAnchorPositions[target]?.let { position ->
+            coroutineScope.launch { scrollState.animateScrollTo(position) }
+        }
+    }
+    fun startPermissionSetup(target: PermissionSetupTarget) {
+        if (isPermissionTargetConfigured(target)) {
+            scrollToPermissionTarget(target, returnAfterCompletion = false)
+            return
+        }
+        scrollToPermissionTarget(target, returnAfterCompletion = true)
+        when (target) {
+            PermissionSetupTarget.STATISTICS -> {
+                viewModel.updateSettings { current -> current.copy(statsEnabled = true) }
+            }
+            PermissionSetupTarget.DIAGNOSTICS -> {
+                viewModel.updateSettings { current ->
+                    current.copy(
+                        diagnosticTelemetryUploadEnabled = true,
+                        shizukuAdvancedModeEnabled = true,
+                    )
+                }
+                viewModel.requestShizukuAuthorization()
+            }
+            PermissionSetupTarget.NOTIFICATIONS -> {
+                runWithNotificationPermission {
+                    viewModel.setNotificationsEnabled(true)
+                }
+            }
+            PermissionSetupTarget.EXACT_ALARM -> {
+                runWithNotificationPermission {
+                    viewModel.setNotificationsEnabled(true)
+                    openExactAlarmSettings(context)
+                }
+            }
+            PermissionSetupTarget.FULL_SCREEN -> {
+                runWithNotificationPermission {
+                    viewModel.setNotificationsEnabled(true)
+                    openFullScreenIntentSettings(context)
+                }
+            }
+            PermissionSetupTarget.KEEP_ALIVE -> {
+                viewModel.setKeepAliveEnabled(true)
+            }
+            PermissionSetupTarget.DISTANCE_CAMERA -> {
+                runWithCameraPermission {
+                    viewModel.setProximityMonitoringEnabled(true)
+                    if (!proximityCalibrated) showProximityCalibrationDialog = true
+                }
+            }
+            PermissionSetupTarget.BLINK_CAMERA -> {
+                runWithCameraPermission { viewModel.setBlinkMonitoringEnabled(true) }
+            }
+            PermissionSetupTarget.AMBIENT_LIGHT -> {
+                viewModel.setAmbientLightMonitoringEnabled(true)
+            }
+            PermissionSetupTarget.BRIGHTNESS -> {
+                viewModel.setAutoBrightnessEnabled(true)
+                if (needsWriteSettingsPermission(context) && !shizukuNativeBrightnessEnabled) {
+                    openWriteSettings(context)
+                }
+            }
+            PermissionSetupTarget.OVERLAY -> {
+                viewModel.updateSettings { current -> current.copy(globalOverlayEnabled = true) }
+                if (needsOverlayPermission(context)) {
+                    openOverlaySettings(context)
+                }
+            }
+            PermissionSetupTarget.SHIZUKU -> {
+                viewModel.updateSettings { current -> current.copy(shizukuAdvancedModeEnabled = true) }
+                viewModel.requestShizukuAuthorization()
+            }
+        }
+    }
+    fun setPermissionTargetEnabled(target: PermissionSetupTarget, enabled: Boolean) {
+        if (enabled) {
+            startPermissionSetup(target)
+            return
+        }
+        activePermissionSetupTarget = null
+        when (target) {
+            PermissionSetupTarget.STATISTICS -> {
+                viewModel.updateSettings { current -> current.copy(statsEnabled = false) }
+            }
+            PermissionSetupTarget.DIAGNOSTICS -> {
+                viewModel.updateSettings { current ->
+                    current.copy(
+                        diagnosticTelemetryUploadEnabled = false,
+                        diagnosticCrashReportUploadEnabled = false,
+                        diagnosticFaceAnalysisUploadEnabled = false,
+                        shizukuAppInventoryUploadEnabled = false,
+                    )
+                }
+            }
+            PermissionSetupTarget.NOTIFICATIONS -> {
+                viewModel.setNotificationsEnabled(false)
+            }
+            PermissionSetupTarget.KEEP_ALIVE -> {
+                viewModel.setKeepAliveEnabled(false)
+            }
+            PermissionSetupTarget.DISTANCE_CAMERA -> {
+                viewModel.setProximityMonitoringEnabled(false)
+            }
+            PermissionSetupTarget.BLINK_CAMERA -> {
+                viewModel.setBlinkMonitoringEnabled(false)
+            }
+            PermissionSetupTarget.AMBIENT_LIGHT -> {
+                viewModel.setAmbientLightMonitoringEnabled(false)
+            }
+            PermissionSetupTarget.BRIGHTNESS -> {
+                viewModel.setAutoBrightnessEnabled(false)
+            }
+            PermissionSetupTarget.OVERLAY -> {
+                viewModel.updateSettings { current -> current.copy(globalOverlayEnabled = false) }
+            }
+            PermissionSetupTarget.SHIZUKU -> {
+                viewModel.updateSettings { current -> current.copy(shizukuAdvancedModeEnabled = false) }
+            }
+            PermissionSetupTarget.EXACT_ALARM,
+            PermissionSetupTarget.FULL_SCREEN -> Unit
         }
     }
     fun scrollToGrowthTarget(target: GrowthConfigTarget) {
@@ -299,6 +396,23 @@ internal fun SettingsScreen(
             GrowthConfigTarget.CLOUD -> remoteState.signedIn
             GrowthConfigTarget.FAMILY -> isFamilyEyeCareModeActive(uiState)
             GrowthConfigTarget.GUIDANCE -> settings.statsEnabled && settings.reminderEnabled
+        }
+    }
+    fun isPermissionTargetConfigured(target: PermissionSetupTarget): Boolean {
+        return when (target) {
+            PermissionSetupTarget.STATISTICS -> settings.statsEnabled
+            PermissionSetupTarget.DIAGNOSTICS -> settings.diagnosticTelemetryUploadEnabled
+            PermissionSetupTarget.NOTIFICATIONS -> settings.notificationEnabled && !notificationPermissionNeeded
+            PermissionSetupTarget.EXACT_ALARM -> settings.notificationEnabled && !exactAlarmSettingsNeeded
+            PermissionSetupTarget.FULL_SCREEN -> settings.notificationEnabled && !fullScreenIntentSettingsNeeded
+            PermissionSetupTarget.KEEP_ALIVE -> settings.keepAliveEnabled
+            PermissionSetupTarget.DISTANCE_CAMERA -> settings.proximityMonitoringEnabled && !cameraPermissionNeeded
+            PermissionSetupTarget.BLINK_CAMERA -> settings.blinkMonitoringEnabled && !cameraPermissionNeeded
+            PermissionSetupTarget.AMBIENT_LIGHT -> settings.ambientLightMonitoringEnabled
+            PermissionSetupTarget.BRIGHTNESS -> settings.autoBrightnessEnabled &&
+                (!writeSettingsPermissionNeeded || shizukuNativeBrightnessEnabled)
+            PermissionSetupTarget.OVERLAY -> settings.globalOverlayEnabled && !overlayPermissionNeeded
+            PermissionSetupTarget.SHIZUKU -> settings.shizukuAdvancedModeEnabled && shizukuState.ready
         }
     }
     val restSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -397,6 +511,32 @@ internal fun SettingsScreen(
             showGrowthConfiguredDialog = true
         }
     }
+    LaunchedEffect(
+        activePermissionSetupTarget,
+        settings.statsEnabled,
+        settings.diagnosticTelemetryUploadEnabled,
+        settings.notificationEnabled,
+        settings.keepAliveEnabled,
+        settings.proximityMonitoringEnabled,
+        settings.blinkMonitoringEnabled,
+        settings.ambientLightMonitoringEnabled,
+        settings.autoBrightnessEnabled,
+        settings.globalOverlayEnabled,
+        settings.shizukuAdvancedModeEnabled,
+        notificationPermissionNeeded,
+        exactAlarmSettingsNeeded,
+        fullScreenIntentSettingsNeeded,
+        cameraPermissionNeeded,
+        writeSettingsPermissionNeeded,
+        overlayPermissionNeeded,
+        shizukuState.ready,
+    ) {
+        val target = activePermissionSetupTarget ?: return@LaunchedEffect
+        if (isPermissionTargetConfigured(target)) {
+            activePermissionSetupTarget = null
+            settingsScrollState?.animateScrollTo(permissionReturnScrollPosition)
+        }
+    }
     LaunchedEffect(settings.shizukuAdvancedModeEnabled) {
         if (settings.shizukuAdvancedModeEnabled) {
             viewModel.refreshShizukuState()
@@ -410,10 +550,13 @@ internal fun SettingsScreen(
             titleRes = R.string.nav_settings,
             message = stringResource(R.string.settings_subtitle),
         )
-        EyeCareSetupAndPrivacyCard(
+        SettingsPrivacyPermissionCenter(
             uiState = uiState,
             permissionRequirements = permissionRequirements,
             shizukuReady = shizukuState.ready,
+            activeTarget = activePermissionSetupTarget,
+            onConfigureTarget = ::startPermissionSetup,
+            onTargetCheckedChange = ::setPermissionTargetEnabled,
         )
         EyeCareActionPlanCard(
             uiState = uiState,
@@ -422,8 +565,9 @@ internal fun SettingsScreen(
             onApplyRecommended = { applyRecommendedEyeCareSettings(viewModel) },
             onExportReport = viewModel::shareMonthlyReportPdf,
         )
-        GrowthConfigAnchor(GrowthConfigTarget.REPORTS, settingsScrollState, growthAnchorPositions)
-        GrowthConfigAnchor(GrowthConfigTarget.GUIDANCE, settingsScrollState, growthAnchorPositions)
+        SettingsScrollAnchor(GrowthConfigTarget.REPORTS, settingsScrollState, growthAnchorPositions)
+        SettingsScrollAnchor(GrowthConfigTarget.GUIDANCE, settingsScrollState, growthAnchorPositions)
+        SettingsScrollAnchor(PermissionSetupTarget.STATISTICS, settingsScrollState, permissionAnchorPositions)
         SettingsSection(R.string.section_general, Icons.Outlined.Settings) {
             Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall)
             LumenFlowRow {
@@ -511,7 +655,7 @@ internal fun SettingsScreen(
                 }
             }
         }
-        GrowthConfigAnchor(GrowthConfigTarget.CLOUD, settingsScrollState, growthAnchorPositions)
+        SettingsScrollAnchor(GrowthConfigTarget.CLOUD, settingsScrollState, growthAnchorPositions)
         RemoteCloudAccountCard(
             state = remoteState,
             onCheckHealth = viewModel::checkRemoteHealth,
@@ -551,7 +695,16 @@ internal fun SettingsScreen(
                 }
             }
         }
-        SettingsSection(R.string.section_notifications, Icons.Outlined.NotificationsActive) {
+        SettingsScrollAnchor(PermissionSetupTarget.NOTIFICATIONS, settingsScrollState, permissionAnchorPositions)
+        SettingsScrollAnchor(PermissionSetupTarget.EXACT_ALARM, settingsScrollState, permissionAnchorPositions)
+        SettingsScrollAnchor(PermissionSetupTarget.FULL_SCREEN, settingsScrollState, permissionAnchorPositions)
+        SettingsSection(
+            R.string.section_notifications,
+            Icons.Outlined.NotificationsActive,
+            forceExpanded = activePermissionSetupTarget == PermissionSetupTarget.NOTIFICATIONS ||
+                activePermissionSetupTarget == PermissionSetupTarget.EXACT_ALARM ||
+                activePermissionSetupTarget == PermissionSetupTarget.FULL_SCREEN,
+        ) {
             SwitchRow(R.string.enable_notifications, Icons.Outlined.NotificationsActive, settings.notificationEnabled) { enabled ->
                 if (enabled) {
                     runWithNotificationPermission {
@@ -614,18 +767,34 @@ internal fun SettingsScreen(
                 }
             }
         }
-        SettingsSection(R.string.section_keep_alive, Icons.Outlined.Schedule, initiallyExpanded = false) {
+        SettingsScrollAnchor(PermissionSetupTarget.KEEP_ALIVE, settingsScrollState, permissionAnchorPositions)
+        SettingsSection(
+            R.string.section_keep_alive,
+            Icons.Outlined.Schedule,
+            initiallyExpanded = false,
+            forceExpanded = activePermissionSetupTarget == PermissionSetupTarget.KEEP_ALIVE,
+        ) {
             SwitchRow(R.string.enable_keep_alive, Icons.Outlined.Schedule, settings.keepAliveEnabled) {
                 viewModel.setKeepAliveEnabled(it)
             }
         }
+        SettingsScrollAnchor(PermissionSetupTarget.DIAGNOSTICS, settingsScrollState, permissionAnchorPositions)
+        SettingsScrollAnchor(PermissionSetupTarget.SHIZUKU, settingsScrollState, permissionAnchorPositions)
         ShizukuAdvancedSettingsSection(
             settings = settings,
             state = shizukuState,
             viewModel = viewModel,
+            forceExpanded = activePermissionSetupTarget == PermissionSetupTarget.SHIZUKU ||
+                activePermissionSetupTarget == PermissionSetupTarget.DIAGNOSTICS,
         )
-        GrowthConfigAnchor(GrowthConfigTarget.FAMILY, settingsScrollState, growthAnchorPositions)
-        SettingsSection(R.string.section_proximity, Icons.Outlined.PhotoCamera, initiallyExpanded = false) {
+        SettingsScrollAnchor(GrowthConfigTarget.FAMILY, settingsScrollState, growthAnchorPositions)
+        SettingsScrollAnchor(PermissionSetupTarget.DISTANCE_CAMERA, settingsScrollState, permissionAnchorPositions)
+        SettingsSection(
+            R.string.section_proximity,
+            Icons.Outlined.PhotoCamera,
+            initiallyExpanded = false,
+            forceExpanded = activePermissionSetupTarget == PermissionSetupTarget.DISTANCE_CAMERA,
+        ) {
             SwitchRow(R.string.enable_proximity_monitoring, Icons.Outlined.PhotoCamera, settings.proximityMonitoringEnabled) { enabled ->
                 if (enabled) {
                     runWithCameraPermission {
@@ -732,7 +901,19 @@ internal fun SettingsScreen(
                 viewModel.updateSettings { current -> current.copy(proximityAlertCooldownSeconds = it) }
             }
         }
-        SettingsSection(R.string.section_eye_protection, Icons.Outlined.PhotoCamera, initiallyExpanded = false) {
+        SettingsScrollAnchor(PermissionSetupTarget.BLINK_CAMERA, settingsScrollState, permissionAnchorPositions)
+        SettingsScrollAnchor(PermissionSetupTarget.AMBIENT_LIGHT, settingsScrollState, permissionAnchorPositions)
+        SettingsScrollAnchor(PermissionSetupTarget.BRIGHTNESS, settingsScrollState, permissionAnchorPositions)
+        SettingsScrollAnchor(PermissionSetupTarget.OVERLAY, settingsScrollState, permissionAnchorPositions)
+        SettingsSection(
+            R.string.section_eye_protection,
+            Icons.Outlined.PhotoCamera,
+            initiallyExpanded = false,
+            forceExpanded = activePermissionSetupTarget == PermissionSetupTarget.BLINK_CAMERA ||
+                activePermissionSetupTarget == PermissionSetupTarget.AMBIENT_LIGHT ||
+                activePermissionSetupTarget == PermissionSetupTarget.BRIGHTNESS ||
+                activePermissionSetupTarget == PermissionSetupTarget.OVERLAY,
+        ) {
             SwitchRow(R.string.enable_blink_monitoring, Icons.Outlined.PhotoCamera, settings.blinkMonitoringEnabled) { enabled ->
                 if (enabled) {
                     runWithCameraPermission { viewModel.setBlinkMonitoringEnabled(true) }
