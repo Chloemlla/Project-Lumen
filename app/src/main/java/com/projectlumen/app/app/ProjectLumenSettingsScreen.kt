@@ -454,7 +454,11 @@ internal fun SettingsScreen(
                 viewModel.clearBackupImportPreview()
             },
             onConfirm = {
-                if (targetUri != null) viewModel.importBackup(targetUri)
+                if (targetUri != null) {
+                    viewModel.importBackup(targetUri)
+                    pendingBackupImportUri = null
+                    viewModel.clearBackupImportPreview()
+                }
             },
         )
     }

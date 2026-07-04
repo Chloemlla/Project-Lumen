@@ -202,7 +202,7 @@ import kotlinx.coroutines.launch
 internal fun HomeScreen(
     uiState: ProjectLumenUiState,
     viewModel: ProjectLumenViewModel,
-    openTranslation: () -> Unit = {},
+    openTranslation: () -> Unit,
 ) {
     val runtime = uiState.runtime
     val reminderActive = runtime.activeEngine == ActiveEngine.REMINDER.name &&

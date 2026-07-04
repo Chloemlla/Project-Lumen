@@ -286,6 +286,8 @@
     <string name="clear_custom_file">清除</string>
     <string name="custom_file_selected">已选择自定义文件</string>
     <string name="open_system_settings">打开系统设置</string>
+    <string name="system_settings_open_failed">无法打开系统设置。</string>
+    <string name="share_action_failed">无法打开分享。</string>
     <string name="auto_dark_window">定时深色主题</string>
     <string name="auto_dark_start">深色开始时间</string>
     <string name="auto_dark_end">深色结束时间</string>

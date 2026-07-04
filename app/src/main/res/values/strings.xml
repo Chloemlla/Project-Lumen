@@ -286,6 +286,8 @@
     <string name="clear_custom_file">Clear</string>
     <string name="custom_file_selected">Custom file selected</string>
     <string name="open_system_settings">Open system settings</string>
+    <string name="system_settings_open_failed">Unable to open system settings.</string>
+    <string name="share_action_failed">Unable to open sharing.</string>
     <string name="auto_dark_window">Scheduled dark theme</string>
     <string name="auto_dark_start">Dark theme starts</string>
     <string name="auto_dark_end">Dark theme ends</string>

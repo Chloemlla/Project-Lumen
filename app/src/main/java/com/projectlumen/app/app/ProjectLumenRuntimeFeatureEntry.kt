@@ -100,8 +100,19 @@ internal class ProjectLumenRuntimeFeatureEntry(
             val settings = settingsRepository.getOrDefault()
             if (!settings.reminderEnabled) return@launch
             val state = runtimeRepository.getOrDefault()
+            if (state.activeEngine == ActiveEngine.POMODORO.name) {
+                return@launch
+            }
             val nowMillis = System.currentTimeMillis()
-            val transition = reminderEngine.startBreak(settings, state, nowMillis)
+            val breakSourceState = if (
+                state.activeEngine == ActiveEngine.REMINDER.name &&
+                state.reminderPhase in reminderBreakStartPhases
+            ) {
+                state
+            } else {
+                reminderEngine.newWorkingState(settings, nowMillis)
+            }
+            val transition = reminderEngine.startBreak(settings, breakSourceState, nowMillis)
             applyTransition(settings, nowMillis, transition)
         }
     }
@@ -233,5 +244,13 @@ internal class ProjectLumenRuntimeFeatureEntry(
                 vibrate = event.vibrate,
             )
         }
+    }
+
+    private companion object {
+        private val reminderBreakStartPhases = setOf(
+            ReminderPhase.WORKING.name,
+            ReminderPhase.PRE_ALERT.name,
+            ReminderPhase.AWAITING_ACTION.name,
+        )
     }
 }

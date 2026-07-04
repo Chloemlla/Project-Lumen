@@ -386,7 +386,7 @@ internal fun chooseFallbackAsset(assets: List<ReleaseAsset>): ReleaseAsset? {
 internal fun openAppNotificationSettings(context: Context) {
     val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
         .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-    context.startActivity(intent)
+    startSettingsActivity(context, intent)
 }
 
 internal fun persistReadableUri(context: Context, uri: Uri) {
@@ -432,8 +432,7 @@ internal fun openExactAlarmSettings(context: Context) {
         Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
         "package:${context.packageName}".toUri(),
     )
-    runCatching { context.startActivity(intent) }
-        .onFailure { openAppNotificationSettings(context) }
+    startSettingsActivity(context, intent)
 }
 
 internal fun openFullScreenIntentSettings(context: Context) {
@@ -442,8 +441,7 @@ internal fun openFullScreenIntentSettings(context: Context) {
         Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
         "package:${context.packageName}".toUri(),
     )
-    runCatching { context.startActivity(intent) }
-        .onFailure { openAppNotificationSettings(context) }
+    startSettingsActivity(context, intent)
 }
 
 internal fun openOverlaySettings(context: Context) {
@@ -451,8 +449,7 @@ internal fun openOverlaySettings(context: Context) {
         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
         "package:${context.packageName}".toUri(),
     )
-    runCatching { context.startActivity(intent) }
-        .onFailure { openAppNotificationSettings(context) }
+    startSettingsActivity(context, intent)
 }
 
 internal fun openWriteSettings(context: Context) {
@@ -460,7 +457,21 @@ internal fun openWriteSettings(context: Context) {
         Settings.ACTION_MANAGE_WRITE_SETTINGS,
         "package:${context.packageName}".toUri(),
     )
+    startSettingsActivity(context, intent)
+}
+
+private fun startSettingsActivity(context: Context, intent: Intent) {
     runCatching { context.startActivity(intent) }
-        .onFailure { openAppNotificationSettings(context) }
+        .recoverCatching {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    "package:${context.packageName}".toUri(),
+                ),
+            )
+        }
+        .onFailure {
+            Toast.makeText(context, R.string.system_settings_open_failed, Toast.LENGTH_SHORT).show()
+        }
 }
 

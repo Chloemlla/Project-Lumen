@@ -131,10 +131,11 @@ private fun shareHomeConvenienceSummary(context: Context, summaryText: String) {
         putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.home_convenience_share_title))
         putExtra(Intent.EXTRA_TEXT, summaryText)
     }
-    context.startActivity(
-        Intent.createChooser(
-            intent,
-            context.getString(R.string.home_convenience_share_title),
-        ),
+    val chooser = Intent.createChooser(
+        intent,
+        context.getString(R.string.home_convenience_share_title),
     )
+    runCatching { context.startActivity(chooser) }.onFailure {
+        Toast.makeText(context, R.string.share_action_failed, Toast.LENGTH_SHORT).show()
+    }
 }
