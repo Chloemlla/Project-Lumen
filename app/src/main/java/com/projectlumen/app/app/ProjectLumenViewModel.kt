@@ -8,6 +8,7 @@ import com.projectlumen.app.core.api.ProjectLumenApiDiagnostics
 import com.projectlumen.app.core.crash.CrashBreadcrumbs
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.database.AppDatabase
+import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
@@ -21,6 +22,7 @@ import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
 import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
+import com.projectlumen.app.core.shizuku.ShizukuNetworkApp
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -99,6 +101,11 @@ class ProjectLumenViewModel(
         stopShizukuResilience = stopShizukuResilience,
         shizuku = shizuku,
     )
+    private val appNetworkControlEntry = ProjectLumenAppNetworkControlFeatureEntry(
+        scope = reportingScope,
+        repository = repositories.appNetworkControls,
+        shizuku = shizuku,
+    )
     private val templatesEntry = ProjectLumenTemplatesFeatureEntry(
         scope = reportingScope,
         settingsRepository = repositories.settings,
@@ -139,6 +146,8 @@ class ProjectLumenViewModel(
     val backupImportPreview = backupEntry.importPreview
     internal val remoteState = remoteEntry.state
     val shizukuState = shizuku.state
+    val shizukuNetworkApps = appNetworkControlEntry.networkApps
+    val appNetworkControlRecords = appNetworkControlEntry.records
     val apiDiagnostics = ProjectLumenApiDiagnostics.traces
     val uiState = stateStore.uiState
 
@@ -275,6 +284,9 @@ class ProjectLumenViewModel(
     fun requestShizukuAuthorization() = reportIfThrows {
         shizuku.requestPermission()
     }
+    fun refreshShizukuNetworkApps() = appNetworkControlEntry.refreshApps()
+    fun restrictAppNetwork(app: ShizukuNetworkApp) = appNetworkControlEntry.restrictApp(app)
+    fun restoreAppNetwork(record: AppNetworkControlEntity) = appNetworkControlEntry.restoreApp(record)
     fun uploadDiagnosticsNow() {
         reportingScope.launch {
             runCatching { uploadTelemetrySnapshot() }

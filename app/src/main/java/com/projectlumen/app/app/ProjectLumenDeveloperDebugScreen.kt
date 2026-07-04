@@ -70,9 +70,12 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.api.CertificatePinPolicy
 import com.projectlumen.app.core.api.ProjectLumenApiConfig
 import com.projectlumen.app.core.api.ProjectLumenApiTrace
+import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
+import com.projectlumen.app.core.shizuku.ShizukuNetworkApp
+import com.projectlumen.app.core.shizuku.ShizukuNetworkAppTypes
 import kotlin.math.roundToInt
 
 @Composable
@@ -86,9 +89,12 @@ internal fun DeveloperDebugScreen(
     val context = LocalContext.current
     val permissionRequirements = rememberPermissionRequirements()
     val shizukuState = viewModel.shizukuState.collectAsStateWithLifecycle().value
+    val shizukuNetworkApps = viewModel.shizukuNetworkApps.collectAsStateWithLifecycle().value
+    val appNetworkControlRecords = viewModel.appNetworkControlRecords.collectAsStateWithLifecycle(emptyList()).value
     val remoteState = viewModel.remoteState.collectAsStateWithLifecycle().value
     val apiTraces = viewModel.apiDiagnostics.collectAsStateWithLifecycle().value
     val luxHistory = remember { mutableStateListOf<Float>() }
+    var networkAppQuery by rememberSaveable { mutableStateOf("") }
     var purchaseProductId by rememberSaveable { mutableStateOf("project_lumen_pro") }
     var purchaseToken by rememberSaveable { mutableStateOf("") }
     val normalizedPurchaseProductId = purchaseProductId.trim()
@@ -96,6 +102,11 @@ internal fun DeveloperDebugScreen(
     LaunchedEffect(runtime.ambientLastLux, uiState.nowMillis) {
         luxHistory += runtime.ambientLastLux.coerceAtLeast(0f)
         while (luxHistory.size > 60) luxHistory.removeAt(0)
+    }
+    LaunchedEffect(shizukuState.ready) {
+        if (shizukuState.ready && shizukuNetworkApps.isEmpty()) {
+            viewModel.refreshShizukuNetworkApps()
+        }
     }
     LumenPage {
         SettingsSection(R.string.developer_section_realtime_debug, Icons.Outlined.Visibility) {
@@ -213,6 +224,18 @@ internal fun DeveloperDebugScreen(
                 DeveloperButtonLabel(Icons.Outlined.Memory, R.string.developer_simulate_low_memory)
             }
         }
+
+        ShizukuNetworkControlsSection(
+            shizukuState = shizukuState,
+            networkApps = shizukuNetworkApps,
+            records = appNetworkControlRecords,
+            query = networkAppQuery,
+            onQueryChange = { networkAppQuery = it },
+            onRefresh = viewModel::refreshShizukuNetworkApps,
+            onAuthorize = viewModel::requestShizukuAuthorization,
+            onRestrict = viewModel::restrictAppNetwork,
+            onRestore = viewModel::restoreAppNetwork,
+        )
 
         SettingsSection(R.string.developer_section_api_security, Icons.Outlined.Lock) {
             DeveloperMetricRow(R.string.developer_security_api_base, ProjectLumenApiConfig.baseUrl)
@@ -346,6 +369,174 @@ internal fun DeveloperDebugScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ShizukuNetworkControlsSection(
+    shizukuState: ShizukuCapabilityState,
+    networkApps: List<ShizukuNetworkApp>,
+    records: List<AppNetworkControlEntity>,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onRefresh: () -> Unit,
+    onAuthorize: () -> Unit,
+    onRestrict: (ShizukuNetworkApp) -> Unit,
+    onRestore: (AppNetworkControlEntity) -> Unit,
+) {
+    val normalizedQuery = query.trim()
+    val recordsByPackage = records.associateBy { it.packageName }
+    val restrictedRecords = records.filter { it.networkRestricted }
+    val filteredApps = networkApps
+        .filter { app ->
+            normalizedQuery.isBlank() ||
+                app.packageName.contains(normalizedQuery, ignoreCase = true) ||
+                app.uid.toString().contains(normalizedQuery)
+        }
+        .take(MAX_NETWORK_APP_CARDS)
+    SettingsSection(R.string.developer_section_shizuku_network_controls, Icons.Outlined.Lock) {
+        DeveloperNote(stringResource(R.string.developer_shizuku_network_boundary))
+        DeveloperMetricRow(R.string.shizuku_status, developerShizukuStatusLabel(shizukuState))
+        DeveloperMetricRow(
+            R.string.developer_shizuku_network_apps_count,
+            stringResource(
+                R.string.developer_shizuku_network_apps_count_value,
+                networkApps.size,
+                restrictedRecords.size,
+            ),
+        )
+        LumenFlowRow {
+            OutlinedButton(onClick = onRefresh, enabled = shizukuState.ready) {
+                DeveloperButtonLabel(Icons.Outlined.Sync, R.string.developer_shizuku_network_refresh_apps)
+            }
+            if (!shizukuState.ready) {
+                OutlinedButton(onClick = onAuthorize, enabled = shizukuState.binderAvailable) {
+                    DeveloperButtonLabel(Icons.Outlined.Lock, R.string.shizuku_authorize)
+                }
+            }
+        }
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = query,
+            onValueChange = onQueryChange,
+            singleLine = true,
+            label = { Text(stringResource(R.string.developer_shizuku_network_search_label)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+        )
+        if (records.isEmpty()) {
+            DeveloperNote(stringResource(R.string.developer_shizuku_network_no_records))
+        } else {
+            records.take(MAX_NETWORK_RECORD_CARDS).forEach { record ->
+                DeveloperNetworkControlRecordCard(record = record, onRestore = { onRestore(record) })
+            }
+        }
+        if (filteredApps.isEmpty()) {
+            DeveloperNote(stringResource(R.string.developer_shizuku_network_no_apps))
+        } else {
+            filteredApps.forEach { app ->
+                DeveloperNetworkAppCard(
+                    app = app,
+                    record = recordsByPackage[app.packageName],
+                    onRestrict = { onRestrict(app) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeveloperNetworkAppCard(
+    app: ShizukuNetworkApp,
+    record: AppNetworkControlEntity?,
+    onRestrict: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = app.packageName,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold,
+            softWrap = true,
+        )
+        Text(
+            text = stringResource(
+                R.string.developer_shizuku_network_app_detail,
+                app.uid,
+                networkAppTypeLabel(app.appType),
+                networkAppStatusLabel(app, record),
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            softWrap = true,
+        )
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = record?.networkRestricted != true,
+            onClick = onRestrict,
+        ) {
+            DeveloperButtonLabel(Icons.Outlined.Lock, R.string.developer_shizuku_network_restrict)
+        }
+    }
+}
+
+@Composable
+private fun DeveloperNetworkControlRecordCard(
+    record: AppNetworkControlEntity,
+    onRestore: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = record.packageName,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold,
+            softWrap = true,
+        )
+        Text(
+            text = stringResource(
+                R.string.developer_shizuku_network_record_detail,
+                record.uid,
+                networkAppTypeLabel(record.appType),
+                networkRecordStatusLabel(record),
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            softWrap = true,
+        )
+        Text(
+            text = networkGuardStatusLabel(record),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            softWrap = true,
+        )
+        if (record.lastError.isNotBlank()) {
+            ApiTraceLine(R.string.developer_shizuku_network_last_error, record.lastError)
+        }
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = record.networkRestricted,
+            onClick = onRestore,
+        ) {
+            DeveloperButtonLabel(Icons.Outlined.Sync, R.string.developer_shizuku_network_restore)
         }
     }
 }
@@ -696,5 +887,48 @@ private fun createDeveloperCrashPreview(): CrashReport {
     )
 }
 
+@Composable
+private fun networkAppTypeLabel(appType: String): String {
+    return when (appType) {
+        ShizukuNetworkAppTypes.SYSTEM -> stringResource(R.string.developer_shizuku_network_system_app)
+        else -> stringResource(R.string.developer_shizuku_network_user_app)
+    }
+}
+
+@Composable
+private fun networkAppStatusLabel(app: ShizukuNetworkApp, record: AppNetworkControlEntity?): String {
+    return when {
+        record?.networkRestricted == true -> stringResource(R.string.developer_shizuku_network_restricted)
+        app.restrictedByUidPolicy -> stringResource(R.string.developer_shizuku_network_uid_policy_active)
+        else -> stringResource(R.string.developer_shizuku_network_available)
+    }
+}
+
+@Composable
+private fun networkRecordStatusLabel(record: AppNetworkControlEntity): String {
+    return when {
+        record.networkRestricted -> stringResource(R.string.developer_shizuku_network_restricted)
+        record.lastError.isNotBlank() -> stringResource(R.string.developer_shizuku_network_failed)
+        else -> stringResource(R.string.developer_shizuku_network_restored)
+    }
+}
+
+@Composable
+private fun networkGuardStatusLabel(record: AppNetworkControlEntity): String {
+    val uidPolicy = if (record.uidPolicyApplied) {
+        stringResource(R.string.developer_shizuku_network_uid_policy_active)
+    } else {
+        stringResource(R.string.developer_shizuku_network_uid_policy_inactive)
+    }
+    val delegatedGuard = when {
+        record.delegatedGuardApplied -> stringResource(R.string.developer_shizuku_network_delegated_guard_active)
+        record.delegatedGuardAttempted -> stringResource(R.string.developer_shizuku_network_delegated_guard_unsupported)
+        else -> stringResource(R.string.developer_shizuku_network_delegated_guard_not_attempted)
+    }
+    return stringResource(R.string.developer_shizuku_network_guard_status, uidPolicy, delegatedGuard)
+}
+
 private const val DEBUG_WRAP_COLUMN = 36
 private const val MAX_API_TRACE_CARDS = 8
+private const val MAX_NETWORK_APP_CARDS = 12
+private const val MAX_NETWORK_RECORD_CARDS = 12

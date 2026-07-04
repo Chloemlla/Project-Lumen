@@ -151,6 +151,45 @@ class ShizukuCapabilityManager(
         )
     }
 
+    suspend fun listNetworkControllableApps(): List<ShizukuNetworkApp> = withContext(Dispatchers.IO) {
+        val currentState = queryState()
+        _state.value = currentState
+        if (!currentState.ready) return@withContext emptyList()
+        val restrictedUids = latestRestrictBackgroundDenylist()
+        val systemApps = latestInstalledApps(SYSTEM_APP_LIST_COMMAND, ShizukuNetworkAppTypes.SYSTEM)
+        val userApps = latestInstalledApps(USER_APP_LIST_COMMAND, ShizukuNetworkAppTypes.USER)
+        (userApps + systemApps)
+            .filter { it.uid > 0 && it.packageName != context.packageName }
+            .distinctBy { it.packageName }
+            .map { app -> app.copy(restrictedByUidPolicy = restrictedUids.contains(app.uid)) }
+            .sortedWith(compareBy<ShizukuNetworkApp> { it.appType != ShizukuNetworkAppTypes.USER }.thenBy { it.packageName })
+    }
+
+    suspend fun restrictAppNetwork(app: ShizukuNetworkApp): ShizukuNetworkPolicyResult = withContext(Dispatchers.IO) {
+        applyAppNetworkPolicy(
+            packageName = app.packageName,
+            uid = app.uid,
+            appType = app.appType,
+            restrict = true,
+            delegatedGuardExpected = true,
+        )
+    }
+
+    suspend fun restoreAppNetwork(
+        packageName: String,
+        uid: Int,
+        appType: String,
+        restoreDelegatedGuard: Boolean,
+    ): ShizukuNetworkPolicyResult = withContext(Dispatchers.IO) {
+        applyAppNetworkPolicy(
+            packageName = packageName,
+            uid = uid,
+            appType = appType,
+            restrict = false,
+            delegatedGuardExpected = restoreDelegatedGuard,
+        )
+    }
+
     suspend fun applyNativeEyeProtection(settings: AppSettingsEntity, smooth: Boolean = true): Boolean = withContext(Dispatchers.IO) {
         val currentState = queryState()
         val shouldEnable = settings.shizukuAdvancedModeEnabled && settings.shizukuNativeEyeProtectionEnabled
@@ -613,6 +652,167 @@ class ShizukuCapabilityManager(
             .toList()
     }
 
+    private fun latestInstalledApps(command: String, appType: String): List<ShizukuNetworkApp> {
+        val result = executeShellCommand(command)
+        if (!result.success) return emptyList()
+        return result.output
+            .lineSequence()
+            .mapNotNull { parseNetworkAppLine(it, appType) }
+            .distinctBy { it.packageName }
+            .sortedBy { it.packageName }
+            .toList()
+    }
+
+    private fun latestRestrictBackgroundDenylist(): Set<Int> {
+        val result = executeShellCommand("cmd netpolicy list restrict-background-blacklist")
+        if (!result.success) return emptySet()
+        return UID_TOKEN_REGEX.findAll(result.output)
+            .mapNotNull { it.value.toIntOrNull() }
+            .filter { it > 0 }
+            .toSet()
+    }
+
+    private fun applyAppNetworkPolicy(
+        packageName: String,
+        uid: Int,
+        appType: String,
+        restrict: Boolean,
+        delegatedGuardExpected: Boolean,
+    ): ShizukuNetworkPolicyResult {
+        val currentState = queryState()
+        _state.value = currentState
+        val normalizedPackageName = sanitizePackageToken(packageName)
+        if (!currentState.ready) {
+            return networkPolicyResult(
+                packageName = normalizedPackageName,
+                uid = uid,
+                appType = appType,
+                networkRestricted = !restrict,
+                uidPolicyApplied = !restrict,
+                delegatedGuardAttempted = delegatedGuardExpected,
+                delegatedGuardApplied = false,
+                output = "",
+                error = "Shizuku authorization is required for app network controls.",
+            )
+        }
+        if (!ANDROID_PACKAGE_NAME_REGEX.matches(normalizedPackageName) || uid <= 0) {
+            return networkPolicyResult(
+                packageName = normalizedPackageName,
+                uid = uid,
+                appType = appType,
+                networkRestricted = !restrict,
+                uidPolicyApplied = !restrict,
+                delegatedGuardAttempted = delegatedGuardExpected,
+                delegatedGuardApplied = false,
+                output = "",
+                error = "A valid package name and UID are required.",
+            )
+        }
+        val policyCommand = if (restrict) {
+            "cmd netpolicy add restrict-background-blacklist $uid"
+        } else {
+            "cmd netpolicy remove restrict-background-blacklist $uid"
+        }
+        val uidPolicyResult = executeShellCommand(policyCommand)
+        val delegatedGuardResult = if (delegatedGuardExpected) {
+            setDelegatedNetworkGuard(normalizedPackageName, restrict)
+        } else {
+            DelegatedNetworkGuardResult(attempted = false, applied = false, output = "", error = "")
+        }
+        val uidPolicySucceeded = uidPolicyResult.success || (!restrict && uidPolicyResult.isAlreadyNotRestricted())
+        val output = listOf(uidPolicyResult.output, delegatedGuardResult.output)
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
+        val errors = buildList {
+            if (!uidPolicySucceeded) {
+                add(uidPolicyResult.error.ifBlank { "Android netpolicy command failed." })
+            }
+            if (delegatedGuardResult.attempted && !delegatedGuardResult.applied) {
+                add(
+                    delegatedGuardResult.error.ifBlank {
+                        "Delegated network guard is not supported on this device.",
+                    },
+                )
+            }
+        }.joinToString("\n")
+        val networkRestricted = if (restrict) uidPolicySucceeded else !uidPolicySucceeded
+        val uidPolicyApplied = if (restrict) uidPolicySucceeded else !uidPolicySucceeded
+        _state.value = queryState(errors)
+        return networkPolicyResult(
+            packageName = normalizedPackageName,
+            uid = uid,
+            appType = appType,
+            networkRestricted = networkRestricted,
+            uidPolicyApplied = uidPolicyApplied,
+            delegatedGuardAttempted = delegatedGuardResult.attempted,
+            delegatedGuardApplied = if (restrict) {
+                delegatedGuardResult.applied
+            } else {
+                delegatedGuardExpected && !delegatedGuardResult.applied
+            },
+            output = output,
+            error = errors,
+        )
+    }
+
+    private fun setDelegatedNetworkGuard(packageName: String, restrict: Boolean): DelegatedNetworkGuardResult {
+        val mode = if (restrict) "ignore" else "allow"
+        val commands = listOf(
+            "cmd appops set $packageName android:internet $mode",
+            "cmd appops set $packageName INTERNET $mode",
+        )
+        val results = commands.map(::executeShellCommand)
+        val applied = results.any { it.success }
+        return DelegatedNetworkGuardResult(
+            attempted = true,
+            applied = applied,
+            output = results.joinToString("\n") { it.output }.trim(),
+            error = if (applied) "" else results.joinToString("\n") { it.error.ifBlank { it.output } }.trim(),
+        )
+    }
+
+    private fun ShellCommandResult.isAlreadyNotRestricted(): Boolean {
+        val combined = "${output}\n${error}".lowercase()
+        return combined.contains("not blacklisted") ||
+            combined.contains("not denylisted") ||
+            combined.contains("not in blacklist") ||
+            combined.contains("not in denylist")
+    }
+
+    private fun networkPolicyResult(
+        packageName: String,
+        uid: Int,
+        appType: String,
+        networkRestricted: Boolean,
+        uidPolicyApplied: Boolean,
+        delegatedGuardAttempted: Boolean,
+        delegatedGuardApplied: Boolean,
+        output: String,
+        error: String,
+    ): ShizukuNetworkPolicyResult {
+        return ShizukuNetworkPolicyResult(
+            packageName = packageName,
+            uid = uid,
+            appType = appType,
+            networkRestricted = networkRestricted,
+            uidPolicyApplied = uidPolicyApplied,
+            delegatedGuardAttempted = delegatedGuardAttempted,
+            delegatedGuardApplied = delegatedGuardApplied,
+            output = output.take(MAX_COMMAND_FIELD_LENGTH),
+            error = error.take(MAX_COMMAND_FIELD_LENGTH),
+        )
+    }
+
+    private fun parseNetworkAppLine(line: String, appType: String): ShizukuNetworkApp? {
+        val installedApp = parseInstalledAppLine(line) ?: return null
+        val uid = installedApp.uid ?: return null
+        return ShizukuNetworkApp(
+            packageName = installedApp.packageName,
+            uid = uid,
+            appType = appType,
+        )
+    }
+
     private fun parseInstalledAppLine(line: String): ShizukuInstalledApp? {
         var packageName = ""
         var installerPackageName = ""
@@ -683,6 +883,13 @@ class ShizukuCapabilityManager(
             get() = exitCode == 0
     }
 
+    private data class DelegatedNetworkGuardResult(
+        val attempted: Boolean,
+        val applied: Boolean,
+        val output: String,
+        val error: String,
+    )
+
     private fun classifyForegroundContext(packageName: String, activityName: String): String {
         val combined = "$packageName $activityName".lowercase()
         return when {
@@ -714,11 +921,17 @@ class ShizukuCapabilityManager(
         private const val SHIZUKU_SHELL_SERVICE_VERSION = 1
         private const val MAX_DIAGNOSTIC_USER_APPS = 150
         private const val MAX_PACKAGE_FIELD_LENGTH = 160
+        private const val MAX_COMMAND_FIELD_LENGTH = 1_000
         private const val USER_APP_LIST_COMMAND =
             "cmd package list packages -3 -i -U --show-versioncode 2>/dev/null || " +
                 "pm list packages -3 -i -U --show-versioncode 2>/dev/null || " +
                 "cmd package list packages -3 -i -U 2>/dev/null || " +
                 "pm list packages -3 -i -U"
+        private const val SYSTEM_APP_LIST_COMMAND =
+            "cmd package list packages -s -i -U --show-versioncode 2>/dev/null || " +
+                "pm list packages -s -i -U --show-versioncode 2>/dev/null || " +
+                "cmd package list packages -s -i -U 2>/dev/null || " +
+                "pm list packages -s -i -U"
 
         private val sensitiveCameraHints = listOf("camera", "camerax", "scanner", "barcode", "qr")
         private val sensitiveCallHints = listOf("call", "voip", "meeting", "conference", "telecom", "zoom", "meet")
@@ -726,6 +939,7 @@ class ShizukuCapabilityManager(
         private val sensitiveGameHints = listOf("game", "unity", "unreal", "tmgp", "mihoyo", "hoyoverse", "netease")
         private val PACKAGE_LIST_TOKEN_SPLIT_REGEX = Regex("\\s+")
         private val ANDROID_PACKAGE_NAME_REGEX = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+")
+        private val UID_TOKEN_REGEX = Regex("\\b\\d{3,}\\b")
     }
 }
 

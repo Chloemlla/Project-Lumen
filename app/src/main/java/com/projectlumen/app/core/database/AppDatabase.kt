@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.projectlumen.app.core.database.daos.AppSettingsDao
+import com.projectlumen.app.core.database.daos.AppNetworkControlsDao
 import com.projectlumen.app.core.database.daos.DailyEyeStatsDao
 import com.projectlumen.app.core.database.daos.DailyGoalsDao
 import com.projectlumen.app.core.database.daos.DailyPomodoroStatsDao
@@ -16,6 +17,7 @@ import com.projectlumen.app.core.database.daos.ReminderPlansDao
 import com.projectlumen.app.core.database.daos.RuntimeStateDao
 import com.projectlumen.app.core.database.daos.TipTemplatesDao
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
+import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
@@ -29,6 +31,7 @@ import com.projectlumen.app.BuildConfig
 @Database(
     entities = [
         AppSettingsEntity::class,
+        AppNetworkControlEntity::class,
         RuntimeStateEntity::class,
         DailyEyeStatsEntity::class,
         DailyPomodoroStatsEntity::class,
@@ -38,11 +41,12 @@ import com.projectlumen.app.BuildConfig
         EntitlementEntity::class,
         ReminderPlanEntity::class,
     ],
-    version = 17,
+    version = 18,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun appSettingsDao(): AppSettingsDao
+    abstract fun appNetworkControlsDao(): AppNetworkControlsDao
     abstract fun runtimeStateDao(): RuntimeStateDao
     abstract fun dailyEyeStatsDao(): DailyEyeStatsDao
     abstract fun dailyPomodoroStatsDao(): DailyPomodoroStatsDao
@@ -194,6 +198,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                createAppNetworkControls(db)
+            }
+        }
+
         private fun migrateEyeProtection(db: SupportSQLiteDatabase) {
             addColumnIfMissing(db, "app_settings", "blinkMonitoringEnabled", "INTEGER NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "app_settings", "blinkNoBlinkThresholdSeconds", "INTEGER NOT NULL DEFAULT 10")
@@ -274,6 +284,27 @@ abstract class AppDatabase : RoomDatabase() {
 
         private fun migrateFaceAnalysisTelemetryConsent(db: SupportSQLiteDatabase) {
             addColumnIfMissing(db, "app_settings", "diagnosticFaceAnalysisUploadEnabled", "INTEGER NOT NULL DEFAULT 0")
+        }
+
+        private fun createAppNetworkControls(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS app_network_controls (
+                    packageName TEXT NOT NULL PRIMARY KEY,
+                    uid INTEGER NOT NULL,
+                    appType TEXT NOT NULL,
+                    networkRestricted INTEGER NOT NULL,
+                    uidPolicyApplied INTEGER NOT NULL,
+                    delegatedGuardAttempted INTEGER NOT NULL,
+                    delegatedGuardApplied INTEGER NOT NULL,
+                    lastCommandOutput TEXT NOT NULL DEFAULT '',
+                    lastError TEXT NOT NULL DEFAULT '',
+                    restrictedAt INTEGER NOT NULL DEFAULT 0,
+                    restoredAt INTEGER NOT NULL DEFAULT 0,
+                    updatedAt INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
         }
 
         private fun migrateDynamicAppearance(db: SupportSQLiteDatabase) {
@@ -404,6 +435,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_14_15,
                     MIGRATION_15_16,
                     MIGRATION_16_17,
+                    MIGRATION_17_18,
                 )
             if (BuildConfig.DEBUG) {
                 builder.fallbackToDestructiveMigration(dropAllTables = true)

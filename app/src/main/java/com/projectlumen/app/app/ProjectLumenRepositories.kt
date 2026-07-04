@@ -2,6 +2,7 @@ package com.projectlumen.app.app
 
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
+import com.projectlumen.app.core.repositories.AppNetworkControlRepository
 import com.projectlumen.app.core.repositories.DailyGoalsRepository
 import com.projectlumen.app.core.repositories.EntitlementRepository
 import com.projectlumen.app.core.repositories.FeatureFlagRepository
@@ -22,6 +23,7 @@ internal class ProjectLumenRepositories(
         eyeCarePreferences,
         { secureCredentials.deviceInstallationId() },
     )
+    val appNetworkControls = AppNetworkControlRepository(database.appNetworkControlsDao())
     val runtime = RuntimeRepository(database.runtimeStateDao())
     val statistics = StatisticsRepository(
         database.dailyEyeStatsDao(),
