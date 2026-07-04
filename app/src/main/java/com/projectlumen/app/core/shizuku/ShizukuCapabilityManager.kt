@@ -730,7 +730,7 @@ class ShizukuCapabilityManager(
             if (delegatedGuardResult.attempted && !delegatedGuardResult.applied) {
                 add(
                     delegatedGuardResult.error.ifBlank {
-                        "Delegated network guard is not supported on this device.",
+                        "Delegated network guard is not supported on this device."
                     },
                 )
             }
