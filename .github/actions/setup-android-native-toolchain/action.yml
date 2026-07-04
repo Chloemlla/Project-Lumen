@@ -1,0 +1,41 @@
+name: Set up Android native toolchain
+description: Install the Android NDK and CMake versions declared in gradle.properties.
+
+runs:
+  using: composite
+  steps:
+    - name: Install Android native toolchain
+      shell: bash
+      run: |
+        set -eu
+
+        NDK_VERSION="$(sed -n 's/^projectLumenNdkVersion=//p' gradle.properties | tail -n 1)"
+        CMAKE_VERSION="$(sed -n 's/^projectLumenCmakeVersion=//p' gradle.properties | tail -n 1)"
+
+        if [ -z "$NDK_VERSION" ] || [ -z "$CMAKE_VERSION" ]; then
+          echo "projectLumenNdkVersion and projectLumenCmakeVersion must be set in gradle.properties." >&2
+          exit 1
+        fi
+
+        ANDROID_SDK_ROOT_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+        SDKMANAGER=""
+
+        if command -v sdkmanager >/dev/null 2>&1; then
+          SDKMANAGER="$(command -v sdkmanager)"
+        elif [ -n "$ANDROID_SDK_ROOT_DIR" ]; then
+          SDKMANAGER="${ANDROID_SDK_ROOT_DIR}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "${ANDROID_SDK_ROOT_DIR}/cmdline-tools" -path "*/bin/sdkmanager" -type f 2>/dev/null | sort | tail -n 1)"
+          fi
+        fi
+
+        if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
+          echo "sdkmanager was not found on PATH or under ANDROID_HOME/ANDROID_SDK_ROOT." >&2
+          exit 127
+        fi
+
+        if [ -n "$ANDROID_SDK_ROOT_DIR" ]; then
+          yes 2>/dev/null | "$SDKMANAGER" --sdk_root="$ANDROID_SDK_ROOT_DIR" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+        else
+          yes 2>/dev/null | "$SDKMANAGER" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+        fi
