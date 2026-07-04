@@ -1,5 +1,6 @@
 package com.projectlumen.app.app
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
@@ -18,15 +19,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.ReminderPhase
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun HomeConvenienceCard(
@@ -37,7 +40,8 @@ internal fun HomeConvenienceCard(
     onPauseOneHour: () -> Unit,
 ) {
     val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     val summaryText = homeConvenienceSummary(uiState)
     val copiedMessage = stringResource(R.string.home_convenience_summary_copied)
     val reminderActive = uiState.runtime.activeEngine == ActiveEngine.REMINDER.name &&
@@ -84,8 +88,14 @@ internal fun HomeConvenienceCard(
                 }
                 OutlinedButton(
                     onClick = {
-                        clipboard.setText(AnnotatedString(summaryText))
-                        Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            clipboard.setClipEntry(
+                                ClipEntry(
+                                    ClipData.newPlainText("home summary", summaryText),
+                                ),
+                            )
+                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                        }
                     },
                 ) {
                     ButtonLabel(Icons.Outlined.ContentCopy, R.string.home_convenience_copy_summary)
