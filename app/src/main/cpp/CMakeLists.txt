@@ -4,6 +4,10 @@ project(lumen_security)
 
 add_library(lumen_security SHARED lumen_security.cpp)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    target_link_options(lumen_security PRIVATE "-Wl,-z,max-page-size=16384")
+endif()
+
 target_compile_definitions(
     lumen_security
     PRIVATE

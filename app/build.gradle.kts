@@ -43,6 +43,7 @@ fun projectLumenBooleanFlag(value: String?): Boolean {
 android {
     namespace = "com.projectlumen.app"
     compileSdk = 37
+    ndkVersion = "28.2.13676358"
 
     val projectLumenVersionName = providers.environmentVariable("PROJECT_LUMEN_VERSION_NAME")
         .orNull
@@ -229,6 +230,7 @@ android {
 
     packaging {
         jniLibs {
+            useLegacyPackaging = false
             pickFirsts += "**/libc++_shared.so"
         }
     }

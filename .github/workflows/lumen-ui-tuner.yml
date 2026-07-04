@@ -100,6 +100,9 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-cleanup: on-success
 
+      - name: Install Android native toolchain
+        run: sdkmanager "ndk;28.2.13676358" "cmake;3.22.1"
+
       - name: Read app version
         run: |
           VERSION_NAME=$(tr -d '\r' < app/application.version | sed -n '1{s/^[[:space:]]*//; s/[[:space:]]*$//; p;}')
