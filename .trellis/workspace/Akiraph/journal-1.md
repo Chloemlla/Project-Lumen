@@ -38,3 +38,36 @@ Removed stale default backend certificate pins, gated optional pinning behind ex
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: Remotion Android product animation
+
+**Date**: 2026-07-05
+**Task**: Remotion Android product animation
+**Branch**: `main`
+
+### Summary
+
+Added a native Android product demo route, a Remotion Chinese Android product animation package, CI rendering workflow, and the frontend spec contract for the animation package.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c0b730d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
