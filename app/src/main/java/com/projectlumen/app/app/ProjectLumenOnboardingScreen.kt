@@ -145,6 +145,10 @@ internal fun ProjectLumenOnboardingScreen(
                 )
             }
 
+            if (pageIndex == pages.lastIndex) {
+                RecommendedEyeCareSetupActionPreview()
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),

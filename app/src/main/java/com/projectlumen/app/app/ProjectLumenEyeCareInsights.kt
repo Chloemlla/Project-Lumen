@@ -90,6 +90,7 @@ internal fun EyeCareGuidedSetupCard(
     onExportReport: () -> Unit,
 ) {
     val summary = rememberEyeCareInsightSummary(uiState, permissionRequirements, shizukuReady)
+    val recommendedFeedback = rememberRecommendedEyeCareApplyFeedback(onApplyRecommended)
     val distanceCalibrated = uiState.settings.proximityBaselineEyeDistancePx > 0f ||
         uiState.settings.proximityBaselineFaceWidthPercent > 0
     val missingRuntimePermission = summary.missingSetupCount > 0
@@ -147,7 +148,7 @@ internal fun EyeCareGuidedSetupCard(
             )
             steps.forEach { step -> GuideStepLine(step) }
             LumenFlowRow {
-                Button(onClick = onApplyRecommended) {
+                Button(onClick = recommendedFeedback.onApply) {
                     ButtonLabel(Icons.Outlined.CheckCircle, R.string.eye_care_apply_recommended)
                 }
                 OutlinedButton(onClick = onResolveNextPermission) {
@@ -163,6 +164,12 @@ internal fun EyeCareGuidedSetupCard(
                     ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)
                 }
             }
+            RecommendedEyeCareSetupFeedback(
+                uiState = uiState,
+                permissionRequirements = permissionRequirements,
+                shizukuReady = shizukuReady,
+                applyFeedbackCount = recommendedFeedback.applyCount,
+            )
         }
     }
 }
@@ -175,6 +182,7 @@ internal fun EyeCareInsightsHomeCard(
     onApplyRecommended: () -> Unit,
 ) {
     val summary = rememberEyeCareInsightSummary(uiState, permissionRequirements, shizukuReady)
+    val recommendedFeedback = rememberRecommendedEyeCareApplyFeedback(onApplyRecommended)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -200,10 +208,16 @@ internal fun EyeCareInsightsHomeCard(
             }
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = onApplyRecommended,
+                onClick = recommendedFeedback.onApply,
             ) {
                 ButtonLabel(Icons.Outlined.CheckCircle, R.string.eye_care_apply_recommended)
             }
+            RecommendedEyeCareSetupFeedback(
+                uiState = uiState,
+                permissionRequirements = permissionRequirements,
+                shizukuReady = shizukuReady,
+                applyFeedbackCount = recommendedFeedback.applyCount,
+            )
         }
     }
 }
@@ -251,6 +265,7 @@ internal fun EyeCareActionPlanCard(
     onExportReport: () -> Unit,
 ) {
     val summary = rememberEyeCareInsightSummary(uiState, permissionRequirements, shizukuReady)
+    val recommendedFeedback = rememberRecommendedEyeCareApplyFeedback(onApplyRecommended)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -264,13 +279,19 @@ internal fun EyeCareActionPlanCard(
             SectionHeader(Icons.Outlined.CheckCircle, R.string.eye_care_action_plan)
             InsightActionList(summary.actionRes)
             LumenFlowRow {
-                Button(onClick = onApplyRecommended) {
+                Button(onClick = recommendedFeedback.onApply) {
                     ButtonLabel(Icons.Outlined.CheckCircle, R.string.eye_care_apply_recommended)
                 }
                 OutlinedButton(onClick = onExportReport) {
                     ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)
                 }
             }
+            RecommendedEyeCareSetupFeedback(
+                uiState = uiState,
+                permissionRequirements = permissionRequirements,
+                shizukuReady = shizukuReady,
+                applyFeedbackCount = recommendedFeedback.applyCount,
+            )
         }
     }
 }
@@ -449,43 +470,8 @@ internal fun EyeCareGrowthCapabilityCard(
 }
 
 internal fun applyRecommendedEyeCareSettings(viewModel: ProjectLumenViewModel) {
-    viewModel.updateSettings { current ->
-        current.copy(
-            reminderEnabled = true,
-            warnIntervalMinutes = 20,
-            restDurationSeconds = 20,
-            statsEnabled = true,
-            notificationEnabled = true,
-            keepAliveEnabled = true,
-            preAlertEnabled = true,
-            preAlertSeconds = 60,
-            askBeforeBreak = true,
-            disableSkip = false,
-            quietHoursEnabled = false,
-            proximityMonitoringEnabled = true,
-            proximityCheckIntervalMinutes = 5,
-            proximityCaptureSeconds = 2,
-            proximityDistanceMultiplierPercent = 130,
-            proximityAlertCooldownSeconds = 120,
-            blinkMonitoringEnabled = true,
-            blinkNoBlinkThresholdSeconds = 12,
-            blinkAlertCooldownSeconds = 90,
-            ambientLightMonitoringEnabled = true,
-            ambientLightLowLuxThreshold = 10,
-            autoBrightnessEnabled = false,
-            globalOverlayEnabled = true,
-            overlayRestDurationSeconds = 20,
-            overlayStrictDistancePercent = 165,
-        )
-    }
-    viewModel.updateDailyGoal { current ->
-        current.copy(
-            restBreakGoal = 8,
-            maxContinuousWorkMinutes = 45,
-            pomodoroGoal = 4,
-            weeklyActiveDaysGoal = 5,
-        )
-    }
+    viewModel.updateSettings(::recommendedEyeCareSettings)
+    viewModel.updateDailyGoal(::recommendedEyeCareDailyGoal)
 }
 
 internal fun applyFamilyEyeCareMode(viewModel: ProjectLumenViewModel) {

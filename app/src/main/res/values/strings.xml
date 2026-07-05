@@ -623,6 +623,16 @@
     <string name="eye_care_active_protections">Active protections</string>
     <string name="eye_care_setup_missing_count">%1$d setup item needs attention.</string>
     <string name="eye_care_apply_recommended">Apply recommended eye-care setup</string>
+    <string name="recommended_setup_status_complete">Current status: recommended setup is active with %1$d protections enabled.</string>
+    <string name="recommended_setup_status_follow_up">Current status: recommended setup is applied with %1$d protections enabled; %2$d follow-up items need attention.</string>
+    <string name="recommended_setup_status_custom">Current status: custom setup differs from the recommendation. %1$d/%2$d recommended values match; %3$d protections are enabled.</string>
+    <string name="recommended_setup_last_action">Last action: applied the baseline profile and updated daily goals.</string>
+    <string name="recommended_setup_button_action">Button action: applies 20-minute reminders, 20-second breaks, statistics, notifications, pre-alerts, camera distance checks, blink checks, low-light monitoring, strict rest overlay, and daily goals.</string>
+    <string name="recommended_setup_followup_items">Next: %1$d permission/setup items still need attention for the enabled protections.</string>
+    <string name="recommended_setup_followup_calibration">Next: calibrate safe distance so near-distance warnings use your posture.</string>
+    <string name="recommended_setup_followup_shizuku">Next: authorize Shizuku or turn off Shizuku advanced mode.</string>
+    <string name="recommended_setup_followup_none">Next: no extra setup is currently detected.</string>
+    <string name="recommended_setup_onboarding_status">Final button: applies the same recommended profile used by Home, Stats, and Settings.</string>
     <string name="eye_care_key_findings">Key findings</string>
     <string name="eye_care_today_actions">Recommended actions</string>
     <string name="eye_care_risk_high">High eye strain risk</string>

@@ -303,17 +303,9 @@ class ProjectLumenViewModel(
         _onboardingState.value = _onboardingState.value.copy(visible = false)
         if (!applyRecommendedSetup) return
         updateSettings { current ->
-            current.copy(
-                reminderEnabled = true,
-                statsEnabled = true,
-                notificationEnabled = true,
-                keepAliveEnabled = true,
-                preAlertEnabled = true,
-                pomodoroEnabled = true,
-                globalOverlayEnabled = true,
-                ambientLightMonitoringEnabled = true,
-            )
+            recommendedEyeCareSettings(current).copy(pomodoroEnabled = true)
         }
+        updateDailyGoal(::recommendedEyeCareDailyGoal)
     }
 
     fun selectTemplate(templateId: Long) {

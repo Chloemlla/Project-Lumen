@@ -34,6 +34,8 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun HomeConvenienceCard(
     uiState: ProjectLumenUiState,
+    permissionRequirements: PermissionRequirements,
+    shizukuReady: Boolean,
     onApplyRecommended: () -> Unit,
     onStartBreak: () -> Unit,
     onStartPomodoro: () -> Unit,
@@ -43,6 +45,7 @@ internal fun HomeConvenienceCard(
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val summaryText = homeConvenienceSummary(uiState)
+    val recommendedFeedback = rememberRecommendedEyeCareApplyFeedback(onApplyRecommended)
     val copiedMessage = stringResource(R.string.home_convenience_summary_copied)
     val reminderActive = uiState.runtime.activeEngine == ActiveEngine.REMINDER.name &&
         uiState.runtime.reminderPhase != ReminderPhase.IDLE.name
@@ -63,10 +66,16 @@ internal fun HomeConvenienceCard(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = onApplyRecommended,
+                onClick = recommendedFeedback.onApply,
             ) {
                 ButtonLabel(Icons.Outlined.CheckCircle, R.string.home_convenience_apply_recommended)
             }
+            RecommendedEyeCareSetupFeedback(
+                uiState = uiState,
+                permissionRequirements = permissionRequirements,
+                shizukuReady = shizukuReady,
+                applyFeedbackCount = recommendedFeedback.applyCount,
+            )
             LumenFlowRow {
                 OutlinedButton(
                     enabled = canStartBreak,

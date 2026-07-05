@@ -621,6 +621,16 @@
     <string name="eye_care_active_protections">已启用防护</string>
     <string name="eye_care_setup_missing_count">还有 %1$d 个配置项需要处理。</string>
     <string name="eye_care_apply_recommended">应用推荐护眼配置</string>
+    <string name="recommended_setup_status_complete">当前状态：推荐配置已生效，已启用 %1$d 项防护。</string>
+    <string name="recommended_setup_status_follow_up">当前状态：推荐配置已应用，已启用 %1$d 项防护；还有 %2$d 个后续项目需要处理。</string>
+    <string name="recommended_setup_status_custom">当前状态：当前配置与推荐配置不同。%1$d/%2$d 个推荐值已匹配；已启用 %3$d 项防护。</string>
+    <string name="recommended_setup_last_action">上次操作：已应用基础防护方案，并更新每日目标。</string>
+    <string name="recommended_setup_button_action">按钮作用：应用 20 分钟提醒、20 秒休息、统计、通知、预提醒、摄像头距离检测、眨眼检测、低光监测、严格休息遮罩和每日目标。</string>
+    <string name="recommended_setup_followup_items">下一步：还有 %1$d 个权限或配置项需要处理，已启用的防护才能完整工作。</string>
+    <string name="recommended_setup_followup_calibration">下一步：校准安全距离，让近距离提醒使用你的实际姿势。</string>
+    <string name="recommended_setup_followup_shizuku">下一步：授权 Shizuku，或关闭 Shizuku 高级模式。</string>
+    <string name="recommended_setup_followup_none">下一步：当前没有检测到额外设置项。</string>
+    <string name="recommended_setup_onboarding_status">最终按钮：会应用与首页、统计和设置页一致的推荐配置。</string>
     <string name="eye_care_key_findings">关键发现</string>
     <string name="eye_care_today_actions">建议行动</string>
     <string name="eye_care_risk_high">高用眼风险</string>

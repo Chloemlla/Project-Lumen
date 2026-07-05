@@ -263,6 +263,8 @@ internal fun HomeScreen(
         GoalProgressCard(uiState)
         HomeConvenienceCard(
             uiState = uiState,
+            permissionRequirements = permissionRequirements,
+            shizukuReady = shizukuState.ready,
             onApplyRecommended = { applyRecommendedEyeCareSettings(viewModel) },
             onStartBreak = viewModel::startBreak,
             onStartPomodoro = { runReminderAction(viewModel::startPomodoro) },
