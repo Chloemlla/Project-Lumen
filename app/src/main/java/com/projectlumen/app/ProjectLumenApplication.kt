@@ -11,6 +11,7 @@ import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.debug.DeveloperDebugOverlayService
+import com.projectlumen.app.core.debug.MemoryHealthMonitor
 import com.projectlumen.app.core.lifecycle.AppLifecycleCoordinator
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.mmkv.ProjectLumenMmkv
@@ -84,12 +85,18 @@ class ProjectLumenApplication : Application() {
         CrashBreadcrumbs.record("Application.onCreate")
         installCrashReporter()
         initializeMmkvOrRecordCrash()
+        MemoryHealthMonitor.sample(this)
         AppIntegrityGuard.enforce(this)
         notifications.ensureChannels()
         LumenToast.install(this)
         ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)
         crashReportUploadsReady = true
         scheduleStoredCrashReportUpload()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        MemoryHealthMonitor.recordTrim(this, level)
+        super.onTrimMemory(level)
     }
 
     private fun installCrashReporter() {

@@ -12,6 +12,7 @@ import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
+import com.projectlumen.app.core.debug.MemoryHealthMonitor
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.enums.PlanTier
 import com.projectlumen.app.core.i18n.LocaleController
@@ -149,6 +150,7 @@ class ProjectLumenViewModel(
     val shizukuNetworkApps = appNetworkControlEntry.networkApps
     val appNetworkControlRecords = appNetworkControlEntry.records
     val apiDiagnostics = ProjectLumenApiDiagnostics.traces
+    val memoryHealth = MemoryHealthMonitor.snapshot
     val uiState = stateStore.uiState
 
     init {

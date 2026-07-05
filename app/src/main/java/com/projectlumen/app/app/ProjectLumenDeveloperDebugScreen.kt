@@ -73,6 +73,7 @@ import com.projectlumen.app.core.api.ProjectLumenApiTrace
 import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
+import com.projectlumen.app.core.debug.MemoryHealthSnapshot
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
 import com.projectlumen.app.core.shizuku.ShizukuNetworkApp
 import com.projectlumen.app.core.shizuku.ShizukuNetworkAppTypes
@@ -93,6 +94,7 @@ internal fun DeveloperDebugScreen(
     val appNetworkControlRecords = viewModel.appNetworkControlRecords.collectAsStateWithLifecycle(emptyList()).value
     val remoteState = viewModel.remoteState.collectAsStateWithLifecycle().value
     val apiTraces = viewModel.apiDiagnostics.collectAsStateWithLifecycle().value
+    val memoryHealth = viewModel.memoryHealth.collectAsStateWithLifecycle().value
     val luxHistory = remember { mutableStateListOf<Float>() }
     var networkAppQuery by rememberSaveable { mutableStateOf("") }
     var purchaseProductId by rememberSaveable { mutableStateOf("project_lumen_pro") }
@@ -216,6 +218,18 @@ internal fun DeveloperDebugScreen(
             ) {
                 DeveloperButtonLabel(Icons.Outlined.Settings, R.string.shizuku_refresh_status)
             }
+        }
+
+        SettingsSection(R.string.developer_section_memory_health, Icons.Outlined.Memory) {
+            DeveloperMetricRow(R.string.developer_memory_pressure, memoryPressureLabel(memoryHealth))
+            DeveloperMetricRow(R.string.developer_memory_app_pss, memorySizeLabel(memoryHealth.totalPssKb.toLong()))
+            DeveloperMetricRow(R.string.developer_memory_java_heap, memorySizeLabel(memoryHealth.javaHeapKb.toLong()))
+            DeveloperMetricRow(R.string.developer_memory_native_heap, memorySizeLabel(memoryHealth.nativeHeapKb.toLong()))
+            DeveloperMetricRow(R.string.developer_memory_graphics, memorySizeLabel(memoryHealth.graphicsKb.toLong()))
+            DeveloperMetricRow(R.string.developer_memory_system_available, memorySizeLabel(memoryHealth.systemAvailKb))
+            DeveloperMetricRow(R.string.developer_memory_system_threshold, memorySizeLabel(memoryHealth.systemThresholdKb))
+            DeveloperMetricRow(R.string.developer_memory_last_sample, timestampLabel(memoryHealth.sampledAtMillis))
+            DeveloperMetricRow(R.string.developer_memory_last_trim, memoryTrimLabel(memoryHealth))
             DeveloperMetricRow(R.string.developer_low_memory_last, timestampLabel(runtime.developerLastLowMemorySimulatedAt))
             Button(
                 onClick = viewModel::simulateLowMemory,
@@ -803,6 +817,47 @@ private fun serviceUptimeLabel(startedAt: Long, stoppedAt: Long, nowMillis: Long
     val minutes = seconds / 60L
     val remainingSeconds = seconds % 60L
     return if (minutes > 0L) "${minutes}m ${remainingSeconds}s" else "${remainingSeconds}s"
+}
+
+@Composable
+private fun memoryPressureLabel(snapshot: MemoryHealthSnapshot): String {
+    if (snapshot.sampledAtMillis <= 0L) return "-"
+    val usedPercent = if (snapshot.systemTotalKb > 0L) {
+        (((snapshot.systemTotalKb - snapshot.systemAvailKb).coerceAtLeast(0L) * 100L) / snapshot.systemTotalKb)
+            .coerceIn(0L, 100L)
+            .toInt()
+    } else {
+        0
+    }
+    val status = when {
+        snapshot.systemLowMemory -> stringResource(R.string.developer_memory_status_system_low)
+        snapshot.systemThresholdKb > 0L && snapshot.systemAvailKb <= snapshot.systemThresholdKb ->
+            stringResource(R.string.developer_memory_status_critical)
+        snapshot.systemThresholdKb > 0L && snapshot.systemAvailKb <= snapshot.systemThresholdKb * 2L ->
+            stringResource(R.string.developer_memory_status_watch)
+        else -> stringResource(R.string.developer_memory_status_normal)
+    }
+    return stringResource(R.string.developer_memory_pressure_value, status, usedPercent)
+}
+
+private fun memorySizeLabel(kilobytes: Long): String {
+    if (kilobytes <= 0L) return "-"
+    val megabytes = kilobytes / 1024f
+    return if (megabytes >= 1024f) {
+        "%.2f GB".format(megabytes / 1024f)
+    } else {
+        "%.1f MB".format(megabytes)
+    }
+}
+
+@Composable
+private fun memoryTrimLabel(snapshot: MemoryHealthSnapshot): String {
+    if (snapshot.lastTrimAtMillis <= 0L || snapshot.lastTrimLevel <= 0) return "-"
+    return stringResource(
+        R.string.developer_memory_trim_value,
+        snapshot.lastTrimLevel,
+        timestampLabel(snapshot.lastTrimAtMillis),
+    )
 }
 
 private fun timestampLabel(value: Long): String {

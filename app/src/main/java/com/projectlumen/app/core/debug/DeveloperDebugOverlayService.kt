@@ -47,6 +47,7 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
     private var lastRoll = 0f
     private var lastYaw = 0f
     private var lastAccelerationMagnitude = 0f
+    private var lastMemoryHealthSampleAt = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -69,6 +70,7 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         if (intent?.action == ACTION_SIMULATE_LOW_MEMORY) {
             simulateLowMemory(app)
         }
+        sampleMemoryHealth(force = true)
         registerSensors()
         if (!overlayTicking) tickOverlay()
         return START_STICKY
@@ -108,6 +110,7 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
 
     @Suppress("DEPRECATION")
     override fun onTrimMemory(level: Int) {
+        MemoryHealthMonitor.recordTrim(this, level)
         if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
             DeveloperDebugFrameStore.clear()
         }
@@ -143,6 +146,7 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
 
     private fun tickOverlay() {
         overlayTicking = true
+        sampleMemoryHealth()
         scope.launch {
             val settings = (application as ProjectLumenApplication).settingsRepository().get()
             handler.post {
@@ -304,8 +308,16 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         return (value * resources.displayMetrics.density).roundToInt()
     }
 
+    private fun sampleMemoryHealth(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastMemoryHealthSampleAt < MEMORY_HEALTH_SAMPLE_INTERVAL_MILLIS) return
+        lastMemoryHealthSampleAt = now
+        MemoryHealthMonitor.sample(this, now)
+    }
+
     companion object {
         private const val ACTION_SIMULATE_LOW_MEMORY = "com.projectlumen.app.DEVELOPER_SIMULATE_LOW_MEMORY"
+        private const val MEMORY_HEALTH_SAMPLE_INTERVAL_MILLIS = 5_000L
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, DeveloperDebugOverlayService::class.java))
