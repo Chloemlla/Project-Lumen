@@ -8,7 +8,7 @@ type ScenePanelProps = {
   scene: DemoScene;
 };
 
-export function ScenePanel({scene}: ScenePanelProps) {
+export function ScenePanel({ scene }: ScenePanelProps) {
   return (
     <aside className="scene-panel">
       <div className="scene-copy">
@@ -17,7 +17,7 @@ export function ScenePanel({scene}: ScenePanelProps) {
         <p>{scene.subtitle}</p>
       </div>
       <div className="voiceover-card">
-        <span>中文旁白</span>
+        <span>功能介绍</span>
         <strong>{scene.voiceover}</strong>
       </div>
       <div className="scene-list">

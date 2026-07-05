@@ -35,7 +35,7 @@ export type DemoScene = {
 
 export const androidDemoState = {
   productName: "Project Lumen",
-  slogan: "Android 上本地优先的护眼系统",
+  slogan: "Android 上功能先进、智能的护眼系统",
   navigation: ["首页", "休息", "番茄钟", "统计", "设置"],
 };
 
@@ -55,16 +55,16 @@ export const demoScenes: DemoScene[] = [
       timer: "20:00",
       progress: 0.12,
       metrics: [
-        {label: "工作", value: "0 分钟"},
-        {label: "休息", value: "0 分钟"},
-        {label: "目标", value: "0/8"},
-        {label: "提醒", value: "已开启"},
+        { label: "工作", value: "0 分钟" },
+        { label: "休息", value: "0 分钟" },
+        { label: "目标", value: "0/8" },
+        { label: "提醒", value: "已开启" },
       ],
     },
     signals: [
-      {label: "通知权限", value: "已就绪", progress: 1},
-      {label: "统计记录", value: "开启", progress: 1},
-      {label: "遮罩防护", value: "待触发", progress: 0.28},
+      { label: "通知权限", value: "已就绪", progress: 1 },
+      { label: "统计记录", value: "开启", progress: 1 },
+      { label: "遮罩防护", value: "待触发", progress: 0.28 },
     ],
     capabilities: ["本地优先", "Material Android", "中文产品片"],
   },
@@ -83,16 +83,16 @@ export const demoScenes: DemoScene[] = [
       timer: "5 项",
       progress: 0.86,
       metrics: [
-        {label: "提醒", value: "20 分钟"},
-        {label: "休息", value: "20 秒"},
-        {label: "监测", value: "3 类"},
-        {label: "目标", value: "8 次"},
+        { label: "提醒", value: "20 分钟" },
+        { label: "休息", value: "20 秒" },
+        { label: "监测", value: "3 类" },
+        { label: "目标", value: "8 次" },
       ],
     },
     signals: [
-      {label: "距离检测", value: "已开启", progress: 1},
-      {label: "眨眼检测", value: "已开启", progress: 1},
-      {label: "低光监测", value: "已开启", progress: 1},
+      { label: "距离检测", value: "已开启", progress: 1 },
+      { label: "眨眼检测", value: "已开启", progress: 1 },
+      { label: "低光监测", value: "已开启", progress: 1 },
     ],
     capabilities: ["推荐设置", "设备指纹", "隐私默认本地"],
   },
@@ -111,16 +111,16 @@ export const demoScenes: DemoScene[] = [
       timer: "08:20",
       progress: 0.58,
       metrics: [
-        {label: "工作", value: "96 分钟"},
-        {label: "休息", value: "12 分钟"},
-        {label: "完成", value: "6 次"},
-        {label: "目标", value: "75%"},
+        { label: "工作", value: "96 分钟" },
+        { label: "休息", value: "12 分钟" },
+        { label: "完成", value: "6 次" },
+        { label: "目标", value: "75%" },
       ],
     },
     signals: [
-      {label: "连续工作", value: "18 分钟", progress: 0.76},
-      {label: "跳过休息", value: "1 次", progress: 0.24},
-      {label: "健康洞察", value: "2 条", progress: 0.62},
+      { label: "连续工作", value: "18 分钟", progress: 0.76 },
+      { label: "跳过休息", value: "1 次", progress: 0.24 },
+      { label: "健康洞察", value: "2 条", progress: 0.62 },
     ],
     capabilities: ["状态卡", "今日统计", "快捷操作"],
   },
@@ -139,16 +139,16 @@ export const demoScenes: DemoScene[] = [
       timer: "00:20",
       progress: 0.68,
       metrics: [
-        {label: "阶段", value: "RESTING"},
-        {label: "模板", value: "柔和绿"},
-        {label: "跳过", value: "禁用"},
-        {label: "通知", value: "已同步"},
+        { label: "阶段", value: "RESTING" },
+        { label: "模板", value: "柔和绿" },
+        { label: "跳过", value: "禁用" },
+        { label: "通知", value: "已同步" },
       ],
     },
     signals: [
-      {label: "预提醒", value: "已触发", progress: 1},
-      {label: "全屏遮罩", value: "开启", progress: 0.92},
-      {label: "下一轮工作", value: "待恢复", progress: 0.34},
+      { label: "预提醒", value: "已触发", progress: 1 },
+      { label: "全屏遮罩", value: "开启", progress: 0.92 },
+      { label: "下一轮工作", value: "待恢复", progress: 0.34 },
     ],
     capabilities: ["ReminderEngine", "通知操作", "休息模板"],
   },
@@ -167,16 +167,16 @@ export const demoScenes: DemoScene[] = [
       timer: "18:40",
       progress: 0.42,
       metrics: [
-        {label: "周期", value: "3/4"},
-        {label: "番茄", value: "3"},
-        {label: "短休", value: "5 分钟"},
-        {label: "长休", value: "15 分钟"},
+        { label: "周期", value: "3/4" },
+        { label: "番茄", value: "3" },
+        { label: "短休", value: "5 分钟" },
+        { label: "长休", value: "15 分钟" },
       ],
     },
     signals: [
-      {label: "主引擎", value: "POMODORO", progress: 1},
-      {label: "护眼提醒", value: "等待", progress: 0.18},
-      {label: "专注统计", value: "写入", progress: 0.72},
+      { label: "主引擎", value: "POMODORO", progress: 1 },
+      { label: "护眼提醒", value: "等待", progress: 0.18 },
+      { label: "专注统计", value: "写入", progress: 0.72 },
     ],
     capabilities: ["Focus", "Short Break", "Long Break"],
   },
@@ -195,16 +195,16 @@ export const demoScenes: DemoScene[] = [
       timer: "165%",
       progress: 0.84,
       metrics: [
-        {label: "距离", value: "165%"},
-        {label: "眨眼", value: "1 次"},
-        {label: "光照", value: "8 lux"},
-        {label: "遮罩", value: "准备"},
+        { label: "距离", value: "165%" },
+        { label: "眨眼", value: "1 次" },
+        { label: "光照", value: "8 lux" },
+        { label: "遮罩", value: "准备" },
       ],
     },
     signals: [
-      {label: "距离倍率", value: "165%", progress: 0.84},
-      {label: "睁眼概率", value: "偏低", progress: 0.42},
-      {label: "环境光", value: "8 lux", progress: 0.18},
+      { label: "距离倍率", value: "165%", progress: 0.84 },
+      { label: "睁眼概率", value: "偏低", progress: 0.42 },
+      { label: "环境光", value: "8 lux", progress: 0.18 },
     ],
     capabilities: ["人脸框", "lux 波形", "Extra Dim"],
   },
@@ -223,16 +223,16 @@ export const demoScenes: DemoScene[] = [
       timer: "7 天",
       progress: 0.74,
       metrics: [
-        {label: "休息", value: "42 次"},
-        {label: "专注", value: "14 次"},
-        {label: "低光", value: "3 次"},
-        {label: "导出", value: "PDF"},
+        { label: "休息", value: "42 次" },
+        { label: "专注", value: "14 次" },
+        { label: "低光", value: "3 次" },
+        { label: "导出", value: "PDF" },
       ],
     },
     signals: [
-      {label: "7 天趋势", value: "上升", progress: 0.74},
-      {label: "月度报告", value: "可导出", progress: 0.88},
-      {label: "习惯建议", value: "已生成", progress: 0.66},
+      { label: "7 天趋势", value: "上升", progress: 0.74 },
+      { label: "月度报告", value: "可导出", progress: 0.88 },
+      { label: "习惯建议", value: "已生成", progress: 0.66 },
     ],
     capabilities: ["CSV", "PNG", "PDF"],
   },
@@ -251,16 +251,16 @@ export const demoScenes: DemoScene[] = [
       timer: "PRO",
       progress: 0.92,
       metrics: [
-        {label: "模板", value: "3 张"},
-        {label: "Shizuku", value: "可用"},
-        {label: "云备份", value: "已同步"},
-        {label: "API", value: "已开放"},
+        { label: "模板", value: "3 张" },
+        { label: "Shizuku", value: "可用" },
+        { label: "云备份", value: "已同步" },
+        { label: "API", value: "已开放" },
       ],
     },
     signals: [
-      {label: "原生护眼", value: "4200 K", progress: 0.82},
-      {label: "云备份", value: "完成", progress: 1},
-      {label: "开放 API", value: "签名校验", progress: 0.76},
+      { label: "原生护眼", value: "4200 K", progress: 0.82 },
+      { label: "云备份", value: "完成", progress: 1 },
+      { label: "开放 API", value: "签名校验", progress: 0.76 },
     ],
     capabilities: ["模板个性化", "Shizuku", "云备份", "开放 API"],
   },
@@ -271,7 +271,9 @@ function resolveClosingScene(): DemoScene {
   if (scene) {
     return scene;
   }
-  throw new Error("Project Lumen demo scenes must include an advanced closing scene.");
+  throw new Error(
+    "Project Lumen demo scenes must include an advanced closing scene.",
+  );
 }
 
 const lastScene = resolveClosingScene();
@@ -283,8 +285,9 @@ export const totalDurationInFrames = demoScenes.reduce(
 
 export function getSceneAtFrame(frame: number): DemoScene {
   return (
-    demoScenes.find((scene) => frame >= scene.start && frame < scene.start + scene.duration) ??
-    lastScene
+    demoScenes.find(
+      (scene) => frame >= scene.start && frame < scene.start + scene.duration,
+    ) ?? lastScene
   );
 }
 
