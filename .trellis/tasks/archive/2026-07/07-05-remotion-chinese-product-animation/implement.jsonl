@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend and Android client guidelines for the Remotion animation and demo surface."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Package/workflow ownership for frontend and Remotion surfaces."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Component structure, styling, accessibility, and UI copy conventions."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality checklist for frontend implementation."}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Strict TypeScript guidance for Remotion package code."}
+{"file": ".trellis/spec/guides/architecture-thinking-guide.md", "reason": "Architecture decision guidance for native Android demo plus separate video renderer."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Avoid unnecessary sharing and duplication while adding the demo/video surfaces."}

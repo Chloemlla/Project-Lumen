@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Quality check entry point for frontend and Android client changes."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Verify Remotion package and workflow contracts."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Frontend quality checklist and test expectations."}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Strict TypeScript review rules for the Remotion package."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Verify the Android demo and Remotion state contract stays explicit."}
