@@ -266,11 +266,15 @@ export const demoScenes: DemoScene[] = [
   },
 ];
 
-const lastScene = demoScenes.find((scene) => scene.id === "advanced");
-
-if (!lastScene) {
+function resolveClosingScene(): DemoScene {
+  const scene = demoScenes.find((candidate) => candidate.id === "advanced");
+  if (scene) {
+    return scene;
+  }
   throw new Error("Project Lumen demo scenes must include an advanced closing scene.");
 }
+
+const lastScene = resolveClosingScene();
 
 export const totalDurationInFrames = demoScenes.reduce(
   (duration, scene) => Math.max(duration, scene.start + scene.duration),
