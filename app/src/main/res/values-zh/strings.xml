@@ -16,6 +16,7 @@
     <string name="nav_settings">设置</string>
     <string name="nav_translation">翻译</string>
     <string name="nav_templates">模板</string>
+    <string name="nav_product_demo">产品演示</string>
     <string name="nav_about">关于</string>
     <string name="navigate_back">返回</string>
     <string name="settings_subtitle">按模块调整应用。高级选项默认收起，需要时再展开。</string>
@@ -761,4 +762,27 @@
     <string name="remote_cloud_upload_backup">上传备份</string>
     <string name="remote_cloud_restore_backup">恢复备份</string>
     <string name="remote_cloud_verify_purchase">校验购买</string>
+    <string name="product_demo_subtitle">护眼提醒、番茄专注、主动感知、统计报告、模板和高级控制按同一条 Android 产品闭环呈现。</string>
+    <string name="product_demo_phone_title">护眼闭环运行中</string>
+    <string name="product_demo_resting_state">休息防护已启动</string>
+    <string name="product_demo_signal_title">主动感知快照</string>
+    <string name="product_demo_signal_distance">观看距离风险</string>
+    <string name="product_demo_signal_blink">干眼预警</string>
+    <string name="product_demo_signal_lux">环境光</string>
+    <string name="product_demo_timeline_title">中文动画分镜</string>
+    <string name="product_demo_scene_step">镜头 %1$d / %2$d</string>
+    <string name="product_demo_scene_onboarding">推荐配置</string>
+    <string name="product_demo_scene_onboarding_detail">提醒、统计、监测、亮度、遮罩和目标一起启用，形成基础防护。</string>
+    <string name="product_demo_scene_home">首页总览</string>
+    <string name="product_demo_scene_home_detail">今天、下一次休息、目标和快捷操作在计时闭环开始前保持可见。</string>
+    <string name="product_demo_scene_break_loop">护眼提醒闭环</string>
+    <string name="product_demo_scene_break_loop_detail">运行态从工作进入预提醒、休息、完成，再回到专注。</string>
+    <string name="product_demo_scene_focus">番茄专注</string>
+    <string name="product_demo_scene_focus_detail">专注、短休和长休共享同一个运行态，避免多个计时器互相冲突。</string>
+    <string name="product_demo_scene_sensors">距离、眨眼和低光</string>
+    <string name="product_demo_scene_sensors_detail">摄像头、眼睛睁开概率、lux 和全屏遮罩汇成主动防护信号。</string>
+    <string name="product_demo_scene_advanced">模板与高级控制</string>
+    <string name="product_demo_scene_advanced_detail">模板、导出、云备份、Shizuku、诊断和开放 API 收束完整产品故事。</string>
+    <string name="product_demo_capability_title">能力墙</string>
+    <string name="product_demo_capability_open_api">开放 API</string>
 </resources>

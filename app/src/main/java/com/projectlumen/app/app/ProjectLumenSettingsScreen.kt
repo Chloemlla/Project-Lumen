@@ -208,6 +208,7 @@ internal fun SettingsScreen(
     checkingUpdate: Boolean,
     onManualUpdateCheck: () -> Unit,
     openTemplates: () -> Unit,
+    openProductDemo: () -> Unit,
     openAbout: () -> Unit,
     openDeveloperOptions: () -> Unit,
 ) {
@@ -593,6 +594,7 @@ internal fun SettingsScreen(
             }
             LumenFlowRow {
                 OutlinedButton(onClick = openTemplates) { ButtonLabel(Icons.Outlined.Style, R.string.nav_templates) }
+                OutlinedButton(onClick = openProductDemo) { ButtonLabel(Icons.Outlined.PlayArrow, R.string.nav_product_demo) }
                 OutlinedButton(onClick = openAbout) { ButtonLabel(Icons.Outlined.Info, R.string.nav_about) }
             }
             SwitchRow(

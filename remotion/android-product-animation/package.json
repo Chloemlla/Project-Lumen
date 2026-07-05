@@ -1,0 +1,25 @@
+{
+  "name": "@project-lumen/android-product-animation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "remotion studio src/index.ts",
+    "preview": "remotion preview src/index.ts",
+    "validate": "tsc --noEmit && remotion compositions src/index.ts",
+    "render": "remotion render src/index.ts LumenAndroidProductAnimation out/lumen-android-product-animation.mp4 --codec=h264 --crf=18"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.340",
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "remotion": "^4.0.340"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "typescript": "^5.8.3"
+  }
+}

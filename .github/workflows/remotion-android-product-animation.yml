@@ -1,0 +1,63 @@
+name: Remotion Android Product Animation
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - ".github/workflows/remotion-android-product-animation.yml"
+      - "docs/REMOTION_ANDROID_PRODUCT_ANIMATION_GUIDE.md"
+      - "remotion/android-product-animation/**"
+  pull_request:
+    branches:
+      - "**"
+    paths:
+      - ".github/workflows/remotion-android-product-animation.yml"
+      - "docs/REMOTION_ANDROID_PRODUCT_ANIMATION_GUIDE.md"
+      - "remotion/android-product-animation/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  render:
+    name: Validate and render Chinese Android product animation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "latest"
+
+      - name: Install Chinese fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
+
+      - name: Install Remotion dependencies
+        working-directory: remotion/android-product-animation
+        run: npm install
+
+      - name: Validate Remotion composition
+        working-directory: remotion/android-product-animation
+        run: npm run validate
+
+      - name: Render Android product animation
+        working-directory: remotion/android-product-animation
+        run: npm run render
+
+      - name: Upload rendered video
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumen-android-product-animation
+          path: remotion/android-product-animation/out/lumen-android-product-animation.mp4
+          if-no-files-found: error
+          retention-days: 14

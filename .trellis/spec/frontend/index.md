@@ -20,6 +20,7 @@ Before writing frontend code, confirm:
 - [ ] Android native library changes follow [`android-native-libraries.md`](./android-native-libraries.md).
 - [ ] Android Shizuku app network controls follow [`android-shizuku-network-controls.md`](./android-shizuku-network-controls.md).
 - [ ] Android launcher shortcut changes follow [`android-launcher-shortcuts.md`](./android-launcher-shortcuts.md).
+- [ ] Remotion Android product animation changes follow [`directory-structure.md`](./directory-structure.md) §2.2; build/render commands stay in GitHub Actions.
 - [ ] VitePress docs changes follow [`docs-site.md`](./docs-site.md); build/test commands stay in GitHub Actions.
 
 ## Quality Check

@@ -16,6 +16,7 @@
     <string name="nav_settings">Settings</string>
     <string name="nav_translation">Translate</string>
     <string name="nav_templates">Templates</string>
+    <string name="nav_product_demo">Product demo</string>
     <string name="nav_about">About</string>
     <string name="navigate_back">Back</string>
     <string name="settings_subtitle">Tune the app by area. Advanced options stay folded until you need them.</string>
@@ -763,4 +764,27 @@
     <string name="remote_cloud_upload_backup">Upload backup</string>
     <string name="remote_cloud_restore_backup">Restore backup</string>
     <string name="remote_cloud_verify_purchase">Verify purchase</string>
+    <string name="product_demo_subtitle">Eye-care reminders, focus sessions, active sensing, reports, templates, and advanced controls are presented as one Android product loop.</string>
+    <string name="product_demo_phone_title">Eye-care loop in progress</string>
+    <string name="product_demo_resting_state">Rest protection active</string>
+    <string name="product_demo_signal_title">Active sensing snapshot</string>
+    <string name="product_demo_signal_distance">Viewing distance risk</string>
+    <string name="product_demo_signal_blink">Dry-eye warning</string>
+    <string name="product_demo_signal_lux">Ambient light</string>
+    <string name="product_demo_timeline_title">Chinese animation storyboard</string>
+    <string name="product_demo_scene_step">Scene %1$d / %2$d</string>
+    <string name="product_demo_scene_onboarding">Recommended setup</string>
+    <string name="product_demo_scene_onboarding_detail">Baseline reminders, statistics, monitoring, brightness, overlay, and goals turn on together.</string>
+    <string name="product_demo_scene_home">Home summary</string>
+    <string name="product_demo_scene_home_detail">Today, next break, goals, and quick actions stay visible before the timer loop starts.</string>
+    <string name="product_demo_scene_break_loop">Eye-care reminder loop</string>
+    <string name="product_demo_scene_break_loop_detail">The runtime moves from work to pre-alert, rest, completion, and back to focus.</string>
+    <string name="product_demo_scene_focus">Pomodoro focus</string>
+    <string name="product_demo_scene_focus_detail">Focus, short break, and long break share the same runtime so timers never compete.</string>
+    <string name="product_demo_scene_sensors">Distance, blink, and low light</string>
+    <string name="product_demo_scene_sensors_detail">Camera, eye openness, lux, and overlay signals become contextual protection.</string>
+    <string name="product_demo_scene_advanced">Templates and advanced controls</string>
+    <string name="product_demo_scene_advanced_detail">Templates, exports, cloud backup, Shizuku, diagnostics, and open API close the product story.</string>
+    <string name="product_demo_capability_title">Capability wall</string>
+    <string name="product_demo_capability_open_api">Open API</string>
 </resources>

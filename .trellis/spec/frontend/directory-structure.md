@@ -120,6 +120,98 @@ LUMEN_ADMIN_STATIC_DIR=backend/admin/dist
 <script type="module" src="/src/main.tsx"></script>
 ```
 
+## 2.2 Remotion Android Product Animation (`remotion/android-product-animation/`)
+
+The Android product animation is a React/TypeScript Remotion package that
+renders a Chinese Android client product video. It is separate from the
+Kotlin/Compose Android app; shared behavior is represented through demo state
+and product copy, not shared mobile UI components.
+
+### 1. Scope / Trigger
+
+- Trigger: any change to `remotion/android-product-animation/**`,
+  `.github/workflows/remotion-android-product-animation.yml`, or the Android
+  product animation guide.
+- Source scope: `remotion/android-product-animation/src/**/*.ts`,
+  `remotion/android-product-animation/src/**/*.tsx`,
+  `remotion/android-product-animation/src/**/*.css`, package config files, and
+  assets under `remotion/android-product-animation/public/`.
+- Runtime scope: rendered videos are emitted under
+  `remotion/android-product-animation/out/` and must stay ignored by git.
+
+### 2. Signatures
+
+```text
+cd remotion/android-product-animation
+npm install
+npm run validate
+npm run render
+```
+
+These commands are executed by GitHub Actions, not locally when repository
+policy forbids local build/test execution.
+
+### 3. Contracts
+
+- Package contract: `package.json` owns Remotion, React, TypeScript, and icon
+  dependencies for this animation package only.
+- Composition contract: `src/Root.tsx` exposes Composition ID
+  `LumenAndroidProductAnimation`.
+- Data contract: `src/data/androidDemoState.ts` owns Chinese scene copy,
+  timing, phone-state metrics, sensing metrics, and capability labels.
+- Asset contract: `public/lumen-icon.png` is the local Remotion static asset for
+  the Project Lumen icon.
+- Output contract: `npm run render` writes
+  `out/lumen-android-product-animation.mp4`.
+- CI contract: `.github/workflows/remotion-android-product-animation.yml`
+  installs CJK fonts before validation/render so Chinese text renders on Ubuntu.
+
+### 4. Validation & Error Matrix
+
+| Condition | Expected behavior |
+|---|---|
+| Missing `public/lumen-icon.png` | Remotion validation/render fails instead of silently omitting the brand asset. |
+| Missing CJK fonts on CI | Workflow installs `fonts-noto-cjk` before rendering. |
+| Scene timing gap | `getSceneAtFrame` falls back to the closing scene, but scene ranges should still be reviewed. |
+| Render output missing | Workflow upload uses `if-no-files-found: error`. |
+| Local verification needed | Use static inspection only; actual validate/render remains in GitHub Actions. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: scene copy and timing live in `androidDemoState.ts`, while visual
+  components stay split by responsibility (`PhoneFrame`, `ScenePanel`,
+  `SensorOverlay`).
+- Base: a new scene adds one `DemoScene` entry and reuses existing component
+  surfaces.
+- Bad: rewriting the Kotlin/Compose Android client in React Native only to feed
+  Remotion, or making the Remotion package call real Android/backend services.
+- Bad: committing rendered MP4 files or `node_modules/`.
+
+### 6. Tests Required
+
+- GitHub workflow: run `npm install`, `npm run validate`, and `npm run render`
+  in `remotion/android-product-animation`.
+- Artifact check: upload
+  `remotion/android-product-animation/out/lumen-android-product-animation.mp4`
+  with `if-no-files-found: error`.
+- Manual review: inspect the rendered artifact for nonblank frames, Chinese text
+  rendering, readable phone UI, and alignment with the Android product guide.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+Move the Android client to React Native so Remotion can reuse mobile screens.
+```
+
+#### Correct
+
+```text
+Keep Kotlin/Compose for the Android app, add a native demo surface, and render a
+separate Remotion React composition from deterministic demo state.
+```
+
 ## 3. Module organization
 
 - A feature owns its components, hooks, and local state; it imports shared UI from `components/` and shared types from `packages/shared`.
