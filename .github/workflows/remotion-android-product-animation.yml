@@ -54,10 +54,18 @@ jobs:
         working-directory: remotion/android-product-animation
         run: npm run render
 
-      - name: Upload rendered video
+      - name: Upload 1080p rendered video
         uses: actions/upload-artifact@v4
         with:
-          name: lumen-android-product-animation
-          path: remotion/android-product-animation/out/lumen-android-product-animation.mp4
+          name: lumen-android-product-animation-1080p
+          path: remotion/android-product-animation/out/lumen-android-product-animation-1080p.mp4
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload 4K rendered video
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumen-android-product-animation-4k
+          path: remotion/android-product-animation/out/lumen-android-product-animation-4k.mp4
           if-no-files-found: error
           retention-days: 14

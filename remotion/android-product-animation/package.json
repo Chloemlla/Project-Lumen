@@ -7,7 +7,9 @@
     "start": "remotion studio src/index.ts",
     "preview": "remotion preview src/index.ts",
     "validate": "tsc --noEmit && remotion compositions src/index.ts",
-    "render": "remotion render src/index.ts LumenAndroidProductAnimation out/lumen-android-product-animation.mp4 --codec=h264 --crf=18"
+    "render": "npm run render:1080p && npm run render:4k",
+    "render:1080p": "remotion render src/index.ts LumenAndroidProductAnimation out/lumen-android-product-animation-1080p.mp4 --codec=h264 --crf=18 --scale=1",
+    "render:4k": "remotion render src/index.ts LumenAndroidProductAnimation out/lumen-android-product-animation-4k.mp4 --codec=h264 --crf=18 --scale=2"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.340",

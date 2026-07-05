@@ -569,7 +569,7 @@ export const androidDemoState = {
 - Android 演示入口：设置页中的“产品演示”，路由位于 `ProjectLumenApp.kt` 的 `Destination.PRODUCT_DEMO`。
 - Remotion 动画包：`remotion/android-product-animation/`。
 - Remotion 中文分镜数据：`remotion/android-product-animation/src/data/androidDemoState.ts`。
-- Remotion 渲染入口：`remotion/android-product-animation/src/index.ts`，Composition ID 为 `LumenAndroidProductAnimation`。
+- Remotion 渲染入口：`remotion/android-product-animation/src/index.ts`，Composition ID 为 `LumenAndroidProductAnimation`；`npm run render` 分别输出 `out/lumen-android-product-animation-1080p.mp4` 和 `out/lumen-android-product-animation-4k.mp4`。
 - GitHub Actions 渲染工作流：`.github/workflows/remotion-android-product-animation.yml`。
 
 React Native 不作为本次方案的实现路径。现有客户端是 Kotlin/Compose，并且包含前台服务、Shizuku、摄像头、光照传感器、悬浮窗、通知和本地存储等 Android 原生能力。为了 Remotion 动画把客户端抽成 React Native 会变成移动端重写任务；Remotion 本身也主要渲染 React DOM/Web 画面，不能直接复用原生 Android 行为。因此本任务只共享演示状态、产品文案和视觉 token，不共享移动端组件实现。
