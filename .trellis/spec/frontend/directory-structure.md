@@ -157,12 +157,18 @@ policy forbids local build/test execution.
   dependencies for this animation package only.
 - Composition contract: `src/Root.tsx` exposes Composition ID
   `LumenAndroidProductAnimation`.
-- Data contract: `src/data/androidDemoState.ts` owns Chinese scene copy,
-  timing, phone-state metrics, sensing metrics, and capability labels.
+- Data contract: `src/data/androidDemoState.ts` owns the public demo-state API,
+  timing calculation, scene lookup, and fallback behavior. Long-form Chinese
+  scene copy may be split under `src/data/chapters/*.ts` as
+  `DemoSceneDefinition[]`, then aggregated by `androidDemoState.ts`.
+- Style contract: long-form keynote styling may be split under `src/styles/*.css`
+  and imported from `src/index.ts`; avoid putting the whole film surface into one
+  oversized stylesheet.
 - Asset contract: `public/lumen-icon.png` is the local Remotion static asset for
   the Project Lumen icon.
 - Output contract: `npm run render` writes
-  `out/lumen-android-product-animation.mp4`.
+  `out/lumen-android-product-animation-1080p.mp4` and
+  `out/lumen-android-product-animation-4k.mp4`.
 - CI contract: `.github/workflows/remotion-android-product-animation.yml`
   installs CJK fonts before validation/render so Chinese text renders on Ubuntu.
 
@@ -173,18 +179,22 @@ policy forbids local build/test execution.
 | Missing `public/lumen-icon.png` | Remotion validation/render fails instead of silently omitting the brand asset. |
 | Missing CJK fonts on CI | Workflow installs `fonts-noto-cjk` before rendering. |
 | Scene timing gap | `getSceneAtFrame` falls back to the closing scene, but scene ranges should still be reviewed. |
-| Render output missing | Workflow upload uses `if-no-files-found: error`. |
+| Render output missing | Workflow uploads both 1080p and 4K artifacts with `if-no-files-found: error`. |
 | Local verification needed | Use static inspection only; actual validate/render remains in GitHub Actions. |
 
 ### 5. Good/Base/Bad Cases
 
-- Good: scene copy and timing live in `androidDemoState.ts`, while visual
+- Good: `androidDemoState.ts` keeps the public API (`demoScenes`,
+  `totalDurationInFrames`, `getSceneAtFrame`, `sceneProgress`) stable, while
+  long-form scene definitions live in focused chapter files and visual
   components stay split by responsibility (`PhoneFrame`, `ScenePanel`,
   `SensorOverlay`).
-- Base: a new scene adds one `DemoScene` entry and reuses existing component
-  surfaces.
+- Base: a new scene adds one `DemoSceneDefinition` entry to the appropriate
+  `src/data/chapters/*.ts` file and reuses existing component surfaces.
 - Bad: rewriting the Kotlin/Compose Android client in React Native only to feed
   Remotion, or making the Remotion package call real Android/backend services.
+- Bad: putting a 20+ minute script, all visual types, and all CSS into one
+  super file.
 - Bad: committing rendered MP4 files or `node_modules/`.
 
 ### 6. Tests Required
@@ -192,7 +202,9 @@ policy forbids local build/test execution.
 - GitHub workflow: run `npm install`, `npm run validate`, and `npm run render`
   in `remotion/android-product-animation`.
 - Artifact check: upload
-  `remotion/android-product-animation/out/lumen-android-product-animation.mp4`
+  `remotion/android-product-animation/out/lumen-android-product-animation-1080p.mp4`
+  and
+  `remotion/android-product-animation/out/lumen-android-product-animation-4k.mp4`
   with `if-no-files-found: error`.
 - Manual review: inspect the rendered artifact for nonblank frames, Chinese text
   rendering, readable phone UI, and alignment with the Android product guide.
