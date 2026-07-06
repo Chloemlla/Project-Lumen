@@ -35,6 +35,7 @@ export function PhoneFrame({scene, progress}: PhoneFrameProps) {
   };
   const surface = scene.phone.surface;
   const chartMax = Math.max(...surface.chart, 1);
+  const primarySignal = scene.signals.find(() => true);
 
   return (
     <div className="phone-shell">
@@ -65,13 +66,19 @@ export function PhoneFrame({scene, progress}: PhoneFrameProps) {
           <button className="primary-phone-action" type="button">
             {surface.primaryAction}
           </button>
+          {primarySignal ? (
+            <div className="phone-notification">
+              <span>{primarySignal.label}</span>
+              <strong>{primarySignal.value}</strong>
+            </div>
+          ) : null}
           <div className="metric-grid">
             {scene.phone.metrics.map((metric) => (
               <MetricTile key={`${scene.id}-${metric.label}`} metric={metric} />
             ))}
           </div>
           <div className="surface-row-list">
-            {surface.rows.slice(0, 4).map((item) => (
+            {surface.rows.slice(0, 3).map((item) => (
               <SurfaceRow item={item} key={`${scene.id}-${item.label}`} />
             ))}
           </div>
@@ -84,7 +91,7 @@ export function PhoneFrame({scene, progress}: PhoneFrameProps) {
             {surface.chart.map((value, index) => (
               <span
                 key={`${scene.id}-chart-${String(index)}`}
-                style={{height: `${Math.max(16, Math.round((value / chartMax) * 88))}px`}}
+                style={{height: `${Math.max(10, Math.round((value / chartMax) * 30))}px`}}
               />
             ))}
           </div>

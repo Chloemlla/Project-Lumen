@@ -13,6 +13,78 @@
   will-change: opacity, transform;
 }
 
+.stage-light-bars {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.055) 18%, transparent 32%),
+    linear-gradient(76deg, transparent 55%, var(--accent-soft) 72%, transparent 88%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 32%, transparent 74%, rgba(255, 255, 255, 0.035));
+  transform: translateX(var(--light-shift));
+  opacity: var(--stage-light-opacity);
+  pointer-events: none;
+}
+
+.floor-reflection {
+  position: absolute;
+  left: 48%;
+  bottom: 124px;
+  width: 760px;
+  height: 96px;
+  transform: translateX(-50%) perspective(800px) rotateX(64deg);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent),
+    linear-gradient(90deg, transparent, var(--accent-soft), transparent);
+  filter: blur(14px);
+  opacity: var(--reflection-opacity);
+  pointer-events: none;
+}
+
+.chapter-intro {
+  position: absolute;
+  top: 152px;
+  left: 58px;
+  right: 58px;
+  height: 148px;
+  display: grid;
+  grid-template-columns: 180px 260px 1fr;
+  gap: 24px;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+  will-change: opacity, transform;
+  z-index: 3;
+}
+
+.chapter-intro span,
+.chapter-intro strong,
+.chapter-intro em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chapter-intro span {
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.chapter-intro strong {
+  color: var(--color-muted);
+  font-size: 26px;
+  font-weight: 850;
+}
+
+.chapter-intro em {
+  color: var(--color-ink);
+  font-size: 46px;
+  font-style: normal;
+  font-weight: 900;
+}
+
 .hero-stage {
   min-height: 740px;
   display: flex;
@@ -163,7 +235,6 @@
   bottom: 150px;
   height: 34px;
   display: grid;
-  grid-template-columns: repeat(25, minmax(0, 1fr));
   gap: 6px;
 }
 

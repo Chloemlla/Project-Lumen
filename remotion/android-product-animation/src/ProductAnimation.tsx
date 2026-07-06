@@ -39,6 +39,12 @@ const featureIcons = [
   {label: "高级保护", icon: ShieldCheck},
 ];
 
+type StageAtmosphereStyle = CSSProperties & {
+  "--light-shift": string;
+  "--stage-light-opacity": string;
+  "--reflection-opacity": string;
+};
+
 export function ProductAnimation() {
   const frame = useCurrentFrame();
   const videoConfig = useVideoConfig();
@@ -55,29 +61,48 @@ export function ProductAnimation() {
   const sceneFrame = Math.max(frame - scene.start, 0);
   const globalProgress = frame / Math.max(totalDurationInFrames - 1, 1);
   const chapterOpacity = interpolate(entrance, [0, 0.72, 1], [0, 0.86, 1]);
+  const chapterExit = clamp01((progress - 0.92) / 0.08);
+  const chapterIntroOpacity = 1 - clamp01((sceneFrame - 112) / 58);
+  const chapterIntroScale = interpolate(clamp01(sceneFrame / 110), [0, 1], [0.985, 1]);
   const phoneY = interpolate(entrance, [0, 1], [70, 0]);
   const panelX = interpolate(entrance, [0, 1], [92, 0]);
   const heroY = interpolate(entrance, [0, 1], [42, 0]);
   const sceneDrift = Math.sin((sceneFrame + scene.chapter * 17) / 70) * 8;
+  const phoneScale = interpolate(progress, [0, 0.54, 1], [0.988, 1.012, 1.002]);
+  const phoneLean = interpolate(progress, [0, 0.5, 1], [-1.8, 0.8, 0]);
   const runtimeSeconds = Math.floor(frame / videoConfig.fps);
   const runtimeLabel = formatRuntime(runtimeSeconds);
+  const atmosphereStyle: StageAtmosphereStyle = {
+    "--light-shift": `${Math.round((progress - 0.5) * 92)}px`,
+    "--stage-light-opacity": `${0.72 - chapterExit * 0.34}`,
+    "--reflection-opacity": `${0.5 - chapterExit * 0.22}`,
+    opacity: 0.62 + chapterOpacity * 0.38,
+  };
   const phoneStyle: CSSProperties = {
-    transform: `translate3d(0, ${phoneY + sceneDrift}px, 0)`,
+    transform: `translate3d(0, ${phoneY + sceneDrift}px, 0) scale(${phoneScale}) rotateY(${phoneLean}deg)`,
+    opacity: 1 - chapterExit * 0.28,
   };
   const panelStyle: CSSProperties = {
     transform: `translate3d(${panelX}px, 0, 0)`,
-    opacity: chapterOpacity,
+    opacity: chapterOpacity * (1 - chapterExit * 0.58),
   };
   const heroStyle: CSSProperties = {
     transform: `translate3d(0, ${heroY}px, 0)`,
-    opacity: chapterOpacity,
+    opacity: chapterOpacity * (1 - chapterExit * 0.4),
+  };
+  const chapterIntroStyle: CSSProperties = {
+    opacity: chapterIntroOpacity,
+    transform: `translate3d(0, ${interpolate(clamp01(sceneFrame / 120), [0, 1], [18, 0])}px, 0) scale(${chapterIntroScale})`,
   };
 
   return (
     <AbsoluteFill className={`composition accent-${scene.accent} mode-${scene.phone.surface.mode}`}>
       <div className="keynote-backdrop" />
+      <div className="stage-light-bars" style={atmosphereStyle} />
       <div className="background-grid" />
+      <div className="floor-reflection" style={atmosphereStyle} />
       <div className="cinema-frame" aria-hidden="true" />
+      <ChapterIntro scene={scene} style={chapterIntroStyle} />
       <div className="brand-lockup">
         <Img className="brand-icon" src={staticFile("lumen-icon.png")} />
         <div>
@@ -137,9 +162,27 @@ function formatRuntime(totalSeconds: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function ChapterRail({scene}: {scene: DemoScene}) {
+function clamp01(value: number): number {
+  return Math.min(Math.max(value, 0), 1);
+}
+
+function ChapterIntro({scene, style}: {scene: DemoScene; style: CSSProperties}) {
   return (
-    <nav className="chapter-rail" aria-label="Project Lumen keynote chapters">
+    <section className="chapter-intro" style={style} aria-label={scene.chapterTitle}>
+      <span>Chapter {String(scene.chapter).padStart(2, "0")}</span>
+      <strong>{scene.eyebrow}</strong>
+      <em>{scene.chapterTitle}</em>
+    </section>
+  );
+}
+
+function ChapterRail({scene}: {scene: DemoScene}) {
+  const railStyle: CSSProperties = {
+    gridTemplateColumns: `repeat(${demoScenes.length}, minmax(0, 1fr))`,
+  };
+
+  return (
+    <nav className="chapter-rail" style={railStyle} aria-label="Project Lumen keynote chapters">
       {demoScenes.map((item) => (
         <div
           className={`chapter-dot ${item.id === scene.id ? "active" : ""} accent-${item.accent}`}
