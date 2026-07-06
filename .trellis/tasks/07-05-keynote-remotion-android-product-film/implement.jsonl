@@ -1,0 +1,8 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend and Remotion entry checklist for the animation package."}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "Remotion Android product animation package and workflow contract."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Component structure, visual quality, copy, and layout guidance."}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Strict TypeScript rules for data-driven Remotion code."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality checklist and forbidden patterns."}
+{"file": ".trellis/spec/guides/architecture-thinking-guide.md", "reason": "Guide for architecture and maintainability of the long-form chapter system."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Guide for data-driven reuse instead of repeated one-off components."}
+{"file": "docs/REMOTION_ANDROID_PRODUCT_ANIMATION_GUIDE.md", "reason": "Source feature map and narrative requirements for the full product film."}

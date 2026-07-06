@@ -1,0 +1,198 @@
+:root {
+  --color-ink: #f6f7f4;
+  --color-muted: #a9b1ad;
+  --color-dim: #717a76;
+  --color-stage: #050607;
+  --color-stage-2: #10130f;
+  --color-panel: rgba(246, 247, 244, 0.085);
+  --color-panel-strong: rgba(246, 247, 244, 0.14);
+  --color-panel-soft: rgba(246, 247, 244, 0.055);
+  --color-border: rgba(246, 247, 244, 0.16);
+  --color-phone: #0b0d0c;
+  --color-phone-screen: #f8faf7;
+  --color-phone-ink: #17211f;
+  --color-phone-muted: #64716d;
+  --color-care: #54d6ad;
+  --color-care-soft: rgba(84, 214, 173, 0.16);
+  --color-focus: #f2b35e;
+  --color-focus-soft: rgba(242, 179, 94, 0.17);
+  --color-sensor: #78c7f7;
+  --color-sensor-soft: rgba(120, 199, 247, 0.16);
+  --color-data: #b5d66d;
+  --color-data-soft: rgba(181, 214, 109, 0.16);
+  --color-advanced: #d2a7ff;
+  --color-advanced-soft: rgba(210, 167, 255, 0.17);
+  --shadow-stage: 0 38px 120px rgba(0, 0, 0, 0.44);
+  --shadow-panel: 0 26px 80px rgba(0, 0, 0, 0.28);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-stage);
+  color: var(--color-ink);
+  font-family:
+    "Noto Sans CJK SC",
+    "Microsoft YaHei",
+    "PingFang SC",
+    "Source Han Sans SC",
+    Arial,
+    sans-serif;
+  letter-spacing: 0;
+}
+
+button {
+  font: inherit;
+}
+
+.composition {
+  --accent: var(--color-care);
+  --accent-soft: var(--color-care-soft);
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 34%),
+    linear-gradient(135deg, var(--color-stage), var(--color-stage-2) 58%, #030404);
+}
+
+.accent-focus {
+  --accent: var(--color-focus);
+  --accent-soft: var(--color-focus-soft);
+}
+
+.accent-sensor {
+  --accent: var(--color-sensor);
+  --accent-soft: var(--color-sensor-soft);
+}
+
+.accent-data {
+  --accent: var(--color-data);
+  --accent-soft: var(--color-data-soft);
+}
+
+.accent-advanced {
+  --accent: var(--color-advanced);
+  --accent-soft: var(--color-advanced-soft);
+}
+
+.keynote-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035), transparent 18%, transparent 82%, rgba(255, 255, 255, 0.035)),
+    linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.035) 42%, transparent 68%);
+}
+
+.background-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.18;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.13) 1px, transparent 1px);
+  background-size: 96px 96px;
+  mask-image: linear-gradient(180deg, transparent 0, #000 18%, #000 78%, transparent 100%);
+}
+
+.cinema-frame {
+  position: absolute;
+  inset: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.brand-lockup {
+  position: absolute;
+  top: 46px;
+  left: 62px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 510px;
+  height: 72px;
+}
+
+.brand-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.34);
+}
+
+.brand-lockup strong {
+  display: block;
+  font-size: 26px;
+  line-height: 1.08;
+  font-weight: 850;
+}
+
+.brand-lockup span {
+  display: block;
+  margin-top: 7px;
+  max-width: 410px;
+  color: var(--color-muted);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.runtime-lockup {
+  position: absolute;
+  top: 50px;
+  left: 50%;
+  width: 430px;
+  height: 68px;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.runtime-lockup span {
+  color: var(--accent);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+}
+
+.runtime-lockup strong {
+  margin-top: 5px;
+  max-width: 420px;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.feature-orbit {
+  position: absolute;
+  top: 52px;
+  right: 62px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 680px;
+  height: 54px;
+}
+
+.feature-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.075);
+  color: var(--accent);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+}
+
+.feature-chip span {
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
