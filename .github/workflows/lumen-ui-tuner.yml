@@ -177,13 +177,13 @@ jobs:
 
               echo "Retrying connected Android test after emulator install failure (attempt ${attempt})."
               adb wait-for-device || true
-              adb uninstall com.projectlumen.app.test >/dev/null 2>&1 || true
-              adb uninstall com.projectlumen.app >/dev/null 2>&1 || true
+              adb uninstall com.chloemlla.projectlumen.test >/dev/null 2>&1 || true
+              adb uninstall com.chloemlla.projectlumen >/dev/null 2>&1 || true
               sleep 15
             done
 
             mkdir -p ui-screenshot-artifacts
-            adb pull /sdcard/Android/data/com.projectlumen.app/files/screenshots ui-screenshot-artifacts || true
+            adb pull /sdcard/Android/data/com.chloemlla.projectlumen/files/screenshots ui-screenshot-artifacts || true
 
       - name: Upload Android UI artifacts
         if: always()

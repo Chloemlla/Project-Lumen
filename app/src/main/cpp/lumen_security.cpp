@@ -20,7 +20,7 @@
 #endif
 
 #ifndef LUMEN_EXPECTED_PACKAGE
-#define LUMEN_EXPECTED_PACKAGE "com.projectlumen.app"
+#define LUMEN_EXPECTED_PACKAGE "com.chloemlla.projectlumen"
 #endif
 
 extern "C" char **environ;

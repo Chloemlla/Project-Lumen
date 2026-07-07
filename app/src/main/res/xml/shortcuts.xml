@@ -10,7 +10,7 @@
         <intent
             android:action="com.project.lumen.action.VIEW_DASHBOARD"
             android:targetClass="com.projectlumen.app.MainActivity"
-            android:targetPackage="com.projectlumen.app">
+            android:targetPackage="com.chloemlla.projectlumen">
             <extra
                 android:name="com.project.lumen.extra.SOURCE_APP"
                 android:value="project_lumen" />
@@ -27,7 +27,7 @@
         <intent
             android:action="com.project.lumen.action.TRIGGER_REST"
             android:targetClass="com.projectlumen.app.MainActivity"
-            android:targetPackage="com.projectlumen.app">
+            android:targetPackage="com.chloemlla.projectlumen">
             <extra
                 android:name="com.project.lumen.extra.SOURCE_APP"
                 android:value="project_lumen" />
@@ -44,7 +44,7 @@
         <intent
             android:action="com.project.lumen.action.START_VISUAL_MONITOR"
             android:targetClass="com.projectlumen.app.MainActivity"
-            android:targetPackage="com.projectlumen.app">
+            android:targetPackage="com.chloemlla.projectlumen">
             <extra
                 android:name="com.project.lumen.extra.SOURCE_APP"
                 android:value="project_lumen" />

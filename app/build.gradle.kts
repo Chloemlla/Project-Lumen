@@ -11,6 +11,7 @@ val projectLumenStoreFile = providers.gradleProperty("PROJECT_LUMEN_STORE_FILE")
 val projectLumenStorePassword = providers.gradleProperty("PROJECT_LUMEN_STORE_PASSWORD").orNull
 val projectLumenKeyAlias = providers.gradleProperty("PROJECT_LUMEN_KEY_ALIAS").orNull
 val projectLumenKeyPassword = providers.gradleProperty("PROJECT_LUMEN_KEY_PASSWORD").orNull
+val projectLumenApplicationId = "com.chloemlla.projectlumen"
 val projectLumenReleaseSigningConfigured = listOf(
     projectLumenStoreFile,
     projectLumenStorePassword,
@@ -154,7 +155,7 @@ android {
         buildConfigField("boolean", "APP_INTEGRITY_ENFORCEMENT_ENABLED", projectLumenReleaseCertSha256.isNotBlank().toString())
         buildConfigField("String", "OPEN_API_TRUSTED_SIGNATURE_SHA256", "\"${projectLumenBuildConfigString(projectLumenOpenApiTrustedSignatureSha256)}\"")
 
-        applicationId = "com.projectlumen.app"
+        applicationId = projectLumenApplicationId
         minSdk = 26
         targetSdk = 37
         versionCode = projectLumenVersionCode
@@ -168,7 +169,7 @@ android {
                     "-DANDROID_STL=c++_shared",
                     "-DLUMEN_REQUEST_SIGNING_SECRET=${projectLumenBuildConfigString(projectLumenRequestSigningSecret)}",
                     "-DLUMEN_RELEASE_CERT_SHA256=${projectLumenBuildConfigString(projectLumenReleaseCertSha256)}",
-                    "-DLUMEN_EXPECTED_PACKAGE=${projectLumenBuildConfigString("com.projectlumen.app")}",
+                    "-DLUMEN_EXPECTED_PACKAGE=${projectLumenBuildConfigString(projectLumenApplicationId)}",
                 )
             }
         }
