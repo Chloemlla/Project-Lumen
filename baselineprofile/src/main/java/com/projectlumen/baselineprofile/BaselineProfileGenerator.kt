@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
+import java.util.regex.Pattern
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,7 +36,7 @@ class BaselineProfileGenerator {
 
     private fun MacrobenchmarkScope.dismissOnboardingIfPresent() {
         val skipButton = device.wait(
-            Until.findObject(By.textMatches("(?i)Skip|跳过")),
+            Until.findObject(By.text(Pattern.compile("(?i)Skip|跳过"))),
             FIND_ONBOARDING_TIMEOUT_MILLIS,
         )
         skipButton?.click()
