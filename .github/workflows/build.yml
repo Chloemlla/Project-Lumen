@@ -83,6 +83,21 @@ jobs:
             echo "Release signing configured."
           fi
 
+      - name: Enable Android emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Generate release baseline profile
+        env:
+          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
+          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
+          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
+          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
+          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
+        run: gradle :app:generateReleaseBaselineProfile --no-daemon --warning-mode all
+
       - name: Build release APK
         env:
           PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}

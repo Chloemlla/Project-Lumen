@@ -3,6 +3,7 @@
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+    id("androidx.baselineprofile")
 }
 
 val projectLumenUseDebugSigning =
@@ -248,6 +249,12 @@ android {
 
 }
 
+baselineProfile {
+    automaticGenerationDuringBuild = false
+    mergeIntoMain = true
+    saveInSrc = true
+}
+
 val validateJetBrainsMonoSubset by tasks.registering {
     val subsetFont = layout.projectDirectory.file("src/main/res/font/jetbrains_mono_lumen_subset.ttf")
     inputs.file(subsetFont)
@@ -303,6 +310,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.navigation:navigation-compose:2.9.8")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation("androidx.room:room-ktx:2.8.4")
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
@@ -318,6 +326,7 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    baselineProfile(project(":baselineprofile"))
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

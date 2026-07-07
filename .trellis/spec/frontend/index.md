@@ -18,6 +18,7 @@ Before writing frontend code, confirm:
 - [ ] Network/WS data is validated (Zod) before being treated as typed.
 - [ ] No secret/token touches client storage or logs.
 - [ ] Android native library changes follow [`android-native-libraries.md`](./android-native-libraries.md).
+- [ ] Android Baseline Profile changes follow [`android-baseline-profiles.md`](./android-baseline-profiles.md).
 - [ ] Android Shizuku app network controls follow [`android-shizuku-network-controls.md`](./android-shizuku-network-controls.md).
 - [ ] Android launcher shortcut changes follow [`android-launcher-shortcuts.md`](./android-launcher-shortcuts.md).
 - [ ] Remotion Android product animation changes follow [`directory-structure.md`](./directory-structure.md) §2.2; build/render commands stay in GitHub Actions.
@@ -43,6 +44,7 @@ Before marking work done (see [`quality-guidelines.md`](./quality-guidelines.md)
 | [State Management](./state-management.md) | Server vs live vs UI state | ✅ Filled |
 | [Type Safety](./type-safety.md) | Shared types, Zod validation, forbidden casts | ✅ Filled |
 | [Android Native Libraries](./android-native-libraries.md) | NDK/CMake version ownership and 16 KB native library alignment | ✅ Filled |
+| [Android Baseline Profiles](./android-baseline-profiles.md) | Baseline Profile generator module, ProfileInstaller, and workflow-only generation | ✅ Filled |
 | [Android Shizuku Network Controls](./android-shizuku-network-controls.md) | Developer-only Shizuku app network policy management | ✅ Filled |
 | [Android Foreground Services](./android-foreground-services.md) | Android client foreground service startup validation and permission gates | ✅ Filled |
 | [Android Launcher Shortcuts](./android-launcher-shortcuts.md) | Android long-press app icon shortcut contracts | ✅ Filled |

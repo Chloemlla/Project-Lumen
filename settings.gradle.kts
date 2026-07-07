@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Project-Lumen"
 include(":app")
+include(":baselineprofile")
