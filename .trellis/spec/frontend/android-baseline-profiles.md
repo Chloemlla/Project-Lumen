@@ -54,7 +54,7 @@ baselineProfile {
 
 ```yaml
 # .github/workflows/build.yml
-run: gradle :app:generateReleaseBaselineProfile --no-daemon --warning-mode all
+run: gradle :app:generateBaselineProfile --no-daemon --warning-mode all
 ```
 
 ## 3. Contracts
@@ -63,14 +63,15 @@ run: gradle :app:generateReleaseBaselineProfile --no-daemon --warning-mode all
 - Producer contract: `baselineprofile` is a standalone `com.android.test` module targeting `:app`; profile journeys live under `baselineprofile/src/main/java`.
 - Package contract: generator tests must collect profiles for the real application id, currently `com.chloemlla.projectlumen`, not the app namespace.
 - Startup contract: startup profile generation should launch the app and cover the first high-value screen path. If onboarding appears on clean install, the journey may dismiss it before exercising the home surface.
-- CI contract: profile generation runs in GitHub Actions with Android emulator acceleration before release assembly. Local machines are limited to static inspection.
+- CI contract: profile generation runs in GitHub Actions with Android emulator acceleration before release assembly. With `mergeIntoMain = true` on current AndroidX Benchmark/ProfileInstaller releases, the app workflow invokes the consumer aggregate task `:app:generateBaselineProfile`; local machines are limited to static inspection.
 - Version contract: keep `androidx.baselineprofile`, `androidx.benchmark:benchmark-macro-junit4`, and `androidx.profileinstaller` on compatible AndroidX Benchmark/ProfileInstaller releases.
 
 ## 4. Validation & Error Matrix
 
 | Condition | Expected behavior |
 |---|---|
-| Baseline Profile generator module missing | `:app:generateReleaseBaselineProfile` cannot resolve the producer dependency; add `include(":baselineprofile")` and `baselineProfile(project(":baselineprofile"))`. |
+| Baseline Profile generator module missing | `:app:generateBaselineProfile` cannot resolve the producer dependency; add `include(":baselineprofile")` and `baselineProfile(project(":baselineprofile"))`. |
+| Workflow calls `:app:generateReleaseBaselineProfile` while `mergeIntoMain = true` | AGP/AndroidX may not register the release-specific consumer task; call `:app:generateBaselineProfile` instead. |
 | Generator uses namespace instead of application id | The profile task targets the wrong package; use `com.chloemlla.projectlumen`. |
 | GitHub runner lacks KVM access | Managed device startup is slow or fails; workflow must enable KVM before profile generation. |
 | Profile generation is attempted locally | Stop and move execution to GitHub Actions per repository policy. |
@@ -85,7 +86,7 @@ run: gradle :app:generateReleaseBaselineProfile --no-daemon --warning-mode all
 
 ## 6. Tests Required
 
-- GitHub workflow: run `gradle :app:generateReleaseBaselineProfile --no-daemon --warning-mode all` before release APK assembly.
+- GitHub workflow: run `gradle :app:generateBaselineProfile --no-daemon --warning-mode all` before release APK assembly.
 - GitHub workflow: run the existing release build, unit test, and lint steps after profile generation.
 - Static review: verify the generator target package matches `projectLumenApplicationId`.
 - Static review: verify no generated profile or benchmark output directories are committed unless intentionally saved as source profiles.
@@ -122,5 +123,5 @@ gradle :app:generateReleaseBaselineProfile
 
 ```yaml
 - name: Generate release baseline profile
-  run: gradle :app:generateReleaseBaselineProfile --no-daemon --warning-mode all
+  run: gradle :app:generateBaselineProfile --no-daemon --warning-mode all
 ```
