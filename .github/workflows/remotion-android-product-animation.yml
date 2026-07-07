@@ -26,8 +26,20 @@ concurrency:
 
 jobs:
   render:
-    name: Validate and render Chinese Android product animation
+    name: Render ${{ matrix.label }} Chinese Android product animation
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: 1080p
+            label: 1080p
+            artifact_name: lumen-android-product-animation-1080p
+            output_path: remotion/android-product-animation/out/lumen-android-product-animation-1080p.mp4
+          - target: 4k
+            label: 4K
+            artifact_name: lumen-android-product-animation-4k
+            output_path: remotion/android-product-animation/out/lumen-android-product-animation-4k.mp4
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -50,22 +62,14 @@ jobs:
         working-directory: remotion/android-product-animation
         run: npm run validate
 
-      - name: Render Android product animation
+      - name: Render ${{ matrix.label }} Android product animation
         working-directory: remotion/android-product-animation
-        run: npm run render
+        run: npm run render:${{ matrix.target }}
 
-      - name: Upload 1080p rendered video
+      - name: Upload ${{ matrix.label }} rendered video
         uses: actions/upload-artifact@v4
         with:
-          name: lumen-android-product-animation-1080p
-          path: remotion/android-product-animation/out/lumen-android-product-animation-1080p.mp4
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload 4K rendered video
-        uses: actions/upload-artifact@v4
-        with:
-          name: lumen-android-product-animation-4k
-          path: remotion/android-product-animation/out/lumen-android-product-animation-4k.mp4
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.output_path }}
           if-no-files-found: error
           retention-days: 14
