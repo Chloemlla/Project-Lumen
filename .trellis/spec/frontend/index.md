@@ -18,6 +18,7 @@ Before writing frontend code, confirm:
 - [ ] Network/WS data is validated (Zod) before being treated as typed.
 - [ ] No secret/token touches client storage or logs.
 - [ ] Android native library changes follow [`android-native-libraries.md`](./android-native-libraries.md).
+- [ ] Android haptic playback changes follow [`android-haptics.md`](./android-haptics.md).
 - [ ] Android Baseline Profile changes follow [`android-baseline-profiles.md`](./android-baseline-profiles.md).
 - [ ] Android Shizuku app network controls follow [`android-shizuku-network-controls.md`](./android-shizuku-network-controls.md).
 - [ ] Android launcher shortcut changes follow [`android-launcher-shortcuts.md`](./android-launcher-shortcuts.md).
@@ -44,6 +45,7 @@ Before marking work done (see [`quality-guidelines.md`](./quality-guidelines.md)
 | [State Management](./state-management.md) | Server vs live vs UI state | ✅ Filled |
 | [Type Safety](./type-safety.md) | Shared types, Zod validation, forbidden casts | ✅ Filled |
 | [Android Native Libraries](./android-native-libraries.md) | NDK/CMake version ownership and 16 KB native library alignment | ✅ Filled |
+| [Android Haptics](./android-haptics.md) | Vendor HE waveform generation and HapticPlayer hestub bridge | ✅ Filled |
 | [Android Baseline Profiles](./android-baseline-profiles.md) | Baseline Profile generator module, ProfileInstaller, and workflow-only generation | ✅ Filled |
 | [Android Shizuku Network Controls](./android-shizuku-network-controls.md) | Developer-only Shizuku app network policy management | ✅ Filled |
 | [Android Foreground Services](./android-foreground-services.md) | Android client foreground service startup validation and permission gates | ✅ Filled |

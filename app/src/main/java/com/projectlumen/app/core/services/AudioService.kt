@@ -9,8 +9,12 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.core.net.toUri
+import com.projectlumen.app.core.haptics.HapticPlaybackService
 
-class AudioService(private val context: Context) {
+class AudioService(
+    private val context: Context,
+    private val haptics: HapticPlaybackService,
+) {
     fun playReminderTone(
         enabled: Boolean,
         soundPath: String = "",
@@ -45,6 +49,7 @@ class AudioService(private val context: Context) {
     }
 
     private fun vibrate() {
+        if (haptics.playReminderNudge()) return
         val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.getSystemService(VibratorManager::class.java)?.defaultVibrator
         } else {

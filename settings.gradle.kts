@@ -11,6 +11,14 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven {
+            isAllowInsecureProtocol = true
+            url = uri("http://nexus.itgsa.com:5566/repository/release/")
+            credentials {
+                username = "developer"
+                password = "developer!@#"
+            }
+        }
     }
 }
 

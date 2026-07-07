@@ -12,6 +12,7 @@ import com.projectlumen.app.core.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.debug.DeveloperDebugOverlayService
 import com.projectlumen.app.core.debug.MemoryHealthMonitor
+import com.projectlumen.app.core.haptics.HapticPlaybackService
 import com.projectlumen.app.core.lifecycle.AppLifecycleCoordinator
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.mmkv.ProjectLumenMmkv
@@ -42,7 +43,8 @@ class ProjectLumenApplication : Application() {
     val database: AppDatabase by lazy { AppDatabase.create(this) }
     val eyeCarePreferences: EyeCarePreferencesDataStore by lazy { EyeCarePreferencesDataStore(this) }
     val notifications: NotificationService by lazy { NotificationService(this) }
-    val audio: AudioService by lazy { AudioService(this) }
+    val haptics: HapticPlaybackService by lazy { HapticPlaybackService() }
+    val audio: AudioService by lazy { AudioService(this, haptics) }
     val export: ExportService by lazy { ExportService(this) }
     val backup: DataBackupService by lazy {
         DataBackupService(this, database, eyeCarePreferences) { secureCredentials.deviceInstallationId() }
