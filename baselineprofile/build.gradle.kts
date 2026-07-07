@@ -25,7 +25,7 @@ android {
 
     testOptions {
         managedDevices {
-            devices {
+            allDevices {
                 create<ManagedVirtualDevice>("pixel6Api35").apply {
                     device = "Pixel 6"
                     apiLevel = 35
@@ -37,7 +37,7 @@ android {
 }
 
 baselineProfile {
-    managedDevices = listOf("pixel6Api35")
+    managedDevices.add("pixel6Api35")
     useConnectedDevices = false
 }
 
