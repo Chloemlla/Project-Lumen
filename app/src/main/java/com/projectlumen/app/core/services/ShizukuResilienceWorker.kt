@@ -1,9 +1,6 @@
 package com.projectlumen.app.core.services
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -11,6 +8,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.enums.ActiveEngine
+import com.projectlumen.app.core.proximity.ProximityCameraForegroundEligibility
 import java.util.concurrent.TimeUnit
 
 class ShizukuResilienceWorker(
@@ -48,7 +46,10 @@ class ShizukuResilienceWorker(
                     app.notifications.showOngoingStatus(runtime)
                 }
             }
-            if (hasCameraPermission(applicationContext) && (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled)) {
+            if (
+                (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) &&
+                ProximityCameraForegroundEligibility.canStartCameraForegroundService(applicationContext)
+            ) {
                 app.scheduleProximityMonitoring()
             }
             if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) {
@@ -75,11 +76,6 @@ class ShizukuResilienceWorker(
 
         fun cancel(context: Context) {
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK)
-        }
-
-        private fun hasCameraPermission(context: Context): Boolean {
-            return ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED
         }
     }
 }

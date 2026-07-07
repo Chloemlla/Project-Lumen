@@ -1,10 +1,8 @@
 package com.projectlumen.app.core.proximity
 
-import android.Manifest
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -43,7 +41,10 @@ class ProximityDetectionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val app = application as ProjectLumenApplication
-        if (!hasCameraPermission() || !startCameraForeground(app, startId)) {
+        if (
+            !ProximityCameraForegroundEligibility.canStartCameraForegroundService(this) ||
+            !startCameraForeground(app, startId)
+        ) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
@@ -100,13 +101,6 @@ class ProximityDetectionService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun hasCameraPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.CAMERA,
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-
     private fun startCameraForeground(app: ProjectLumenApplication, startId: Int): Boolean {
         return runCatching {
             ServiceCompat.startForeground(
@@ -132,7 +126,7 @@ class ProximityDetectionService : Service() {
         val settingsRepository = app.settingsRepository()
         val settings = settingsRepository.get() ?: return
         if (!calibrate && !settings.proximityMonitoringEnabled && !settings.blinkMonitoringEnabled) return
-        if (!hasCameraPermission()) return
+        if (!ProximityCameraForegroundEligibility.hasCameraPermission(this)) return
         if (!calibrate && app.shizuku.shouldDeferSampling(settings)) {
             clearActiveState(app)
             return
@@ -500,6 +494,7 @@ class ProximityDetectionService : Service() {
         fun start(context: Context, calibrate: Boolean) {
             val intent = Intent(context, ProximityDetectionService::class.java)
                 .putExtra(EXTRA_CALIBRATE, calibrate)
+            if (!ProximityCameraForegroundEligibility.canStartCameraForegroundService(context)) return
             runCatching {
                 ContextCompat.startForegroundService(context, intent)
             }.onFailure { throwable ->

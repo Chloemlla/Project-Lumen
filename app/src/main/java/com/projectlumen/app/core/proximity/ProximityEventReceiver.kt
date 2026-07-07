@@ -1,16 +1,13 @@
 package com.projectlumen.app.core.proximity
 
-import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import androidx.core.content.ContextCompat
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.mmkv.ProjectLumenMmkv
 import com.tencent.mmkv.MMKV
@@ -39,7 +36,9 @@ class ProximityEventReceiver : BroadcastReceiver() {
                 val settings = app.settingsRepository().get()
                 if (settings?.proximityMonitoringEnabled != true && settings?.blinkMonitoringEnabled != true) return@launch
                 if (settings.developerModeEnabled && !settings.developerUnlockTriggerEnabled) return@launch
-                if (!hasCameraPermission(app)) return@launch
+                if (!ProximityCameraForegroundEligibility.canStartCameraForegroundService(app)) {
+                    return@launch
+                }
                 if (!shouldRunEventSample(app)) return@launch
                 if (app.shizuku.shouldDeferSampling(settings)) return@launch
                 if (!ProximityTriggerGate(app).canRun(settings)) return@launch
@@ -63,11 +62,6 @@ class ProximityEventReceiver : BroadcastReceiver() {
         private const val MIN_EVENT_TRIGGER_INTERVAL_MS = 60_000L
         private val legacyLastTriggerAtKey = longPreferencesKey(KEY_LAST_TRIGGER_AT)
         private val migrationLock = Mutex()
-
-        private fun hasCameraPermission(context: Context): Boolean {
-            return ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED
-        }
 
         private suspend fun shouldRunEventSample(context: Context): Boolean {
             val now = System.currentTimeMillis()
