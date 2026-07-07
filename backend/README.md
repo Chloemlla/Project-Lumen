@@ -35,12 +35,15 @@ LUMEN_ACCESS_TOKEN_TTL_SECONDS=604800
 LUMEN_REQUEST_SIGNING_SECRET=project-lumen-local-request-signing-key
 LUMEN_REQUEST_TIMESTAMP_SKEW_SECONDS=300
 LUMEN_REQUIRE_REQUEST_SIGNING=true
+LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=true
 LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false
 ```
 
 `LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false` is intentionally fail-closed for Google Play purchases until real platform verification credentials are wired in.
 
 `LUMEN_REQUEST_SIGNING_SECRET` must match the Android release build secret supplied as `PROJECT_LUMEN_REQUEST_SIGNING_SECRET`; otherwise signed client requests fail with HTTP 403. Keep the default value for local development only.
+
+`LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=true` lets `GET /api/v1/releases/check` and legacy `GET /v1/releases/check` bypass HMAC signing so already-released APKs can discover corrective updates. Set it to `false` only when the release-check endpoint should require the same request signature as other `/v1` routes. GitHub deployment reads this from the non-secret repository variable `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK`.
 
 Android builds always require HTTPS and Android/OkHttp system trust for backend communication. `PROJECT_LUMEN_API_CERTIFICATE_PINS` and `PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS` are optional hardening inputs; they are compiled into the APK only when `PROJECT_LUMEN_API_CERTIFICATE_PINNING_ENABLED=true` or `PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINNING_ENABLED=true`, and the build fails if pinning is enabled without pins. Leave pinning disabled when certificates are managed by a public CA or CDN, and enable it only when the release process can provide both current and backup `sha256/` pins for the active host.
 

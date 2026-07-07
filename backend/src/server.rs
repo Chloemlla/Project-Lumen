@@ -130,6 +130,7 @@ fn log_startup_config(config: &Config) {
         request_signing_secret_configured = !config.request_signing_secret.trim().is_empty(),
         request_timestamp_skew_seconds = config.request_timestamp_skew_seconds,
         require_request_signing = config.require_request_signing,
+        allow_public_release_check = config.allow_public_release_check,
         accept_unverified_purchases = config.accept_unverified_purchases,
         "startup configuration loaded"
     );

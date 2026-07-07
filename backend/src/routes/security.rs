@@ -2,7 +2,7 @@ use crate::{error::ApiError, state::AppState};
 use axum::{
     body::{to_bytes, Body},
     extract::State,
-    http::{HeaderMap, Request},
+    http::{HeaderMap, Method, Request},
     middleware::Next,
     response::Response,
 };
@@ -17,12 +17,23 @@ const MAX_SIGNED_BODY_BYTES: usize = 10 * 1024 * 1024;
 const HEADER_TIMESTAMP: &str = "x-lumen-timestamp";
 const HEADER_NONCE: &str = "x-lumen-nonce";
 const HEADER_SIGNATURE: &str = "x-lumen-signature";
+const RELEASE_CHECK_PATH: &str = "/v1/releases/check";
 
 pub async fn enforce_api_security(
     State(state): State<AppState>,
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, ApiError> {
+    if state.config.allow_public_release_check
+        && is_release_check_path(
+            state.config.api_prefix.as_str(),
+            request.method(),
+            request.uri().path(),
+        )
+    {
+        return Ok(next.run(request).await);
+    }
+
     if !state.config.require_request_signing {
         return Ok(next.run(request).await);
     }
@@ -166,4 +177,53 @@ fn now_millis() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as i64)
         .unwrap_or_default()
+}
+
+fn is_release_check_path(api_prefix: &str, method: &Method, path: &str) -> bool {
+    if *method != Method::GET {
+        return false;
+    }
+
+    path == RELEASE_CHECK_PATH
+        || path
+            .strip_prefix(api_prefix)
+            .is_some_and(|suffix| suffix == RELEASE_CHECK_PATH)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn matches_release_check_for_configured_prefix_and_legacy_path() {
+        assert!(is_release_check_path(
+            "/api",
+            &Method::GET,
+            "/api/v1/releases/check"
+        ));
+        assert!(is_release_check_path(
+            "/api",
+            &Method::GET,
+            "/v1/releases/check"
+        ));
+    }
+
+    #[test]
+    fn does_not_match_other_methods_or_routes() {
+        assert!(!is_release_check_path(
+            "/api",
+            &Method::POST,
+            "/api/v1/releases/check"
+        ));
+        assert!(!is_release_check_path(
+            "/api",
+            &Method::GET,
+            "/api/v1/config/sync"
+        ));
+        assert!(!is_release_check_path(
+            "/api",
+            &Method::GET,
+            "/apiary/v1/releases/check"
+        ));
+    }
 }

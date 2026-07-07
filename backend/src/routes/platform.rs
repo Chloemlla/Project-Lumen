@@ -27,6 +27,12 @@ pub fn router() -> Router<AppState> {
 }
 
 async fn openapi(State(state): State<AppState>) -> Json<Value> {
+    let release_check_security = if state.config.allow_public_release_check {
+        json!([])
+    } else {
+        json!([{ "lumenRequestSignature": [] }])
+    };
+
     Json(json!({
         "openapi": "3.0.3",
         "info": {
@@ -54,7 +60,7 @@ async fn openapi(State(state): State<AppState>) -> Json<Value> {
             "/v1/face-analysis/frames": { "post": { "summary": "Upload face-analysis metadata frame" } },
             "/v1/config/feature-flags": { "get": { "summary": "Fetch remote feature flags" } },
             "/v1/config/sync": { "get": { "summary": "Fetch cursor-based templates, feature flags, and remote policies" } },
-            "/v1/releases/check": { "get": { "summary": "Check channel-aware Android release availability" } }
+            "/v1/releases/check": { "get": { "summary": "Check channel-aware Android release availability", "security": release_check_security } }
         },
         "components": {
             "securitySchemes": {

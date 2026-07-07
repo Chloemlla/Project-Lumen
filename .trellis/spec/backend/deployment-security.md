@@ -12,9 +12,11 @@
 ### 2. Signatures
 
 - Backend env: `LUMEN_REQUEST_SIGNING_SECRET`.
+- Backend env: `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK`.
 - Android release build env: `PROJECT_LUMEN_REQUEST_SIGNING_SECRET`.
 - Backend middleware reads `X-Lumen-Timestamp`, `X-Lumen-Nonce`, and `X-Lumen-Signature`.
 - Android client signs the canonical request payload and sends the same three headers on API requests.
+- Public release check API: `GET /api/v1/releases/check` and legacy `GET /v1/releases/check`.
 - Android native signing bridge is built by CMake with `ANDROID_STL=c++_shared` and requires `libc++_shared.so` in the APK.
 
 ### 3. Contracts
@@ -22,6 +24,9 @@
 - `LUMEN_REQUEST_SIGNING_SECRET` and `PROJECT_LUMEN_REQUEST_SIGNING_SECRET` must carry the same secret value for the same production API environment.
 - The local default `project-lumen-local-request-signing-key` is allowed only for local development or deliberately matched non-production testing.
 - Backend deployment workflows must pass the GitHub Actions secret `PROJECT_LUMEN_REQUEST_SIGNING_SECRET` into the running container as `LUMEN_REQUEST_SIGNING_SECRET`.
+- `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=true` makes `GET /api/v1/releases/check` and legacy `GET /v1/releases/check` public update-discovery endpoints so older or mismatched APKs can still discover a corrective release.
+- `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=false` puts release check behind the same HMAC requirement as other protected `/v1` routes.
+- All other protected `/v1` routes must continue to fail closed when `LUMEN_REQUIRE_REQUEST_SIGNING=true`.
 - Android release builds that use the native signing bridge must pass `-DANDROID_STL=c++_shared` and package/pick `**/libc++_shared.so` so `System.loadLibrary("lumen_security")` can resolve the C++ runtime.
 - If `LUMEN_REQUIRE_REQUEST_SIGNING=true`, unsigned requests or signatures generated with a different secret must fail closed.
 - `LUMEN_REQUIRE_PLAY_INTEGRITY` is independent from request signing; enabling it requires clients to be able to attach `X-Lumen-Integrity`.
@@ -29,6 +34,9 @@
 ### 4. Validation & Error Matrix
 
 - Missing `X-Lumen-Timestamp`, `X-Lumen-Nonce`, or `X-Lumen-Signature` while signing is required -> HTTP 403.
+- `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=true` and `GET /api/v1/releases/check` or `GET /v1/releases/check` without signing headers -> normal release response, not HTTP 403.
+- `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=true` and `GET /api/v1/releases/check` or `GET /v1/releases/check` with stale/invalid signing headers -> normal release response, not `REQUEST_SIGNATURE_INVALID`.
+- `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=false` and unsigned release check while signing is required -> HTTP 403.
 - Timestamp outside `LUMEN_REQUEST_TIMESTAMP_SKEW_SECONDS` -> HTTP 403.
 - Empty backend signing secret while signing is required -> HTTP 403.
 - Android/backend signing secret mismatch -> HTTP 403 on otherwise valid signed requests.
@@ -39,15 +47,21 @@
 ### 5. Good/Base/Bad Cases
 
 - Good: Android release and backend deployment both receive the same production request-signing secret from GitHub Actions secrets.
+- Good: `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=true` makes release-check requests public while account, sync, telemetry, purchase, and backup routes still require valid request signatures.
+- Good: `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=false` restores strict HMAC protection for release check without disabling HMAC on the rest of `/v1`.
 - Good: Android APKs that include `lumen_security` also include `libc++_shared.so` for every packaged ABI when the native library is built with the shared STL.
 - Base: local backend and local/debug client both use the documented development fallback secret.
+- Bad: The update-discovery endpoint sits only behind request signing, so a released APK with a bad compiled secret cannot learn about the fixed release.
 - Bad: Android release is built with `PROJECT_LUMEN_REQUEST_SIGNING_SECRET`, but backend deployment omits `LUMEN_REQUEST_SIGNING_SECRET`; login starts fail with HTTP 403 even when diagnostics report `signed=true`.
 - Bad: `lumen_security` uses C++ standard library code, but the APK omits `libc++_shared.so`; the client can report `signed=true` while signing with the fallback key after the native bridge fails.
 
 ### 6. Tests Required
 
 - GitHub workflow review: backend deployment env includes `LUMEN_REQUEST_SIGNING_SECRET: ${{ secrets.PROJECT_LUMEN_REQUEST_SIGNING_SECRET }}`.
+- GitHub workflow review: backend deployment env passes `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK: ${{ vars.LUMEN_ALLOW_PUBLIC_RELEASE_CHECK }}` so production can explicitly close the public release-check bypass.
 - Android packaging review: `app/build.gradle.kts` includes `-DANDROID_STL=c++_shared` and a `jniLibs.pickFirsts` entry for `**/libc++_shared.so`.
+- Backend route/security tests: with `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=true`, release check succeeds without request-signing headers for both configured API prefix and legacy `/v1` path.
+- Backend route/security tests: with `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=false`, unsigned release check returns HTTP 403 when request signing is required.
 - Backend route/security tests: a request signed with the configured secret succeeds, and the same request signed with a different secret returns HTTP 403.
 - Android signing tests: canonical payload construction remains aligned with backend canonicalization for method, path, query, body hash, timestamp, and nonce.
 
@@ -58,6 +72,12 @@
 ```yaml
 env:
   IMAGE_URL: ${{ needs.build-image.outputs.deploy_image }}
+```
+
+```rust
+let v1 = Router::new()
+    .merge(platform::router())
+    .layer(middleware::from_fn_with_state(state.clone(), security::enforce_api_security));
 ```
 
 ```kotlin
@@ -74,6 +94,12 @@ externalNativeBuild {
 env:
   IMAGE_URL: ${{ needs.build-image.outputs.deploy_image }}
   LUMEN_REQUEST_SIGNING_SECRET: ${{ secrets.PROJECT_LUMEN_REQUEST_SIGNING_SECRET }}
+```
+
+```rust
+if state.config.allow_public_release_check && is_release_check_path(api_prefix, method, path) {
+    return Ok(next.run(request).await);
+}
 ```
 
 ```kotlin
