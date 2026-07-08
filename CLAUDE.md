@@ -65,14 +65,14 @@ npm run dev        # local Vite dev server
 
 ## Backend architecture (`backend/`)
 
-- **axum** router assembled in `src/api.rs`. Routes (`src/routes/*.rs`) are nested under a configurable prefix (default `/api`): a `/v1` group (also mirrored at root for legacy clients) behind `security::enforce_api_security` (request-signature verification) and `audit::audit_request`, plus `/admin` and public `platform` routes. The same binary serves the admin SPA from `/admin` and `/assets`.
+- **axum** router assembled in `src/api.rs`. Routes (`src/routes/*.rs`) are nested under a configurable prefix (default `/api`): a `/v1` group (also mirrored at root for legacy clients) behind optional `security::enforce_api_security` request-signature verification (`LUMEN_REQUIRE_REQUEST_SIGNING=true`) and `audit::audit_request`, plus `/admin` and public `platform` routes. The same binary serves the admin SPA from `/admin` and `/assets`.
 - **Layering:** `routes/` (HTTP) → `store/` (MongoDB collections) → `models/` (serde types). `state.rs` holds `AppState` (Mongo client + config); `config.rs` reads all `LUMEN_*` env vars; `server.rs` wires CORS/tracing and binds the listener.
 - **Purchases fail closed** (`LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false`) until real Play verification is wired in. Email login codes are sent via Happy-TTS **outemail** (`outemail.rs`); when no API key is set, `/api/v1/auth/email/start` returns a dev code.
 - See `backend/README.md` for the full env var list, endpoint catalog, and the 20 admin-dashboard modules / MongoDB collections.
 
 ## Cross-component contract
 
-The Android build's `PROJECT_LUMEN_REQUEST_SIGNING_SECRET` **must equal** the backend's `LUMEN_REQUEST_SIGNING_SECRET`, or signed client requests get HTTP 403. Both default to `project-lumen-local-request-signing-key` for local dev only.
+When backend request signing is explicitly enabled with `LUMEN_REQUIRE_REQUEST_SIGNING=true`, the Android build's `PROJECT_LUMEN_REQUEST_SIGNING_SECRET` **must equal** the backend's `LUMEN_REQUEST_SIGNING_SECRET`, or signed client requests get HTTP 403. Backend request-signature verification is disabled by default, including production deployments.
 
 ## Build-time configuration (Android)
 
