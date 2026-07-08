@@ -62,7 +62,7 @@ impl Config {
             ),
             request_timestamp_skew_seconds: env_u64("LUMEN_REQUEST_TIMESTAMP_SKEW_SECONDS", 300)
                 .min(300),
-            require_request_signing: env_bool("LUMEN_REQUIRE_REQUEST_SIGNING", true),
+            require_request_signing: env_bool("LUMEN_REQUIRE_REQUEST_SIGNING", false),
             allow_public_release_check: env_bool("LUMEN_ALLOW_PUBLIC_RELEASE_CHECK", true),
             accept_unverified_purchases: env_bool("LUMEN_ACCEPT_UNVERIFIED_PURCHASES", false),
         }

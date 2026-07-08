@@ -34,14 +34,16 @@ LUMEN_OUTEMAIL_TIMEOUT_SECONDS=10
 LUMEN_ACCESS_TOKEN_TTL_SECONDS=604800
 LUMEN_REQUEST_SIGNING_SECRET=project-lumen-local-request-signing-key
 LUMEN_REQUEST_TIMESTAMP_SKEW_SECONDS=300
-LUMEN_REQUIRE_REQUEST_SIGNING=true
+LUMEN_REQUIRE_REQUEST_SIGNING=false
 LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=true
 LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false
 ```
 
 `LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false` is intentionally fail-closed for Google Play purchases until real platform verification credentials are wired in.
 
-`LUMEN_REQUEST_SIGNING_SECRET` must match the Android release build secret supplied as `PROJECT_LUMEN_REQUEST_SIGNING_SECRET`; otherwise signed client requests fail with HTTP 403. Keep the default value for local development only.
+Request signing verification is disabled by default, including production deployments. Set `LUMEN_REQUIRE_REQUEST_SIGNING=true` explicitly to require the `X-Lumen-Timestamp`, `X-Lumen-Nonce`, and `X-Lumen-Signature` headers on protected `/v1` routes.
+
+When request signing is enabled, `LUMEN_REQUEST_SIGNING_SECRET` must match the Android release build secret supplied as `PROJECT_LUMEN_REQUEST_SIGNING_SECRET`; otherwise signed client requests fail with HTTP 403. Keep the default value for local development only.
 
 `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=true` lets `GET /api/v1/releases/check` and legacy `GET /v1/releases/check` bypass HMAC signing so already-released APKs can discover corrective updates. Set it to `false` only when the release-check endpoint should require the same request signature as other `/v1` routes. GitHub deployment reads this from the non-secret repository variable `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK`.
 
