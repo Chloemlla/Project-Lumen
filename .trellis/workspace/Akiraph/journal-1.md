@@ -57,7 +57,9 @@ Added a native Android product demo route, a Remotion Chinese Android product an
 
 ### Main Changes
 
-(Add details)
+- Changed `backend/src/config.rs` so `LUMEN_REQUIRE_REQUEST_SIGNING` defaults to `false`.
+- Changed backend deployment workflow to read `LUMEN_REQUIRE_REQUEST_SIGNING` from repository variables and fall back to `false`.
+- Updated backend README, CLAUDE.md, and backend deployment security spec to document explicit opt-in request-signature verification.
 
 ### Git Commits
 
@@ -67,7 +69,7 @@ Added a native Android product demo route, a Remotion Chinese Android product an
 
 ### Testing
 
-- [OK] (Add test results)
+- [OK] Static review only; local build, lint, type-check, and tests were not run because repository policy requires actual verification through GitHub workflows.
 
 ### Status
 
@@ -97,6 +99,41 @@ Added AndroidX Baseline Profile consumer and generator module, wired GitHub Acti
 | Hash | Message |
 |------|---------|
 | `4c4e2e8` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 4: Default disable backend request signing
+
+**Date**: 2026-07-08
+**Task**: Default disable backend request signing
+**Branch**: `main`
+
+### Summary
+
+Defaulted backend request-signature verification off, made deployment opt-in via LUMEN_REQUIRE_REQUEST_SIGNING, and updated docs/specs.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7867765` | (see git log) |
+| `1fd376d` | (see git log) |
+| `d92e41b` | (see git log) |
 
 ### Testing
 
