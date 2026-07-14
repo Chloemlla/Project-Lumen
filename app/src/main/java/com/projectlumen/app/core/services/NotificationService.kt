@@ -78,11 +78,22 @@ class NotificationService(private val context: Context) {
         nowMillis: Long = System.currentTimeMillis(),
     ) {
         cancelAllScheduled()
-        if (!settings.notificationEnabled) {
+        // The blocking overlay ("forced rest") is a hard enforcement that must fire in the
+        // background even when notifications are turned off. Its only background wake-up source
+        // once the app is killed/backgrounded is the AlarmManager exact alarm scheduled below, so
+        // keep scheduling alarms whenever notifications OR the overlay enforcement are enabled.
+        val overlayEnforcementEnabled = settings.globalOverlayEnabled
+        if (!settings.notificationEnabled && !overlayEnforcementEnabled) {
             dismissTimerNotifications(allTimerNotificationIds)
             return
         }
-        dismissStaleTimerNotifications(state)
+        if (!settings.notificationEnabled) {
+            // Don't leave stale notifications, but still schedule the enforcement alarms below.
+            // AlarmReceiver already gates notification posting on notificationEnabled separately.
+            dismissTimerNotifications(allTimerNotificationIds)
+        } else {
+            dismissStaleTimerNotifications(state)
+        }
         when (state.activeEngine) {
             ActiveEngine.REMINDER.name -> {
                 if (QuietHours.suppressesReminderNotifications(settings, nowMillis)) {

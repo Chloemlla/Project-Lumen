@@ -264,8 +264,10 @@ class TimerForegroundService : LifecycleService() {
     }
 
     private fun refreshRuntimeNotifications(settings: AppSettingsEntity, state: RuntimeStateEntity) {
-        if (!settings.notificationEnabled) return
+        // Always resync alarms: the forced-rest overlay depends on them firing in the background
+        // even when notifications are off. syncRuntimeAlarms decides internally what to schedule.
         notifications.syncRuntimeAlarms(settings, state)
+        if (!settings.notificationEnabled) return
         notifications.showOngoingStatus(state)
     }
 

@@ -62,9 +62,12 @@ class AlarmReceiver : BroadcastReceiver() {
                         }
                     }
                 }
+                // Forced-rest overlay is a hard enforcement gated only on the overlay setting and
+                // quiet hours — NOT on notificationEnabled. This mirrors the foreground path in
+                // TimerForegroundService.showBlockingOverlayIfNeeded so behaviour is identical
+                // whether the break becomes due in the foreground or after the app is backgrounded.
                 if (
                     intent.action == ACTION_BREAK_DUE &&
-                    settings.notificationEnabled &&
                     settings.globalOverlayEnabled &&
                     !suppressReminder
                 ) {
