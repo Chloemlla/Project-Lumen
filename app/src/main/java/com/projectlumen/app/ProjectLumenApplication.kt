@@ -179,8 +179,25 @@ class ProjectLumenApplication : Application() {
     }
 
     fun startTimerService() {
-        ContextCompat.startForegroundService(this, Intent(this, TimerForegroundService::class.java))
+        // Enqueue the reconciliation safety net first so it survives even when the
+        // foreground-service start below is refused (background start on Android 12+).
         TimerReconciliationWorker.enqueue(this)
+        startForegroundServiceSafely(Intent(this, TimerForegroundService::class.java))
+    }
+
+    /**
+     * Starts a foreground service without letting a background-start refusal crash the caller.
+     *
+     * On Android 12+ (API 31) `startForegroundService` throws
+     * `ForegroundServiceStartNotAllowedException` (a subclass of `IllegalStateException`) when the
+     * app is in the background and no start exemption applies. WorkManager workers and boot/alarm
+     * receivers routinely hit this. Reminders still fire via AlarmManager exact alarms, so a refused
+     * start is recoverable — we record it and move on instead of tearing down the reconciliation
+     * chain.
+     */
+    private fun startForegroundServiceSafely(intent: Intent) {
+        runCatching { ContextCompat.startForegroundService(this, intent) }
+            .onFailure(::recordCrash)
     }
 
     fun settingsRepository(): SettingsRepository {

@@ -169,7 +169,13 @@ class LightMonitorService : Service(), SensorEventListener {
         private const val ULTRA_LOW_BRIGHTNESS_THRESHOLD_PERCENT = 10
 
         fun start(context: Context) {
-            ContextCompat.startForegroundService(context, Intent(context, LightMonitorService::class.java))
+            // May be invoked from background workers/receivers; a background-start refusal on
+            // Android 12+ must not crash the caller and break its reconciliation chain.
+            runCatching {
+                ContextCompat.startForegroundService(context, Intent(context, LightMonitorService::class.java))
+            }.onFailure { throwable ->
+                (context.applicationContext as? ProjectLumenApplication)?.recordCrash(throwable)
+            }
         }
 
         fun stop(context: Context) {

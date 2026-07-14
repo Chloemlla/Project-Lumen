@@ -176,7 +176,11 @@ class EyeProtectionOverlayService : Service() {
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_MESSAGE, message)
                 .putExtra(EXTRA_DURATION_SECONDS, durationSeconds)
-            ContextCompat.startForegroundService(context, intent)
+            // A background-start refusal on Android 12+ must not crash the alarm/timer caller.
+            runCatching { ContextCompat.startForegroundService(context, intent) }
+                .onFailure { throwable ->
+                    (context.applicationContext as? ProjectLumenApplication)?.recordCrash(throwable)
+                }
         }
     }
 }
