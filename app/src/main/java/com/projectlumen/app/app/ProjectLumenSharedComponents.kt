@@ -166,6 +166,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.projectlumen.app.BuildConfig
+import androidx.compose.ui.semantics.Role
 import com.projectlumen.app.R
 import com.projectlumen.app.core.crash.CrashReport
 import com.projectlumen.app.ProjectLumenApplication
@@ -366,6 +367,8 @@ internal fun SettingsSection(
     icon: ImageVector,
     initiallyExpanded: Boolean = true,
     forceExpanded: Boolean = false,
+    headerAccessory: (@Composable () -> Unit)? = null,
+    summary: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     var expanded by rememberSaveable(titleRes) { mutableStateOf(initiallyExpanded) }
@@ -392,7 +395,12 @@ internal fun SettingsSection(
                     .fillMaxWidth()
                     .clip(LumenCardShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
-                    .clickable { expanded = !expanded }
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = stringResource(
+                            if (expanded) R.string.settings_section_collapse else R.string.settings_section_expand,
+                        ),
+                    ) { expanded = !expanded }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -404,12 +412,16 @@ internal fun SettingsSection(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
+                headerAccessory?.invoke()
                 Icon(
                     Icons.Outlined.KeyboardArrowDown,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.graphicsLayer { rotationZ = arrowRotation },
                 )
+            }
+            summary?.let { summaryContent ->
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = summaryContent)
             }
             AnimatedVisibility(
                 visible = expanded,

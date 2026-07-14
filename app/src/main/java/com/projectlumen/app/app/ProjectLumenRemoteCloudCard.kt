@@ -1,8 +1,7 @@
 package com.projectlumen.app.app
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,7 +15,6 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -29,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -63,17 +62,35 @@ internal fun RemoteCloudAccountCard(
         }
     }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-        shape = LumenCardShape,
-        colors = lumenCardColors(),
-        elevation = lumenCardElevation(),
-        border = lumenCardBorder(),
+    SettingsSection(
+        titleRes = R.string.remote_cloud_title,
+        icon = Icons.Outlined.CloudUpload,
+        initiallyExpanded = false,
+        headerAccessory = {
+            Text(
+                text = stringResource(
+                    if (state.signedIn) R.string.remote_cloud_badge_signed_in else R.string.remote_cloud_badge_signed_out,
+                ),
+                modifier = Modifier
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(
+                        if (state.signedIn) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                    )
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                color = if (state.signedIn) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+        },
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeader(Icons.Outlined.CloudUpload, R.string.remote_cloud_title)
             Text(
                 stringResource(R.string.remote_cloud_message),
                 style = MaterialTheme.typography.bodyMedium,
@@ -180,6 +197,5 @@ internal fun RemoteCloudAccountCard(
                     }
                 }
             }
-        }
     }
 }

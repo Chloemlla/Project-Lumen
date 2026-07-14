@@ -165,6 +165,24 @@ internal fun privacyReadinessScore(
     return (checks.count { it } * 100f / checks.size).toInt()
 }
 
+internal fun privacyActionNeededCount(
+    settings: AppSettingsEntity,
+    permissionRequirements: PermissionRequirements,
+    shizukuReady: Boolean,
+): Int {
+    val pending = listOf(
+        settings.notificationEnabled && permissionRequirements.notification,
+        settings.notificationEnabled && permissionRequirements.exactAlarm,
+        settings.notificationEnabled && permissionRequirements.fullScreenIntent,
+        settings.proximityMonitoringEnabled && permissionRequirements.camera,
+        settings.blinkMonitoringEnabled && permissionRequirements.camera,
+        settings.autoBrightnessEnabled && permissionRequirements.writeSettings && !usesShizukuNativeBrightness(settings),
+        settings.globalOverlayEnabled && permissionRequirements.overlay,
+        settings.shizukuAdvancedModeEnabled && !shizukuReady,
+    )
+    return pending.count { it }
+}
+
 internal fun usesShizukuNativeBrightness(settings: AppSettingsEntity): Boolean {
     return settings.shizukuAdvancedModeEnabled && settings.shizukuNativeEyeProtectionEnabled
 }

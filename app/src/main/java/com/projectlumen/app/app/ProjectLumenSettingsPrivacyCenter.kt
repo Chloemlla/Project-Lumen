@@ -26,7 +26,6 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -57,18 +56,20 @@ internal fun SettingsPrivacyPermissionCenter(
     val settings = uiState.settings
     val nextTarget = firstMissingPermissionTarget(settings, permissionRequirements, shizukuReady)
     val readinessScore = privacyReadinessScore(settings, permissionRequirements, shizukuReady)
+    val actionNeededCount = privacyActionNeededCount(settings, permissionRequirements, shizukuReady)
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-        shape = LumenCardShape,
-        colors = lumenCardColors(),
-        elevation = lumenCardElevation(),
-        border = lumenCardBorder(),
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeader(Icons.Outlined.Lock, R.string.eye_care_privacy_permissions)
+    SettingsSection(
+        titleRes = R.string.eye_care_privacy_permissions,
+        icon = Icons.Outlined.Lock,
+        initiallyExpanded = false,
+        forceExpanded = activeTarget != null,
+        headerAccessory = {
+            PrivacyReadinessBadge(
+                readinessScore = readinessScore,
+                actionNeededCount = actionNeededCount,
+            )
+        },
+        summary = {
             Text(
                 stringResource(R.string.settings_privacy_permission_summary),
                 style = MaterialTheme.typography.bodyMedium,
@@ -83,10 +84,15 @@ internal fun SettingsPrivacyPermissionCenter(
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
             if (nextTarget != null) {
-                Button(onClick = { onConfigureTarget(nextTarget) }) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onConfigureTarget(nextTarget) },
+                ) {
                     ButtonLabel(Icons.Outlined.CheckCircle, R.string.settings_permission_fix_next)
                 }
             }
+        },
+    ) {
             Text(
                 stringResource(R.string.settings_privacy_quick_tiles),
                 style = MaterialTheme.typography.titleSmall,
@@ -229,7 +235,6 @@ internal fun SettingsPrivacyPermissionCenter(
                 onTargetCheckedChange = onTargetCheckedChange,
             )
             StatusLine(Icons.Outlined.Info, stringResource(R.string.eye_care_privacy_boundary))
-        }
     }
 }
 
@@ -416,6 +421,43 @@ private fun PrivacyPermissionRow(
             )
         }
     }
+}
+
+@Composable
+private fun PrivacyReadinessBadge(
+    readinessScore: Int,
+    actionNeededCount: Int,
+) {
+    val label: String
+    val containerColor: androidx.compose.ui.graphics.Color
+    val contentColor: androidx.compose.ui.graphics.Color
+    when {
+        actionNeededCount > 0 -> {
+            label = stringResource(R.string.settings_privacy_badge_action_needed, actionNeededCount)
+            containerColor = MaterialTheme.colorScheme.errorContainer
+            contentColor = MaterialTheme.colorScheme.onErrorContainer
+        }
+        readinessScore >= 100 -> {
+            label = stringResource(R.string.settings_privacy_badge_all_ready)
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+        }
+        else -> {
+            label = stringResource(R.string.percent_value, readinessScore)
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        }
+    }
+    Text(
+        text = label,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(containerColor)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = contentColor,
+    )
 }
 
 @Composable

@@ -266,34 +266,52 @@ internal fun EyeCareActionPlanCard(
 ) {
     val summary = rememberEyeCareInsightSummary(uiState, permissionRequirements, shizukuReady)
     val recommendedFeedback = rememberRecommendedEyeCareApplyFeedback(onApplyRecommended)
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-        shape = LumenCardShape,
-        colors = lumenCardColors(),
-        elevation = lumenCardElevation(),
-        border = lumenCardBorder(),
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeader(Icons.Outlined.CheckCircle, R.string.eye_care_action_plan)
-            InsightActionList(summary.actionRes)
-            LumenFlowRow {
-                Button(onClick = recommendedFeedback.onApply) {
-                    ButtonLabel(Icons.Outlined.CheckCircle, R.string.eye_care_apply_recommended)
-                }
-                OutlinedButton(onClick = onExportReport) {
-                    ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)
-                }
-            }
-            RecommendedEyeCareSetupFeedback(
-                uiState = uiState,
-                permissionRequirements = permissionRequirements,
-                shizukuReady = shizukuReady,
-                applyFeedbackCount = recommendedFeedback.applyCount,
+    SettingsSection(
+        titleRes = R.string.eye_care_action_plan,
+        icon = Icons.Outlined.CheckCircle,
+        headerAccessory = {
+            Text(
+                text = stringResource(summary.riskLabelRes),
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(riskBadgeContainerColor(summary.riskScore))
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = riskBadgeContentColor(summary.riskScore),
             )
+        },
+    ) {
+        InsightActionList(summary.actionRes)
+        LumenFlowRow {
+            Button(onClick = recommendedFeedback.onApply) {
+                ButtonLabel(Icons.Outlined.CheckCircle, R.string.eye_care_apply_recommended)
+            }
+            OutlinedButton(onClick = onExportReport) {
+                ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)
+            }
         }
+        RecommendedEyeCareSetupFeedback(
+            uiState = uiState,
+            permissionRequirements = permissionRequirements,
+            shizukuReady = shizukuReady,
+            applyFeedbackCount = recommendedFeedback.applyCount,
+        )
     }
+}
+
+@Composable
+private fun riskBadgeContainerColor(riskScore: Int): Color = when {
+    riskScore >= 66 -> MaterialTheme.colorScheme.errorContainer
+    riskScore >= 33 -> MaterialTheme.colorScheme.secondaryContainer
+    else -> MaterialTheme.colorScheme.primaryContainer
+}
+
+@Composable
+private fun riskBadgeContentColor(riskScore: Int): Color = when {
+    riskScore >= 66 -> MaterialTheme.colorScheme.onErrorContainer
+    riskScore >= 33 -> MaterialTheme.colorScheme.onSecondaryContainer
+    else -> MaterialTheme.colorScheme.onPrimaryContainer
 }
 
 @Composable
@@ -395,19 +413,42 @@ internal fun EyeCareGrowthCapabilityCard(
     val cloudSyncReady = remoteState.signedIn
     val familyModeReady = isFamilyEyeCareModeActive(uiState)
     val aiGuidanceReady = uiState.settings.statsEnabled && uiState.settings.reminderEnabled
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-        shape = LumenCardShape,
-        colors = lumenCardColors(),
-        elevation = lumenCardElevation(),
-        border = lumenCardBorder(),
+    val activeCapabilities = listOf(
+        proEnabled && hasPremiumTemplates,
+        advancedReportsReady,
+        cloudSyncReady,
+        familyModeReady,
+        aiGuidanceReady,
+    ).count { it }
+    SettingsSection(
+        titleRes = R.string.eye_care_growth_capabilities,
+        icon = Icons.Outlined.Sync,
+        initiallyExpanded = false,
+        headerAccessory = {
+            Text(
+                text = "$activeCapabilities/5",
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(
+                        if (activeCapabilities > 0) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                    )
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (activeCapabilities > 0) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+        },
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeader(Icons.Outlined.Sync, R.string.eye_care_growth_capabilities)
-            MetricRow(R.string.plan_tier, uiState.settings.planTier.lowercase())
-            CapabilityLine(
+        MetricRow(R.string.plan_tier, uiState.settings.planTier.lowercase())
+        CapabilityLine(
                 icon = Icons.Outlined.Style,
                 titleRes = R.string.eye_care_growth_pro_templates,
                 active = proEnabled && hasPremiumTemplates,
@@ -465,7 +506,6 @@ internal fun EyeCareGrowthCapabilityCard(
                     ButtonLabel(Icons.Outlined.Info, R.string.eye_care_apply_local_guidance)
                 }
             }
-        }
     }
 }
 

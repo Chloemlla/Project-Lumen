@@ -2,6 +2,8 @@
 <resources>
     <string name="settings_privacy_permission_summary">在一个位置管理敏感能力。开关会启用关联功能，“配置”会跳到对应设置段或 Android 权限页。</string>
     <string name="settings_privacy_quick_tiles">控制中心</string>
+    <string name="settings_privacy_badge_all_ready">已就绪</string>
+    <string name="settings_privacy_badge_action_needed">%1$d 项待处理</string>
     <string name="settings_permission_fix_next">处理下一项权限</string>
     <string name="settings_permission_configure">配置</string>
     <string name="settings_permission_resolve">处理</string>
