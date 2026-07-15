@@ -1039,10 +1039,10 @@ Sanitization redacts local user-home paths plus `content://` / `file://` URIs. T
 
 | Layout signal | Behavior |
 |---|---|
-| Compact width (`< 600.dp` or Compact class / phone) | Full-width content, denser 12–16.dp padding, smaller hero type, stack header wraps above expand control, vertical action stack |
+| Compact width (`< 600.dp` or Compact class / phone) | Full-width content, denser 12–16.dp padding, smaller hero type, denser info tiles / pills / buttons, stack header wraps above expand control, vertical action stack |
 | Medium width | Content max 720.dp, 20.dp padding, two-column secondary actions when height is not compact |
 | Expanded width (`>= 840.dp` or Expanded class) | Content max 960.dp, wider metadata pills, horizontal secondary actions when height is not compact |
-| Compact height (`< 560.dp` or Compact class) | Tighter vertical padding/spacing; lower stack max heights so primary actions stay reachable on short phones |
+| Compact height (`< 560.dp` or Compact class) | Tighter vertical padding/spacing; lower stack max heights and denser controls so primary actions stay reachable on short phones |
 
 Stack preview defaults to 18 collapsed lines; users can expand/collapse. Author footer card is always rendered when integrity passes.
 

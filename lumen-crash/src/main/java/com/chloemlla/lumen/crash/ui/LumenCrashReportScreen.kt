@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -168,16 +169,43 @@ fun LumenCrashReportScreen(
 
             CrashReportCard(contentPadding = layout.cardPadding) {
                 CrashReportSectionHeader(Icons.Outlined.Info, stringResource(R.string.lumen_crash_report_summary))
-                CrashReportInfoTile(stringResource(R.string.lumen_crash_report_id), report.reportId)
-                CrashReportInfoTile(stringResource(R.string.lumen_crash_report_time), formattedTime)
+                CrashReportInfoTile(
+                    label = stringResource(R.string.lumen_crash_report_id),
+                    value = report.reportId,
+                    dense = layout.denseControls,
+                    contentPadding = layout.controlPadding,
+                )
+                CrashReportInfoTile(
+                    label = stringResource(R.string.lumen_crash_report_time),
+                    value = formattedTime,
+                    dense = layout.denseControls,
+                    contentPadding = layout.controlPadding,
+                )
                 CrashReportInfoTile(
                     label = stringResource(R.string.lumen_crash_report_root_cause),
                     value = report.rootCause,
                     emphasis = true,
+                    dense = layout.denseControls,
+                    contentPadding = layout.controlPadding,
                 )
-                CrashReportInfoTile(stringResource(R.string.lumen_crash_report_exception_type), report.exceptionType)
-                CrashReportInfoTile(stringResource(R.string.lumen_crash_report_thread), report.threadName)
-                CrashReportInfoTile(stringResource(R.string.lumen_crash_report_process), report.processName)
+                CrashReportInfoTile(
+                    label = stringResource(R.string.lumen_crash_report_exception_type),
+                    value = report.exceptionType,
+                    dense = layout.denseControls,
+                    contentPadding = layout.controlPadding,
+                )
+                CrashReportInfoTile(
+                    label = stringResource(R.string.lumen_crash_report_thread),
+                    value = report.threadName,
+                    dense = layout.denseControls,
+                    contentPadding = layout.controlPadding,
+                )
+                CrashReportInfoTile(
+                    label = stringResource(R.string.lumen_crash_report_process),
+                    value = report.processName,
+                    dense = layout.denseControls,
+                    contentPadding = layout.controlPadding,
+                )
             }
 
             CrashReportCard(contentPadding = layout.cardPadding) {
@@ -187,7 +215,12 @@ fun LumenCrashReportScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     systemInfo.forEach { (label, value) ->
-                        CrashReportMetadataPill(label = label, value = value, maxWidth = layout.pillMaxWidth)
+                        CrashReportMetadataPill(
+                            label = label,
+                            value = value,
+                            maxWidth = layout.pillMaxWidth,
+                            dense = layout.denseControls,
+                        )
                     }
                 }
             }
@@ -200,7 +233,7 @@ fun LumenCrashReportScreen(
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         report.recentEvents.takeLast(CRASH_EVENT_VISIBLE_COUNT).forEach { event ->
-                            CrashReportEventRow(event)
+                            CrashReportEventRow(event = event, dense = layout.denseControls)
                         }
                     }
                 }
@@ -322,6 +355,10 @@ fun LumenCrashReportScreen(
                 horizontalActions = layout.horizontalActions,
                 twoColumnActions = layout.twoColumnActions,
                 compact = layout.compactWidth,
+                dense = layout.denseControls,
+                buttonMinHeight = layout.buttonMinHeight,
+                buttonContentPadding = layout.buttonContentPadding,
+                iconButtonSpacing = layout.iconButtonSpacing,
                 onCopyId = {
                     runCatching { AuthorIntegrity.verifyOrThrow("copy-id") }
                     context.getSystemService(ClipboardManager::class.java)
@@ -407,10 +444,16 @@ private data class CrashLayoutTokens(
     val verticalPadding: Dp,
     val sectionSpacing: Dp,
     val cardPadding: Dp,
+    val controlPadding: Dp,
+    val controlInnerSpacing: Dp,
+    val buttonMinHeight: Dp,
+    val buttonContentPadding: PaddingValues,
+    val iconButtonSpacing: Dp,
     val stackCollapsedMaxHeight: Dp,
     val stackExpandedMaxHeight: Dp,
     val pillMaxWidth: Dp,
     val compactWidth: Boolean,
+    val denseControls: Boolean,
     val horizontalActions: Boolean,
     val twoColumnActions: Boolean,
 )
@@ -468,10 +511,32 @@ private fun rememberCrashLayoutTokens(
     }
     val twoColumnActions = mediumWidth && !compactHeight
     val horizontalActions = expandedWidth && !compactHeight
+    val denseControls = phoneLike || compactHeight
+    val veryNarrowPhone = phoneLike && effectiveWidth < 360.dp
+    val controlPadding = when {
+        veryNarrowPhone -> 10.dp
+        denseControls -> 12.dp
+        else -> 14.dp
+    }
+    val buttonMinHeight = when {
+        veryNarrowPhone -> 44.dp
+        denseControls -> 48.dp
+        else -> 52.dp
+    }
+    val buttonHorizontalPadding = when {
+        veryNarrowPhone -> 12.dp
+        denseControls -> 14.dp
+        else -> 16.dp
+    }
+    val buttonVerticalPadding = when {
+        veryNarrowPhone -> 8.dp
+        denseControls -> 10.dp
+        else -> 12.dp
+    }
     return CrashLayoutTokens(
         maxContentWidth = maxContentWidth,
         horizontalPadding = when {
-            phoneLike && effectiveWidth < 360.dp -> 12.dp
+            veryNarrowPhone -> 12.dp
             compactWidth -> 16.dp
             else -> 20.dp
         },
@@ -485,15 +550,25 @@ private fun rememberCrashLayoutTokens(
             phoneLike -> 12.dp
             else -> 16.dp
         },
-        cardPadding = if (phoneLike) 12.dp else 16.dp,
+        cardPadding = if (denseControls) 12.dp else 16.dp,
+        controlPadding = controlPadding,
+        controlInnerSpacing = if (denseControls) 8.dp else 12.dp,
+        buttonMinHeight = buttonMinHeight,
+        buttonContentPadding = PaddingValues(
+            horizontal = buttonHorizontalPadding,
+            vertical = buttonVerticalPadding,
+        ),
+        iconButtonSpacing = if (veryNarrowPhone) 6.dp else if (denseControls) 8.dp else 10.dp,
         stackCollapsedMaxHeight = stackCollapsed,
         stackExpandedMaxHeight = stackExpanded,
         pillMaxWidth = when {
-            phoneLike -> effectiveWidth
+            phoneLike && effectiveWidth < 400.dp -> effectiveWidth
+            phoneLike -> (effectiveWidth - 24.dp).coerceAtLeast(160.dp)
             expandedWidth -> 360.dp
             else -> 320.dp
         },
         compactWidth = compactWidth,
+        denseControls = denseControls,
         horizontalActions = horizontalActions,
         twoColumnActions = twoColumnActions,
     )
@@ -550,6 +625,8 @@ private fun CrashAuthorFooterCard(report: CrashReport) {
             label = CrashAuthorAttribution.AUTHOR_NAME,
             value = CrashAuthorAttribution.AUTHOR_URL,
             emphasis = true,
+            dense = true,
+            contentPadding = 12.dp,
         )
         Text(
             text = CrashAuthorAttribution.FOOTER_LABEL,
@@ -666,53 +743,79 @@ private fun CrashReportInfoTile(
     label: String,
     value: String,
     emphasis: Boolean = false,
+    dense: Boolean = false,
+    contentPadding: Dp = 12.dp,
 ) {
+    val labelStyle = if (dense) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge
+    val valueStyle = when {
+        emphasis && dense -> MaterialTheme.typography.titleSmall
+        emphasis -> MaterialTheme.typography.titleMedium
+        dense -> MaterialTheme.typography.bodySmall
+        else -> MaterialTheme.typography.bodyMedium
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surface)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(contentPadding),
+        verticalArrangement = Arrangement.spacedBy(if (dense) 2.dp else 4.dp),
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = labelStyle,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = value,
-            style = if (emphasis) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+            style = valueStyle,
             fontWeight = if (emphasis) FontWeight.SemiBold else FontWeight.Normal,
             color = MaterialTheme.colorScheme.onSurface,
-            maxLines = if (emphasis) 4 else 3,
+            maxLines = if (emphasis) 5 else 3,
             overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 @Composable
-private fun CrashReportMetadataPill(label: String, value: String, maxWidth: Dp) {
+private fun CrashReportMetadataPill(
+    label: String,
+    value: String,
+    maxWidth: Dp,
+    dense: Boolean = false,
+) {
+    val horizontal = if (dense) 10.dp else 12.dp
+    val vertical = if (dense) 8.dp else 10.dp
     Surface(
-        modifier = Modifier.widthIn(max = maxWidth),
+        modifier = if (dense) {
+            Modifier
+                .fillMaxWidth()
+                .widthIn(max = maxWidth)
+        } else {
+            Modifier.widthIn(max = maxWidth)
+        },
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = horizontal, vertical = vertical),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
+                style = if (dense) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = value,
-                style = MaterialTheme.typography.bodyMedium,
+                style = if (dense) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
@@ -723,7 +826,10 @@ private fun CrashReportMetadataPill(label: String, value: String, maxWidth: Dp) 
 }
 
 @Composable
-private fun CrashReportEventRow(event: String) {
+private fun CrashReportEventRow(
+    event: String,
+    dense: Boolean = false,
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -733,10 +839,15 @@ private fun CrashReportEventRow(event: String) {
     ) {
         Text(
             text = event,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(
+                horizontal = if (dense) 10.dp else 12.dp,
+                vertical = if (dense) 8.dp else 10.dp,
+            ),
+            style = if (dense) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
             color = MaterialTheme.colorScheme.onSurface,
+            maxLines = if (dense) 4 else 6,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -746,13 +857,17 @@ private fun CrashReportActionPanel(
     horizontalActions: Boolean,
     twoColumnActions: Boolean,
     compact: Boolean,
+    dense: Boolean,
+    buttonMinHeight: Dp,
+    buttonContentPadding: PaddingValues,
+    iconButtonSpacing: Dp,
     onCopyId: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
     onClear: () -> Unit,
 ) {
-    val panelPadding = if (compact) 12.dp else 16.dp
-    val buttonSpacing = if (compact) 8.dp else 12.dp
+    val panelPadding = if (dense) 12.dp else 16.dp
+    val buttonSpacing = if (dense) 8.dp else 12.dp
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -769,131 +884,182 @@ private fun CrashReportActionPanel(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onCopyId) {
-                            Icon(Icons.Outlined.ContentCopy, contentDescription = null)
-                            Spacer(modifier = Modifier.size(8.dp))
-                            Text(
-                                text = stringResource(R.string.lumen_crash_report_copy_id),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onCopy) {
-                            Icon(Icons.Outlined.ContentCopy, contentDescription = null)
-                            Spacer(modifier = Modifier.size(8.dp))
-                            Text(
-                                text = stringResource(R.string.lumen_crash_report_copy),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onShare) {
-                            Icon(Icons.Outlined.Share, contentDescription = null)
-                            Spacer(modifier = Modifier.size(8.dp))
-                            Text(
-                                text = stringResource(R.string.lumen_crash_report_share),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    Button(modifier = Modifier.fillMaxWidth(), onClick = onClear) {
-                        Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text(
-                            text = stringResource(R.string.lumen_crash_report_clear_and_continue),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        CrashReportActionButton(
+                            text = stringResource(R.string.lumen_crash_report_copy_id),
+                            icon = Icons.Outlined.ContentCopy,
+                            onClick = onCopyId,
+                            outlined = true,
+                            modifier = Modifier.weight(1f),
+                            minHeight = buttonMinHeight,
+                            contentPadding = buttonContentPadding,
+                            iconSpacing = iconButtonSpacing,
+                        )
+                        CrashReportActionButton(
+                            text = stringResource(R.string.lumen_crash_report_copy),
+                            icon = Icons.Outlined.ContentCopy,
+                            onClick = onCopy,
+                            outlined = true,
+                            modifier = Modifier.weight(1f),
+                            minHeight = buttonMinHeight,
+                            contentPadding = buttonContentPadding,
+                            iconSpacing = iconButtonSpacing,
+                        )
+                        CrashReportActionButton(
+                            text = stringResource(R.string.lumen_crash_report_share),
+                            icon = Icons.Outlined.Share,
+                            onClick = onShare,
+                            outlined = true,
+                            modifier = Modifier.weight(1f),
+                            minHeight = buttonMinHeight,
+                            contentPadding = buttonContentPadding,
+                            iconSpacing = iconButtonSpacing,
                         )
                     }
+                    CrashReportActionButton(
+                        text = stringResource(R.string.lumen_crash_report_clear_and_continue),
+                        icon = Icons.Outlined.DeleteOutline,
+                        onClick = onClear,
+                        outlined = false,
+                        modifier = Modifier.fillMaxWidth(),
+                        minHeight = buttonMinHeight,
+                        contentPadding = buttonContentPadding,
+                        iconSpacing = iconButtonSpacing,
+                        maxLines = 1,
+                    )
                 }
                 twoColumnActions -> {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onCopyId) {
-                            Icon(Icons.Outlined.ContentCopy, contentDescription = null)
-                            Spacer(modifier = Modifier.size(8.dp))
-                            Text(
-                                text = stringResource(R.string.lumen_crash_report_copy_id),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onCopy) {
-                            Icon(Icons.Outlined.ContentCopy, contentDescription = null)
-                            Spacer(modifier = Modifier.size(8.dp))
-                            Text(
-                                text = stringResource(R.string.lumen_crash_report_copy),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                        CrashReportActionButton(
+                            text = stringResource(R.string.lumen_crash_report_copy_id),
+                            icon = Icons.Outlined.ContentCopy,
+                            onClick = onCopyId,
+                            outlined = true,
+                            modifier = Modifier.weight(1f),
+                            minHeight = buttonMinHeight,
+                            contentPadding = buttonContentPadding,
+                            iconSpacing = iconButtonSpacing,
+                        )
+                        CrashReportActionButton(
+                            text = stringResource(R.string.lumen_crash_report_copy),
+                            icon = Icons.Outlined.ContentCopy,
+                            onClick = onCopy,
+                            outlined = true,
+                            modifier = Modifier.weight(1f),
+                            minHeight = buttonMinHeight,
+                            contentPadding = buttonContentPadding,
+                            iconSpacing = iconButtonSpacing,
+                        )
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onShare) {
-                            Icon(Icons.Outlined.Share, contentDescription = null)
-                            Spacer(modifier = Modifier.size(8.dp))
-                            Text(
-                                text = stringResource(R.string.lumen_crash_report_share),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Button(modifier = Modifier.weight(1f), onClick = onClear) {
-                            Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
-                            Spacer(modifier = Modifier.size(8.dp))
-                            Text(
-                                text = stringResource(R.string.lumen_crash_report_clear_and_continue),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                        CrashReportActionButton(
+                            text = stringResource(R.string.lumen_crash_report_share),
+                            icon = Icons.Outlined.Share,
+                            onClick = onShare,
+                            outlined = true,
+                            modifier = Modifier.weight(1f),
+                            minHeight = buttonMinHeight,
+                            contentPadding = buttonContentPadding,
+                            iconSpacing = iconButtonSpacing,
+                        )
+                        CrashReportActionButton(
+                            text = stringResource(R.string.lumen_crash_report_clear_and_continue),
+                            icon = Icons.Outlined.DeleteOutline,
+                            onClick = onClear,
+                            outlined = false,
+                            modifier = Modifier.weight(1f),
+                            minHeight = buttonMinHeight,
+                            contentPadding = buttonContentPadding,
+                            iconSpacing = iconButtonSpacing,
+                            maxLines = 1,
+                        )
                     }
                 }
                 else -> {
-                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCopyId) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = null)
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text(
-                            text = stringResource(R.string.lumen_crash_report_copy_id),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCopy) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = null)
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text(
-                            text = stringResource(R.string.lumen_crash_report_copy),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onShare) {
-                        Icon(Icons.Outlined.Share, contentDescription = null)
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text(
-                            text = stringResource(R.string.lumen_crash_report_share),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Button(modifier = Modifier.fillMaxWidth(), onClick = onClear) {
-                        Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text(
-                            text = stringResource(R.string.lumen_crash_report_clear_and_continue),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    CrashReportActionButton(
+                        text = stringResource(R.string.lumen_crash_report_copy_id),
+                        icon = Icons.Outlined.ContentCopy,
+                        onClick = onCopyId,
+                        outlined = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        minHeight = buttonMinHeight,
+                        contentPadding = buttonContentPadding,
+                        iconSpacing = iconButtonSpacing,
+                    )
+                    CrashReportActionButton(
+                        text = stringResource(R.string.lumen_crash_report_copy),
+                        icon = Icons.Outlined.ContentCopy,
+                        onClick = onCopy,
+                        outlined = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        minHeight = buttonMinHeight,
+                        contentPadding = buttonContentPadding,
+                        iconSpacing = iconButtonSpacing,
+                    )
+                    CrashReportActionButton(
+                        text = stringResource(R.string.lumen_crash_report_share),
+                        icon = Icons.Outlined.Share,
+                        onClick = onShare,
+                        outlined = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        minHeight = buttonMinHeight,
+                        contentPadding = buttonContentPadding,
+                        iconSpacing = iconButtonSpacing,
+                    )
+                    CrashReportActionButton(
+                        text = stringResource(R.string.lumen_crash_report_clear_and_continue),
+                        icon = Icons.Outlined.DeleteOutline,
+                        onClick = onClear,
+                        outlined = false,
+                        modifier = Modifier.fillMaxWidth(),
+                        minHeight = buttonMinHeight,
+                        contentPadding = buttonContentPadding,
+                        iconSpacing = iconButtonSpacing,
+                        maxLines = if (compact) 2 else 1,
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CrashReportActionButton(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    outlined: Boolean,
+    modifier: Modifier = Modifier,
+    minHeight: Dp,
+    contentPadding: PaddingValues,
+    iconSpacing: Dp,
+    maxLines: Int = 1,
+) {
+    val buttonModifier = modifier.defaultMinSize(minHeight = minHeight)
+    if (outlined) {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = buttonModifier,
+            contentPadding = contentPadding,
+        ) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.size(iconSpacing))
+            Text(text = text, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
+        }
+    } else {
+        Button(
+            onClick = onClick,
+            modifier = buttonModifier,
+            contentPadding = contentPadding,
+        ) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.size(iconSpacing))
+            Text(text = text, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -947,14 +1113,21 @@ private fun CrashReportShareChoice(
     description: String,
     onClick: () -> Unit,
 ) {
+    val dense = LocalConfiguration.current.screenWidthDp < 600
     OutlinedButton(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = if (dense) 56.dp else 64.dp),
         onClick = onClick,
         shape = RoundedCornerShape(8.dp),
-        contentPadding = PaddingValues(14.dp),
+        contentPadding = PaddingValues(if (dense) 12.dp else 14.dp),
     ) {
-        Icon(imageVector = icon, contentDescription = null)
-        Spacer(modifier = Modifier.size(12.dp))
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(if (dense) 18.dp else 20.dp),
+        )
+        Spacer(modifier = Modifier.size(if (dense) 10.dp else 12.dp))
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -962,13 +1135,17 @@ private fun CrashReportShareChoice(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleSmall,
+                style = if (dense) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = if (dense) 3 else 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
