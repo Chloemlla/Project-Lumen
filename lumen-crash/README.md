@@ -48,7 +48,7 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 - Multi-path atomic persistence under app-specific **external** storage (`getExternalFilesDir` / `externalCacheDir`)
 - Breadcrumbs ring buffer (max 40 events, sanitized)
 - Adaptive Material3 crash report screen (`WindowSizeClass`)
-- Copy report ID / copy full report / share text / share file (file share needs host `FileProvider`)
+- Copy report ID / copy full report / share text / share file (file share needs host `FileProvider`) / upload paste link (default `https://paste.gentoo.zip`)
 - Host-configurable app metadata and product strings
 - Upload stays in the host app via `onCrashSaved`
 - **Non-removable author attribution**: Chloemlla + https://github.com/Chloemlla/
@@ -1079,6 +1079,25 @@ Example host provider:
 ```
 
 SDK share-as-file writes a UTF-8 `.txt` under internal cache first (`cacheDir/lumen-crash-share`, fallback external cache), attaches it through `FileProvider`, and propagates temporary URI read grants through the system chooser. If authority is missing, the UI shows the library "file share unavailable" string and still allows text share.
+
+### Upload shareable link (LogPaste)
+
+Crash UI can upload the sanitized report text to a LogPaste-compatible endpoint and surface a shareable HTTPS link:
+
+```text
+POST multipart/form-data field "_"  ->  https://paste.gentoo.zip
+Response body: paste id or full URL
+Shareable link: https://paste.gentoo.zip/<id>
+```
+
+Config:
+
+| Field | Default | Notes |
+|---|---|---|
+| `pasteUploadEnabled` | `true` | Disable to hide the upload-link share option |
+| `pasteUploadBaseUrl` | `https://paste.gentoo.zip` | Must be HTTPS; trailing slash is ignored |
+
+On success the SDK copies the link to the clipboard and shows a dialog with Copy / Open / Share actions. Library manifest merges `INTERNET` permission into hosts.
 
 ## Host product copy
 

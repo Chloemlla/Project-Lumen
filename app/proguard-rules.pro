@@ -82,6 +82,7 @@
 -keep class com.chloemlla.lumen.crash.CrashReportStore { *; }
 -keep class com.chloemlla.lumen.crash.CrashBreadcrumbs { *; }
 -keep class com.chloemlla.lumen.crash.AuthorBlock { *; }
+-keep class com.chloemlla.lumen.crash.CrashReportPasteUploader { *; }
 -keep class com.chloemlla.lumen.crash.ui.LumenCrashReportScreenKt { *; }
 
 # Safe package-level exemption for host release builds.

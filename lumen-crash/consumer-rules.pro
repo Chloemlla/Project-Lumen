@@ -31,6 +31,7 @@
 -keep class com.chloemlla.lumen.crash.CrashAppInfo { *; }
 -keep class com.chloemlla.lumen.crash.CrashReportStore { *; }
 -keep class com.chloemlla.lumen.crash.CrashBreadcrumbs { *; }
+-keep class com.chloemlla.lumen.crash.CrashReportPasteUploader { *; }
 -keep class com.chloemlla.lumen.crash.ui.LumenCrashReportScreenKt { *; }
 
 # Package-level exemption (safe default for release minify hosts).

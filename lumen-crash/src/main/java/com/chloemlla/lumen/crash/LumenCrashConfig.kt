@@ -15,6 +15,13 @@ data class LumenCrashConfig(
     val shareSubject: String? = null,
     val reportTitle: String? = null,
     val reportMessage: String? = null,
+    /**
+     * When true, the crash UI can upload the report text to a LogPaste endpoint and
+     * surface a shareable HTTPS link (default: https://paste.gentoo.zip).
+     */
+    val pasteUploadEnabled: Boolean = true,
+    /** HTTPS base URL for LogPaste-compatible upload. Trailing slashes are ignored. */
+    val pasteUploadBaseUrl: String = CrashReportPasteUploader.DEFAULT_BASE_URL,
     val onCrashSaved: ((CrashReport) -> Unit)? = null,
     val killProcessWhenNoPreviousHandler: Boolean = true,
 )

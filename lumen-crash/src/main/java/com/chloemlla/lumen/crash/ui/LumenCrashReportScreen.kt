@@ -84,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.chloemlla.lumen.crash.AuthorIntegrity
 import com.chloemlla.lumen.crash.CrashAuthorAttribution
+import com.chloemlla.lumen.crash.CrashReportPasteUploader
 import com.chloemlla.lumen.crash.CrashReport
 import com.chloemlla.lumen.crash.LumenCrash
 import com.chloemlla.lumen.crash.R
@@ -91,6 +92,7 @@ import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.Executors
 
 private val crashReportScreenTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
 private const val CRASH_STACK_COLLAPSED_LINES = 18
@@ -126,6 +128,8 @@ fun LumenCrashReportScreen(
 
     var stackExpanded by rememberSaveable(report.crashedAtMillis) { mutableStateOf(false) }
     var shareOptionsVisible by rememberSaveable(report.crashedAtMillis) { mutableStateOf(false) }
+    var pasteLinkDialogUrl by rememberSaveable(report.crashedAtMillis) { mutableStateOf<String?>(null) }
+    var pasteUploadInFlight by remember { mutableStateOf(false) }
     val formattedTime = remember(report.crashedAtMillis) {
         Instant.ofEpochMilli(report.crashedAtMillis)
             .atZone(ZoneId.systemDefault())
@@ -417,6 +421,7 @@ fun LumenCrashReportScreen(
     if (shareOptionsVisible) {
         CrashReportShareOptionsDialog(
             fileShareEnabled = !config?.fileProviderAuthority.isNullOrBlank(),
+            pasteShareEnabled = config?.pasteUploadEnabled != false,
             onDismiss = { shareOptionsVisible = false },
             onShareText = {
                 shareOptionsVisible = false
@@ -434,6 +439,55 @@ fun LumenCrashReportScreen(
                 } else {
                     shareCrashReportFile(context, report, authority, config?.shareSubject)
                 }
+            },
+            onShareLink = {
+                if (pasteUploadInFlight) return@CrashReportShareOptionsDialog
+                shareOptionsVisible = false
+                pasteUploadInFlight = true
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.lumen_crash_report_share_link_uploading),
+                    Toast.LENGTH_SHORT,
+                ).show()
+                uploadCrashReportPasteLink(
+                    context = context,
+                    report = report,
+                    baseUrl = config?.pasteUploadBaseUrl
+                        ?: CrashReportPasteUploader.DEFAULT_BASE_URL,
+                    onSuccess = { url ->
+                        pasteUploadInFlight = false
+                        pasteLinkDialogUrl = url
+                    },
+                    onFailure = {
+                        pasteUploadInFlight = false
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.lumen_crash_report_share_link_failed),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    },
+                )
+            },
+        )
+    }
+
+    pasteLinkDialogUrl?.let { url ->
+        CrashReportShareableLinkDialog(
+            url = url,
+            onDismiss = { pasteLinkDialogUrl = null },
+            onCopy = {
+                copyTextToClipboard(context, label = "crash report link", text = url)
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.lumen_crash_report_share_link_ready, url),
+                    Toast.LENGTH_LONG,
+                ).show()
+            },
+            onOpen = {
+                openHttpsUrl(context, url)
+            },
+            onShare = {
+                shareCrashReportLink(context, url, config?.shareSubject)
             },
         )
     }
@@ -1068,9 +1122,11 @@ private fun CrashReportActionButton(
 @Composable
 private fun CrashReportShareOptionsDialog(
     fileShareEnabled: Boolean,
+    pasteShareEnabled: Boolean,
     onDismiss: () -> Unit,
     onShareText: () -> Unit,
     onShareFile: () -> Unit,
+    onShareLink: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1095,6 +1151,14 @@ private fun CrashReportShareOptionsDialog(
                         title = stringResource(R.string.lumen_crash_report_share_as_file),
                         description = stringResource(R.string.lumen_crash_report_share_as_file_description),
                         onClick = onShareFile,
+                    )
+                }
+                if (pasteShareEnabled) {
+                    CrashReportShareChoice(
+                        icon = Icons.Outlined.Share,
+                        title = stringResource(R.string.lumen_crash_report_share_as_link),
+                        description = stringResource(R.string.lumen_crash_report_share_as_link_description),
+                        onClick = onShareLink,
                     )
                 }
             }
@@ -1248,6 +1312,126 @@ private fun launchCrashReportShare(
             Toast.LENGTH_SHORT,
         ).show()
     }
+}
+
+@Composable
+private fun CrashReportShareableLinkDialog(
+    url: String,
+    onDismiss: () -> Unit,
+    onCopy: () -> Unit,
+    onOpen: () -> Unit,
+    onShare: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(imageVector = Icons.Outlined.Share, contentDescription = null) },
+        title = { Text(text = stringResource(R.string.lumen_crash_report_share_as_link)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = stringResource(R.string.lumen_crash_report_share_link_ready, url),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = url,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onShare) {
+                Text(text = stringResource(R.string.lumen_crash_report_share))
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = onCopy) {
+                    Text(text = stringResource(R.string.lumen_crash_report_copy))
+                }
+                TextButton(onClick = onOpen) {
+                    Text(text = stringResource(R.string.lumen_crash_report_share_link_open))
+                }
+                TextButton(onClick = onDismiss) {
+                    Text(text = stringResource(R.string.lumen_crash_report_share_cancel))
+                }
+            }
+        },
+    )
+}
+
+private fun uploadCrashReportPasteLink(
+    context: Context,
+    report: CrashReport,
+    baseUrl: String,
+    onSuccess: (String) -> Unit,
+    onFailure: (Throwable) -> Unit,
+) {
+    val appContext = context.applicationContext
+    val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    Executors.newSingleThreadExecutor().execute {
+        val result = runCatching {
+            AuthorIntegrity.verifyOrThrow("share-link")
+            val url = CrashReportPasteUploader.uploadText(
+                text = report.toClipboardText(),
+                baseUrl = baseUrl,
+            )
+            copyTextToClipboard(appContext, label = "crash report link", text = url)
+            url
+        }
+        mainHandler.post {
+            result
+                .onSuccess(onSuccess)
+                .onFailure(onFailure)
+        }
+    }
+}
+
+private fun shareCrashReportLink(context: Context, url: String, shareSubject: String?) {
+    runCatching {
+        AuthorIntegrity.verifyOrThrow("share-link-intent")
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(
+                Intent.EXTRA_SUBJECT,
+                shareSubject?.takeIf { it.isNotBlank() }
+                    ?: context.getString(R.string.lumen_crash_report_share_subject),
+            )
+            putExtra(Intent.EXTRA_TEXT, url)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        launchCrashReportShare(context, intent)
+    }.onFailure {
+        Toast.makeText(
+            context,
+            context.getString(R.string.lumen_crash_report_share_failed),
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
+}
+
+private fun openHttpsUrl(context: Context, url: String) {
+    runCatching {
+        require(url.startsWith("https://", ignoreCase = true))
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }.onFailure {
+        Toast.makeText(
+            context,
+            context.getString(R.string.lumen_crash_report_share_link_failed),
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
+}
+
+private fun copyTextToClipboard(context: Context, label: String, text: String) {
+    val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
 }
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
