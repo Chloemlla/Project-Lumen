@@ -455,16 +455,21 @@ fun LumenCrashReportScreen(
                     baseUrl = config?.pasteUploadBaseUrl
                         ?: CrashReportPasteUploader.DEFAULT_BASE_URL,
                     onSuccess = { url ->
-                        pasteUploadInFlight = false
-                        pasteLinkDialogUrl = url
+                        // Upload failures/success must never process-kill the crash UI.
+                        runCatching {
+                            pasteUploadInFlight = false
+                            pasteLinkDialogUrl = url
+                        }
                     },
                     onFailure = {
-                        pasteUploadInFlight = false
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.lumen_crash_report_share_link_failed),
-                            Toast.LENGTH_SHORT,
-                        ).show()
+                        runCatching {
+                            pasteUploadInFlight = false
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.lumen_crash_report_share_link_failed),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
                     },
                 )
             },
@@ -1372,20 +1377,41 @@ private fun uploadCrashReportPasteLink(
 ) {
     val appContext = context.applicationContext
     val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    Executors.newSingleThreadExecutor().execute {
-        val result = runCatching {
-            AuthorIntegrity.verifyOrThrow("share-link")
-            val url = CrashReportPasteUploader.uploadText(
-                text = report.toClipboardText(),
-                baseUrl = baseUrl,
-            )
-            copyTextToClipboard(appContext, label = "crash report link", text = url)
-            url
+    // Never let network / integrity / clipboard failures crash the host process.
+    // Upload is best-effort; text/file share remain available after a failed paste upload.
+    runCatching {
+        Executors.newSingleThreadExecutor().execute {
+            val result = runCatching {
+                AuthorIntegrity.verifyOrThrow("share-link")
+                CrashReportPasteUploader.uploadText(
+                    text = report.toClipboardText(),
+                    baseUrl = baseUrl,
+                )
+            }
+            mainHandler.post {
+                runCatching {
+                    result.fold(
+                        onSuccess = { url ->
+                            runCatching {
+                                copyTextToClipboard(
+                                    appContext,
+                                    label = "crash report link",
+                                    text = url,
+                                )
+                            }
+                            onSuccess(url)
+                        },
+                        onFailure = onFailure,
+                    )
+                }.onFailure { callbackError ->
+                    // Last-resort: still clear in-flight UI via failure path if possible.
+                    runCatching { onFailure(callbackError) }
+                }
+            }
         }
+    }.onFailure { scheduleError ->
         mainHandler.post {
-            result
-                .onSuccess(onSuccess)
-                .onFailure(onFailure)
+            runCatching { onFailure(scheduleError) }
         }
     }
 }
@@ -1430,8 +1456,10 @@ private fun openHttpsUrl(context: Context, url: String) {
 }
 
 private fun copyTextToClipboard(context: Context, label: String, text: String) {
-    val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
-    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
+    runCatching {
+        val clipboard = context.getSystemService(ClipboardManager::class.java) ?: return
+        clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
+    }
 }
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {

@@ -1095,7 +1095,7 @@ POST multipart/form-data 字段 "_"  ->  https://paste.gentoo.zip
 | `pasteUploadEnabled` | `true` | 设为 `false` 可隐藏“上传并分享链接”选项 |
 | `pasteUploadBaseUrl` | `https://paste.gentoo.zip` | 必须 HTTPS；尾部 `/` 会被忽略 |
 
-上传成功后 SDK 会把链接复制到剪贴板，并弹出包含 复制 / 打开 / 分享 操作的对话框。库 manifest 会向宿主合并 `INTERNET` 权限。
+上传成功后 SDK 会把链接复制到剪贴板，并弹出包含 复制 / 打开 / 分享 操作的对话框。上传是 best-effort：网络、完整性校验或端点失败只会 Toast 报错，文本/文件分享仍可用，且不得因上传失败导致崩溃页进程退出。库 manifest 会向宿主合并 `INTERNET` 权限。
 
 ## 宿主产品文案
 

@@ -25,44 +25,58 @@ object CrashReportPasteUploader {
         connectTimeoutMillis: Int = 15_000,
         readTimeoutMillis: Int = 30_000,
     ): String {
-        AuthorIntegrity.verifyOrThrow("paste-upload")
-        val payload = text.trim()
-        require(payload.isNotEmpty()) { "Crash report text is empty." }
+        // Throw only checked-style failures for callers to catch; never call Process.kill/exit.
+        return try {
+            AuthorIntegrity.verifyOrThrow("paste-upload")
+            val payload = text.trim()
+            require(payload.isNotEmpty()) { "Crash report text is empty." }
 
-        val endpoint = normalizeBaseUrl(baseUrl)
-        val boundary = "----LumenCrashPasteBoundary${UUID.randomUUID().toString().replace("-", "")}"
-        val body = buildMultipartBody(boundary = boundary, fieldName = "_", value = payload)
+            val endpoint = normalizeBaseUrl(baseUrl)
+            val boundary = "----LumenCrashPasteBoundary${UUID.randomUUID().toString().replace("-", "")}"
+            val body = buildMultipartBody(boundary = boundary, fieldName = "_", value = payload)
 
-        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            doInput = true
-            doOutput = true
-            useCaches = false
-            connectTimeout = connectTimeoutMillis
-            readTimeout = readTimeoutMillis
-            setRequestProperty("Accept", "text/plain, */*")
-            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-            setRequestProperty("Content-Length", body.toByteArray(StandardCharsets.UTF_8).size.toString())
-            setRequestProperty("User-Agent", "lumen-crash-sdk")
-        }
-
-        try {
-            OutputStreamWriter(connection.outputStream, StandardCharsets.UTF_8).use { writer ->
-                writer.write(body)
-                writer.flush()
+            val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doInput = true
+                doOutput = true
+                useCaches = false
+                connectTimeout = connectTimeoutMillis.coerceAtLeast(1_000)
+                readTimeout = readTimeoutMillis.coerceAtLeast(1_000)
+                instanceFollowRedirects = true
+                setRequestProperty("Accept", "text/plain, */*")
+                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                setRequestProperty(
+                    "Content-Length",
+                    body.toByteArray(StandardCharsets.UTF_8).size.toString(),
+                )
+                setRequestProperty("User-Agent", "lumen-crash-sdk")
             }
 
-            val status = connection.responseCode
-            val responseText = readBody(
-                if (status in 200..299) connection.inputStream else connection.errorStream,
-            ).trim()
+            try {
+                OutputStreamWriter(connection.outputStream, StandardCharsets.UTF_8).use { writer ->
+                    writer.write(body)
+                    writer.flush()
+                }
 
-            if (status !in 200..299) {
-                throw IOException("Paste upload failed with HTTP $status: ${responseText.take(200)}")
+                val status = connection.responseCode
+                val responseText = readBody(
+                    if (status in 200..299) connection.inputStream else connection.errorStream,
+                ).trim()
+
+                if (status !in 200..299) {
+                    throw IOException(
+                        "Paste upload failed with HTTP $status: ${responseText.take(200)}",
+                    )
+                }
+                resolveShareableUrl(endpoint, responseText)
+            } finally {
+                runCatching { connection.disconnect() }
             }
-            return resolveShareableUrl(endpoint, responseText)
-        } finally {
-            connection.disconnect()
+        } catch (error: Throwable) {
+            // Normalize all failures (including Error subclasses from flaky runtimes) so UI
+            // callers can treat paste upload as non-fatal best-effort work.
+            if (error is IOException) throw error
+            throw IOException("Paste upload failed: ${error.message ?: error::class.java.simpleName}", error)
         }
     }
 
