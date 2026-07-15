@@ -156,13 +156,15 @@ https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v<version>
 
 ### 2）如何选择 / 解析版本
 
-默认消费方式：**自动解析 Project Lumen 上 `main` 分支为 `lumen-crash` 自动发版的最新版本**，再把该精确版本号写进 Gradle。
+默认消费方式：**始终自动解析 Project Lumen 上 `main` 分支为 `lumen-crash` 自动发版的最新版本**。正常外部接入**不要**在源码里硬编码钉死版本号。
 
-| 场景 | 版本形态 | 推荐来源 |
+| 场景 | 版本形态 | 要求 / 推荐来源 |
 |---|---|---|
-| 外部应用默认接入 | `0.1.0-<shortSha>` | 最新 `main` 自动发版（`lumen-crash-v0.1.0-<shortSha>`） |
-| 稳定冻结 / 生产固定 | `0.1.0` | tag 发布 `lumen-crash-v0.1.0` |
+| 外部应用默认接入（**必须**） | 最新 `0.1.0-<shortSha>` | 每次 CI/配置时自动解析最新 `lumen-crash-v*` main 发版 |
 | 本 monorepo 本地开发 | 工程模块 | `implementation(project(":lumen-crash"))` |
+| 仅限临时例外冻结 | 纯 `X.Y.Z` | 只允许短期排障使用；不是默认文档路径 |
+
+**要求：** 宿主应依赖 `com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>`，其中 `<auto-resolved-latest>` 来自 2.1 解析器，并在每次 CI/配置时刷新。不要把手工维护的硬编码版本当作长期接入方式。
 
 #### 2.1 自动解析最新 main 自动发版
 
@@ -250,29 +252,41 @@ GitHub CLI 一行命令：
 gh release list --repo Chloemlla/Project-Lumen --limit 100   | awk '/^lumen-crash-v/ { print $1; exit }'   | sed 's/^lumen-crash-v//'
 ```
 
-解析完成后，把精确版本写入依赖：
+解析完成后，把自动解析到的最新版本注入 Gradle。优先用 env / property 注入，**不要在源码中硬编码钉死**。
 
-```kotlin
-implementation("com.chloemlla.lumen:lumen-crash:<resolved-version>")
-// 示例：implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
-```
-
-可选 CI 模式（先解析，再导出给 Gradle）：
+推荐 CI / 本地模式：
 
 ```bash
 VERSION="$(...上面的解析命令...)"
 echo "LUMEN_CRASH_VERSION=${VERSION}" >> "$GITHUB_ENV"
-# 然后依赖 com.chloemlla.lumen:lumen-crash:${LUMEN_CRASH_VERSION}
+# 或本地 Gradle：
+# echo "lumenCrashVersion=${VERSION}" >> gradle.properties
 ```
+
+```kotlin
+// app/build.gradle.kts
+val lumenCrashVersion =
+    providers.gradleProperty("lumenCrashVersion")
+        .orElse(providers.environmentVariable("LUMEN_CRASH_VERSION"))
+        .orNull
+        ?: error("请先解析最新 lumen-crash（见 README 2.1）")
+
+dependencies {
+    implementation("com.chloemlla.lumen:lumen-crash:$lumenCrashVersion")
+}
+```
+
+正常接入路径**不要**提交永久硬编码行，例如 `implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")`。版本必须来自 latest-main 自动解析器。
 
 #### 2.2 其他版本来源
 
-你也可以从这些地方读取版本：
+这些只是同一套“自动最新”策略的检查辅助，不是长期硬编码钉死版本的理由：
 
 - GitHub Release 标题 / tag（`lumen-crash-v0.1.0-1a2b3c4d` => `0.1.0-1a2b3c4d`）
 - release 资产 `sdk-manifest.json` 的 `version` 字段
 - GitHub Packages 的 package 版本列表
-- 纯稳定 tag `lumen-crash-v0.1.0`（仅在你明确要冻结 semver 时）
+
+像 `lumen-crash-v0.1.0` 这样的纯稳定 tag 只用于临时例外冻结。默认外部接入始终是：每次自动解析最新的 `main` `lumen-crash-v*` 发版。
 
 ### 3）下载后先做完整性校验
 
@@ -332,44 +346,44 @@ dependencies {
 
 只需要最短路径时，按这份清单走：
 
-1. 自动解析 Project Lumen 上 `main` 为 `lumen-crash` 自动发版的最新版本（见 [第 2 节](#2如何选择解析版本)）。
+1. 自动解析 Project Lumen 上 `main` 为 `lumen-crash` 自动发版的最新版本（见 [第 2 节](#2如何选择解析版本)）。**不要**硬编码钉死版本。
 2. 创建带 `read:packages` 权限的 GitHub token。
 3. 把凭证写到 `~/.gradle/gradle.properties`（**不要提交**到仓库）。
 4. 在 `settings.gradle.kts` 添加 GitHub Packages Maven 仓库。
-5. 依赖 `com.chloemlla.lumen:lumen-crash:<resolved-version>`。
+5. 依赖 `com.chloemlla.lumen:lumen-crash:$lumenCrashVersion`，其中 `$lumenCrashVersion` 为自动解析到的最新值。
 6. Sync Gradle，并接入 `LumenCrash.install(...)` 与待处理崩溃报告 UI。
 
 | 字段 | 值 |
 |---|---|
 | Group ID | `com.chloemlla.lumen` |
 | Artifact ID | `lumen-crash` |
-| 默认版本来源 | 最新 `main` 自动发版（`0.1.0-<shortSha>`） |
-| 示例解析版本 | `0.1.0-1a2b3c4d` |
-| 完整坐标 | `com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d` |
+| 默认版本来源 | **自动最新** `main` 发版（`0.1.0-<shortSha>`） |
+| 版本策略 | 始终自动解析；正常接入不要硬编码钉死 |
+| 示例解析版本（瞬时） | `0.1.0-1a2b3c4d` |
+| 完整坐标形态 | `com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>` |
 | Maven 仓库 | `https://maven.pkg.github.com/Chloemlla/Project-Lumen` |
 | Packages 页面 | `https://github.com/Chloemlla/Project-Lumen/packages` |
 | 自动发版 tag 模式 | `https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v0.1.0-<shortSha>` |
-| 可选稳定冻结 | `lumen-crash-v0.1.0` |
 
-自动解析后的 Gradle 依赖行：
+自动解析后的 Gradle 依赖形态：
 
 ```kotlin
-implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
+implementation("com.chloemlla.lumen:lumen-crash:$lumenCrashVersion")
+// $lumenCrashVersion 来自 2.1 / env / gradle.properties，不是硬编码 pin
 ```
 
 #### 5.2 查找 / 解析已发布版本
 
-默认路径：自动解析 Project Lumen `main` 发布的最新 `lumen-crash-v*`（见 2.1），再固定该精确字符串。
+必选路径：每次 CI/配置时自动解析 Project Lumen `main` 发布的最新 `lumen-crash-v*`（见 2.1），再把该值注入 Gradle。**不要**把它作为永久写死在源码中的常量。
 
-| 来源 | 复制内容 |
+| 来源 | 如何使用 |
 |---|---|
-| **推荐：** 最新 main 自动发版 | 运行 2.1 解析脚本；形态 `0.1.0-<shortSha>` |
+| **必须：** 最新 main 自动发版 | 运行 2.1 解析脚本；形态 `0.1.0-<shortSha>` |
 | GitHub Release tag | `lumen-crash-v0.1.0-1a2b3c4d` => 依赖版本 `0.1.0-1a2b3c4d` |
 | Release 资产 `sdk-manifest.json` | 字段 `version` 与 `maven.coordinates` |
 | GitHub Packages 的 package 版本列表 | 如 `0.1.0-1a2b3c4d` |
-| 可选稳定冻结 | 纯 semver tag `lumen-crash-v0.1.0` => `0.1.0` |
 
-日常外部接入请跟踪最新 main 自动发版（`0.1.0-<shortSha>`）。只有在你明确要做生产冻结时，才切到纯 semver tag。
+外部接入始终跟踪最新 main 自动发版（`0.1.0-<shortSha>`）。不要把永久硬编码的稳定冻结写成默认依赖行。
 
 #### 5.3 创建读权限 token
 
@@ -490,24 +504,33 @@ dependencyResolutionManagement {
 
 ```kotlin
 // app/build.gradle.kts
-dependencies {
-    // 优先使用 2.1 / 5.2 自动解析出的最新 main 版本
-    implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
+val lumenCrashVersion =
+    providers.gradleProperty("lumenCrashVersion")
+        .orElse(providers.environmentVariable("LUMEN_CRASH_VERSION"))
+        .orNull
+        ?: error("请先解析最新 lumen-crash（见 README 2.1）")
 
-    // 可选生产冻结：
-    // implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+dependencies {
+    // 必须：使用 2.1 / 5.2 自动解析的最新 main 发版
+    // 不要在源码中硬编码 com.chloemlla.lumen:lumen-crash:X.Y.Z-<sha>
+    implementation("com.chloemlla.lumen:lumen-crash:$lumenCrashVersion")
 }
 ```
 
 Groovy：
 
 ```groovy
+def lumenCrashVersion = findProperty("lumenCrashVersion") ?: System.getenv("LUMEN_CRASH_VERSION")
+if (!lumenCrashVersion) {
+    throw new GradleException("请先解析最新 lumen-crash（见 README 2.1）")
+}
+
 dependencies {
-    implementation "com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d"
+    implementation "com.chloemlla.lumen:lumen-crash:$lumenCrashVersion"
 }
 ```
 
-把版本替换成 latest-main 解析器返回的精确字符串（或你明确要冻结的稳定版）。
+`$lumenCrashVersion` 必须来自 latest-main 自动解析器。正常接入**不要**硬编码钉死固定版本字符串。
 
 #### 5.7 Sync、解析并验证
 
@@ -517,10 +540,11 @@ dependencies {
 ./gradlew :app:dependencies --configuration releaseRuntimeClasspath
 ```
 
-2. 确认依赖树包含：
+2. 确认依赖树包含已解析到的最新坐标，例如：
 
 ```text
-com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d
+com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>
+# 某次解析结果示例：com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d
 ```
 
 3. 可选冒烟检查：
@@ -652,9 +676,9 @@ runCatching { riskyWork() }
 | 缺少 credentials 块 | `401 Unauthorized` | 添加 `credentials { ... }` 并设置 `gpr.*` 或环境变量 |
 | token 没有 `read:packages` | `401` / `403` | 重建具备 package 读权限的 token |
 | 未做 SSO 授权 | `403 Forbidden` | 给 token 完成组织 SSO 授权 |
-| 版本号写错 | 找不到 package | 从 Packages / Release / `sdk-manifest.json` 复制精确版本 |
+| 版本号写错 | 找不到 package | 从 Packages / Release / `sdk-manifest.json` 复制自动解析到的最新版本 |
 | 凭证被提交 | 密钥泄露 | 挪到 `~/.gradle/gradle.properties` 或 CI secrets，并轮换 token |
-| 只用裸 AAR 而不是 Maven 坐标 | 丢失传递依赖 | 优先 `implementation("com.chloemlla.lumen:lumen-crash:<version>")` |
+| 只用裸 AAR 而不是 Maven 坐标 | 丢失传递依赖 | 优先 `implementation("com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>")` |
 
 ### 6）方式 C：只使用 GitHub Release 资产（不走 Packages 鉴权）
 
@@ -815,12 +839,12 @@ runCatching { riskyWork() }
 
 外部宿主应用建议：
 
-1. 自动解析 Project Lumen `main` 上 `lumen-crash` 的最新自动发版（`lumen-crash-vX.Y.Z-<shortSha>`）
-2. 用该精确版本通过 **GitHub Packages Maven 坐标** 消费
+1. 每次 CI/配置时自动解析 Project Lumen `main` 上 `lumen-crash` 的最新自动发版（`lumen-crash-vX.Y.Z-<shortSha>`）
+2. 通过 **GitHub Packages Maven 坐标** 消费 `com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>`
 3. 凭证不进版本库
-4. 需要跟进更新时重新解析 / 重新固定版本
-5. 仅在长期生产冻结时，才切到纯稳定 tag（`lumen-crash-vX.Y.Z`）
-6. 晋级版本前核对 `sdk-manifest.json` 与 checksums
+4. 持续重新解析最新 main 自动发版；正常接入**不要**硬编码钉死版本
+5. 避免在源码中长期硬编码冻结版本
+6. 校验 `sdk-manifest.json` 与 checksums 以确认解析结果
 7. 上线前完成 `install` + 待处理报告 UI 拦截
 
 本 monorepo 建议：
@@ -1216,10 +1240,11 @@ android {
 ### 依赖与版本
 
 - **不要**单独使用 `/releases/latest`。本仓库可能同时发布非 SDK release。只认 `lumen-crash-v*` 前缀 tag。
-- 解析后 pin 精确版本：`0.1.0-<shortSha>`（main 自动发版）或纯 `X.Y.Z`（有意冻结）。不要留下浮动的 `latest` 坐标。
+- **必须：** 自动解析最新 `main` 的 `lumen-crash-v*` 发版，并注入为 `com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>`。正常外部接入**不要**硬编码钉死固定版本。
+- Maven 本身没有魔法浮动 `latest` 坐标；保持最新的正统方式是 2.1 解析器 + 每次 CI/配置时的 property/env 注入。
 - GitHub Packages 需要鉴权读取（`read:packages`）。若组织启用 SSO，token 必须先完成 SSO 授权。
 - 凭据放仓库外（`~/.gradle/gradle.properties` 或 CI secrets），**不要提交** token。
-- `Could not find` / `401` / `403` 几乎总是：Packages 仓库 URL、版本字符串、token 三者之一错误。见 [排障清单](#9排障清单)。
+- `Could not find` / `401` / `403` 几乎总是：Packages 仓库 URL、过期/错误版本字符串、token 三者之一错误。见 [排障清单](#9排障清单)。
 
 ### 宿主环境
 
@@ -1276,7 +1301,7 @@ android {
 
 ### 稳妥生产路径
 
-1. 解析并 pin 精确的 main 自动发版版本（`lumen-crash-vX.Y.Z-<shortSha>`）。
+1. 自动解析最新 main 自动发版版本（`lumen-crash-vX.Y.Z-<shortSha>`）并注入依赖；**不要**硬编码钉死。
 2. 通过 GitHub Packages 接入，凭据放仓库外。
 3. 在 `attachBaseContext` 安装。
 4. 启动时用 pending-report UI 闸门。

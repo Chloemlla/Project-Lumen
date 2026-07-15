@@ -86,7 +86,7 @@ The SDK is released automatically by GitHub Actions workflow:
 - Version source: `lumen-crash/sdk.version`
 - Maven coordinates: `com.chloemlla.lumen:lumen-crash:<version>`
 
-For consumers, prefer auto-resolving the latest Project Lumen `main` release via the `lumen-crash-v*` tag prefix (see section 2).
+For consumers, **require** auto-resolving the latest Project Lumen `main` release via the `lumen-crash-v*` tag prefix (see section 2). Do not hard-pin `com.chloemlla.lumen:lumen-crash` for normal integration.
 
 ### Triggers
 
@@ -158,13 +158,15 @@ https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v<version>
 
 ### 2) Choose / resolve a version
 
-Default consumer guidance is: **automatically resolve the latest Project Lumen `main` auto release** for `lumen-crash`, then pin that exact version string in Gradle.
+Default consumer guidance is: **always automatically resolve the latest Project Lumen `main` auto release** for `lumen-crash`. Do **not** hard-pin a fixed version string in source control for normal external integration.
 
-| Scenario | Version form | Recommended source |
+| Scenario | Version form | Required / recommended source |
 |---|---|---|
-| Default external integration | `0.1.0-<shortSha>` | Latest `main` auto release (`lumen-crash-v0.1.0-<shortSha>`) |
-| Stable pin / production freeze | `0.1.0` | Tag release `lumen-crash-v0.1.0` |
+| Default external integration (**required**) | latest `0.1.0-<shortSha>` | Auto-resolve newest `lumen-crash-v*` main release at configure/CI time |
 | Local monorepo development | project module | `implementation(project(":lumen-crash"))` |
+| Exceptional temporary freeze only | pure `X.Y.Z` | Allowed only for short-lived debugging; not the default docs path |
+
+**Requirement:** host apps should depend on `com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>`, where `<auto-resolved-latest>` comes from the resolver in section 2.1 on every CI/configure run. Do not leave a hand-maintained hard-coded version as the long-term integration path.
 
 #### 2.1 Automatically resolve the latest main auto release
 
@@ -252,29 +254,41 @@ GitHub CLI one-liner:
 gh release list --repo Chloemlla/Project-Lumen --limit 100   | awk '/^lumen-crash-v/ { print $1; exit }'   | sed 's/^lumen-crash-v//'
 ```
 
-After resolution, copy the exact version into your dependency line:
+After resolution, inject the auto-resolved latest version into Gradle. Prefer an env/property injection so the version is **not hard-pinned** in source.
 
-```kotlin
-implementation("com.chloemlla.lumen:lumen-crash:<resolved-version>")
-// example: implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
-```
-
-Optional CI pattern (resolve, then export for Gradle):
+Recommended CI / local pattern:
 
 ```bash
 VERSION="$(...resolve command from above...)"
 echo "LUMEN_CRASH_VERSION=${VERSION}" >> "$GITHUB_ENV"
-# then depend on com.chloemlla.lumen:lumen-crash:${LUMEN_CRASH_VERSION}
+# or for local Gradle:
+# echo "lumenCrashVersion=${VERSION}" >> gradle.properties
 ```
+
+```kotlin
+// app/build.gradle.kts
+val lumenCrashVersion =
+    providers.gradleProperty("lumenCrashVersion")
+        .orElse(providers.environmentVariable("LUMEN_CRASH_VERSION"))
+        .orNull
+        ?: error("Resolve latest lumen-crash first (see README section 2.1)")
+
+dependencies {
+    implementation("com.chloemlla.lumen:lumen-crash:$lumenCrashVersion")
+}
+```
+
+Do **not** commit a permanent hard-coded line such as `implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")` as the normal integration path. The version must come from the latest-main auto resolver.
 
 #### 2.2 Other version sources
 
-You can also read a version from:
+These are inspection aids for the same auto-latest policy, not reasons to hard-pin forever:
 
 - GitHub Release title / tag (`lumen-crash-v0.1.0-1a2b3c4d` => `0.1.0-1a2b3c4d`)
 - release asset `sdk-manifest.json` field `version`
 - GitHub Packages package version list
-- pure stable tag `lumen-crash-v0.1.0` when you intentionally freeze a semver
+
+Pure stable tags such as `lumen-crash-v0.1.0` are only for exceptional temporary freezes. Default external integration remains: auto-resolve the newest `main` `lumen-crash-v*` release every time.
 
 ### 3) Verify download integrity
 
@@ -334,44 +348,44 @@ This is the recommended way for **external Android apps** to consume the publish
 
 Use this checklist when you only need the shortest path:
 
-1. Automatically resolve the latest Project Lumen `main` auto release for `lumen-crash` (see [section 2](#2-choose--resolve-a-version)).
+1. Automatically resolve the latest Project Lumen `main` auto release for `lumen-crash` (see [section 2](#2-choose--resolve-a-version)). Do **not** hard-pin a fixed version.
 2. Create a GitHub token with `read:packages`.
 3. Put credentials in `~/.gradle/gradle.properties` (do **not** commit them).
 4. Add the GitHub Packages Maven repository in `settings.gradle.kts`.
-5. Depend on `com.chloemlla.lumen:lumen-crash:<resolved-version>`.
+5. Depend on `com.chloemlla.lumen:lumen-crash:$lumenCrashVersion` where `$lumenCrashVersion` is the auto-resolved latest value.
 6. Sync Gradle and wire `LumenCrash.install(...)` + pending-report UI.
 
 | Field | Value |
 |---|---|
 | Group ID | `com.chloemlla.lumen` |
 | Artifact ID | `lumen-crash` |
-| Default version source | Latest `main` auto release (`0.1.0-<shortSha>`) |
-| Example resolved version | `0.1.0-1a2b3c4d` |
-| Full coordinates | `com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d` |
+| Default version source | **Auto-latest** `main` release (`0.1.0-<shortSha>`) |
+| Version policy | Always auto-resolve; do not hard-pin in normal integration |
+| Example resolved version (ephemeral) | `0.1.0-1a2b3c4d` |
+| Full coordinates form | `com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>` |
 | Maven repository | `https://maven.pkg.github.com/Chloemlla/Project-Lumen` |
 | Packages page | `https://github.com/Chloemlla/Project-Lumen/packages` |
 | Auto release tag pattern | `https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v0.1.0-<shortSha>` |
-| Optional stable freeze | `lumen-crash-v0.1.0` |
 
-Gradle dependency line after auto-resolve:
+Gradle dependency form after auto-resolve:
 
 ```kotlin
-implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
+implementation("com.chloemlla.lumen:lumen-crash:$lumenCrashVersion")
+// $lumenCrashVersion comes from section 2.1 / env / gradle.properties, not a hard-coded pin
 ```
 
 #### 5.2 Find / resolve the published version
 
-Default path: auto-resolve the newest `lumen-crash-v*` release published from Project Lumen `main` (section 2.1), then pin that exact string.
+Required path: auto-resolve the newest `lumen-crash-v*` release published from Project Lumen `main` (section 2.1) on each CI/configure run, then inject that value into Gradle. Do **not** hard-pin it as a permanent source-controlled constant.
 
-| Source | What to copy |
+| Source | What to use |
 |---|---|
-| **Recommended:** latest main auto release | run the resolver in section 2.1; form `0.1.0-<shortSha>` |
+| **Required:** latest main auto release | run the resolver in section 2.1; form `0.1.0-<shortSha>` |
 | GitHub Release tag | `lumen-crash-v0.1.0-1a2b3c4d` => dependency version `0.1.0-1a2b3c4d` |
 | Release asset `sdk-manifest.json` | field `version` and `maven.coordinates` |
 | GitHub Packages package version list | package version string such as `0.1.0-1a2b3c4d` |
-| Optional stable freeze | pure semver tag `lumen-crash-v0.1.0` => `0.1.0` |
 
-For day-to-day external integration, track the latest main auto release (`0.1.0-<shortSha>`). Switch to a pure semver tag only when you intentionally freeze a production pin.
+For external integration, always track the latest main auto release (`0.1.0-<shortSha>`). Do not document or keep a permanent hard-pinned stable freeze as the default dependency line.
 
 #### 5.3 Create a read token
 
@@ -492,24 +506,33 @@ In the host module, usually `app/build.gradle.kts`:
 
 ```kotlin
 // app/build.gradle.kts
-dependencies {
-    // Prefer the auto-resolved latest main release from section 2.1 / 5.2
-    implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
+val lumenCrashVersion =
+    providers.gradleProperty("lumenCrashVersion")
+        .orElse(providers.environmentVariable("LUMEN_CRASH_VERSION"))
+        .orNull
+        ?: error("Resolve latest lumen-crash first (see README section 2.1)")
 
-    // Optional production freeze:
-    // implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+dependencies {
+    // Required: auto-latest main release from section 2.1 / 5.2
+    // Do not hard-pin com.chloemlla.lumen:lumen-crash:X.Y.Z-<sha> in source control.
+    implementation("com.chloemlla.lumen:lumen-crash:$lumenCrashVersion")
 }
 ```
 
 Groovy:
 
 ```groovy
+def lumenCrashVersion = findProperty("lumenCrashVersion") ?: System.getenv("LUMEN_CRASH_VERSION")
+if (!lumenCrashVersion) {
+    throw new GradleException("Resolve latest lumen-crash first (see README section 2.1)")
+}
+
 dependencies {
-    implementation "com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d"
+    implementation "com.chloemlla.lumen:lumen-crash:$lumenCrashVersion"
 }
 ```
 
-Replace the version with the exact string returned by the latest-main resolver (or a stable freeze if you intentionally pin).
+`$lumenCrashVersion` must come from the latest-main auto resolver. Do **not** hard-pin a fixed release string for normal integration.
 
 #### 5.7 Sync, resolve, and verify
 
@@ -519,10 +542,11 @@ Replace the version with the exact string returned by the latest-main resolver (
 ./gradlew :app:dependencies --configuration releaseRuntimeClasspath
 ```
 
-2. Confirm the tree includes:
+2. Confirm the tree includes a resolved latest coordinate, for example:
 
 ```text
-com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d
+com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>
+# example snapshot of one resolve run: com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d
 ```
 
 3. Optional smoke checks:
@@ -817,12 +841,12 @@ For private package access from another repository, use a PAT secret with `read:
 
 For external host apps:
 
-1. Auto-resolve the latest Project Lumen `main` auto release for `lumen-crash` (`lumen-crash-vX.Y.Z-<shortSha>`)
-2. Consume via **GitHub Packages Maven coordinates** with that exact version
+1. Auto-resolve the latest Project Lumen `main` auto release for `lumen-crash` (`lumen-crash-vX.Y.Z-<shortSha>`) on every CI/configure run
+2. Consume via **GitHub Packages Maven coordinates** as `com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>`
 3. Keep credentials outside VCS
-4. Re-resolve / re-pin when you intentionally move to a newer main auto release
-5. Optionally freeze on a pure stable tag (`lumen-crash-vX.Y.Z`) only for long-lived production pins
-6. Verify `sdk-manifest.json` / checksums when promoting a version
+4. Keep re-resolving the newest main auto release; do **not** hard-pin a fixed version for normal integration
+5. Avoid long-lived hard-pinned freezes in source control
+6. Verify `sdk-manifest.json` / checksums when validating a resolved version
 7. Wire `install` + pending-report UI gate before shipping
 
 For this monorepo:
@@ -1216,10 +1240,11 @@ High-frequency host integration mistakes. Use this as a pre-ship checklist; deta
 ### Dependency and version
 
 - Do **not** use `/releases/latest` alone. This repository may publish non-SDK releases. Only accept tags with the `lumen-crash-v*` prefix.
-- Pin an exact version string after resolve: `0.1.0-<shortSha>` for main auto releases, or pure `X.Y.Z` for intentional freezes. Do not leave a floating `latest` coordinate.
+- **Required:** auto-resolve the newest `main` `lumen-crash-v*` release and inject it as `com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>`. Do **not** hard-pin a fixed version string for normal external integration.
+- Maven itself has no magical floating `latest` coordinate; the approved way to stay current is the section 2.1 resolver + property/env injection on every CI/configure run.
 - GitHub Packages needs authenticated reads (`read:packages`). Org SSO tokens must be SSO-authorized.
 - Keep credentials outside VCS (`~/.gradle/gradle.properties` or CI secrets). Never commit tokens.
-- `Could not find` / `401` / `403` almost always means one of: missing Packages repo URL, wrong version string, missing/invalid token. See [Troubleshooting](#9-troubleshooting).
+- `Could not find` / `401` / `403` almost always means one of: missing Packages repo URL, stale/wrong version string, missing/invalid token. See [Troubleshooting](#9-troubleshooting).
 
 ### Host environment
 
@@ -1276,7 +1301,7 @@ Also:
 
 ### Safe production path
 
-1. Resolve and pin the exact latest main auto-release version (`lumen-crash-vX.Y.Z-<shortSha>`).
+1. Auto-resolve the latest main auto-release version (`lumen-crash-vX.Y.Z-<shortSha>`) and inject it; do **not** hard-pin.
 2. Consume via GitHub Packages with out-of-repo credentials.
 3. Install in `attachBaseContext`.
 4. Gate startup with pending-report UI.
