@@ -21,6 +21,7 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 - [Consume published SDK](#consume-published-sdk)
   - [What each release produces](#1-what-each-release-produces)
   - [GitHub Packages](#5-option-b-github-packages-recommended-for-external-apps)
+  - [GitHub Packages Maven tutorial](#51-quick-start-github-packages-maven-package)
   - [Release assets / local Maven](#6-option-c-consume-github-release-assets-without-packages-auth)
   - [Troubleshooting](#9-troubleshooting)
 - [Minimal integration](#minimal-integration-3-host-touchpoints)
@@ -216,29 +217,113 @@ Cons:
 
 ### 5) Option B: GitHub Packages (recommended for external apps)
 
-#### 5.1 Create credentials
+This is the recommended way for **external Android apps** to consume the published Maven package.
 
-You need a GitHub identity that can read packages from this repository:
+#### 5.1 Quick start: GitHub Packages Maven package
 
-- GitHub Actions: use `GITHUB_TOKEN` with `packages: read` (or broader workflow permissions)
-- Local / external CI: use a classic PAT or fine-grained token with `read:packages`
-- If the org/user has SSO, authorize the token for SSO
+Use this checklist when you only need the shortest path:
 
-Suggested local Gradle properties (`~/.gradle/gradle.properties` or project `gradle.properties` that is **not committed**):
+1. Confirm a published version exists on the Packages page or Release page.
+2. Create a GitHub token with `read:packages`.
+3. Put credentials in `~/.gradle/gradle.properties` (do **not** commit them).
+4. Add the GitHub Packages Maven repository in `settings.gradle.kts`.
+5. Depend on `com.chloemlla.lumen:lumen-crash:<version>`.
+6. Sync Gradle and wire `LumenCrash.install(...)` + pending-report UI.
+
+| Field | Value |
+|---|---|
+| Group ID | `com.chloemlla.lumen` |
+| Artifact ID | `lumen-crash` |
+| Example version | `0.1.0` |
+| Full coordinates | `com.chloemlla.lumen:lumen-crash:0.1.0` |
+| Maven repository | `https://maven.pkg.github.com/Chloemlla/Project-Lumen` |
+| Packages page | `https://github.com/Chloemlla/Project-Lumen/packages` |
+| Stable release pattern | `https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v0.1.0` |
+
+Gradle dependency line:
+
+```kotlin
+implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+```
+
+#### 5.2 Find the published version
+
+Pick one source and keep the version exact:
+
+| Source | What to copy |
+|---|---|
+| GitHub Packages package version list | package version string such as `0.1.0` |
+| GitHub Release tag | `lumen-crash-v0.1.0` => dependency version `0.1.0` |
+| Release asset `sdk-manifest.json` | field `version` and `maven.coordinates` |
+| main-branch auto release | form `0.1.0-<shortSha>` |
+
+Stable consumer apps should prefer a pure semver tag (`0.1.0`). Use `0.1.0-<shortSha>` only when you intentionally track a main-branch build.
+
+#### 5.3 Create a read token
+
+GitHub Packages is authenticated even when the package is public in some account/org configurations. Create a token that can read packages from this repository:
+
+| Runtime | Credential |
+|---|---|
+| Local machine | classic PAT or fine-grained token with `read:packages` |
+| Same-repo GitHub Actions | `GITHUB_TOKEN` with `packages: read` |
+| Other-repo / external CI | dedicated PAT/fine-grained token with `read:packages`, stored as a secret |
+
+Token rules:
+
+- Username is your GitHub username (or the identity that owns the token).
+- Password / token value is the PAT or CI token, **not** your GitHub login password.
+- If the account/org uses SAML SSO, authorize the token for SSO first.
+- Never commit the token into git.
+
+Classic PAT minimum scope:
+
+```text
+read:packages
+```
+
+If the package is private or your org requires broader package access, also ensure the token can read the owning repository.
+
+#### 5.4 Store credentials outside the repo
+
+Recommended local file: `~/.gradle/gradle.properties`
 
 ```properties
 gpr.user=YOUR_GITHUB_USERNAME
 gpr.key=YOUR_GITHUB_PAT_OR_TOKEN
 ```
 
-Or environment variables:
+Windows example path:
+
+```text
+C:\\Users\\<you>\\.gradle\\gradle.properties
+```
+
+macOS / Linux example path:
+
+```text
+~/.gradle/gradle.properties
+```
+
+Environment-variable alternative:
 
 ```bash
+# bash / zsh / Git Bash
 export GITHUB_ACTOR=YOUR_GITHUB_USERNAME
 export GITHUB_TOKEN=YOUR_GITHUB_PAT_OR_TOKEN
 ```
 
-#### 5.2 Add the repository once
+```powershell
+# Windows PowerShell
+$env:GITHUB_ACTOR = "YOUR_GITHUB_USERNAME"
+$env:GITHUB_TOKEN = "YOUR_GITHUB_PAT_OR_TOKEN"
+```
+
+Do **not** put real tokens into a committed project `gradle.properties`.
+
+#### 5.5 Add the Maven repository once
+
+In the consumer app `settings.gradle.kts`:
 
 ```kotlin
 // settings.gradle.kts
@@ -261,18 +346,83 @@ dependencyResolutionManagement {
 }
 ```
 
-#### 5.3 Depend on the published artifact
+Notes:
+
+- Keep `google()` and `mavenCentral()` so transitive AndroidX / Compose dependencies still resolve.
+- Put credentials on this repository block; do not hardcode secrets in source.
+- If your project still uses root `build.gradle.kts` / `allprojects.repositories`, add the same Maven block there instead.
+
+Groovy `settings.gradle` equivalent:
+
+```groovy
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            name = "GitHubPackagesProjectLumen"
+            url = uri("https://maven.pkg.github.com/Chloemlla/Project-Lumen")
+            credentials {
+                username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
+                password = providers.gradleProperty("gpr.key").orNull ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
+```
+
+#### 5.6 Declare the dependency
+
+In the host module, usually `app/build.gradle.kts`:
 
 ```kotlin
 // app/build.gradle.kts
 dependencies {
     implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
-    // or a main-branch build:
+
+    // main-branch auto-published build example:
     // implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
 }
 ```
 
-#### 5.4 Host app requirements
+Groovy:
+
+```groovy
+dependencies {
+    implementation "com.chloemlla.lumen:lumen-crash:0.1.0"
+}
+```
+
+Replace `0.1.0` with the exact published version you selected in step 5.2.
+
+#### 5.7 Sync, resolve, and verify
+
+1. Sync the Gradle project in Android Studio, or run:
+
+```bash
+./gradlew :app:dependencies --configuration releaseRuntimeClasspath
+```
+
+2. Confirm the tree includes:
+
+```text
+com.chloemlla.lumen:lumen-crash:0.1.0
+```
+
+3. Optional smoke checks:
+
+```bash
+# resolve only
+./gradlew :app:compileDebugKotlin --dry-run
+
+# full compile
+./gradlew :app:compileDebugKotlin
+```
+
+If resolution fails, jump to [Troubleshooting](#9-troubleshooting).
+
+#### 5.8 Host app requirements
 
 Because the SDK is Compose-first and publishes Material3 / window-size-class as `api` dependencies:
 
@@ -301,6 +451,97 @@ android {
     }
 }
 ```
+
+#### 5.9 Minimal code after the package resolves
+
+After Gradle can download the package, wire these three host touchpoints.
+
+Install early:
+
+```kotlin
+class MyApp : Application() {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        LumenCrash.install(
+            this,
+            LumenCrashConfig(
+                appDisplayName = "My App",
+                versionName = BuildConfig.VERSION_NAME,
+                versionCode = BuildConfig.VERSION_CODE,
+                commitHash = BuildConfig.SHORT_HASH,
+                fileProviderAuthority = "${packageName}.fileprovider",
+                shareSubject = "Crash report",
+                onCrashSaved = { report ->
+                    // optional host upload / telemetry schedule
+                },
+            ),
+        )
+    }
+}
+```
+
+Gate startup UI on a pending report:
+
+```kotlin
+setContent {
+    val report = LumenCrash.loadPendingReport()
+    if (report != null) {
+        LumenCrashReportScreen(
+            report = report,
+            onContinue = {
+                LumenCrash.clearPendingReport()
+                // recreate() or switch to normal app content
+            },
+        )
+    } else {
+        App()
+    }
+}
+```
+
+Optional handled failures / breadcrumbs:
+
+```kotlin
+LumenCrash.recordBreadcrumb("CheckoutScreen.submit")
+runCatching { riskyWork() }
+    .onFailure { LumenCrash.record(it) }
+```
+
+#### 5.10 Consumer CI example
+
+Same repository / token that can read the package:
+
+```yaml
+- name: Build consumer app
+  env:
+    GITHUB_ACTOR: ${{ github.actor }}
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: ./gradlew :app:assembleRelease --no-daemon
+```
+
+External repository that cannot read this package with the default token:
+
+```yaml
+- name: Build consumer app
+  env:
+    GITHUB_ACTOR: ${{ github.actor }}
+    GITHUB_TOKEN: ${{ secrets.LUMEN_CRASH_READ_PACKAGES_TOKEN }}
+  run: ./gradlew :app:assembleRelease --no-daemon
+```
+
+Store `LUMEN_CRASH_READ_PACKAGES_TOKEN` as a repository secret with `read:packages`.
+
+#### 5.11 Common GitHub Packages mistakes
+
+| Mistake | Result | Fix |
+|---|---|---|
+| Wrong repo URL | `Could not find ... lumen-crash` | Use `https://maven.pkg.github.com/Chloemlla/Project-Lumen` |
+| Missing credentials block | `401 Unauthorized` | Add `credentials { ... }` and set `gpr.*` or env vars |
+| Token lacks `read:packages` | `401` / `403` | Recreate token with package read permission |
+| SSO not authorized | `403 Forbidden` | Authorize the token for org SSO |
+| Version typo | package not found | Copy exact version from Packages/Release/`sdk-manifest.json` |
+| Credentials committed | secret leak | Move secrets to `~/.gradle/gradle.properties` or CI secrets and rotate the token |
+| Using bare AAR instead of Maven coordinates | missing transitive deps | Prefer `implementation("com.chloemlla.lumen:lumen-crash:<version>")` |
 
 ### 6) Option C: consume GitHub Release assets without Packages auth
 

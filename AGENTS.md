@@ -10,4 +10,4 @@ powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 Get-Content -Encoding UTF8 file-path
-Each time you complete the addition or modification of a feature according to my requirements, a commit message should be automatically generated and submitted and pushed after you finish modifying the code. When submitting a GPG key, you can temporarily omit the signature.
+Each time you complete the addition or modification of a feature according to my requirements, a commit message should be automatically generated and submitted and pushed after you finish modifying the code. When submitting a GPG key, you can temporarily omit the signature. and auto push

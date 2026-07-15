@@ -28,13 +28,13 @@ class BaselineProfileGenerator {
             stableIterations = 2,
             outputFilePrefix = "project-lumen",
             includeInStartupProfile = true,
-            setupBlock = {
-                // Ensure a clean task stack before each iteration.
-                pressHome()
-                killProcess()
-                device.waitForIdle(IDLE_TIMEOUT_MILLIS)
-            },
         ) {
+            // Clean process/task state inside the profile block.
+            // BaselineProfileRule.collect in benchmark-macro-junit4:1.4.1 has no setupBlock.
+            pressHome()
+            killProcess()
+            device.waitForIdle(IDLE_TIMEOUT_MILLIS)
+
             pressHome()
             startProjectLumenAndWait()
             dismissBlockingUiIfPresent()
