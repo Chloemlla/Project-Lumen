@@ -6,6 +6,7 @@ on:
       - "**"
     paths:
       - ".github/workflows/lumen-ui-tuner.yml"
+      - "scripts/run-lumen-topbar-screenshot-test.sh"
       - "design/lumen-ui-tokens.json"
       - "tools/lumen-ui-tuner/**"
       - "app/build.gradle.kts"
@@ -18,6 +19,7 @@ on:
       - "**"
     paths:
       - ".github/workflows/lumen-ui-tuner.yml"
+      - "scripts/run-lumen-topbar-screenshot-test.sh"
       - "design/lumen-ui-tokens.json"
       - "tools/lumen-ui-tuner/**"
       - "app/build.gradle.kts"
@@ -134,56 +136,11 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 900
           script: |
-            set -eu
-
-            adb wait-for-device
-            for attempt in 1 2 3 4 5; do
-              if adb shell cmd package list packages >/dev/null 2>&1; then
-                break
-              fi
-              if [ "$attempt" = "5" ]; then
-                echo "Android package manager did not become ready before connected tests." >&2
-                exit 1
-              fi
-              sleep 10
-            done
-
-            run_connected_test() {
-              gradle connectedDebugAndroidTest \
-                -Pandroid.testInstrumentationRunnerArguments.class=com.projectlumen.app.app.LumenTopBarScreenshotTest \
-                --no-daemon \
-                --warning-mode all
-            }
-
-            for attempt in 1 2 3; do
-              log_file="connected-debug-android-test-attempt-${attempt}.log"
-              set +e
-              run_connected_test > "$log_file" 2>&1
-              status=$?
-              set -e
-              cat "$log_file"
-
-              if [ "$status" -eq 0 ]; then
-                break
-              fi
-
-              if ! grep -Eq "Failed to install split APK|Broken pipe|DdmlibAndroidDeviceController|EmulatorConsole" "$log_file"; then
-                exit "$status"
-              fi
-
-              if [ "$attempt" = "3" ]; then
-                exit "$status"
-              fi
-
-              echo "Retrying connected Android test after emulator install failure (attempt ${attempt})."
-              adb wait-for-device || true
-              adb uninstall com.chloemlla.projectlumen.test >/dev/null 2>&1 || true
-              adb uninstall com.chloemlla.projectlumen >/dev/null 2>&1 || true
-              sleep 15
-            done
-
-            mkdir -p ui-screenshot-artifacts
-            adb pull /sdcard/Android/data/com.chloemlla.projectlumen/files/screenshots ui-screenshot-artifacts || true
+            # Keep this entrypoint as a single command. Inline multiline control flow is unsafe
+            # with android-emulator-runner because some runner versions execute script lines
+            # via repeated `sh -c`, which truncates `for ... do` loops.
+            chmod +x scripts/run-lumen-topbar-screenshot-test.sh
+            ./scripts/run-lumen-topbar-screenshot-test.sh
 
       - name: Upload Android UI artifacts
         if: always()
