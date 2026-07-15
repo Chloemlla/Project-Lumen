@@ -35,6 +35,7 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 - [Host product copy](#host-product-copy)
 - [Author protection](#author-protection)
 - [ProGuard / R8](#proguard--r8)
+  - [Required third-party minify exemption](#required-third-party-minify-exemption)
 - [Testing](#testing)
 - [Project Lumen host notes](#project-lumen-host-notes)
 - [Out of scope](#out-of-scope)
@@ -1107,15 +1108,70 @@ Forced into:
 
 ## ProGuard / R8
 
+### Required third-party minify exemption
+
+If the host app enables ProGuard / R8, **`com.chloemlla.lumen.crash.**` must be treated as a minify exemption surface**.
+
+Do **not**:
+
+- obfuscate / rename Lumen Crash public API classes
+- shrink away author attribution constants
+- strip integrity entry points used at runtime
+
+If you do, install and crash UI can fail-closed (`SecurityException` or blocked crash screen), and copy/share may lose author attribution.
+
+### Automatic exemption path (preferred)
+
 Release minify is off inside the library by default. The AAR ships `consumer-rules.pro`, and Android Gradle Plugin merges those consumer rules into the **host app** minify config automatically when you depend on:
 
 ```kotlin
 implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
 ```
 
-### What third-party hosts need to do
+For a normal Maven / GitHub Packages dependency, this automatic consumer-rules merge is the preferred exemption path. You usually **do not** need to copy rules by hand.
 
-1. Enable minify only if your release product requires it:
+### Explicit host exemption (recommended backup)
+
+If your host:
+
+- enables `isMinifyEnabled = true`
+- strips consumer rules
+- uses a custom shrinker pipeline
+- or wants an explicit app-module backup
+
+add this **required exemption block** to host `app/proguard-rules.pro`:
+
+```proguard
+############################################################
+# Lumen Crash SDK minify exemption
+# Artifact: com.chloemlla.lumen:lumen-crash
+# Put this in the host app proguard-rules.pro
+############################################################
+
+# Required: author attribution + integrity checks
+-keep class com.chloemlla.lumen.crash.CrashAuthorAttribution {
+    public static final java.lang.String *;
+}
+-keep class com.chloemlla.lumen.crash.AuthorIntegrity {
+    public static *** verifyOrThrow();
+    public static *** fingerprintHex();
+}
+
+# Required backup: keep public SDK API used by host integration
+-keep class com.chloemlla.lumen.crash.LumenCrash { *; }
+-keep class com.chloemlla.lumen.crash.LumenCrashConfig { *; }
+-keep class com.chloemlla.lumen.crash.CrashReport { *; }
+-keep class com.chloemlla.lumen.crash.CrashAppInfo { *; }
+-keep class com.chloemlla.lumen.crash.CrashReportStore { *; }
+-keep class com.chloemlla.lumen.crash.CrashBreadcrumbs { *; }
+-keep class com.chloemlla.lumen.crash.ui.LumenCrashReportScreenKt { *; }
+
+# Package-level exemption (safe default for third-party hosts)
+-keep class com.chloemlla.lumen.crash.** { *; }
+-dontwarn com.chloemlla.lumen.crash.**
+```
+
+Host release minify example:
 
 ```kotlin
 // app/build.gradle.kts
@@ -1125,42 +1181,22 @@ android {
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
+                "proguard-rules.pro", // must include the Lumen Crash exemption block above
             )
         }
     }
 }
 ```
 
-2. Prefer relying on the packaged consumer rules first. For a normal Maven / GitHub Packages dependency, you usually **do not** need to copy rules by hand.
+### Compose / Material3 note
 
-3. If your host build strips consumer rules, uses a custom shrinker pipeline, or you want an explicit backup in the app module, add this block to your host `app/proguard-rules.pro`:
+This SDK is Compose-first and publishes Material3 / window-size-class as `api` dependencies. In host release builds, do not add broad rules that strip Compose runtime classes used by the crash UI.
 
-```proguard
-# Lumen Crash SDK (com.chloemlla.lumen:lumen-crash)
-# Keep author attribution constants and integrity entry points used at runtime.
--keep class com.chloemlla.lumen.crash.CrashAuthorAttribution {
-    public static final java.lang.String *;
-}
--keep class com.chloemlla.lumen.crash.AuthorIntegrity {
-    public static *** verifyOrThrow();
-    public static *** fingerprintHex();
-}
-
-# Optional hardening if your shrinker is aggressive against public API surfaces.
--keep class com.chloemlla.lumen.crash.LumenCrash { *; }
--keep class com.chloemlla.lumen.crash.LumenCrashConfig { *; }
--keep class com.chloemlla.lumen.crash.CrashReport { *; }
--keep class com.chloemlla.lumen.crash.CrashAppInfo { *; }
--keep class com.chloemlla.lumen.crash.ui.LumenCrashReportScreenKt { *; }
-```
-
-4. Keep Compose / Material3 intact in the host release build. Because this SDK is Compose-first and publishes Material3 / window-size-class as `api` dependencies, do not add broad `-dontwarn` / aggressive keep-removal rules that strip Compose runtime classes used by the crash UI.
-
-### Why these keeps exist
+### Why the exemption is required
 
 - `CrashAuthorAttribution` constants are read by multi-point author integrity checks.
 - `AuthorIntegrity.verifyOrThrow()` / `fingerprintHex()` run on install, report build/load/export, and UI open.
+- Host integration calls `LumenCrash`, `LumenCrashConfig`, `CrashReport`, and `LumenCrashReportScreen`.
 - If those symbols are renamed or removed, install/UI can fail-closed with `SecurityException` or a blocked crash screen.
 
 ### Verify after enabling minify
