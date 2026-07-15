@@ -1105,9 +1105,40 @@ LumenCrashConfig(
 
 ## ProGuard / R8
 
-库自身默认关闭 release minify。宿主开启混淆时应保留 `consumer-rules.pro` 中的规则：
+库自身默认关闭 release minify。AAR 会携带 `consumer-rules.pro`；当你依赖：
+
+```kotlin
+implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+```
+
+Android Gradle Plugin 通常会自动把这些 consumer rules 合并进**宿主 app** 的混淆配置。
+
+### 第三方宿主需要做什么
+
+1. 仅在 release 需要时开启混淆：
+
+```kotlin
+// app/build.gradle.kts
+android {
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
+    }
+}
+```
+
+2. 优先依赖 SDK 自带的 consumer rules。正常通过 Maven / GitHub Packages 依赖时，**通常不必**手抄规则。
+
+3. 如果你的宿主构建会剥离 consumer rules、使用了自定义 shrinker 流水线，或希望在 app 模块显式备份，请把下面这段加到宿主 `app/proguard-rules.pro`：
 
 ```proguard
+# Lumen Crash SDK (com.chloemlla.lumen:lumen-crash)
+# 保留运行时会用到的作者署名常量与完整性校验入口。
 -keep class com.chloemlla.lumen.crash.CrashAuthorAttribution {
     public static final java.lang.String *;
 }
@@ -1115,7 +1146,31 @@ LumenCrashConfig(
     public static *** verifyOrThrow();
     public static *** fingerprintHex();
 }
+
+# 可选加固：当 shrinker 对公开 API 较激进时使用。
+-keep class com.chloemlla.lumen.crash.LumenCrash { *; }
+-keep class com.chloemlla.lumen.crash.LumenCrashConfig { *; }
+-keep class com.chloemlla.lumen.crash.CrashReport { *; }
+-keep class com.chloemlla.lumen.crash.CrashAppInfo { *; }
+-keep class com.chloemlla.lumen.crash.ui.LumenCrashReportScreenKt { *; }
 ```
+
+4. 保持宿主 release 构建中的 Compose / Material3 完好。本 SDK 以 Compose 为主，并通过 `api` 暴露 Material3 / window-size-class；不要添加会大面积剥离 Compose runtime 的激进规则。
+
+### 为什么需要这些 keep
+
+- `CrashAuthorAttribution` 常量会被多点作者完整性校验读取。
+- `AuthorIntegrity.verifyOrThrow()` / `fingerprintHex()` 会在安装、报告构建/加载/导出、UI 打开时执行。
+- 若这些符号被重命名或删除，install/UI 可能 fail-closed，抛出 `SecurityException` 或进入阻断崩溃页。
+
+### 开启混淆后如何验证
+
+1. 构建依赖了 `lumen-crash` 的 minify release APK/AAB。
+2. 触发测试崩溃，或打开崩溃报告预览路径。
+3. 确认：
+   - `LumenCrash.install(...)` 仍成功
+   - 待处理报告 UI 能打开
+   - 复制 / 分享内容仍包含作者署名
 
 ## 测试
 
