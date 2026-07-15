@@ -19,6 +19,10 @@
 - [接入依赖](#接入依赖)
 - [自动发布](#自动发布)
 - [消费已发布 SDK](#消费已发布-sdk)
+  - [每次发布会产出什么](#1每次发布会产出什么)
+  - [GitHub Packages](#5方式-bgithub-packages外部应用推荐)
+  - [Release 资产 / 本地 Maven](#6方式-c只使用-github-release-资产不走-packages-鉴权)
+  - [排障清单](#9排障清单)
 - [最小集成](#最小集成3-个宿主接入点)
 - [公开 API](#公开-api)
 - [崩溃捕获流程](#崩溃捕获流程)
@@ -106,39 +110,367 @@ git push origin lumen-crash-v0.1.0
 
 ## 消费已发布 SDK
 
-### 方式 A：本 monorepo 工程模块
+本节是面向 `.github/workflows/lumen-crash-sdk-release.yml` **发布产物** 的详细使用教程。
+
+### 1）每次发布会产出什么
+
+每次 SDK 发布成功后，会同时得到：
+
+1. 一个 GitHub Release（tag 形如 `lumen-crash-v<version>`）
+2. 同一套 Maven 制品到 **GitHub Packages**
+3. 名为 `lumen-crash-sdk-<version>` 的 workflow artifact
+
+常见发布资产：
+
+| 资产 | 示例 | 用途 |
+|---|---|---|
+| Release AAR | `lumen-crash-0.1.0.aar` | Android 库二进制包 |
+| POM | `lumen-crash-0.1.0.pom` | Maven 坐标与依赖元数据 |
+| Gradle Module Metadata | `lumen-crash-0.1.0.module` | Gradle variant 元数据 |
+| Sources JAR | `lumen-crash-0.1.0-sources.jar` | IDE 源码跳转 |
+| 校验文件 | `checksums.txt` | 全部资产的 SHA-256 |
+| 清单 | `sdk-manifest.json` | 机器可读发布元数据 |
+| 说明 | `release-notes.md` | 人类可读发布摘要 |
+
+Maven 坐标：
+
+```text
+com.chloemlla.lumen:lumen-crash:<version>
+```
+
+仓库地址：
+
+```text
+https://maven.pkg.github.com/Chloemlla/Project-Lumen
+```
+
+Release 页面模式：
+
+```text
+https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v<version>
+```
+
+### 2）如何选择版本
+
+| 场景 | 版本形态 | 推荐来源 |
+|---|---|---|
+| 外部应用稳定接入 | `0.1.0` | tag 发布 `lumen-crash-v0.1.0` |
+| 跟踪 main 的构建 | `0.1.0-<shortSha>` | `main` 自动发布的最新版 |
+| 本 monorepo 本地开发 | 工程模块 | `implementation(project(":lumen-crash"))` |
+
+版本可从这些地方读取：
+
+- GitHub Release 标题 / tag（`lumen-crash-v0.1.0` => `0.1.0`）
+- `sdk-manifest.json` 的 `version` 字段
+- GitHub Packages 的 package 版本列表
+
+### 3）下载后先做完整性校验
+
+若你手动下载 AAR 再接入 CI 或正式宿主，请先校验：
+
+```bash
+# Linux / macOS / Git Bash
+sha256sum -c checksums.txt
+
+# 或只校验单个文件
+sha256sum lumen-crash-0.1.0.aar
+# 与 checksums.txt 中对应行比对
+```
+
+```powershell
+# Windows PowerShell
+Get-FileHash .\lumen-crash-0.1.0.aar -Algorithm SHA256
+# 与 checksums.txt 比对
+```
+
+同时打开 `sdk-manifest.json` 确认：
+
+- `groupId` = `com.chloemlla.lumen`
+- `artifactId` = `lumen-crash`
+- `version` 与下载资产一致
+- `maven.coordinates` 与你的 Gradle 依赖行一致
+
+### 4）方式 A：本 monorepo 工程模块
+
+适用于 Project Lumen 仓库内部。
 
 ```kotlin
 // settings.gradle.kts
 include(":lumen-crash")
 
 // app/build.gradle.kts
-implementation(project(":lumen-crash"))
+dependencies {
+    implementation(project(":lumen-crash"))
+}
 ```
 
-### 方式 B：GitHub Packages / GitHub Release 资产
+优点：
+
+- 无需鉴权
+- 直接跟踪源码
+- 最适合本地功能开发
+
+缺点：
+
+- 不能直接给外部宿主工程复用
+
+### 5）方式 B：GitHub Packages（外部应用推荐）
+
+#### 5.1 准备凭证
+
+需要一个能读取本仓库 packages 的 GitHub 身份：
+
+- GitHub Actions：使用具备 `packages: read` 的 `GITHUB_TOKEN`
+- 本地 / 外部 CI：使用带 `read:packages` 的 classic PAT 或 fine-grained token
+- 若账号/组织启用了 SSO，需先给 token 完成 SSO 授权
+
+建议把本地凭证放在 `~/.gradle/gradle.properties` 或**不会提交**的工程 `gradle.properties`：
+
+```properties
+gpr.user=YOUR_GITHUB_USERNAME
+gpr.key=YOUR_GITHUB_PAT_OR_TOKEN
+```
+
+或使用环境变量：
+
+```bash
+export GITHUB_ACTOR=YOUR_GITHUB_USERNAME
+export GITHUB_TOKEN=YOUR_GITHUB_PAT_OR_TOKEN
+```
+
+#### 5.2 只配置一次仓库
 
 ```kotlin
-// settings.gradle.kts 或 dependencyResolutionManagement
-repositories {
-    maven {
-        url = uri("https://maven.pkg.github.com/Chloemlla/Project-Lumen")
-        credentials {
-            username = providers.gradleProperty("gpr.user").orNull
-                ?: System.getenv("GITHUB_ACTOR")
-            password = providers.gradleProperty("gpr.key").orNull
-                ?: System.getenv("GITHUB_TOKEN")
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            name = "GitHubPackagesProjectLumen"
+            url = uri("https://maven.pkg.github.com/Chloemlla/Project-Lumen")
+            credentials {
+                username = providers.gradleProperty("gpr.user").orNull
+                    ?: System.getenv("GITHUB_ACTOR")
+                password = providers.gradleProperty("gpr.key").orNull
+                    ?: System.getenv("GITHUB_TOKEN")
+            }
         }
     }
 }
-
-// app/build.gradle.kts
-implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
 ```
 
-访问 GitHub Packages 通常需要具备 `read:packages` 权限的 classic/PAT 或 `GITHUB_TOKEN`（若仓库启用 SSO，还需完成授权）。
+#### 5.3 声明依赖
 
-也可以直接从 workflow 生成的 GitHub Release 资产中下载 AAR。
+```kotlin
+// app/build.gradle.kts
+dependencies {
+    implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+    // 或者 main 分支构建：
+    // implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
+}
+```
+
+#### 5.4 宿主工程要求
+
+SDK 以 Compose 为主，并会通过 `api` 暴露 Material3 / window-size-class：
+
+- 宿主 `minSdk` 建议 `>= 26`
+- 宿主需启用 Compose
+- 推荐 Kotlin / JVM 17
+- 若宿主已使用 Compose Material3，通常无需额外拼装 Compose 依赖
+
+示例：
+
+```kotlin
+android {
+    compileSdk = 35 // 或更高
+
+    defaultConfig {
+        minSdk = 26
+    }
+
+    buildFeatures {
+        compose = true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+```
+
+### 6）方式 C：只使用 GitHub Release 资产（不走 Packages 鉴权）
+
+适合能下载 Release 文件，但不想在每个消费方配置 GitHub Packages 凭证的场景。
+
+#### 6.1 下载资产
+
+从 `lumen-crash-v<version>` 发布页至少下载：
+
+- `lumen-crash-<version>.aar`
+- `lumen-crash-<version>.pom`（建议）
+- `checksums.txt`
+- `sdk-manifest.json`
+
+并按上文完成校验。
+
+#### 6.2 组装本地 Maven 仓库
+
+按标准坐标路径放置文件：
+
+```text
+local-maven/
+  com/
+    chloemlla/
+      lumen/
+        lumen-crash/
+          0.1.0/
+            lumen-crash-0.1.0.aar
+            lumen-crash-0.1.0.pom
+            lumen-crash-0.1.0.module          # 可选，建议保留
+            lumen-crash-0.1.0-sources.jar     # 可选
+```
+
+再让 Gradle 指向该目录：
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            name = "LumenCrashLocal"
+            url = uri("${rootDir}/local-maven")
+        }
+    }
+}
+```
+
+```kotlin
+// app/build.gradle.kts
+dependencies {
+    implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+}
+```
+
+#### 6.3 直接依赖 AAR 文件（仅建议用于快速冒烟）
+
+```kotlin
+// app/build.gradle.kts
+dependencies {
+    implementation(files("libs/lumen-crash-0.1.0.aar"))
+}
+```
+
+说明：
+
+- 适合快速编译验证
+- 正式接入仍建议走 Maven 坐标，以便保留 POM 传递依赖信息
+- 若使用裸 AAR，可能需要手动对齐 Compose Material3 / activity-compose 版本
+
+### 7）依赖解析成功后的端到端接入
+
+当 Gradle 已能解析 `lumen-crash` 后，按以下 3 个接入点集成。
+
+#### 7.1 尽早安装
+
+```kotlin
+class MyApp : Application() {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        LumenCrash.install(
+            this,
+            LumenCrashConfig(
+                appDisplayName = "My App",
+                versionName = BuildConfig.VERSION_NAME,
+                versionCode = BuildConfig.VERSION_CODE,
+                commitHash = BuildConfig.SHORT_HASH,
+                fileProviderAuthority = "${packageName}.fileprovider",
+                shareSubject = "Crash report",
+                onCrashSaved = { report ->
+                    // 宿主上传 / 遥测调度
+                },
+            ),
+        )
+    }
+}
+```
+
+#### 7.2 用待处理报告拦截 UI
+
+```kotlin
+setContent {
+    val report = LumenCrash.loadPendingReport()
+    if (report != null) {
+        LumenCrashReportScreen(
+            report = report,
+            onContinue = {
+                LumenCrash.clearPendingReport()
+                // recreate()，或切换到正常应用内容
+            },
+        )
+    } else {
+        App()
+    }
+}
+```
+
+#### 7.3 可选：面包屑与已捕获异常
+
+```kotlin
+LumenCrash.recordBreadcrumb("CheckoutScreen.submit")
+runCatching { riskyWork() }
+    .onFailure { LumenCrash.record(it) }
+```
+
+#### 7.4 可选：文件分享支持
+
+若需要崩溃页“分享文件”，请配置宿主 `FileProvider`，并把 authority 传入 `LumenCrashConfig.fileProviderAuthority`。仅文本分享时可不配置。
+
+### 8）CI 使用方式
+
+消费方仓库的 GitHub Actions 示例：
+
+```yaml
+- name: Build consumer app
+  env:
+    GITHUB_ACTOR: ${{ github.actor }}
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: |
+    ./gradlew :app:assembleRelease --no-daemon
+```
+
+若从其他仓库读取私有 package，请改用具备 `read:packages` 的 PAT secret，而不是默认无权读取该 package 的 token。
+
+### 9）排障清单
+
+| 现象 | 常见原因 | 处理 |
+|---|---|---|
+| `Could not find com.chloemlla.lumen:lumen-crash:...` | 未配置 GitHub Packages 或版本写错 | 补仓库地址，并用 release/manifest 中的精确版本 |
+| `401 Unauthorized` / `403 Forbidden` | token 无 `read:packages` 或未 SSO 授权 | 重建/授权 token，检查 `gpr.user` / `gpr.key` |
+| 依赖解析成功但 Compose UI 符号缺失 | 宿主未启用 Compose | 设置 `buildFeatures.compose = true` |
+| 无法使用文件分享 | 未配置 `fileProviderAuthority` | 配置 FileProvider 并传入 authority |
+| 预览/手动 `fromThrowable` 编译失败 | 缺少 `CrashAppInfo` | 传入应用元信息，或改用 `LumenCrash.record(throwable)` |
+| 校验和不匹配 | 下载不完整/损坏 | 重新下载资产并复核 `checksums.txt` |
+
+### 10）生产环境推荐路径
+
+外部宿主应用建议：
+
+1. 优先使用稳定 tag 版本（`lumen-crash-vX.Y.Z`）
+2. 通过 **GitHub Packages Maven 坐标** 消费
+3. 凭证不进版本库
+4. 晋级版本前核对 `sdk-manifest.json` 与 checksums
+5. 上线前完成 `install` + 待处理报告 UI 拦截
+
+本 monorepo 建议：
+
+1. 继续使用 `implementation(project(":lumen-crash"))`
+2. 仅在验证外部消费打包时使用已发布产物
 
 ## 接入依赖
 
