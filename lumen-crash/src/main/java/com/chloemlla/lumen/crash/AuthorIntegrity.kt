@@ -18,7 +18,7 @@ object AuthorIntegrity {
     @JvmStatic
     fun verifyOrThrow(reason: String = "author-integrity") {
         val failures = mutableListOf<String>()
-        if (CrashAuthorAttribution.AUTHOR_NAME != "Chloemlla") {
+        if (CrashAuthorAttribution.AUTHOR_NAME != "ChloeMlla") {
             failures += "author-name"
         }
         if (CrashAuthorAttribution.AUTHOR_URL != "https://github.com/Chloemlla/") {

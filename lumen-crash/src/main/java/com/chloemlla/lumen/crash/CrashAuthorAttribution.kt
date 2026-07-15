@@ -5,7 +5,7 @@ package com.chloemlla.lumen.crash
  * Host apps cannot replace these values through [LumenCrashConfig].
  */
 object CrashAuthorAttribution {
-    const val AUTHOR_NAME: String = "Chloemlla"
+    const val AUTHOR_NAME: String = "ChloeMlla"
     const val AUTHOR_URL: String = "https://github.com/Chloemlla/"
     const val AUTHOR_HANDLE: String = "chloemlla"
 
@@ -13,7 +13,7 @@ object CrashAuthorAttribution {
     const val FINGERPRINT_HEX: String =
         "c6485425f032c152fa08a8695ca7a4da18f4f3db9c5f6b380e57cf7c12285d30"
 
-    const val FOOTER_LABEL: String = "Crash SDK by Chloemlla · https://github.com/Chloemlla/"
+    const val FOOTER_LABEL: String = "Crash SDK by ChloeMlla · https://github.com/Chloemlla/"
 
     fun payload(): String = "$AUTHOR_NAME|$AUTHOR_URL"
 }

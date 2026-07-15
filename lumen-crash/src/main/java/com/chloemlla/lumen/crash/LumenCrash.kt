@@ -67,12 +67,11 @@ object LumenCrash {
     }
 
     private fun installUncaughtExceptionHandler(application: Application) {
-        val defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         val existing = handlerRef.get()
-        if (defaultExceptionHandler === existing && existing != null) return
+        if (existing != null && previousHandler === existing) return
 
-        lateinit var handler: Thread.UncaughtExceptionHandler
-        handler = Thread.UncaughtExceptionHandler { thread, throwable ->
+        val handler = Thread.UncaughtExceptionHandler { thread, throwable ->
             val config = installedConfig.get()
             val appInfo = config?.toAppInfo() ?: CrashAppInfo(
                 appDisplayName = application.packageName,
@@ -85,8 +84,9 @@ object LumenCrash {
             startupCrashReport = report
             runCatching { CrashReportStore(application.applicationContext).save(report) }
             runCatching { config?.onCrashSaved?.invoke(report) }
-            if (defaultExceptionHandler != null && defaultExceptionHandler !== handler) {
-                defaultExceptionHandler.uncaughtException(thread, throwable)
+            val chained = previousHandler
+            if (chained != null && chained !== handlerRef.get()) {
+                chained.uncaughtException(thread, throwable)
             } else if (config?.killProcessWhenNoPreviousHandler != false) {
                 Process.killProcess(Process.myPid())
                 exitProcess(10)

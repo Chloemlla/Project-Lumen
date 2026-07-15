@@ -31,7 +31,7 @@ class AuthorIntegrityTest {
             recentEvents = emptyList(),
         )
         val text = report.toClipboardText()
-        assertTrue(text.contains("Chloemlla"))
+        assertTrue(text.contains("ChloeMlla"))
         assertTrue(text.contains("https://github.com/Chloemlla/"))
         assertTrue(text.contains(CrashAuthorAttribution.FINGERPRINT_HEX))
     }

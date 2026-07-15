@@ -50,7 +50,7 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 - Copy report ID / copy full report / share text / share file (file share needs host `FileProvider`)
 - Host-configurable app metadata and product strings
 - Upload stays in the host app via `onCrashSaved`
-- **Non-removable author attribution**: Chloemlla + https://github.com/Chloemlla/
+- **Non-removable author attribution**: ChloeMlla + https://github.com/Chloemlla/
 - Strict author integrity checks (fail-closed)
 
 ## Module layout
@@ -1114,11 +1114,11 @@ Upload is intentionally **out of scope** for the SDK. Project Lumen uses `onCras
 
 Author constants live in `CrashAuthorAttribution`:
 
-- Name: `Chloemlla`
+- Name: `ChloeMlla`
 - URL: `https://github.com/Chloemlla/`
 - Handle: `chloemlla`
 - Fingerprint: SHA-256 of `AUTHOR_NAME|AUTHOR_URL` as lowercase hex
-- Footer label: `Crash SDK by Chloemlla · https://github.com/Chloemlla/`
+- Footer label: `Crash SDK by ChloeMlla · https://github.com/Chloemlla/`
 
 Forced into:
 
