@@ -3,6 +3,7 @@ package com.projectlumen.app.core.security
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.projectlumen.app.core.api.AuthSession
@@ -113,16 +114,26 @@ class SecureCredentialStore(context: Context) {
     }
 
     fun installProfile(nowMillis: Long = System.currentTimeMillis()): DeviceInstallProfile {
-        migrateLegacyCredentialsIfNeeded()
-        val hadDeviceCredential = encryptedMmkv.containsKey(KEY_DEVICE_INSTALLATION_ID)
-        val firstSeenAt = encryptedMmkv.decodeLong(KEY_FIRST_SEEN_AT, 0L).takeIf { it > 0L }
-            ?: nowMillis.also { encryptedMmkv.encode(KEY_FIRST_SEEN_AT, it) }
-        return DeviceInstallProfile(
-            hadDeviceCredentialBeforeLaunch = hadDeviceCredential,
-            firstSeenAt = firstSeenAt,
-            packageFirstInstallAt = packageFirstInstallAt(),
-            onboardingCompletedAt = encryptedMmkv.decodeLong(KEY_ONBOARDING_COMPLETED_AT, 0L),
-        )
+        return runCatching {
+            migrateLegacyCredentialsIfNeeded()
+            val hadDeviceCredential = encryptedMmkv.containsKey(KEY_DEVICE_INSTALLATION_ID)
+            val firstSeenAt = encryptedMmkv.decodeLong(KEY_FIRST_SEEN_AT, 0L).takeIf { it > 0L }
+                ?: nowMillis.also { encryptedMmkv.encode(KEY_FIRST_SEEN_AT, it) }
+            DeviceInstallProfile(
+                hadDeviceCredentialBeforeLaunch = hadDeviceCredential,
+                firstSeenAt = firstSeenAt,
+                packageFirstInstallAt = packageFirstInstallAt(),
+                onboardingCompletedAt = encryptedMmkv.decodeLong(KEY_ONBOARDING_COMPLETED_AT, 0L),
+            )
+        }.getOrElse { error ->
+            Log.e(TAG, "installProfile failed; using ephemeral defaults", error)
+            DeviceInstallProfile(
+                hadDeviceCredentialBeforeLaunch = false,
+                firstSeenAt = nowMillis,
+                packageFirstInstallAt = packageFirstInstallAt(),
+                onboardingCompletedAt = 0L,
+            )
+        }
     }
 
     fun markOnboardingCompleted(nowMillis: Long = System.currentTimeMillis()) {
@@ -131,20 +142,25 @@ class SecureCredentialStore(context: Context) {
     }
 
     fun deviceInstallationId(): String {
-        migrateLegacyCredentialsIfNeeded()
-        val existing = encryptedMmkv.decodeString(KEY_DEVICE_INSTALLATION_ID)
-            ?.takeIf { it.isNotBlank() }
-        if (
-            existing != null &&
-            isDeviceFingerprint(existing) &&
-            encryptedMmkv.decodeInt(KEY_DEVICE_FINGERPRINT_VERSION, 0) >= DEVICE_FINGERPRINT_VERSION
-        ) {
-            return existing
+        return runCatching {
+            migrateLegacyCredentialsIfNeeded()
+            val existing = encryptedMmkv.decodeString(KEY_DEVICE_INSTALLATION_ID)
+                ?.takeIf { it.isNotBlank() }
+            if (
+                existing != null &&
+                isDeviceFingerprint(existing) &&
+                encryptedMmkv.decodeInt(KEY_DEVICE_FINGERPRINT_VERSION, 0) >= DEVICE_FINGERPRINT_VERSION
+            ) {
+                return@runCatching existing
+            }
+            val generated = generateDeviceFingerprint()
+            encryptedMmkv.encode(KEY_DEVICE_INSTALLATION_ID, generated)
+            encryptedMmkv.encode(KEY_DEVICE_FINGERPRINT_VERSION, DEVICE_FINGERPRINT_VERSION)
+            generated
+        }.getOrElse { error ->
+            Log.e(TAG, "deviceInstallationId failed; using ephemeral fingerprint", error)
+            generateDeviceFingerprint()
         }
-        val generated = generateDeviceFingerprint()
-        encryptedMmkv.encode(KEY_DEVICE_INSTALLATION_ID, generated)
-        encryptedMmkv.encode(KEY_DEVICE_FINGERPRINT_VERSION, DEVICE_FINGERPRINT_VERSION)
-        return generated
     }
 
     private fun migrateLegacyCredentialsIfNeeded() {
@@ -190,13 +206,18 @@ class SecureCredentialStore(context: Context) {
     }
 
     private fun mmkvCryptKey(): String {
-        val existing = secureMetadata.getString(KEY_MMKV_CRYPT_KEY, null)
-        if (!existing.isNullOrBlank()) return existing
-        val generated = UUID.randomUUID().toString() + UUID.randomUUID().toString()
-        check(secureMetadata.edit().putString(KEY_MMKV_CRYPT_KEY, generated).commit()) {
-            "Unable to persist MMKV encryption key."
+        return runCatching {
+            val existing = secureMetadata.getString(KEY_MMKV_CRYPT_KEY, null)
+            if (!existing.isNullOrBlank()) return@runCatching existing
+            val generated = UUID.randomUUID().toString() + UUID.randomUUID().toString()
+            if (!secureMetadata.edit().putString(KEY_MMKV_CRYPT_KEY, generated).commit()) {
+                Log.e(TAG, "Unable to persist MMKV encryption key; using ephemeral key")
+            }
+            generated
+        }.getOrElse { error ->
+            Log.e(TAG, "mmkvCryptKey failed; using ephemeral key", error)
+            UUID.randomUUID().toString() + UUID.randomUUID().toString()
         }
-        return generated
     }
 
     private fun generateDeviceFingerprint(): String {
@@ -243,6 +264,7 @@ class SecureCredentialStore(context: Context) {
     }
 
     private companion object {
+        private const val TAG = "SecureCredentialStore"
         private const val STORE_NAME = "project_lumen_secure_credentials"
         private const val KEY_ACCESS_TOKEN = "access_token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"

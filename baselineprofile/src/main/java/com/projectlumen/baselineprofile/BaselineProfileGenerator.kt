@@ -78,6 +78,16 @@ class BaselineProfileGenerator {
                 startActivityAndWait(launchIntent)
             }.onFailure { error ->
                 lastError = error.message
+                // Macrobenchmark throws if the process dies mid-wait. Capture logcat for diagnosis
+                // and continue retrying instead of failing the whole collect block immediately.
+                val logSnippet = runCatching {
+                    device.executeShellCommand(
+                        "logcat -d -t 80 AndroidRuntime:E ProjectLumenApp:E MainActivity:E *:S",
+                    ).trim()
+                }.getOrDefault("")
+                if (logSnippet.isNotEmpty()) {
+                    lastError = "${error.message} | logcat=$logSnippet"
+                }
             }
 
             val deadlineMillis = System.currentTimeMillis() + APP_VISIBLE_TIMEOUT_MILLIS

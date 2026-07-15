@@ -58,7 +58,11 @@ class ProjectLumenApplication : Application() {
             if (!LumenCrash.isInstalled()) {
                 runCatching { installLumenCrashSdk() }
             }
-            return LumenCrash.store()
+            // Never throw from property access during cold start / baseline launches.
+            return runCatching { LumenCrash.store() }.getOrElse {
+                // Last-resort local store if SDK install failed closed.
+                CrashReportStore(this)
+            }
         }
     val secureCredentials: SecureCredentialStore by lazy { SecureCredentialStore(this) }
     val openApiController: LumenOpenRuntimeController by lazy { LumenOpenRuntimeController(this) }
@@ -93,26 +97,32 @@ class ProjectLumenApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Keep cold start non-fatal for managed-device baseline profile generation.
         runCatching {
-            installLumenCrashSdk()
-            CrashBreadcrumbs.record("Application.onCreate")
-        }.onFailure { Log.e(TAG, "LumenCrash install failed in onCreate", it) }
-        initializeMmkvOrRecordCrash()
-        runCatching { MemoryHealthMonitor.sample(this) }
-        // Baseline-profile managed devices and incomplete CI signing configs must still boot.
-        // Integrity remains enforced for real release builds that configure the cert fingerprint.
-        runCatching { AppIntegrityGuard.enforce(this) }
-            .onFailure { throwable ->
-                Log.e(TAG, "App integrity enforcement failed", throwable)
-                recordCrash(throwable)
+            runCatching {
+                installLumenCrashSdk()
+                CrashBreadcrumbs.record("Application.onCreate")
+            }.onFailure { Log.e(TAG, "LumenCrash install failed in onCreate", it) }
+            initializeMmkvOrRecordCrash()
+            runCatching { MemoryHealthMonitor.sample(this) }
+            // Integrity remains enforced for real release builds that configure the cert fingerprint,
+            // but must not process-kill managed-emulator boots when the native bridge fails.
+            runCatching { AppIntegrityGuard.enforce(this) }
+                .onFailure { throwable ->
+                    Log.e(TAG, "App integrity enforcement failed", throwable)
+                    recordCrash(throwable)
+                }
+            runCatching { notifications.ensureChannels() }
+            runCatching { LumenToast.install(this) }
+            runCatching {
+                ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)
             }
-        runCatching { notifications.ensureChannels() }
-        runCatching { LumenToast.install(this) }
-        runCatching {
-            ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)
+            crashReportUploadsReady = true
+            scheduleStoredCrashReportUpload()
+        }.onFailure { error ->
+            Log.e(TAG, "Application.onCreate failed", error)
+            crashReportUploadsReady = true
         }
-        crashReportUploadsReady = true
-        scheduleStoredCrashReportUpload()
     }
 
     override fun onTrimMemory(level: Int) {

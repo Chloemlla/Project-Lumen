@@ -1,6 +1,7 @@
 package com.projectlumen.app.app
 
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.projectlumen.app.core.api.ProjectLumenApiClient
@@ -21,6 +22,7 @@ import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
+import com.projectlumen.app.core.security.DeviceInstallProfile
 import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.shizuku.ShizukuNetworkApp
@@ -60,8 +62,19 @@ class ProjectLumenViewModel(
     private val repositories = ProjectLumenRepositories(database, eyeCarePreferences, secureCredentials)
     private val now = MutableStateFlow(System.currentTimeMillis())
     private var crashStateStore: ProjectLumenStateStore? = null
-    private val installProfile = secureCredentials.installProfile()
-    private val deviceFingerprint = secureCredentials.deviceInstallationId()
+    private val installProfile = runCatching { secureCredentials.installProfile() }
+        .onFailure { Log.e(TAG, "installProfile failed in ViewModel", it) }
+        .getOrElse {
+            DeviceInstallProfile(
+                hadDeviceCredentialBeforeLaunch = false,
+                firstSeenAt = System.currentTimeMillis(),
+                packageFirstInstallAt = 0L,
+                onboardingCompletedAt = 0L,
+            )
+        }
+    private val deviceFingerprint = runCatching { secureCredentials.deviceInstallationId() }
+        .onFailure { Log.e(TAG, "deviceInstallationId failed in ViewModel", it) }
+        .getOrDefault("unknown-device")
     private val crashReportingHandler = CoroutineExceptionHandler { _, throwable ->
         crashStateStore?.recordCrash(throwable) ?: recordCrashReport(throwable)
     }
@@ -154,21 +167,27 @@ class ProjectLumenViewModel(
     val uiState = stateStore.uiState
 
     init {
-        CrashBreadcrumbs.record("ProjectLumenViewModel.init")
+        runCatching { CrashBreadcrumbs.record("ProjectLumenViewModel.init") }
         reportingScope.launch {
-            val hadExistingLocalUse = hasExistingLocalUse()
-            repositories.settings.ensureDefault()
-            repositories.runtime.ensureDefault()
-            repositories.dailyGoals.ensureDefault()
-            templatesEntry.seedDefaultTemplates()
-            runtimeEntry.restoreFromClock()
-            val settings = repositories.settings.getOrDefault()
-            settingsEntry.applyStartupMonitoring(settings)
-            runtimeEntry.refreshActiveNotifications(settings, repositories.runtime.getOrDefault())
-            refreshOnboardingState(hadExistingLocalUse)
-            runCatching { uploadTelemetrySnapshot() }
+            runCatching {
+                val hadExistingLocalUse = hasExistingLocalUse()
+                repositories.settings.ensureDefault()
+                repositories.runtime.ensureDefault()
+                repositories.dailyGoals.ensureDefault()
+                templatesEntry.seedDefaultTemplates()
+                runtimeEntry.restoreFromClock()
+                val settings = repositories.settings.getOrDefault()
+                settingsEntry.applyStartupMonitoring(settings)
+                runtimeEntry.refreshActiveNotifications(settings, repositories.runtime.getOrDefault())
+                refreshOnboardingState(hadExistingLocalUse)
+                runCatching { uploadTelemetrySnapshot() }
+            }.onFailure { error ->
+                Log.e(TAG, "ViewModel startup work failed", error)
+                recordCrashReport(error)
+            }
         }
-        runtimeEntry.startClock(now)
+        runCatching { runtimeEntry.startClock(now) }
+            .onFailure { Log.e(TAG, "startClock failed", it) }
     }
 
     fun navigateWebPage(url: String) {
@@ -411,6 +430,7 @@ class ProjectLumenViewModel(
     }
 
     private companion object {
+        private const val TAG = "ProjectLumenViewModel"
         private const val FRESH_INSTALL_WINDOW_MILLIS = 3L * 24L * 60L * 60L * 1_000L
         private const val FIRST_SEEN_GRACE_MILLIS = 5L * 60L * 1_000L
     }

@@ -34,7 +34,12 @@ object AppIntegrityGuard {
             if (hasRuntimeHookingClasses()) add("runtime-hook")
         }
         if (failureReasons.isNotEmpty()) {
-            throw SecurityException("Project Lumen integrity check failed: ${failureReasons.joinToString()}.")
+            // Soft-fail: still report via caller runCatching, but never hard-kill the process
+            // when the failure is environment-related (managed emulators, debug hooks).
+            Log.e(TAG, "Integrity check failed: ${failureReasons.joinToString()}")
+            throw SecurityException(
+                "Project Lumen integrity check failed: ${failureReasons.joinToString()}.",
+            )
         }
     }
 
