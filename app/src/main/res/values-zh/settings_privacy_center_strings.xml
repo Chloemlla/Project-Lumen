@@ -2,6 +2,8 @@
 <resources>
     <string name="settings_section_expand">展开栏目</string>
     <string name="settings_section_collapse">收起栏目</string>
+    <string name="settings_expand_all">全部展开</string>
+    <string name="settings_collapse_all">全部收起</string>
     <string name="settings_privacy_permission_summary">在一个位置管理敏感能力。开关会启用关联功能，“配置”会跳到对应设置段或 Android 权限页。</string>
     <string name="settings_privacy_quick_tiles">控制中心</string>
     <string name="settings_privacy_badge_all_ready">已就绪</string>

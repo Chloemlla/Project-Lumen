@@ -2,6 +2,8 @@
 <resources>
     <string name="settings_section_expand">Expand section</string>
     <string name="settings_section_collapse">Collapse section</string>
+    <string name="settings_expand_all">Expand all</string>
+    <string name="settings_collapse_all">Collapse all</string>
     <string name="settings_privacy_permission_summary">Review sensitive capabilities in one place. Switches enable the linked feature, and Configure jumps to the exact setting or Android permission screen.</string>
     <string name="settings_privacy_quick_tiles">Control center</string>
     <string name="settings_privacy_badge_all_ready">All ready</string>

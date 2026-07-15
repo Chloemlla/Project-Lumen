@@ -102,6 +102,8 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.UnfoldLess
+import androidx.compose.material.icons.outlined.UnfoldMore
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -123,6 +125,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -131,6 +134,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -361,6 +365,34 @@ internal fun SectionHeader(icon: ImageVector, @StringRes titleRes: Int) {
     }
 }
 
+/**
+ * Broadcasts "expand all" / "collapse all" intents to every [SettingsSection] rendered
+ * beneath a [CompositionLocalProvider] that supplies it. Each section observes the two
+ * monotonically increasing tokens and reacts once per bump, while still owning its own
+ * local expand state so individual toggles keep working.
+ */
+@androidx.compose.runtime.Stable
+internal class SettingsSectionGroupController {
+    var expandToken by mutableIntStateOf(0)
+        private set
+    var collapseToken by mutableIntStateOf(0)
+        private set
+
+    fun expandAll() {
+        expandToken++
+    }
+
+    fun collapseAll() {
+        collapseToken++
+    }
+}
+
+internal val LocalSettingsSectionGroup = staticCompositionLocalOf<SettingsSectionGroupController?> { null }
+
+@Composable
+internal fun rememberSettingsSectionGroupController(): SettingsSectionGroupController =
+    remember { SettingsSectionGroupController() }
+
 @Composable
 internal fun SettingsSection(
     @StringRes titleRes: Int,
@@ -374,6 +406,15 @@ internal fun SettingsSection(
     var expanded by rememberSaveable(titleRes) { mutableStateOf(initiallyExpanded) }
     LaunchedEffect(forceExpanded) {
         if (forceExpanded) expanded = true
+    }
+    val groupController = LocalSettingsSectionGroup.current
+    if (groupController != null) {
+        LaunchedEffect(groupController.expandToken) {
+            if (groupController.expandToken > 0) expanded = true
+        }
+        LaunchedEffect(groupController.collapseToken) {
+            if (groupController.collapseToken > 0 && !forceExpanded) expanded = false
+        }
     }
     val arrowRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
@@ -430,6 +471,42 @@ internal fun SettingsSection(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
             }
+        }
+    }
+}
+
+/**
+ * A compact toolbar that drives a [SettingsSectionGroupController]. Renders two text
+ * buttons — expand all / collapse all — so a long list of collapsible sections can be
+ * opened or tidied in one tap.
+ */
+@Composable
+internal fun SettingsSectionToolbar(
+    controller: SettingsSectionGroupController,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(onClick = { controller.expandAll() }) {
+            Icon(
+                Icons.Outlined.UnfoldMore,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.settings_expand_all))
+        }
+        TextButton(onClick = { controller.collapseAll() }) {
+            Icon(
+                Icons.Outlined.UnfoldLess,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.settings_collapse_all))
         }
     }
 }
