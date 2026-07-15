@@ -84,6 +84,8 @@ The SDK is released automatically by GitHub Actions workflow:
 - Version source: `lumen-crash/sdk.version`
 - Maven coordinates: `com.chloemlla.lumen:lumen-crash:<version>`
 
+For consumers, prefer auto-resolving the latest Project Lumen `main` release via the `lumen-crash-v*` tag prefix (see section 2).
+
 ### Triggers
 
 | Trigger | Version / tag behavior |
