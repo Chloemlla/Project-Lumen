@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.BatteryManager
 import android.os.Build
@@ -156,13 +157,48 @@ class ShizukuCapabilityManager(
         _state.value = currentState
         if (!currentState.ready) return@withContext emptyList()
         val restrictedUids = latestRestrictBackgroundDenylist()
-        val systemApps = latestInstalledApps(SYSTEM_APP_LIST_COMMAND, ShizukuNetworkAppTypes.SYSTEM)
-        val userApps = latestInstalledApps(USER_APP_LIST_COMMAND, ShizukuNetworkAppTypes.USER)
-        (userApps + systemApps)
+        // Primary source: in-process PackageManager. This is reliable across OEM ROMs and does
+        // not depend on the shell `pm list packages -U` output format, which varies by device and
+        // is the reason the list previously came back empty on some builds.
+        val packageManagerApps = latestInstalledAppsFromPackageManager()
+        // Supplement with elevated shell enumeration so packages hidden from our direct query
+        // (e.g. other users/profiles or apps not visible even with QUERY_ALL_PACKAGES) still show.
+        val shellSystemApps = latestInstalledApps(SYSTEM_APP_LIST_COMMAND, ShizukuNetworkAppTypes.SYSTEM)
+        val shellUserApps = latestInstalledApps(USER_APP_LIST_COMMAND, ShizukuNetworkAppTypes.USER)
+        (packageManagerApps + shellUserApps + shellSystemApps)
             .filter { it.uid > 0 && it.packageName != context.packageName }
             .distinctBy { it.packageName }
             .map { app -> app.copy(restrictedByUidPolicy = restrictedUids.contains(app.uid)) }
             .sortedWith(compareBy<ShizukuNetworkApp> { it.appType != ShizukuNetworkAppTypes.USER }.thenBy { it.packageName })
+    }
+
+    private fun latestInstalledAppsFromPackageManager(): List<ShizukuNetworkApp> {
+        val packageManager = context.packageManager
+        val installedApps = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getInstalledApplications(
+                    PackageManager.ApplicationInfoFlags.of(0L),
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getInstalledApplications(0)
+            }
+        }.getOrElse { return emptyList() }
+        return installedApps
+            .asSequence()
+            .filter { it.uid > 0 }
+            .map { info ->
+                val isSystemApp = (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                    (info.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                ShizukuNetworkApp(
+                    packageName = sanitizePackageToken(info.packageName.orEmpty()),
+                    uid = info.uid,
+                    appType = if (isSystemApp) ShizukuNetworkAppTypes.SYSTEM else ShizukuNetworkAppTypes.USER,
+                )
+            }
+            .filter { ANDROID_PACKAGE_NAME_REGEX.matches(it.packageName) }
+            .distinctBy { it.packageName }
+            .toList()
     }
 
     suspend fun restrictAppNetwork(app: ShizukuNetworkApp): ShizukuNetworkPolicyResult = withContext(Dispatchers.IO) {
