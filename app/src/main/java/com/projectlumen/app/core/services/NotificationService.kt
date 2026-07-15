@@ -26,6 +26,7 @@ import com.projectlumen.app.core.toast.LumenToast
 import com.projectlumen.app.core.toast.LumenToastKind
 import com.projectlumen.app.core.toast.showLumenToast
 import com.projectlumen.app.core.time.QuietHours
+import java.util.concurrent.atomic.AtomicReference
 
 private const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIFICATIONS"
 
@@ -199,18 +200,25 @@ class NotificationService(private val context: Context) {
     }
 
     fun buildOngoingStatusNotification(state: RuntimeStateEntity? = null): Notification {
-        val nowMillis = System.currentTimeMillis()
-        val content = ongoingLiveUpdateContent(state, nowMillis)
+        val content = ongoingLiveUpdateContent(state, System.currentTimeMillis())
+        return buildOngoingStatusNotification(content)
+    }
+
+    private fun buildOngoingStatusNotification(content: OngoingLiveUpdateContent): Notification {
+        lastPublishedLiveUpdateSignature.set(content.signature)
         val builder = NotificationCompat.Builder(context, NotificationChannels.STATUS)
             .setSmallIcon(R.drawable.ic_notification_lumen)
             .setContentTitle(content.title)
             .setContentText(content.message)
+            .setSubText(content.subText)
             .setContentIntent(openAppPendingIntent(NotificationIds.FOREGROUND_TIMER))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setSilent(true)
             .setShowWhen(false)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setRequestPromotedOngoing(content.requestPromotedOngoing)
             .setStyle(content.progressStyle)
             .addAction(
@@ -219,15 +227,16 @@ class NotificationService(private val context: Context) {
                 actionPendingIntent(NotificationIds.STOP_TIMER_ACTION, ReminderActionReceiver.ACTION_STOP_ALL),
             )
 
-        content.shortCriticalText?.let { shortText ->
-            builder.setShortCriticalText(shortText)
-        }
-        content.whenMillis?.let { whenMillis ->
+        // Official Live Update chip: prefer chronometer for >= 2 minutes, short text otherwise.
+        // Avoid setting both, so the chip does not fight between countdown and custom text.
+        if (content.whenMillis != null) {
             builder
-                .setWhen(whenMillis)
+                .setWhen(content.whenMillis)
                 .setUsesChronometer(true)
                 .setChronometerCountDown(content.chronometerCountDown)
                 .setShowWhen(true)
+        } else {
+            content.shortCriticalText?.let(builder::setShortCriticalText)
         }
         return builder.build()
     }
@@ -347,10 +356,13 @@ class NotificationService(private val context: Context) {
 
     fun showOngoingStatus(state: RuntimeStateEntity) {
         if (!canPostNotifications()) return
+        val nowMillis = System.currentTimeMillis()
+        val content = ongoingLiveUpdateContent(state, nowMillis)
+        if (!shouldPublishLiveUpdate(content)) return
         try {
             NotificationManagerCompat.from(context).notify(
                 NotificationIds.FOREGROUND_TIMER,
-                buildOngoingStatusNotification(state),
+                buildOngoingStatusNotification(content),
             )
         } catch (_: SecurityException) {
             return
@@ -358,6 +370,7 @@ class NotificationService(private val context: Context) {
     }
 
     fun cancelOngoingStatus() {
+        lastPublishedLiveUpdateSignature.set(null)
         NotificationManagerCompat.from(context).cancel(NotificationIds.FOREGROUND_TIMER)
     }
 
@@ -519,11 +532,13 @@ class NotificationService(private val context: Context) {
     private data class OngoingLiveUpdateContent(
         val title: String,
         val message: String,
+        val subText: String? = null,
         val progressStyle: ProgressStyle,
         val requestPromotedOngoing: Boolean,
         val shortCriticalText: String? = null,
         val whenMillis: Long? = null,
         val chronometerCountDown: Boolean = true,
+        val signature: String,
     )
 
     private fun ongoingLiveUpdateContent(
@@ -535,62 +550,131 @@ class NotificationService(private val context: Context) {
                 title = context.getString(R.string.ongoing_timer_title),
                 message = context.getString(R.string.ongoing_timer_message),
                 shortCriticalText = context.getString(R.string.live_update_chip_running),
+                phaseKey = "null",
             )
         }
 
         return when (state.activeEngine) {
             ActiveEngine.REMINDER.name -> when (state.reminderPhase) {
-                ReminderPhase.WORKING.name,
-                ReminderPhase.PRE_ALERT.name,
-                ReminderPhase.AWAITING_ACTION.name -> timedLiveUpdate(
-                    title = context.getString(R.string.ongoing_timer_title),
-                    message = context.getString(R.string.ongoing_status_working),
+                ReminderPhase.WORKING.name -> timedLiveUpdate(
+                    title = context.getString(R.string.live_update_title_working),
+                    message = remainingStatusMessage(
+                        templateRes = R.string.live_update_message_working,
+                        endAt = state.nextReminderAt,
+                        nowMillis = nowMillis,
+                    ),
+                    subText = context.getString(R.string.live_update_subtext_next_break),
                     startAt = state.reminderStartedAt,
                     endAt = state.nextReminderAt,
                     nowMillis = nowMillis,
-                    shortCriticalText = remainingChipText(state.nextReminderAt, nowMillis),
+                    milestoneAt = state.nextPreAlertAt.takeIf { it > state.reminderStartedAt && it < state.nextReminderAt },
+                    phaseKey = "reminder-working",
+                    staticMessage = context.getString(R.string.ongoing_status_working),
+                )
+                ReminderPhase.PRE_ALERT.name -> timedLiveUpdate(
+                    title = context.getString(R.string.live_update_title_pre_alert),
+                    message = remainingStatusMessage(
+                        templateRes = R.string.live_update_message_pre_alert,
+                        endAt = state.nextReminderAt,
+                        nowMillis = nowMillis,
+                    ),
+                    subText = context.getString(R.string.live_update_subtext_prepare_rest),
+                    startAt = state.reminderStartedAt,
+                    endAt = state.nextReminderAt,
+                    nowMillis = nowMillis,
+                    milestoneAt = state.nextPreAlertAt.takeIf { it > state.reminderStartedAt && it < state.nextReminderAt },
+                    phaseKey = "reminder-pre-alert",
+                    staticMessage = context.getString(R.string.pre_alert_notification_message),
+                )
+                ReminderPhase.AWAITING_ACTION.name -> completedLiveUpdate(
+                    title = context.getString(R.string.live_update_title_break_due),
+                    message = context.getString(R.string.live_update_message_break_due),
+                    shortCriticalText = context.getString(R.string.live_update_chip_due),
+                    phaseKey = "reminder-awaiting",
                 )
                 ReminderPhase.RESTING.name -> timedLiveUpdate(
-                    title = context.getString(R.string.break_title),
-                    message = context.getString(R.string.ongoing_status_resting),
+                    title = context.getString(R.string.live_update_title_resting),
+                    message = remainingStatusMessage(
+                        templateRes = R.string.live_update_message_resting,
+                        endAt = state.breakEndAt,
+                        nowMillis = nowMillis,
+                    ),
+                    subText = context.getString(R.string.live_update_subtext_rest),
                     startAt = state.breakStartedAt,
                     endAt = state.breakEndAt,
                     nowMillis = nowMillis,
-                    shortCriticalText = remainingChipText(state.breakEndAt, nowMillis),
+                    phaseKey = "reminder-resting",
+                    staticMessage = context.getString(R.string.ongoing_status_resting),
                 )
                 ReminderPhase.PAUSED.name -> indeterminateLiveUpdate(
-                    title = context.getString(R.string.ongoing_timer_title),
+                    title = context.getString(R.string.live_update_title_paused),
                     message = context.getString(R.string.ongoing_status_paused),
                     shortCriticalText = context.getString(R.string.live_update_chip_paused),
                     requestPromotedOngoing = false,
+                    phaseKey = "reminder-paused",
                 )
                 else -> indeterminateLiveUpdate(
                     title = context.getString(R.string.ongoing_timer_title),
                     message = context.getString(R.string.ongoing_timer_message),
                     shortCriticalText = context.getString(R.string.live_update_chip_running),
+                    phaseKey = "reminder-other",
                 )
             }
             ActiveEngine.POMODORO.name -> when (state.pomodoroPhase) {
-                PomodoroPhase.FOCUS.name,
-                PomodoroPhase.SHORT_BREAK.name,
-                PomodoroPhase.LONG_BREAK.name -> timedLiveUpdate(
-                    title = context.getString(R.string.pomodoro_title),
-                    message = context.getString(R.string.ongoing_status_pomodoro),
+                PomodoroPhase.FOCUS.name -> timedLiveUpdate(
+                    title = context.getString(R.string.live_update_title_pomodoro_focus),
+                    message = remainingStatusMessage(
+                        templateRes = R.string.live_update_message_pomodoro_focus,
+                        endAt = state.pomodoroPhaseEndAt,
+                        nowMillis = nowMillis,
+                    ),
+                    subText = context.getString(R.string.live_update_subtext_cycle, state.pomodoroCycleIndex.coerceAtLeast(1)),
                     startAt = state.pomodoroPhaseStartedAt,
                     endAt = state.pomodoroPhaseEndAt,
                     nowMillis = nowMillis,
-                    shortCriticalText = remainingChipText(state.pomodoroPhaseEndAt, nowMillis),
+                    phaseKey = "pomodoro-focus-${state.pomodoroCycleIndex}",
+                    staticMessage = context.getString(R.string.ongoing_status_pomodoro),
+                )
+                PomodoroPhase.SHORT_BREAK.name -> timedLiveUpdate(
+                    title = context.getString(R.string.live_update_title_pomodoro_short_break),
+                    message = remainingStatusMessage(
+                        templateRes = R.string.live_update_message_pomodoro_break,
+                        endAt = state.pomodoroPhaseEndAt,
+                        nowMillis = nowMillis,
+                    ),
+                    subText = context.getString(R.string.live_update_subtext_cycle, state.pomodoroCycleIndex.coerceAtLeast(1)),
+                    startAt = state.pomodoroPhaseStartedAt,
+                    endAt = state.pomodoroPhaseEndAt,
+                    nowMillis = nowMillis,
+                    phaseKey = "pomodoro-short-${state.pomodoroCycleIndex}",
+                    staticMessage = context.getString(R.string.ongoing_status_pomodoro),
+                )
+                PomodoroPhase.LONG_BREAK.name -> timedLiveUpdate(
+                    title = context.getString(R.string.live_update_title_pomodoro_long_break),
+                    message = remainingStatusMessage(
+                        templateRes = R.string.live_update_message_pomodoro_break,
+                        endAt = state.pomodoroPhaseEndAt,
+                        nowMillis = nowMillis,
+                    ),
+                    subText = context.getString(R.string.live_update_subtext_cycle, state.pomodoroCycleIndex.coerceAtLeast(1)),
+                    startAt = state.pomodoroPhaseStartedAt,
+                    endAt = state.pomodoroPhaseEndAt,
+                    nowMillis = nowMillis,
+                    phaseKey = "pomodoro-long-${state.pomodoroCycleIndex}",
+                    staticMessage = context.getString(R.string.ongoing_status_pomodoro),
                 )
                 else -> indeterminateLiveUpdate(
-                    title = context.getString(R.string.ongoing_timer_title),
-                    message = context.getString(R.string.ongoing_timer_message),
+                    title = context.getString(R.string.pomodoro_title),
+                    message = context.getString(R.string.ongoing_status_pomodoro),
                     shortCriticalText = context.getString(R.string.live_update_chip_running),
+                    phaseKey = "pomodoro-other",
                 )
             }
             else -> indeterminateLiveUpdate(
                 title = context.getString(R.string.ongoing_timer_title),
                 message = context.getString(R.string.ongoing_timer_message),
                 shortCriticalText = context.getString(R.string.live_update_chip_running),
+                phaseKey = "idle-other",
             )
         }
     }
@@ -598,17 +682,22 @@ class NotificationService(private val context: Context) {
     private fun timedLiveUpdate(
         title: String,
         message: String,
+        subText: String? = null,
         startAt: Long,
         endAt: Long,
         nowMillis: Long,
-        shortCriticalText: String?,
+        milestoneAt: Long? = null,
+        phaseKey: String,
+        staticMessage: String? = null,
     ): OngoingLiveUpdateContent {
         val totalMillis = (endAt - startAt).coerceAtLeast(0L)
         if (startAt <= 0L || endAt <= 0L || totalMillis <= 0L) {
             return indeterminateLiveUpdate(
                 title = title,
                 message = message,
-                shortCriticalText = shortCriticalText,
+                subText = subText,
+                shortCriticalText = context.getString(R.string.live_update_chip_running),
+                phaseKey = "$phaseKey-indeterminate",
             )
         }
 
@@ -620,16 +709,76 @@ class NotificationService(private val context: Context) {
             .setStyledByProgress(true)
             .setProgress(progress)
             .addProgressSegment(ProgressStyle.Segment(LIVE_UPDATE_PROGRESS_MAX))
+
+        milestoneAt?.let { markerAt ->
+            val markerProgress = (((markerAt - startAt).coerceIn(0L, totalMillis) * LIVE_UPDATE_PROGRESS_MAX) / totalMillis)
+                .toInt()
+                .coerceIn(1, LIVE_UPDATE_PROGRESS_MAX)
+            style.addProgressPoint(ProgressStyle.Point(markerProgress))
+        }
+
         val remainingMillis = (endAt - nowMillis).coerceAtLeast(0L)
         val useChronometer = remainingMillis >= LIVE_UPDATE_CHRONOMETER_MIN_MILLIS
+        // When chronometer is shown, keep body text stable so the system countdown owns the ticking.
+        val resolvedMessage = if (useChronometer) {
+            staticMessage ?: message
+        } else {
+            message
+        }
+        val shortText = if (useChronometer) {
+            null
+        } else {
+            remainingChipText(endAt, nowMillis)
+        }
+        // Coalesce progress updates so tiny millisecond jitter does not spam NotificationManager.
+        val progressBucket = progress / LIVE_UPDATE_PROGRESS_BUCKET
+        val remainingBucketSeconds = if (useChronometer) {
+            // Chronometer ticks on-device; only republish when progress meaningfully moves.
+            -1L
+        } else {
+            remainingMillis / 1_000L
+        }
+        return OngoingLiveUpdateContent(
+            title = title,
+            message = resolvedMessage,
+            subText = subText,
+            progressStyle = style,
+            requestPromotedOngoing = true,
+            shortCriticalText = shortText,
+            whenMillis = if (useChronometer) endAt else null,
+            chronometerCountDown = true,
+            signature = listOf(
+                phaseKey,
+                progressBucket,
+                remainingBucketSeconds,
+                useChronometer,
+                endAt,
+                title,
+                resolvedMessage,
+                subText.orEmpty(),
+                shortText.orEmpty(),
+            ).joinToString("|"),
+        )
+    }
+
+    private fun completedLiveUpdate(
+        title: String,
+        message: String,
+        shortCriticalText: String,
+        phaseKey: String,
+    ): OngoingLiveUpdateContent {
+        val style = ProgressStyle()
+            .setStyledByProgress(true)
+            .setProgress(LIVE_UPDATE_PROGRESS_MAX)
+            .addProgressSegment(ProgressStyle.Segment(LIVE_UPDATE_PROGRESS_MAX))
         return OngoingLiveUpdateContent(
             title = title,
             message = message,
+            subText = context.getString(R.string.live_update_subtext_action_needed),
             progressStyle = style,
             requestPromotedOngoing = true,
             shortCriticalText = shortCriticalText,
-            whenMillis = if (useChronometer) endAt else null,
-            chronometerCountDown = true,
+            signature = listOf(phaseKey, title, message, shortCriticalText).joinToString("|"),
         )
     }
 
@@ -638,33 +787,63 @@ class NotificationService(private val context: Context) {
         message: String,
         shortCriticalText: String?,
         requestPromotedOngoing: Boolean = true,
+        subText: String? = null,
+        phaseKey: String,
     ): OngoingLiveUpdateContent {
         return OngoingLiveUpdateContent(
             title = title,
             message = message,
+            subText = subText,
             progressStyle = ProgressStyle().setProgressIndeterminate(true),
             requestPromotedOngoing = requestPromotedOngoing,
             shortCriticalText = shortCriticalText,
+            signature = listOf(
+                phaseKey,
+                requestPromotedOngoing,
+                title,
+                message,
+                subText.orEmpty(),
+                shortCriticalText.orEmpty(),
+            ).joinToString("|"),
         )
     }
 
+    private fun remainingStatusMessage(templateRes: Int, endAt: Long, nowMillis: Long): String {
+        val remaining = formatRemainingCompact(endAt, nowMillis)
+            ?: return context.getString(R.string.live_update_message_due_now)
+        return context.getString(templateRes, remaining)
+    }
+
     private fun remainingChipText(endAt: Long, nowMillis: Long): String? {
+        return formatRemainingCompact(endAt, nowMillis)
+            ?: context.getString(R.string.live_update_chip_due)
+    }
+
+    private fun formatRemainingCompact(endAt: Long, nowMillis: Long): String? {
         if (endAt <= 0L) return null
-        val remainingSeconds = ((endAt - nowMillis).coerceAtLeast(0L) + 999L) / 1000L
-        if (remainingSeconds <= 0L) {
-            return context.getString(R.string.live_update_chip_due)
-        }
-        val minutes = remainingSeconds / 60L
+        val remainingSeconds = ((endAt - nowMillis).coerceAtLeast(0L) + 999L) / 1_000L
+        if (remainingSeconds <= 0L) return null
+        val hours = remainingSeconds / 3_600L
+        val minutes = (remainingSeconds % 3_600L) / 60L
         val seconds = remainingSeconds % 60L
-        return if (minutes >= 60L) {
-            val hours = minutes / 60L
-            val remainMinutes = minutes % 60L
-            context.getString(R.string.live_update_chip_hours_minutes, hours, remainMinutes)
-        } else if (minutes > 0L) {
-            context.getString(R.string.live_update_chip_minutes_seconds, minutes, seconds)
-        } else {
-            context.getString(R.string.live_update_chip_seconds, seconds)
+        return when {
+            hours > 0L -> context.getString(
+                R.string.live_update_chip_hours_minutes,
+                hours,
+                minutes,
+            )
+            minutes > 0L -> context.getString(
+                R.string.live_update_chip_minutes_seconds,
+                minutes,
+                seconds,
+            )
+            else -> context.getString(R.string.live_update_chip_seconds, seconds)
         }
+    }
+
+    private fun shouldPublishLiveUpdate(content: OngoingLiveUpdateContent): Boolean {
+        val previous = lastPublishedLiveUpdateSignature.get()
+        return previous != content.signature
     }
 
     private fun actionPendingIntent(id: Int, action: String): PendingIntent {
@@ -688,6 +867,7 @@ class NotificationService(private val context: Context) {
 
     private companion object {
         const val LIVE_UPDATE_PROGRESS_MAX = 1_000
+        const val LIVE_UPDATE_PROGRESS_BUCKET = 10
         const val LIVE_UPDATE_CHRONOMETER_MIN_MILLIS = 2 * 60_000L
 
         val reminderNotificationIds = listOf(

@@ -126,7 +126,7 @@ class TimerForegroundService : LifecycleService() {
                 return@collect
             }
             val tickedState = recordIncrementalEyeStats(settings, screenAdjustedState, nowMillis)
-            // Keep the Android Live Update progress/chip in sync with the active timer phase.
+            // Refresh Live Update progress/chip; NotificationService dedupes identical payloads.
             if (settings.notificationEnabled || settings.keepAliveEnabled) {
                 notifications.showOngoingStatus(tickedState)
             }
