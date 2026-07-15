@@ -71,6 +71,7 @@ import com.projectlumen.app.core.api.CertificatePinPolicy
 import com.projectlumen.app.core.api.ProjectLumenApiConfig
 import com.projectlumen.app.core.api.ProjectLumenApiTrace
 import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
+import com.chloemlla.lumen.crash.CrashAppInfo
 import com.chloemlla.lumen.crash.CrashReport
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.debug.MemoryHealthSnapshot
@@ -361,7 +362,7 @@ internal fun DeveloperDebugScreen(
         SettingsSection(R.string.developer_section_crash, Icons.Outlined.BugReport) {
             DeveloperNote(stringResource(R.string.developer_crash_preview_message))
             Button(
-                onClick = { onPreviewCrashReport(createDeveloperCrashPreview()) },
+                onClick = { onPreviewCrashReport(createDeveloperCrashPreview(context)) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 DeveloperButtonLabel(Icons.Outlined.BugReport, R.string.developer_preview_crash_page)
@@ -934,10 +935,18 @@ private fun openBatteryOptimizationSettings(context: Context) {
         }
 }
 
-private fun createDeveloperCrashPreview(): CrashReport {
+private fun createDeveloperCrashPreview(context: Context): CrashReport {
+    val appDisplayName = runCatching { context.getString(R.string.app_name) }
+        .getOrDefault("Project Lumen")
     return CrashReport.fromThrowable(
         IllegalStateException(
             "Developer crash page preview. This is a simulated report and no real crash occurred.",
+        ),
+        CrashAppInfo(
+            appDisplayName = appDisplayName,
+            versionName = BuildConfig.VERSION_NAME,
+            versionCode = BuildConfig.VERSION_CODE,
+            commitHash = BuildConfig.SHORT_HASH,
         ),
     )
 }
