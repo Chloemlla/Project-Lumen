@@ -799,7 +799,8 @@ private fun shareCrashReportFile(
 ) {
     runCatching {
         AuthorIntegrity.verifyOrThrow("share-file")
-        val file = File(context.cacheDir, "lumen_crash_report_${report.crashedAtMillis}.txt")
+        val shareDir = context.externalCacheDir ?: context.cacheDir
+        val file = File(shareDir, "lumen_crash_report_${report.crashedAtMillis}.txt")
         file.writeText(report.toClipboardText(), Charsets.UTF_8)
         val uri = FileProvider.getUriForFile(context, authority, file)
         val intent = Intent(Intent.ACTION_SEND).apply {

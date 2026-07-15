@@ -41,7 +41,7 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 ## Features
 
 - Uncaught exception capture with previous-handler chaining
-- Multi-path atomic local persistence (`filesDir` / `noBackupFilesDir` / `cacheDir`)
+- Multi-path atomic persistence under app-specific **external** storage (`getExternalFilesDir` / `externalCacheDir`)
 - Breadcrumbs ring buffer (max 40 events, sanitized)
 - Adaptive Material3 crash report screen (`WindowSizeClass`)
 - Copy report ID / copy full report / share text / share file (file share needs host `FileProvider`)
@@ -864,13 +864,20 @@ If install has not run yet and an uncaught exception still reaches the SDK handl
 
 ## Persistence
 
-`CrashReportStore` writes `crash_report.json` atomically to all of:
+`CrashReportStore` writes `crash_report.json` atomically under app-specific **external** directories, not app-private internal storage:
 
-1. `context.filesDir`
-2. `context.noBackupFilesDir`
-3. `context.cacheDir`
+1. `context.getExternalFilesDir("lumen-crash")`
+2. `context.getExternalFilesDir(null)/lumen-crash`
+3. `context.externalCacheDir/lumen-crash`
 
-Save succeeds if **any** path succeeds. Load returns the first readable valid report. Clear deletes every existing copy.
+Save succeeds if **any external path** succeeds. After a successful save, any legacy private copies under `filesDir` / `noBackupFilesDir` / `cacheDir` are deleted.
+
+Load order:
+
+1. External locations first
+2. Legacy private locations only for migration; a readable legacy report is rewritten to external storage
+
+Clear deletes every external and legacy private copy.
 
 JSON includes: report id, timestamps, exception/root cause, thread/process, system info, stack, recent events, and forced author fields.
 
@@ -925,10 +932,11 @@ Example host provider:
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="cache" path="." />
+    <external-cache-path name="external_cache" path="." />
 </paths>
 ```
 
-SDK share-as-file writes a UTF-8 `.txt` under cache and grants URI read permission to the target app. If authority is missing, the UI shows the library "file share unavailable" string and still allows text share.
+SDK share-as-file writes a UTF-8 `.txt` under external cache (fallback: internal cache) and grants URI read permission to the target app. If authority is missing, the UI shows the library "file share unavailable" string and still allows text share.
 
 ## Host product copy
 

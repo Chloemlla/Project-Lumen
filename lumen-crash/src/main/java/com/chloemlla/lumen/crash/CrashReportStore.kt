@@ -5,42 +5,103 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 
+/**
+ * Persists the latest crash report outside app-private internal storage.
+ *
+ * Primary locations are app-specific external directories so the report is not kept only
+ * under internal private paths (`filesDir` / `noBackupFilesDir` / `cacheDir`).
+ * Legacy private copies are still readable/cleared for migration.
+ */
 class CrashReportStore(context: Context) {
-    private val files = listOf(
-        File(context.filesDir, FILE_NAME),
-        File(context.noBackupFilesDir, FILE_NAME),
-        File(context.cacheDir, FILE_NAME),
-    )
+    private val appContext = context.applicationContext
 
     fun save(report: CrashReport) {
         AuthorIntegrity.verifyOrThrow("store-save")
         val payload = report.toJson().toString()
+        val targets = writableTargets()
+        if (targets.isEmpty()) {
+            throw IOException("No external crash report directory is available.")
+        }
+
         val failures = mutableListOf<Throwable>()
         var saved = false
-        files.forEach { file ->
+        targets.forEach { file ->
             runCatching {
                 file.writeAtomically(payload)
                 saved = true
             }.onFailure(failures::add)
         }
-        if (saved) return
-        throw IOException("Unable to persist crash report.", failures.firstOrNull())
+        if (!saved) {
+            throw IOException("Unable to persist crash report.", failures.firstOrNull())
+        }
+
+        // Avoid leaving stale private copies after a successful external write.
+        clearLegacyPrivateCopies()
     }
 
     fun load(): CrashReport? {
-        return files.firstNotNullOfOrNull { file ->
-            if (!file.exists()) {
-                null
-            } else {
-                runCatching { crashReportFromJson(JSONObject(file.readText(Charsets.UTF_8))) }.getOrNull()
+        // Prefer external locations first, then migrate any legacy private copy.
+        externalTargets().forEach { file ->
+            readReport(file)?.let { return it }
+        }
+        legacyPrivateTargets().forEach { file ->
+            val report = readReport(file) ?: return@forEach
+            runCatching { save(report) }
+            return report
+        }
+        return null
+    }
+
+    fun clear() {
+        (externalTargets() + legacyPrivateTargets()).forEach { file ->
+            if (file.exists()) {
+                file.delete()
+            }
+            file.parentFile
+                ?.takeIf { it.name == DIR_NAME && it.isDirectory && it.list().isNullOrEmpty() }
+                ?.delete()
+        }
+    }
+
+    private fun writableTargets(): List<File> = externalTargets()
+
+    private fun externalTargets(): List<File> {
+        val dirs = listOfNotNull(
+            appContext.getExternalFilesDir(DIR_NAME),
+            appContext.getExternalFilesDir(null)?.resolve(DIR_NAME),
+            appContext.externalCacheDir?.resolve(DIR_NAME),
+        ).distinctBy { it.absolutePath }
+
+        return dirs.map { dir ->
+            if (!dir.exists()) {
+                dir.mkdirs()
+            }
+            File(dir, FILE_NAME)
+        }
+    }
+
+    private fun legacyPrivateTargets(): List<File> = listOf(
+        File(appContext.filesDir, FILE_NAME),
+        File(appContext.noBackupFilesDir, FILE_NAME),
+        File(appContext.cacheDir, FILE_NAME),
+        File(appContext.filesDir, "$DIR_NAME/$FILE_NAME"),
+        File(appContext.noBackupFilesDir, "$DIR_NAME/$FILE_NAME"),
+        File(appContext.cacheDir, "$DIR_NAME/$FILE_NAME"),
+    )
+
+    private fun clearLegacyPrivateCopies() {
+        legacyPrivateTargets().forEach { file ->
+            if (file.exists()) {
+                file.delete()
             }
         }
     }
 
-    fun clear() {
-        files.forEach { file ->
-            if (file.exists()) file.delete()
-        }
+    private fun readReport(file: File): CrashReport? {
+        if (!file.exists()) return null
+        return runCatching {
+            crashReportFromJson(JSONObject(file.readText(Charsets.UTF_8)))
+        }.getOrNull()
     }
 
     private fun File.writeAtomically(payload: String) {
@@ -57,6 +118,7 @@ class CrashReportStore(context: Context) {
     }
 
     private companion object {
+        const val DIR_NAME = "lumen-crash"
         const val FILE_NAME = "crash_report.json"
     }
 }
