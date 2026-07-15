@@ -296,7 +296,7 @@ gpr.key=YOUR_GITHUB_PAT_OR_TOKEN
 Windows example path:
 
 ```text
-C:\\Users\\<you>\\.gradle\\gradle.properties
+C:\Users\<you>\.gradle\gradle.properties
 ```
 
 macOS / Linux example path:
