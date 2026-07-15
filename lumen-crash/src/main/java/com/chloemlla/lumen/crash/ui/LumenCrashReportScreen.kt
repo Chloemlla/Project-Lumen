@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
@@ -1182,23 +1183,23 @@ private fun shareCrashReportFile(
 ) {
     runCatching {
         AuthorIntegrity.verifyOrThrow("share-file")
-        val shareDir = context.externalCacheDir ?: context.cacheDir
+        // Prefer internal cache: FileProvider cache-path is always present, and some OEMs
+        // refuse external-cache content URIs even when the path XML includes them.
+        val shareDir = resolveCrashShareDirectory(context)
         val file = File(shareDir, "lumen_crash_report_${report.crashedAtMillis}.txt")
         file.writeText(report.toClipboardText(), Charsets.UTF_8)
         val uri = FileProvider.getUriForFile(context, authority, file)
+        val subject = shareSubject?.takeIf { it.isNotBlank() }
+            ?: context.getString(R.string.lumen_crash_report_share_subject)
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(
-                Intent.EXTRA_SUBJECT,
-                shareSubject?.takeIf { it.isNotBlank() }
-                    ?: context.getString(R.string.lumen_crash_report_share_subject),
-            )
+            putExtra(Intent.EXTRA_SUBJECT, subject)
             putExtra(Intent.EXTRA_STREAM, uri)
             clipData = ClipData.newUri(context.contentResolver, file.name, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        launchCrashReportShare(context, intent)
+        launchCrashReportShare(context, intent, uri)
     }.onFailure {
         Toast.makeText(
             context,
@@ -1208,12 +1209,38 @@ private fun shareCrashReportFile(
     }
 }
 
-private fun launchCrashReportShare(context: Context, intent: Intent) {
+private fun resolveCrashShareDirectory(context: Context): File {
+    val candidates = listOfNotNull(
+        File(context.cacheDir, "lumen-crash-share"),
+        context.externalCacheDir?.let { File(it, "lumen-crash-share") },
+    )
+    for (dir in candidates) {
+        if (dir.exists() || dir.mkdirs()) {
+            return dir
+        }
+    }
+    // Last resort: root internal cache is covered by the host <cache-path path="." /> entry.
+    return context.cacheDir
+}
+
+private fun launchCrashReportShare(
+    context: Context,
+    intent: Intent,
+    grantUri: Uri? = null,
+) {
     runCatching {
-        context.startActivity(
-            Intent.createChooser(intent, context.getString(R.string.lumen_crash_report_share))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
+        val chooserTitle = context.getString(R.string.lumen_crash_report_share)
+        val chooser = Intent.createChooser(intent, chooserTitle).apply {
+            // createChooser wraps the send Intent. Grant flags and ClipData must also live on
+            // the outer chooser Intent so the selected target receives temporary URI access.
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (grantUri != null || intent.clipData != null) {
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                clipData = intent.clipData
+                    ?: grantUri?.let { ClipData.newUri(context.contentResolver, "shared", it) }
+            }
+        }
+        context.startActivity(chooser)
     }.onFailure {
         Toast.makeText(
             context,

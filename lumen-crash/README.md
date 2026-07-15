@@ -1077,7 +1077,7 @@ Example host provider:
 </paths>
 ```
 
-SDK share-as-file writes a UTF-8 `.txt` under external cache (fallback: internal cache) and grants URI read permission to the target app. If authority is missing, the UI shows the library "file share unavailable" string and still allows text share.
+SDK share-as-file writes a UTF-8 `.txt` under internal cache first (`cacheDir/lumen-crash-share`, fallback external cache), attaches it through `FileProvider`, and propagates temporary URI read grants through the system chooser. If authority is missing, the UI shows the library "file share unavailable" string and still allows text share.
 
 ## Host product copy
 
@@ -1270,7 +1270,7 @@ Also:
 ### File share and product copy
 
 - Text share works without host setup. File share requires a host `FileProvider` plus `LumenCrashConfig.fileProviderAuthority`. Without authority, the UI keeps text share and shows the library "file share unavailable" string.
-- Provider paths must expose cache / external-cache locations used by the SDK share writer. See [File share setup](#file-share-setup).
+- Provider paths must expose cache (required) and preferably external-cache for the SDK share writer fallback. See [File share setup](#file-share-setup).
 - Override only product-facing strings through config (`reportTitle`, `reportMessage`, `shareSubject`). Do not re-copy the full shared UI string set into the host app.
 - Author attribution is not configurable and cannot be hidden. Attempts to strip it fail closed.
 
