@@ -58,3 +58,33 @@
 -dontwarn androidx.lifecycle.**
 -dontwarn androidx.navigation.**
 -dontwarn androidx.room.**
+
+
+############################################################
+# Lumen Crash SDK minify exemption
+# Module/artifact: :lumen-crash / com.chloemlla.lumen:lumen-crash
+# Required when release minify/resource shrink is enabled.
+# Prevents white-screen/startup crash from author integrity
+# fail-closed checks and missing crash public API symbols.
+############################################################
+-keep class com.chloemlla.lumen.crash.CrashAuthorAttribution {
+    public static final java.lang.String *;
+}
+-keep class com.chloemlla.lumen.crash.AuthorIntegrity {
+    public static *** verifyOrThrow(...);
+    public static *** fingerprintHex();
+    public static *** verifiedAuthorBlock();
+}
+-keep class com.chloemlla.lumen.crash.LumenCrash { *; }
+-keep class com.chloemlla.lumen.crash.LumenCrashConfig { *; }
+-keep class com.chloemlla.lumen.crash.CrashReport { *; }
+-keep class com.chloemlla.lumen.crash.CrashAppInfo { *; }
+-keep class com.chloemlla.lumen.crash.CrashReportStore { *; }
+-keep class com.chloemlla.lumen.crash.CrashBreadcrumbs { *; }
+-keep class com.chloemlla.lumen.crash.AuthorBlock { *; }
+-keep class com.chloemlla.lumen.crash.ui.LumenCrashReportScreenKt { *; }
+
+# Safe package-level exemption for host release builds.
+-keep class com.chloemlla.lumen.crash.** { *; }
+-keepclassmembers class com.chloemlla.lumen.crash.** { *; }
+-dontwarn com.chloemlla.lumen.crash.**
