@@ -4,7 +4,7 @@ package com.chloemlla.lumen.crash
  * Host-provided configuration for the crash SDK.
  *
  * Business metadata and product copy are injectable. Author attribution is **not**
- * configurable and is always forced to ChloeMlla / https://github.com/Chloemlla/.
+ * configurable and is always forced to Chloemlla / https://github.com/Chloemlla/.
  */
 data class LumenCrashConfig(
     val appDisplayName: String,

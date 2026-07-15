@@ -107,7 +107,7 @@ publishing {
                 developers {
                     developer {
                         id.set("chloemlla")
-                        name.set("ChloeMlla")
+                        name.set("Chloemlla")
                         url.set("https://github.com/Chloemlla/")
                     }
                 }

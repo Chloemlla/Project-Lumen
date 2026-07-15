@@ -50,7 +50,7 @@
 - 复制报告 ID / 复制完整报告 / 分享文本 / 分享文件（文件分享需要宿主 `FileProvider`）
 - 宿主可配置应用元信息与产品文案
 - 上报逻辑保留在宿主侧，通过 `onCrashSaved` 回调接入
-- **不可配置/不可移除的作者署名**：ChloeMlla + https://github.com/Chloemlla/
+- **不可配置/不可移除的作者署名**：Chloemlla + https://github.com/Chloemlla/
 - 严格作者完整性校验（失败即阻断）
 
 ## 模块结构
@@ -1112,11 +1112,11 @@ LumenCrashConfig(
 
 作者常量位于 `CrashAuthorAttribution`：
 
-- 名称：`ChloeMlla`
+- 名称：`Chloemlla`
 - URL：`https://github.com/Chloemlla/`
 - Handle：`chloemlla`
 - 指纹：`AUTHOR_NAME|AUTHOR_URL` 的 SHA-256 小写十六进制
-- 页脚标签：`Crash SDK by ChloeMlla · https://github.com/Chloemlla/`
+- 页脚标签：`Crash SDK by Chloemlla · https://github.com/Chloemlla/`
 
 强制写入：
 
