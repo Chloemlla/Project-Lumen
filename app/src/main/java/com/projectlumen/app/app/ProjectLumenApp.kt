@@ -65,7 +65,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.projectlumen.app.R
-import com.projectlumen.app.core.crash.CrashReport
+import com.projectlumen.app.ProjectLumenApplication
+import com.chloemlla.lumen.crash.CrashReport
+import com.chloemlla.lumen.crash.ui.LumenCrashReportScreen
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.openapi.LumenOpenLaunchRequest
@@ -279,13 +281,19 @@ fun ProjectLumenApp(
             themePaletteJson = activeThemeTemplate?.layoutJson,
         ) {
             activeCrashReport?.let { report ->
-                CrashReportScreen(
+                LumenCrashReportScreen(
                     report = report,
                     onContinue = {
                         activeCrashReport = null
                         viewModel.clearCrashReport()
                     },
                     clearStoredReportOnContinue = activeCrashReportClearsStore,
+                    onClearStoredReport = {
+                        val application = localizedContext.applicationContext as? ProjectLumenApplication
+                        application?.scheduleCrashReportUpload(report)
+                        runCatching { application?.crashReports?.clear() }
+                        application?.clearStartupCrashReport()
+                    },
                 )
                 return@ProjectLumenTheme
             }

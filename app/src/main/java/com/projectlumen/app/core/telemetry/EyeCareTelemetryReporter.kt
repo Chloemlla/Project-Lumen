@@ -34,8 +34,8 @@ import com.projectlumen.app.core.api.RestComplianceTelemetry
 import com.projectlumen.app.core.api.SensorDisturbanceTelemetry
 import com.projectlumen.app.core.api.TipTemplateTelemetry
 import com.projectlumen.app.core.api.UserConfigurationTelemetry
-import com.projectlumen.app.core.crash.CrashReport
-import com.projectlumen.app.core.crash.CrashReportStore
+import com.chloemlla.lumen.crash.CrashReport
+import com.chloemlla.lumen.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity

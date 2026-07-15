@@ -71,7 +71,7 @@ import com.projectlumen.app.core.api.CertificatePinPolicy
 import com.projectlumen.app.core.api.ProjectLumenApiConfig
 import com.projectlumen.app.core.api.ProjectLumenApiTrace
 import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
-import com.projectlumen.app.core.crash.CrashReport
+import com.chloemlla.lumen.crash.CrashReport
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.debug.MemoryHealthSnapshot
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityState

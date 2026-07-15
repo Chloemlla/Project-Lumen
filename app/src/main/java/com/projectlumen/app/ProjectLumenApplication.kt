@@ -1,4 +1,4 @@
-﻿package com.projectlumen.app
+package com.projectlumen.app
 
 import android.app.Application
 import android.content.Context
@@ -6,9 +6,11 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.projectlumen.app.core.api.ProjectLumenApiClient
-import com.projectlumen.app.core.crash.CrashBreadcrumbs
-import com.projectlumen.app.core.crash.CrashReport
-import com.projectlumen.app.core.crash.CrashReportStore
+import com.chloemlla.lumen.crash.LumenCrashConfig
+import com.chloemlla.lumen.crash.LumenCrash
+import com.chloemlla.lumen.crash.CrashBreadcrumbs
+import com.chloemlla.lumen.crash.CrashReport
+import com.chloemlla.lumen.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.debug.DeveloperDebugOverlayService
 import com.projectlumen.app.core.debug.MemoryHealthMonitor
@@ -50,7 +52,8 @@ class ProjectLumenApplication : Application() {
         DataBackupService(this, database, eyeCarePreferences) { secureCredentials.deviceInstallationId() }
     }
     val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient() }
-    val crashReports: CrashReportStore by lazy { CrashReportStore(this) }
+    val crashReports: CrashReportStore
+        get() = LumenCrash.store()
     val secureCredentials: SecureCredentialStore by lazy { SecureCredentialStore(this) }
     val openApiController: LumenOpenRuntimeController by lazy { LumenOpenRuntimeController(this) }
     val telemetry: EyeCareTelemetryReporter by lazy {
@@ -69,23 +72,21 @@ class ProjectLumenApplication : Application() {
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val crashReportUploadInFlight = AtomicBoolean(false)
-    private var crashExceptionHandler: Thread.UncaughtExceptionHandler? = null
     @Volatile
     private var crashReportUploadsReady = false
-    @Volatile
-    var startupCrashReport: CrashReport? = null
-        private set
+    val startupCrashReport: CrashReport?
+        get() = LumenCrash.startupCrashReport
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
+        installLumenCrashSdk()
         CrashBreadcrumbs.record("Application.attachBaseContext")
-        installCrashReporter()
     }
 
     override fun onCreate() {
         super.onCreate()
+        installLumenCrashSdk()
         CrashBreadcrumbs.record("Application.onCreate")
-        installCrashReporter()
         initializeMmkvOrRecordCrash()
         MemoryHealthMonitor.sample(this)
         AppIntegrityGuard.enforce(this)
@@ -101,26 +102,23 @@ class ProjectLumenApplication : Application() {
         super.onTrimMemory(level)
     }
 
-    private fun installCrashReporter() {
-        val defaultExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
-        if (defaultExceptionHandler === crashExceptionHandler) return
-
-        lateinit var handler: Thread.UncaughtExceptionHandler
-        handler = Thread.UncaughtExceptionHandler { thread, throwable ->
-            val report = runCatching { CrashReport.fromThrowable(throwable) }
-                .getOrElse { CrashReport.fromThrowableFallback(throwable, it) }
-            runCatching { crashReports.save(report) }
-            scheduleCrashReportUpload(report)
-            if (defaultExceptionHandler != null && defaultExceptionHandler !== handler) {
-                defaultExceptionHandler.uncaughtException(thread, throwable)
-            } else {
-                android.os.Process.killProcess(android.os.Process.myPid())
-                kotlin.system.exitProcess(10)
-            }
-        }
-        crashExceptionHandler = handler
-        Thread.setDefaultUncaughtExceptionHandler(handler)
-        CrashBreadcrumbs.record("Crash reporter installed")
+    private fun installLumenCrashSdk() {
+        if (LumenCrash.isInstalled()) return
+        val appName = runCatching { getString(R.string.app_name) }.getOrDefault("Project Lumen")
+        LumenCrash.install(
+            this,
+            LumenCrashConfig(
+                appDisplayName = appName,
+                versionName = BuildConfig.VERSION_NAME,
+                versionCode = BuildConfig.VERSION_CODE,
+                commitHash = BuildConfig.SHORT_HASH,
+                fileProviderAuthority = "${packageName}.fileprovider",
+                shareSubject = runCatching { getString(R.string.crash_report_share_subject) }.getOrNull(),
+                reportTitle = runCatching { getString(R.string.crash_report_title) }.getOrNull(),
+                reportMessage = runCatching { getString(R.string.crash_report_message) }.getOrNull(),
+                onCrashSaved = { report -> scheduleCrashReportUpload(report) },
+            ),
+        )
     }
 
     private fun initializeMmkvOrRecordCrash() {
@@ -134,17 +132,11 @@ class ProjectLumenApplication : Application() {
     }
 
     fun recordCrash(throwable: Throwable): CrashReport {
-        CrashBreadcrumbs.record("Crash captured: ${throwable::class.java.name}")
-        val report = runCatching { CrashReport.fromThrowable(throwable) }
-            .getOrElse { CrashReport.fromThrowableFallback(throwable, it) }
-        startupCrashReport = report
-        runCatching { CrashReportStore(this).save(report) }
-            .onSuccess { scheduleCrashReportUpload(report) }
-        return report
+        return LumenCrash.record(throwable)
     }
 
     fun clearStartupCrashReport() {
-        startupCrashReport = null
+        LumenCrash.clearStartupCrashReport()
     }
 
     fun scheduleStoredCrashReportUpload() {
@@ -173,7 +165,7 @@ class ProjectLumenApplication : Application() {
         if (storedReport?.reportId == report.reportId) {
             runCatching { crashReports.clear() }
         }
-        if (startupCrashReport?.reportId == report.reportId) {
+        if (LumenCrash.startupCrashReport?.reportId == report.reportId) {
             clearStartupCrashReport()
         }
     }

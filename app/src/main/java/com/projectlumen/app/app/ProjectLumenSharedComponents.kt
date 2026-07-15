@@ -172,7 +172,7 @@ import androidx.navigation.compose.rememberNavController
 import com.projectlumen.app.BuildConfig
 import androidx.compose.ui.semantics.Role
 import com.projectlumen.app.R
-import com.projectlumen.app.core.crash.CrashReport
+import com.chloemlla.lumen.crash.CrashReport
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity

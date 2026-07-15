@@ -165,7 +165,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.R
-import com.projectlumen.app.core.crash.CrashReport
+import com.chloemlla.lumen.crash.CrashReport
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity

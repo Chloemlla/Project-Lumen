@@ -5,8 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.api.ProjectLumenApiDiagnostics
-import com.projectlumen.app.core.crash.CrashBreadcrumbs
-import com.projectlumen.app.core.crash.CrashReport
+import com.chloemlla.lumen.crash.CrashBreadcrumbs
+import com.chloemlla.lumen.crash.CrashReport
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
 import com.projectlumen.app.core.database.entities.AppSettingsEntity

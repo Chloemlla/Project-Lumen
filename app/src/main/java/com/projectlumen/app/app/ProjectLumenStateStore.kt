@@ -3,7 +3,7 @@ package com.projectlumen.app.app
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
-import com.projectlumen.app.core.crash.CrashReport
+import com.chloemlla.lumen.crash.CrashReport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted

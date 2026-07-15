@@ -12,10 +12,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.projectlumen.app.app.CrashReportScreen
+import com.chloemlla.lumen.crash.ui.LumenCrashReportScreen
 import com.projectlumen.app.app.ProjectLumenApp
 import com.projectlumen.app.app.ProjectLumenViewModel
-import com.projectlumen.app.core.crash.CrashBreadcrumbs
+import com.chloemlla.lumen.crash.CrashBreadcrumbs
+import com.chloemlla.lumen.crash.LumenCrash
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.openapi.LumenOpenIntents
 import com.projectlumen.app.openapi.LumenOpenLaunchRequest
@@ -47,12 +48,18 @@ open class MainActivity : ComponentActivity() {
             var startupReport by remember { mutableStateOf(initialStartupReport) }
             startupReport?.let { report ->
                 ProjectLumenTheme(themeMode = AppThemeMode.SYSTEM, useDynamicColors = false) {
-                    CrashReportScreen(
+                    LumenCrashReportScreen(
                         report = report,
                         onContinue = {
                             app.clearStartupCrashReport()
                             startupReport = null
                             if (initialViewModel == null) recreate()
+                        },
+                        clearStoredReportOnContinue = true,
+                        onClearStoredReport = {
+                            app.scheduleCrashReportUpload(report)
+                            runCatching { app.crashReports.clear() }
+                            app.clearStartupCrashReport()
                         },
                     )
                 }

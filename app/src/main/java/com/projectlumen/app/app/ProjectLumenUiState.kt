@@ -8,7 +8,7 @@ import com.projectlumen.app.core.database.entities.EntitlementEntity
 import com.projectlumen.app.core.database.entities.ReminderPlanEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
-import com.projectlumen.app.core.crash.CrashReport
+import com.chloemlla.lumen.crash.CrashReport
 
 data class ProjectLumenUiState(
     val settings: AppSettingsEntity = AppSettingsEntity(),
