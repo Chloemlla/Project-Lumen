@@ -1011,14 +1011,14 @@ Sanitization redacts local user-home paths plus `content://` / `file://` URIs. T
 
 ## Adaptive UI
 
-`LumenCrashReportScreen` uses `calculateWindowSizeClass` when an `Activity` is available, with width/height fallbacks from `BoxWithConstraints`.
+`LumenCrashReportScreen` uses `calculateWindowSizeClass` when an `Activity` is available, with width/height fallbacks from `BoxWithConstraints` and `LocalConfiguration`. The screen also applies `WindowInsets.safeDrawing` so phone status/navigation bars and display cutouts do not cover content under edge-to-edge hosts.
 
 | Layout signal | Behavior |
 |---|---|
-| Compact width (`< 600.dp` or Compact class) | Full-width content, 16.dp horizontal padding, vertical action stack |
-| Medium width | Content max 720.dp, 20.dp padding |
-| Expanded width (`>= 840.dp` or Expanded class) | Content max 960.dp, wider metadata pills, horizontal actions when height is not compact |
-| Compact height (`< 560.dp` or Compact class) | Tighter vertical padding/spacing; lower stack max heights so primary actions stay reachable |
+| Compact width (`< 600.dp` or Compact class / phone) | Full-width content, denser 12–16.dp padding, smaller hero type, stack header wraps above expand control, vertical action stack |
+| Medium width | Content max 720.dp, 20.dp padding, two-column secondary actions when height is not compact |
+| Expanded width (`>= 840.dp` or Expanded class) | Content max 960.dp, wider metadata pills, horizontal secondary actions when height is not compact |
+| Compact height (`< 560.dp` or Compact class) | Tighter vertical padding/spacing; lower stack max heights so primary actions stay reachable on short phones |
 
 Stack preview defaults to 18 collapsed lines; users can expand/collapse. Author footer card is always rendered when integrity passes.
 

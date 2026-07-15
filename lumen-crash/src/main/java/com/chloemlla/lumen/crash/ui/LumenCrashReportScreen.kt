@@ -21,12 +21,15 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,6 +70,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -143,7 +147,8 @@ fun LumenCrashReportScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing),
         contentAlignment = Alignment.TopCenter,
     ) {
         val layout = rememberCrashLayoutTokens(windowSizeClass, maxWidth, maxHeight)
@@ -155,9 +160,13 @@ fun LumenCrashReportScreen(
                 .padding(horizontal = layout.horizontalPadding, vertical = layout.verticalPadding),
             verticalArrangement = Arrangement.spacedBy(layout.sectionSpacing),
         ) {
-            CrashReportHero(title = title, message = message)
+            CrashReportHero(
+                title = title,
+                message = message,
+                compact = layout.compactWidth,
+            )
 
-            CrashReportCard {
+            CrashReportCard(contentPadding = layout.cardPadding) {
                 CrashReportSectionHeader(Icons.Outlined.Info, stringResource(R.string.lumen_crash_report_summary))
                 CrashReportInfoTile(stringResource(R.string.lumen_crash_report_id), report.reportId)
                 CrashReportInfoTile(stringResource(R.string.lumen_crash_report_time), formattedTime)
@@ -171,7 +180,7 @@ fun LumenCrashReportScreen(
                 CrashReportInfoTile(stringResource(R.string.lumen_crash_report_process), report.processName)
             }
 
-            CrashReportCard {
+            CrashReportCard(contentPadding = layout.cardPadding) {
                 CrashReportSectionHeader(Icons.Outlined.Devices, stringResource(R.string.lumen_crash_report_system_info))
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -184,7 +193,7 @@ fun LumenCrashReportScreen(
             }
 
             if (report.recentEvents.isNotEmpty()) {
-                CrashReportCard {
+                CrashReportCard(contentPadding = layout.cardPadding) {
                     CrashReportSectionHeader(
                         Icons.Outlined.Info,
                         stringResource(R.string.lumen_crash_report_recent_events),
@@ -197,32 +206,73 @@ fun LumenCrashReportScreen(
                 }
             }
 
-            CrashReportCard {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CrashReportSectionHeader(
-                        icon = Icons.Outlined.BugReport,
-                        title = stringResource(R.string.lumen_crash_report_stack_trace),
-                    )
-                    TextButton(onClick = { stackExpanded = !stackExpanded }) {
-                        Icon(
-                            imageVector = if (stackExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                            contentDescription = null,
+            CrashReportCard(contentPadding = layout.cardPadding) {
+                if (layout.compactWidth) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        CrashReportSectionHeader(
+                            icon = Icons.Outlined.BugReport,
+                            title = stringResource(R.string.lumen_crash_report_stack_trace),
                         )
-                        Text(
-                            text = stringResource(
-                                if (stackExpanded) {
-                                    R.string.lumen_crash_report_collapse_stack
+                        TextButton(
+                            onClick = { stackExpanded = !stackExpanded },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (stackExpanded) {
+                                    Icons.Outlined.ExpandLess
                                 } else {
-                                    R.string.lumen_crash_report_show_full_stack
+                                    Icons.Outlined.ExpandMore
                                 },
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                                contentDescription = null,
+                            )
+                            Text(
+                                text = stringResource(
+                                    if (stackExpanded) {
+                                        R.string.lumen_crash_report_collapse_stack
+                                    } else {
+                                        R.string.lumen_crash_report_show_full_stack
+                                    },
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CrashReportSectionHeader(
+                            icon = Icons.Outlined.BugReport,
+                            title = stringResource(R.string.lumen_crash_report_stack_trace),
+                            modifier = Modifier.weight(1f, fill = false),
                         )
+                        TextButton(onClick = { stackExpanded = !stackExpanded }) {
+                            Icon(
+                                imageVector = if (stackExpanded) {
+                                    Icons.Outlined.ExpandLess
+                                } else {
+                                    Icons.Outlined.ExpandMore
+                                },
+                                contentDescription = null,
+                            )
+                            Text(
+                                text = stringResource(
+                                    if (stackExpanded) {
+                                        R.string.lumen_crash_report_collapse_stack
+                                    } else {
+                                        R.string.lumen_crash_report_show_full_stack
+                                    },
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
                 Text(
@@ -270,6 +320,8 @@ fun LumenCrashReportScreen(
 
             CrashReportActionPanel(
                 horizontalActions = layout.horizontalActions,
+                twoColumnActions = layout.twoColumnActions,
+                compact = layout.compactWidth,
                 onCopyId = {
                     runCatching { AuthorIntegrity.verifyOrThrow("copy-id") }
                     context.getSystemService(ClipboardManager::class.java)
@@ -354,10 +406,13 @@ private data class CrashLayoutTokens(
     val horizontalPadding: Dp,
     val verticalPadding: Dp,
     val sectionSpacing: Dp,
+    val cardPadding: Dp,
     val stackCollapsedMaxHeight: Dp,
     val stackExpandedMaxHeight: Dp,
     val pillMaxWidth: Dp,
+    val compactWidth: Boolean,
     val horizontalActions: Boolean,
+    val twoColumnActions: Boolean,
 )
 
 @Composable
@@ -366,35 +421,81 @@ private fun rememberCrashLayoutTokens(
     maxWidth: Dp,
     maxHeight: Dp,
 ): CrashLayoutTokens {
+    val configuration = LocalConfiguration.current
     val widthClass = windowSizeClass?.widthSizeClass
     val heightClass = windowSizeClass?.heightSizeClass
-    val compactWidth = widthClass == WindowWidthSizeClass.Compact || maxWidth < 600.dp
-    val expandedWidth = widthClass == WindowWidthSizeClass.Expanded || maxWidth >= 840.dp
-    val compactHeight = heightClass == WindowHeightSizeClass.Compact || maxHeight < 560.dp
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    val effectiveWidth = minOf(maxWidth, screenWidth)
+    val effectiveHeight = minOf(maxHeight, screenHeight)
+    val compactWidth =
+        widthClass == WindowWidthSizeClass.Compact ||
+            effectiveWidth < 600.dp ||
+            screenWidth < 600.dp
+    val mediumWidth =
+        !compactWidth && (
+            widthClass == WindowWidthSizeClass.Medium ||
+                (effectiveWidth >= 600.dp && effectiveWidth < 840.dp)
+            )
+    val expandedWidth =
+        widthClass == WindowWidthSizeClass.Expanded ||
+            effectiveWidth >= 840.dp ||
+            screenWidth >= 840.dp
+    val compactHeight =
+        heightClass == WindowHeightSizeClass.Compact ||
+            effectiveHeight < 560.dp ||
+            screenHeight < 560.dp
+    val phoneLike = compactWidth || (screenWidth < 600.dp)
     val maxContentWidth = when {
         expandedWidth -> 960.dp
-        compactWidth -> maxWidth
+        compactWidth -> effectiveWidth
+        mediumWidth -> 720.dp
         else -> 720.dp
     }
     val stackCollapsed = when {
+        phoneLike && compactHeight -> 120.dp
         compactHeight -> 140.dp
         expandedWidth -> 280.dp
+        phoneLike -> 180.dp
         else -> 220.dp
     }
     val stackExpanded = when {
+        phoneLike && compactHeight -> 220.dp
         compactHeight -> 240.dp
         expandedWidth -> 520.dp
+        phoneLike -> 320.dp
         else -> 420.dp
     }
+    val twoColumnActions = mediumWidth && !compactHeight
+    val horizontalActions = expandedWidth && !compactHeight
     return CrashLayoutTokens(
         maxContentWidth = maxContentWidth,
-        horizontalPadding = if (compactWidth) 16.dp else 20.dp,
-        verticalPadding = if (compactHeight) 16.dp else 24.dp,
-        sectionSpacing = if (compactHeight) 12.dp else 16.dp,
+        horizontalPadding = when {
+            phoneLike && effectiveWidth < 360.dp -> 12.dp
+            compactWidth -> 16.dp
+            else -> 20.dp
+        },
+        verticalPadding = when {
+            compactHeight -> 12.dp
+            phoneLike -> 16.dp
+            else -> 24.dp
+        },
+        sectionSpacing = when {
+            compactHeight -> 10.dp
+            phoneLike -> 12.dp
+            else -> 16.dp
+        },
+        cardPadding = if (phoneLike) 12.dp else 16.dp,
         stackCollapsedMaxHeight = stackCollapsed,
         stackExpandedMaxHeight = stackExpanded,
-        pillMaxWidth = if (expandedWidth) 360.dp else 320.dp,
-        horizontalActions = expandedWidth && !compactHeight,
+        pillMaxWidth = when {
+            phoneLike -> effectiveWidth
+            expandedWidth -> 360.dp
+            else -> 320.dp
+        },
+        compactWidth = compactWidth,
+        horizontalActions = horizontalActions,
+        twoColumnActions = twoColumnActions,
     )
 }
 
@@ -404,6 +505,7 @@ private fun CrashIntegrityBlockedScreen() {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -466,15 +568,30 @@ private fun CrashAuthorFooterCard(report: CrashReport) {
 }
 
 @Composable
-private fun CrashReportHero(title: String, message: String) {
+private fun CrashReportHero(
+    title: String,
+    message: String,
+    compact: Boolean,
+) {
+    val iconSize = if (compact) 44.dp else 52.dp
+    val titleStyle = if (compact) {
+        MaterialTheme.typography.titleLarge
+    } else {
+        MaterialTheme.typography.headlineSmall
+    }
+    val messageStyle = if (compact) {
+        MaterialTheme.typography.bodyMedium
+    } else {
+        MaterialTheme.typography.bodyLarge
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 14.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(52.dp)
+                .size(iconSize)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.errorContainer),
             contentAlignment = Alignment.Center,
@@ -491,12 +608,12 @@ private fun CrashReportHero(title: String, message: String) {
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
+                style = titleStyle,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = message,
-                style = MaterialTheme.typography.bodyLarge,
+                style = messageStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -504,7 +621,10 @@ private fun CrashReportHero(title: String, message: String) {
 }
 
 @Composable
-private fun CrashReportCard(content: @Composable ColumnScope.() -> Unit) {
+private fun CrashReportCard(
+    contentPadding: Dp = 16.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -512,21 +632,32 @@ private fun CrashReportCard(content: @Composable ColumnScope.() -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(contentPadding),
+            verticalArrangement = Arrangement.spacedBy(if (contentPadding < 16.dp) 10.dp else 12.dp),
             content = content,
         )
     }
 }
 
 @Composable
-private fun CrashReportSectionHeader(icon: ImageVector, title: String) {
+private fun CrashReportSectionHeader(
+    icon: ImageVector,
+    title: String,
+    modifier: Modifier = Modifier,
+) {
     Row(
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -613,11 +744,15 @@ private fun CrashReportEventRow(event: String) {
 @Composable
 private fun CrashReportActionPanel(
     horizontalActions: Boolean,
+    twoColumnActions: Boolean,
+    compact: Boolean,
     onCopyId: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
     onClear: () -> Unit,
 ) {
+    val panelPadding = if (compact) 12.dp else 16.dp
+    val buttonSpacing = if (compact) 8.dp else 12.dp
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -625,15 +760,103 @@ private fun CrashReportActionPanel(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(panelPadding),
+            verticalArrangement = Arrangement.spacedBy(buttonSpacing),
         ) {
-            if (horizontalActions) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedButton(modifier = Modifier.weight(1f), onClick = onCopyId) {
+            when {
+                horizontalActions -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onCopyId) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                text = stringResource(R.string.lumen_crash_report_copy_id),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onCopy) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                text = stringResource(R.string.lumen_crash_report_copy),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onShare) {
+                            Icon(Icons.Outlined.Share, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                text = stringResource(R.string.lumen_crash_report_share),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    Button(modifier = Modifier.fillMaxWidth(), onClick = onClear) {
+                        Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text(
+                            text = stringResource(R.string.lumen_crash_report_clear_and_continue),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                twoColumnActions -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onCopyId) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                text = stringResource(R.string.lumen_crash_report_copy_id),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onCopy) {
+                            Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                text = stringResource(R.string.lumen_crash_report_copy),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(modifier = Modifier.weight(1f), onClick = onShare) {
+                            Icon(Icons.Outlined.Share, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                text = stringResource(R.string.lumen_crash_report_share),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Button(modifier = Modifier.weight(1f), onClick = onClear) {
+                            Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                text = stringResource(R.string.lumen_crash_report_clear_and_continue),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCopyId) {
                         Icon(Icons.Outlined.ContentCopy, contentDescription = null)
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(
@@ -642,7 +865,7 @@ private fun CrashReportActionPanel(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    OutlinedButton(modifier = Modifier.weight(1f), onClick = onCopy) {
+                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCopy) {
                         Icon(Icons.Outlined.ContentCopy, contentDescription = null)
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(
@@ -651,7 +874,7 @@ private fun CrashReportActionPanel(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    OutlinedButton(modifier = Modifier.weight(1f), onClick = onShare) {
+                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onShare) {
                         Icon(Icons.Outlined.Share, contentDescription = null)
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(
@@ -660,32 +883,15 @@ private fun CrashReportActionPanel(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                }
-                Button(modifier = Modifier.fillMaxWidth(), onClick = onClear) {
-                    Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(stringResource(R.string.lumen_crash_report_clear_and_continue))
-                }
-            } else {
-                OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCopyId) {
-                    Icon(Icons.Outlined.ContentCopy, contentDescription = null)
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(stringResource(R.string.lumen_crash_report_copy_id))
-                }
-                OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCopy) {
-                    Icon(Icons.Outlined.ContentCopy, contentDescription = null)
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(stringResource(R.string.lumen_crash_report_copy))
-                }
-                OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onShare) {
-                    Icon(Icons.Outlined.Share, contentDescription = null)
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(stringResource(R.string.lumen_crash_report_share))
-                }
-                Button(modifier = Modifier.fillMaxWidth(), onClick = onClear) {
-                    Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(stringResource(R.string.lumen_crash_report_clear_and_continue))
+                    Button(modifier = Modifier.fillMaxWidth(), onClick = onClear) {
+                        Icon(Icons.Outlined.DeleteOutline, contentDescription = null)
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text(
+                            text = stringResource(R.string.lumen_crash_report_clear_and_continue),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
