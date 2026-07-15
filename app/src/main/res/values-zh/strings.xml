@@ -392,6 +392,12 @@
     <string name="ongoing_status_resting">休息计时正在进行。</string>
     <string name="ongoing_status_paused">提醒计时已暂停。</string>
     <string name="ongoing_status_pomodoro">番茄钟计时正在进行。</string>
+    <string name="live_update_chip_running">进行中</string>
+    <string name="live_update_chip_paused">已暂停</string>
+    <string name="live_update_chip_due">到期</string>
+    <string name="live_update_chip_seconds">%1$d秒</string>
+    <string name="live_update_chip_minutes_seconds">%1$d:%2$02d</string>
+    <string name="live_update_chip_hours_minutes">%1$d时%2$02d</string>
     <string name="weekly_trend">近期趋势</string>
     <string name="today_goals">今日目标</string>
     <string name="section_goals">目标</string>
