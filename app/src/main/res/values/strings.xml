@@ -22,6 +22,8 @@
     <string name="settings_subtitle">Tune the app by area. Advanced options stay folded until you need them.</string>
     <string name="settings_expand_all">Expand all</string>
     <string name="settings_collapse_all">Collapse all</string>
+    <string name="settings_section_expand">Expand section</string>
+    <string name="settings_section_collapse">Collapse section</string>
     <string name="status_ready">Ready</string>
     <string name="status_working">Working</string>
     <string name="status_pre_alert">Pre-alert</string>
