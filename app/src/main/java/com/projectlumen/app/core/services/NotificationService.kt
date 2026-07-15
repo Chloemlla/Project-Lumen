@@ -31,6 +31,8 @@ import java.util.concurrent.atomic.AtomicReference
 private const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIFICATIONS"
 
 class NotificationService(private val context: Context) {
+    private val lastPublishedLiveUpdateSignature = AtomicReference<String?>(null)
+
     fun ensureChannels() {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannels(
