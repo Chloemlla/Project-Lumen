@@ -17,6 +17,8 @@
 - [功能特性](#功能特性)
 - [模块结构](#模块结构)
 - [接入依赖](#接入依赖)
+- [自动发布](#自动发布)
+- [消费已发布 SDK](#消费已发布-sdk)
 - [最小集成](#最小集成3-个宿主接入点)
 - [公开 API](#公开-api)
 - [崩溃捕获流程](#崩溃捕获流程)
@@ -49,6 +51,7 @@
 lumen-crash/
   build.gradle.kts
   consumer-rules.pro
+  sdk.version
   README.md
   README.zh-CN.md
   src/main/
@@ -66,6 +69,76 @@ lumen-crash/
     res/values-zh/strings.xml       # 中文默认文案
   src/test/.../AuthorIntegrityTest.kt
 ```
+
+## 自动发布
+
+SDK 通过 GitHub Actions 工作流自动发布：
+
+- 工作流：`.github/workflows/lumen-crash-sdk-release.yml`
+- 版本源：`lumen-crash/sdk.version`
+- Maven 坐标：`com.chloemlla.lumen:lumen-crash:<version>`
+
+### 触发方式
+
+| 触发 | 版本 / tag 行为 |
+|---|---|
+| 推送到 `main`，且改动了 `lumen-crash/**` 或该 workflow | 版本 = `<sdk.version>-<shortSha>`，tag = `lumen-crash-v<version>` |
+| 推送 tag `lumen-crash-vX.Y.Z` | 版本 = `X.Y.Z`，使用该精确 tag 发布 |
+| 手动 `workflow_dispatch` | 可选版本覆盖；默认同时发布 GitHub Release 与 Packages |
+
+### 发布流水线
+
+1. 解析版本元数据
+2. 运行 `:lumen-crash:test`
+3. 组装 release AAR（`:lumen-crash:assembleRelease`）
+4. 将 Maven 制品发布到本地仓库，便于打包资产
+5. 收集 AAR / POM / sources / checksums 与 `sdk-manifest.json`
+6. 创建 GitHub Release（tag 形如 `lumen-crash-v...`）
+7. 将同一 Maven publication 发布到 GitHub Packages
+
+### 手动稳定版 tag 示例
+
+```bash
+# 需要时先修改 lumen-crash/sdk.version
+git tag lumen-crash-v0.1.0
+git push origin lumen-crash-v0.1.0
+```
+
+## 消费已发布 SDK
+
+### 方式 A：本 monorepo 工程模块
+
+```kotlin
+// settings.gradle.kts
+include(":lumen-crash")
+
+// app/build.gradle.kts
+implementation(project(":lumen-crash"))
+```
+
+### 方式 B：GitHub Packages / GitHub Release 资产
+
+```kotlin
+// settings.gradle.kts 或 dependencyResolutionManagement
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/Chloemlla/Project-Lumen")
+        credentials {
+            username = providers.gradleProperty("gpr.user").orNull
+                ?: System.getenv("GITHUB_ACTOR")
+            password = providers.gradleProperty("gpr.key").orNull
+                ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
+}
+
+// app/build.gradle.kts
+implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+```
+
+访问 GitHub Packages 通常需要具备 `read:packages` 权限的 classic/PAT 或 `GITHUB_TOKEN`（若仓库启用 SSO，还需完成授权）。
+
+也可以直接从 workflow 生成的 GitHub Release 资产中下载 AAR。
 
 ## 接入依赖
 

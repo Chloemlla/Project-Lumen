@@ -17,6 +17,8 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 - [Features](#features)
 - [Module layout](#module-layout)
 - [Install](#install)
+- [Auto release](#auto-release)
+- [Consume published SDK](#consume-published-sdk)
 - [Minimal integration](#minimal-integration-3-host-touchpoints)
 - [Public API](#public-api)
 - [Crash capture behavior](#crash-capture-behavior)
@@ -49,6 +51,7 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 lumen-crash/
   build.gradle.kts
   consumer-rules.pro
+  sdk.version
   README.md
   README.zh-CN.md
   src/main/
@@ -66,6 +69,76 @@ lumen-crash/
     res/values-zh/strings.xml       # ZH defaults
   src/test/.../AuthorIntegrityTest.kt
 ```
+
+## Auto release
+
+The SDK is released automatically by GitHub Actions workflow:
+
+- Workflow: `.github/workflows/lumen-crash-sdk-release.yml`
+- Version source: `lumen-crash/sdk.version`
+- Maven coordinates: `com.chloemlla.lumen:lumen-crash:<version>`
+
+### Triggers
+
+| Trigger | Version / tag behavior |
+|---|---|
+| Push to `main` that changes `lumen-crash/**` or the workflow file | Version = `<sdk.version>-<shortSha>`, tag = `lumen-crash-v<version>` |
+| Push tag `lumen-crash-vX.Y.Z` | Version = `X.Y.Z`, release uses that exact tag |
+| Manual `workflow_dispatch` | Optional version override; still publishes GitHub Release + Packages by default |
+
+### Release pipeline
+
+1. Resolve version metadata
+2. Run `:lumen-crash:test`
+3. Assemble release AAR (`:lumen-crash:assembleRelease`)
+4. Publish Maven artifacts to a local repo for packaging
+5. Collect AAR / POM / sources / checksums + `sdk-manifest.json`
+6. Create GitHub Release under tag `lumen-crash-v...`
+7. Publish the same Maven publication to GitHub Packages
+
+### Manual stable tag example
+
+```bash
+# bump lumen-crash/sdk.version first when needed
+git tag lumen-crash-v0.1.0
+git push origin lumen-crash-v0.1.0
+```
+
+## Consume published SDK
+
+### Option A: project module (this monorepo)
+
+```kotlin
+// settings.gradle.kts
+include(":lumen-crash")
+
+// app/build.gradle.kts
+implementation(project(":lumen-crash"))
+```
+
+### Option B: GitHub Packages / GitHub Release assets
+
+```kotlin
+// settings.gradle.kts or dependencyResolutionManagement
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/Chloemlla/Project-Lumen")
+        credentials {
+            username = providers.gradleProperty("gpr.user").orNull
+                ?: System.getenv("GITHUB_ACTOR")
+            password = providers.gradleProperty("gpr.key").orNull
+                ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
+}
+
+// app/build.gradle.kts
+implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+```
+
+GitHub Packages authentication typically needs a classic/PAT or `GITHUB_TOKEN` with `read:packages` (and SSO authorized if required).
+
+You can also download the release AAR directly from the GitHub Release assets produced by the workflow.
 
 ## Install
 

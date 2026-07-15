@@ -1,0 +1,323 @@
+name: Release Lumen Crash SDK
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "lumen-crash-v*"
+  workflow_dispatch:
+    inputs:
+      version_override:
+        description: "Optional version override (e.g. 0.1.1). Leave empty to use lumen-crash/sdk.version."
+        required: false
+        type: string
+      publish_github_packages:
+        description: "Also publish Maven artifacts to GitHub Packages"
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: lumen-crash-sdk-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: read
+
+jobs:
+  changes:
+    name: Detect SDK changes
+    runs-on: ubuntu-latest
+    outputs:
+      sdk: ${{ steps.decide.outputs.sdk }}
+    steps:
+      - name: Checkout repository
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/checkout@v5
+
+      - name: Path filter
+        id: filter
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            sdk:
+              - 'lumen-crash/**'
+              - '.github/workflows/lumen-crash-sdk-release.yml'
+
+      - name: Decide whether to release
+        id: decide
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "sdk=${{ steps.filter.outputs.sdk }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sdk=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  release-lumen-crash-sdk:
+    name: Build and release lumen-crash SDK
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.5.1"
+          cache-read-only: false
+          cache-cleanup: on-success
+
+      - name: Resolve SDK version and release metadata
+        id: meta
+        env:
+          VERSION_OVERRIDE: ${{ github.event.inputs.version_override }}
+        run: |
+          set -euo pipefail
+          FILE_VERSION=$(tr -d '\r' < lumen-crash/sdk.version | sed -n '1{s/^[[:space:]]*//; s/[[:space:]]*$//; p;}')
+          SHORT_HASH="${GITHUB_SHA::8}"
+          COMMIT_HASH="${GITHUB_SHA}"
+
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+            RAW_VERSION="${TAG_NAME#lumen-crash-v}"
+            if [ -z "$RAW_VERSION" ] || [ "$RAW_VERSION" = "$TAG_NAME" ]; then
+              echo "Unsupported tag format: ${TAG_NAME}. Expected lumen-crash-vX.Y.Z"
+              exit 1
+            fi
+            VERSION_NAME="$RAW_VERSION"
+            RELEASE_TAG="$TAG_NAME"
+            PRERELEASE=false
+            if echo "$VERSION_NAME" | grep -Eiq '(alpha|beta|rc|snapshot|dev)'; then
+              PRERELEASE=true
+            fi
+          else
+            if [ -n "${VERSION_OVERRIDE:-}" ]; then
+              VERSION_BASE="$(printf '%s' "$VERSION_OVERRIDE" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+            else
+              VERSION_BASE="${FILE_VERSION:-0.0.0}"
+            fi
+            if [ -z "$VERSION_BASE" ]; then
+              VERSION_BASE="0.0.0"
+            fi
+            VERSION_NAME="${VERSION_BASE}-${SHORT_HASH}"
+            RELEASE_TAG="lumen-crash-v${VERSION_NAME}"
+            PRERELEASE=false
+          fi
+
+          {
+            echo "VERSION_NAME=${VERSION_NAME}"
+            echo "RELEASE_TAG=${RELEASE_TAG}"
+            echo "SHORT_HASH=${SHORT_HASH}"
+            echo "COMMIT_HASH=${COMMIT_HASH}"
+            echo "PRERELEASE=${PRERELEASE}"
+          } >> "$GITHUB_ENV"
+
+          {
+            echo "version_name=${VERSION_NAME}"
+            echo "release_tag=${RELEASE_TAG}"
+            echo "prerelease=${PRERELEASE}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Resolved SDK version=${VERSION_NAME}, tag=${RELEASE_TAG}"
+
+      - name: Run lumen-crash unit tests
+        run: gradle :lumen-crash:test --no-daemon --warning-mode all
+
+      - name: Assemble release AAR
+        run: |
+          gradle :lumen-crash:assembleRelease \
+            -PlumenCrashSdkVersion="${VERSION_NAME}" \
+            --no-daemon \
+            --warning-mode all
+
+      - name: Publish Maven artifacts to local repository
+        run: |
+          gradle :lumen-crash:publishReleasePublicationToLocalReleaseRepository \
+            -PlumenCrashSdkVersion="${VERSION_NAME}" \
+            --no-daemon \
+            --warning-mode all
+
+      - name: Prepare SDK release assets
+        run: |
+          set -euo pipefail
+          mkdir -p sdk-release-assets
+          LOCAL_REPO="lumen-crash/build/repo/com/chloemlla/lumen/lumen-crash/${VERSION_NAME}"
+          if [ ! -d "$LOCAL_REPO" ]; then
+            echo "Local Maven publication directory was not found: $LOCAL_REPO"
+            find lumen-crash/build -maxdepth 6 -type d -print || true
+            exit 1
+          fi
+
+          shopt -s nullglob
+          for path in "$LOCAL_REPO"/*; do
+            name="$(basename "$path")"
+            case "$name" in
+              *.aar|*.pom|*.jar|*.module)
+                cp "$path" "sdk-release-assets/"
+                ;;
+            esac
+          done
+
+          AAR_COUNT=$(find sdk-release-assets -maxdepth 1 -type f -name "*.aar" | wc -l | tr -d ' ')
+          if [ "$AAR_COUNT" -lt 1 ]; then
+            echo "No AAR assets were prepared."
+            ls -lah "$LOCAL_REPO" || true
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+
+          version = os.environ["VERSION_NAME"]
+          tag = os.environ["RELEASE_TAG"]
+          commit = os.environ["COMMIT_HASH"]
+          repository = os.environ["GITHUB_REPOSITORY"]
+
+          notes = f"""## Lumen Crash SDK {version}
+
+          - Module: `:lumen-crash`
+          - Maven coordinates: `com.chloemlla.lumen:lumen-crash:{version}`
+          - Commit: `{commit}`
+          - Tag: `{tag}`
+
+          ### Assets
+          - Release AAR
+          - Maven POM / module metadata
+          - Sources JAR (when available)
+          - SHA-256 checksums
+
+          ### Host integration
+          ```kotlin
+          repositories {{
+              maven {{
+                  url = uri("https://maven.pkg.github.com/{repository}")
+                  credentials {{
+                      username = providers.gradleProperty("gpr.user").orNull
+                          ?: System.getenv("GITHUB_ACTOR")
+                      password = providers.gradleProperty("gpr.key").orNull
+                          ?: System.getenv("GITHUB_TOKEN")
+                  }}
+              }}
+          }}
+
+          dependencies {{
+              implementation("com.chloemlla.lumen:lumen-crash:{version}")
+          }}
+          ```
+
+          See [lumen-crash/README.md](https://github.com/{repository}/blob/{commit}/lumen-crash/README.md).
+          """
+          cleaned = "\n".join(
+              line[10:] if line.startswith("          ") else line
+              for line in notes.splitlines()
+          )
+          Path("sdk-release-assets/release-notes.md").write_text(
+              cleaned.strip() + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          (
+            cd sdk-release-assets
+            sha256sum * > checksums.txt
+          )
+
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          version = os.environ["VERSION_NAME"]
+          tag = os.environ["RELEASE_TAG"]
+          commit = os.environ["COMMIT_HASH"]
+          repository = os.environ["GITHUB_REPOSITORY"]
+          asset_dir = pathlib.Path("sdk-release-assets")
+          checksums = {}
+          for line in (asset_dir / "checksums.txt").read_text(encoding="utf-8").splitlines():
+              parts = line.split()
+              if len(parts) >= 2:
+                  checksums[pathlib.Path(parts[-1]).name] = parts[0].lower()
+
+          assets = []
+          for path in sorted(asset_dir.iterdir()):
+              if not path.is_file() or path.name in {"checksums.txt", "sdk-manifest.json"}:
+                  continue
+              assets.append({
+                  "name": path.name,
+                  "sha256": checksums.get(path.name, ""),
+                  "sizeBytes": path.stat().st_size,
+              })
+
+          manifest = {
+              "schemaVersion": 1,
+              "sdk": "lumen-crash",
+              "groupId": "com.chloemlla.lumen",
+              "artifactId": "lumen-crash",
+              "version": version,
+              "tagName": tag,
+              "commitHash": commit,
+              "releaseUrl": f"https://github.com/{repository}/releases/tag/{tag}",
+              "maven": {
+                  "coordinates": f"com.chloemlla.lumen:lumen-crash:{version}",
+                  "repository": f"https://maven.pkg.github.com/{repository}",
+              },
+              "assets": assets,
+          }
+          (asset_dir / "sdk-manifest.json").write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          subprocess.check_call("sha256sum * > checksums.txt", shell=True, cwd=asset_dir)
+          PY
+
+          echo "Prepared SDK assets:"
+          ls -lah sdk-release-assets
+
+      - name: Upload SDK release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumen-crash-sdk-${{ env.VERSION_NAME }}
+          path: sdk-release-assets/*
+          retention-days: 30
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "Lumen Crash SDK ${{ env.VERSION_NAME }}"
+          draft: false
+          prerelease: ${{ env.PRERELEASE == 'true' }}
+          generate_release_notes: true
+          body_path: sdk-release-assets/release-notes.md
+          files: sdk-release-assets/*
+
+      - name: Publish to GitHub Packages
+        if: >-
+          success() &&
+          (
+            github.event_name != 'workflow_dispatch' ||
+            github.event.inputs.publish_github_packages == 'true'
+          )
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gradle :lumen-crash:publishReleasePublicationToGitHubPackagesRepository \
+            -PlumenCrashSdkVersion="${VERSION_NAME}" \
+            --no-daemon \
+            --warning-mode all
