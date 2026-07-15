@@ -162,6 +162,11 @@ android {
         versionCode = projectLumenVersionCode
         versionName = projectLumenVersionName
 
+        // Keep x86_64 for managed-device baseline profile generation on CI emulators.
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         externalNativeBuild {

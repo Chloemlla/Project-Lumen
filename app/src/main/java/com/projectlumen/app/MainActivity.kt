@@ -36,7 +36,7 @@ open class MainActivity : ComponentActivity() {
         handleOpenIntent(intent)
         val app = application as ProjectLumenApplication
         var initialStartupReport = app.startupCrashReport
-            ?: runCatching { app.crashReports.load() }.getOrNull()
+            ?: runCatching { if (LumenCrash.isInstalled()) app.crashReports.load() else null }.getOrNull()
         val initialViewModel = if (initialStartupReport == null) {
             createProjectLumenViewModel(app)
         } else {
@@ -44,7 +44,7 @@ open class MainActivity : ComponentActivity() {
         }
         if (initialStartupReport == null && initialViewModel == null) {
             initialStartupReport = app.startupCrashReport
-                ?: runCatching { app.crashReports.load() }.getOrNull()
+                ?: runCatching { if (LumenCrash.isInstalled()) app.crashReports.load() else null }.getOrNull()
         }
         setContent {
             var startupReport by remember { mutableStateOf(initialStartupReport) }
@@ -71,7 +71,7 @@ open class MainActivity : ComponentActivity() {
             if (viewModel == null) return@setContent
             ProjectLumenApp(
                 viewModel = viewModel,
-                crashReport = runCatching { app.crashReports.load() }.getOrNull(),
+                crashReport = runCatching { if (LumenCrash.isInstalled()) app.crashReports.load() else null }.getOrNull(),
                 openLaunchRequest = openLaunchRequest.value,
             )
         }
@@ -120,14 +120,14 @@ open class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        CrashBreadcrumbs.record("MainActivity.onNewIntent")
+        runCatching { CrashBreadcrumbs.record("MainActivity.onNewIntent") }
         setIntent(intent)
         handleOpenIntent(intent)
     }
 
     private fun handleOpenIntent(intent: Intent?) {
         val request = LumenOpenIntents.parseLaunchRequest(intent, callingPackage) ?: return
-        CrashBreadcrumbs.record("Open API launch target=${request.target}")
+        runCatching { CrashBreadcrumbs.record("Open API launch target=${request.target}") }
         openLaunchRequest.value = request
         val app = application as ProjectLumenApplication
         lifecycleScope.launch(Dispatchers.IO) {

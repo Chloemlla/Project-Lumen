@@ -88,3 +88,4 @@
 -keep class com.chloemlla.lumen.crash.** { *; }
 -keepclassmembers class com.chloemlla.lumen.crash.** { *; }
 -dontwarn com.chloemlla.lumen.crash.**
+-keepnames class com.chloemlla.lumen.crash.**

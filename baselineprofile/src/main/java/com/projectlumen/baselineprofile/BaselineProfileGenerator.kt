@@ -45,47 +45,69 @@ class BaselineProfileGenerator {
     private fun MacrobenchmarkScope.startProjectLumenAndWait() {
         // Prefer an explicit MAIN/LAUNCHER intent so launch is deterministic on managed devices.
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val launchIntent = context.packageManager
-            .getLaunchIntentForPackage(TARGET_PACKAGE)
-            ?.apply {
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_CLEAR_TASK or
-                        Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
-                )
+        val packageManager = context.packageManager
+        val launchIntent = (
+            packageManager.getLaunchIntentForPackage(TARGET_PACKAGE)
+                ?: Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_LAUNCHER)
+                    setPackage(TARGET_PACKAGE)
+                    val resolveInfo = packageManager.queryIntentActivities(this, 0).firstOrNull()
+                    if (resolveInfo != null) {
+                        setClassName(TARGET_PACKAGE, resolveInfo.activityInfo.name)
+                    }
+                }
+            ).apply {
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TASK or
+                    Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
+            )
+        }
+
+        // Retry a couple of cold starts; managed devices can flake on first process spawn.
+        var lastError: String? = null
+        repeat(LAUNCH_ATTEMPTS) { attempt ->
+            if (attempt > 0) {
+                pressHome()
+                killProcess()
+                device.waitForIdle(IDLE_TIMEOUT_MILLIS)
+                pressHome()
             }
-        if (launchIntent != null) {
-            startActivityAndWait(launchIntent)
-        } else {
-            startActivityAndWait()
-        }
 
-        // Macrobenchmark validates that the process remains running; allow cold start + first frame.
-        val deadlineMillis = System.currentTimeMillis() + APP_VISIBLE_TIMEOUT_MILLIS
-        var becameVisible = false
-        var processStillRunning = false
-        while (System.currentTimeMillis() < deadlineMillis) {
-            becameVisible = device.hasObject(By.pkg(TARGET_PACKAGE).depth(0))
-            processStillRunning = device.executeShellCommand("pidof $TARGET_PACKAGE")
-                .trim()
-                .isNotEmpty()
-            if (becameVisible && processStillRunning) {
-                break
+            runCatching {
+                startActivityAndWait(launchIntent)
+            }.onFailure { error ->
+                lastError = error.message
             }
-            device.waitForIdle(PROCESS_POLL_INTERVAL_MILLIS)
+
+            val deadlineMillis = System.currentTimeMillis() + APP_VISIBLE_TIMEOUT_MILLIS
+            var becameVisible = false
+            var processStillRunning = false
+            while (System.currentTimeMillis() < deadlineMillis) {
+                becameVisible = device.hasObject(By.pkg(TARGET_PACKAGE).depth(0))
+                processStillRunning = isTargetProcessRunning()
+                if (becameVisible && processStillRunning) {
+                    device.waitForIdle(IDLE_TIMEOUT_MILLIS)
+                    return
+                }
+                device.waitForIdle(PROCESS_POLL_INTERVAL_MILLIS)
+            }
+            lastError = "visible=$becameVisible processRunning=$processStillRunning"
         }
 
-        check(becameVisible) {
-            "Target package $TARGET_PACKAGE did not become visible after launch " +
-                "(api=${Build.VERSION.SDK_INT})."
-        }
-        check(processStillRunning) {
-            "Target package $TARGET_PACKAGE is not running after launch settle. " +
-                "This usually means Application/Activity crashed on the managed emulator " +
-                "(missing x86_64 libs, integrity enforcement, or startup exception)."
-        }
+        error(
+            "Target package $TARGET_PACKAGE failed to stay running after launch " +
+                "(api=${Build.VERSION.SDK_INT}, last=$lastError). " +
+                "Likely Application/Activity crash on managed emulator " +
+                "(missing x86_64 libs, integrity enforcement, or startup exception).",
+        )
+    }
 
-        device.waitForIdle(IDLE_TIMEOUT_MILLIS)
+    private fun MacrobenchmarkScope.isTargetProcessRunning(): Boolean {
+        val pidof = device.executeShellCommand("pidof $TARGET_PACKAGE").trim()
+        if (pidof.isNotEmpty()) return true
+        val ps = device.executeShellCommand("ps -A | grep $TARGET_PACKAGE").trim()
+        return ps.isNotEmpty()
     }
 
     private fun MacrobenchmarkScope.dismissBlockingUiIfPresent() {
@@ -126,8 +148,9 @@ class BaselineProfileGenerator {
 
     private companion object {
         private const val TARGET_PACKAGE = "com.chloemlla.projectlumen"
+        private const val LAUNCH_ATTEMPTS = 3
         private const val APP_VISIBLE_TIMEOUT_MILLIS = 30_000L
-        private const val FIND_UI_TIMEOUT_MILLIS = 2_000L
+        private const val FIND_UI_TIMEOUT_MILLIS = 2_500L
         private const val IDLE_TIMEOUT_MILLIS = 2_000L
         private const val PROCESS_POLL_INTERVAL_MILLIS = 500L
         private const val HOME_SCROLL_BOTTOM_FRACTION = 0.78f

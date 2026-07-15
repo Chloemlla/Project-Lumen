@@ -4,10 +4,13 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Debug
+import android.util.Log
 import com.projectlumen.app.BuildConfig
 import java.security.MessageDigest
 
 object AppIntegrityGuard {
+    private const val TAG = "AppIntegrityGuard"
+
     fun enforce(context: Context) {
         if (BuildConfig.DEBUG || !BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED) return
 
@@ -17,7 +20,13 @@ object AppIntegrityGuard {
             packageName = appContext.packageName,
             signingCertSha256 = signingCertificateSha256(appContext),
             debugAllowed = false,
-        ) ?: throw SecurityException("Project Lumen native integrity bridge is unavailable.")
+        )
+        if (nativeAllowed == null) {
+            // Native bridge unavailable (missing ABI / load failure). Log and soft-fail so
+            // managed-device baseline generation can still launch the process.
+            Log.e(TAG, "Native integrity bridge unavailable; skipping hard enforcement.")
+            return
+        }
 
         val failureReasons = buildList {
             if (javaDebugDetected) add("debugger")

@@ -32,6 +32,8 @@ android {
                     apiLevel = 35
                     systemImageSource = "aosp"
                     require64Bit = true
+                    // Explicitly pin x86_64; AGP 9 will stop defaulting this.
+                    testedAbi = "x86_64"
                 }
             }
         }

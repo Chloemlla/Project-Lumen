@@ -96,7 +96,18 @@ jobs:
           PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
           PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
           PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
-        run: gradle :app:generateBaselineProfile --no-daemon --warning-mode all
+        run: |
+          # Ensure managed-device profile generation can install/run even when release
+          # signing secrets are present but native cert pinning metadata is not.
+          if [ -f gradle.properties ]; then
+            sed -i 's/\r$//' gradle.properties
+            [ -n "$(tail -c 1 gradle.properties)" ] && echo "" >> gradle.properties
+            grep -q '^PROJECT_LUMEN_USE_DEBUG_SIGNING=' gradle.properties || \
+              printf 'PROJECT_LUMEN_USE_DEBUG_SIGNING=true\n' >> gradle.properties
+          else
+            printf 'PROJECT_LUMEN_USE_DEBUG_SIGNING=true\n' > gradle.properties
+          fi
+          gradle :app:generateBaselineProfile --no-daemon --warning-mode all
 
       - name: Build release APK
         env:

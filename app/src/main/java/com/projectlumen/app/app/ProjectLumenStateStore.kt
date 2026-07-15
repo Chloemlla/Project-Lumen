@@ -16,7 +16,7 @@ internal class ProjectLumenStateStore(
     repositories: ProjectLumenRepositories,
     scope: CoroutineScope,
     now: StateFlow<Long>,
-    private val recordCrashReport: (Throwable) -> CrashReport,
+    private val recordCrashReport: (Throwable) -> CrashReport?,
 ) {
     private val settingsPreview = MutableStateFlow<AppSettingsEntity?>(null)
     private val crashReport = MutableStateFlow<CrashReport?>(null)

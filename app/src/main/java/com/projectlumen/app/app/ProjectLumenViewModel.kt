@@ -55,7 +55,7 @@ class ProjectLumenViewModel(
     private val shizuku: ShizukuCapabilityManager,
     private val simulateDeveloperLowMemory: () -> Unit,
     private val uploadTelemetrySnapshot: suspend () -> Unit,
-    private val recordCrashReport: (Throwable) -> CrashReport,
+    private val recordCrashReport: (Throwable) -> CrashReport?,
 ) : ViewModel() {
     private val repositories = ProjectLumenRepositories(database, eyeCarePreferences, secureCredentials)
     private val now = MutableStateFlow(System.currentTimeMillis())

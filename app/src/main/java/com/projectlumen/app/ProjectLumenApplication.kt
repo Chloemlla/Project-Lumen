@@ -3,6 +3,7 @@ package com.projectlumen.app
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.projectlumen.app.core.api.ProjectLumenApiClient
@@ -53,7 +54,12 @@ class ProjectLumenApplication : Application() {
     }
     val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient() }
     val crashReports: CrashReportStore
-        get() = LumenCrash.store()
+        get() {
+            if (!LumenCrash.isInstalled()) {
+                runCatching { installLumenCrashSdk() }
+            }
+            return LumenCrash.store()
+        }
     val secureCredentials: SecureCredentialStore by lazy { SecureCredentialStore(this) }
     val openApiController: LumenOpenRuntimeController by lazy { LumenOpenRuntimeController(this) }
     val telemetry: EyeCareTelemetryReporter by lazy {
@@ -75,14 +81,14 @@ class ProjectLumenApplication : Application() {
     @Volatile
     private var crashReportUploadsReady = false
     val startupCrashReport: CrashReport?
-        get() = LumenCrash.startupCrashReport
+        get() = runCatching { LumenCrash.startupCrashReport }.getOrNull()
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
         runCatching {
             installLumenCrashSdk()
             CrashBreadcrumbs.record("Application.attachBaseContext")
-        }
+        }.onFailure { Log.e(TAG, "LumenCrash install failed in attachBaseContext", it) }
     }
 
     override fun onCreate() {
@@ -90,14 +96,15 @@ class ProjectLumenApplication : Application() {
         runCatching {
             installLumenCrashSdk()
             CrashBreadcrumbs.record("Application.onCreate")
-        }
+        }.onFailure { Log.e(TAG, "LumenCrash install failed in onCreate", it) }
         initializeMmkvOrRecordCrash()
         runCatching { MemoryHealthMonitor.sample(this) }
         // Baseline-profile managed devices and incomplete CI signing configs must still boot.
         // Integrity remains enforced for real release builds that configure the cert fingerprint.
         runCatching { AppIntegrityGuard.enforce(this) }
             .onFailure { throwable ->
-                runCatching { recordCrash(throwable) }
+                Log.e(TAG, "App integrity enforcement failed", throwable)
+                recordCrash(throwable)
             }
         runCatching { notifications.ensureChannels() }
         runCatching { LumenToast.install(this) }
@@ -138,16 +145,22 @@ class ProjectLumenApplication : Application() {
             .onFailure(::recordCrash)
     }
 
-    fun recordStartupCrash(throwable: Throwable): CrashReport {
+    fun recordStartupCrash(throwable: Throwable): CrashReport? {
         return recordCrash(throwable)
     }
 
-    fun recordCrash(throwable: Throwable): CrashReport {
-        return LumenCrash.record(throwable)
+    /**
+     * Never throws: baseline-profile / managed-emulator boots must survive even when
+     * LumenCrash is unavailable or integrity checks fail closed.
+     */
+    fun recordCrash(throwable: Throwable): CrashReport? {
+        return runCatching { LumenCrash.record(throwable) }
+            .onFailure { Log.e(TAG, "Failed to record crash", it) }
+            .getOrNull()
     }
 
     fun clearStartupCrashReport() {
-        LumenCrash.clearStartupCrashReport()
+        runCatching { LumenCrash.clearStartupCrashReport() }
     }
 
     fun scheduleStoredCrashReportUpload() {
@@ -159,11 +172,13 @@ class ProjectLumenApplication : Application() {
         if (!crashReportUploadInFlight.compareAndSet(false, true)) return
         applicationScope.launch {
             try {
-                val reportToUpload = report ?: runCatching { crashReports.load() }.getOrNull() ?: return@launch
+                val reportToUpload = report
+                    ?: runCatching { crashReports.load() }.getOrNull()
+                    ?: return@launch
                 val result = runCatching { telemetry.uploadCrashReport(reportToUpload, force = true) }.getOrNull()
                 if (result?.accepted == true) {
                     clearUploadedCrashReport(reportToUpload)
-                    CrashBreadcrumbs.record("Crash report uploaded")
+                    runCatching { CrashBreadcrumbs.record("Crash report uploaded") }
                 }
             } finally {
                 crashReportUploadInFlight.set(false)
@@ -176,7 +191,7 @@ class ProjectLumenApplication : Application() {
         if (storedReport?.reportId == report.reportId) {
             runCatching { crashReports.clear() }
         }
-        if (LumenCrash.startupCrashReport?.reportId == report.reportId) {
+        if (startupCrashReport?.reportId == report.reportId) {
             clearStartupCrashReport()
         }
     }
@@ -200,7 +215,7 @@ class ProjectLumenApplication : Application() {
      */
     private fun startForegroundServiceSafely(intent: Intent) {
         runCatching { ContextCompat.startForegroundService(this, intent) }
-            .onFailure(::recordCrash)
+            .onFailure { recordCrash(it) }
     }
 
     fun settingsRepository(): SettingsRepository {
@@ -258,5 +273,9 @@ class ProjectLumenApplication : Application() {
 
     fun stopShizukuResilience() {
         ShizukuResilienceWorker.cancel(this)
+    }
+
+    private companion object {
+        private const val TAG = "ProjectLumenApp"
     }
 }
