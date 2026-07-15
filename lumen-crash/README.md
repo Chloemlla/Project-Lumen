@@ -20,6 +20,7 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 - [Auto release](#auto-release)
 - [Consume published SDK](#consume-published-sdk)
   - [What each release produces](#1-what-each-release-produces)
+  - [Resolve latest main auto release](#2-choose--resolve-a-version)
   - [GitHub Packages](#5-option-b-github-packages-recommended-for-external-apps)
   - [GitHub Packages Maven tutorial](#51-quick-start-github-packages-maven-package)
   - [Release assets / local Maven](#6-option-c-consume-github-release-assets-without-packages-auth)
@@ -151,19 +152,125 @@ Release page pattern:
 https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v<version>
 ```
 
-### 2) Choose a version
+### 2) Choose / resolve a version
+
+Default consumer guidance is: **automatically resolve the latest Project Lumen `main` auto release** for `lumen-crash`, then pin that exact version string in Gradle.
 
 | Scenario | Version form | Recommended source |
 |---|---|---|
-| Stable consumer integration | `0.1.0` | Tag release `lumen-crash-v0.1.0` |
-| Main-branch snapshot-like build | `0.1.0-<shortSha>` | Latest auto release from `main` |
+| Default external integration | `0.1.0-<shortSha>` | Latest `main` auto release (`lumen-crash-v0.1.0-<shortSha>`) |
+| Stable pin / production freeze | `0.1.0` | Tag release `lumen-crash-v0.1.0` |
 | Local monorepo development | project module | `implementation(project(":lumen-crash"))` |
 
-Read the chosen version from either:
+#### 2.1 Automatically resolve the latest main auto release
 
-- GitHub Release title / tag (`lumen-crash-v0.1.0` => `0.1.0`)
-- `sdk-manifest.json` field `version`
+Main-branch auto releases are created by `.github/workflows/lumen-crash-sdk-release.yml` with:
+
+- version form: `<sdk.version>-<shortSha>` (example: `0.1.0-1a2b3c4d`)
+- tag form: `lumen-crash-v<version>` (example: `lumen-crash-v0.1.0-1a2b3c4d`)
+
+Use the GitHub Releases API filtered by the `lumen-crash-v` tag prefix. Do **not** use `/releases/latest` alone, because this repository may also publish non-SDK releases.
+
+bash / Git Bash:
+
+```bash
+# Requires: curl + jq
+# Optional: export GH_TOKEN=... if API auth / rate-limit requires it
+
+OWNER_REPO="Chloemlla/Project-Lumen"
+API="https://api.github.com/repos/${OWNER_REPO}/releases?per_page=100"
+AUTH_HEADER=()
+if [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
+  AUTH_HEADER=(-H "Authorization: Bearer ${GH_TOKEN:-$GITHUB_TOKEN}")
+fi
+
+VERSION="$(
+  curl -fsSL "${AUTH_HEADER[@]}" \
+    -H "Accept: application/vnd.github+json" \
+    "$API" \
+  | jq -r '
+      [.[]
+        | select(.draft == false)
+        | select(.tag_name | startswith("lumen-crash-v"))
+      ]
+      | sort_by(.published_at // .created_at)
+      | reverse
+      | .[0].tag_name
+      | sub("^lumen-crash-v"; "")
+    '
+)"
+
+if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+  echo "No lumen-crash release found" >&2
+  exit 1
+fi
+
+echo "Resolved latest lumen-crash main auto release: ${VERSION}"
+echo "implementation(\"com.chloemlla.lumen:lumen-crash:${VERSION}\")"
+echo "Release page: https://github.com/${OWNER_REPO}/releases/tag/lumen-crash-v${VERSION}"
+```
+
+PowerShell:
+
+```powershell
+# Optional: $env:GH_TOKEN = "..."
+$ownerRepo = "Chloemlla/Project-Lumen"
+$headers = @{
+  Accept = "application/vnd.github+json"
+  "User-Agent" = "lumen-crash-version-resolver"
+}
+$token = $env:GH_TOKEN
+if (-not $token) { $token = $env:GITHUB_TOKEN }
+if ($token) { $headers.Authorization = "Bearer $token" }
+
+$releases = Invoke-RestMethod `
+  -Uri "https://api.github.com/repos/$ownerRepo/releases?per_page=100" `
+  -Headers $headers
+
+$latest = $releases |
+  Where-Object { -not $_.draft -and $_.tag_name -like "lumen-crash-v*" } |
+  Sort-Object { if ($_.published_at) { [datetime]$_.published_at } else { [datetime]$_.created_at } } -Descending |
+  Select-Object -First 1
+
+if (-not $latest) {
+  throw "No lumen-crash release found"
+}
+
+$version = $latest.tag_name -replace '^lumen-crash-v', ''
+Write-Host "Resolved latest lumen-crash main auto release: $version"
+Write-Host "implementation(\"com.chloemlla.lumen:lumen-crash:$version\")"
+Write-Host "Release page: https://github.com/$ownerRepo/releases/tag/lumen-crash-v$version"
+```
+
+GitHub CLI one-liner:
+
+```bash
+gh release list --repo Chloemlla/Project-Lumen --limit 100   | awk '/^lumen-crash-v/ { print $1; exit }'   | sed 's/^lumen-crash-v//'
+```
+
+After resolution, copy the exact version into your dependency line:
+
+```kotlin
+implementation("com.chloemlla.lumen:lumen-crash:<resolved-version>")
+// example: implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
+```
+
+Optional CI pattern (resolve, then export for Gradle):
+
+```bash
+VERSION="$(...resolve command from above...)"
+echo "LUMEN_CRASH_VERSION=${VERSION}" >> "$GITHUB_ENV"
+# then depend on com.chloemlla.lumen:lumen-crash:${LUMEN_CRASH_VERSION}
+```
+
+#### 2.2 Other version sources
+
+You can also read a version from:
+
+- GitHub Release title / tag (`lumen-crash-v0.1.0-1a2b3c4d` => `0.1.0-1a2b3c4d`)
+- release asset `sdk-manifest.json` field `version`
 - GitHub Packages package version list
+- pure stable tag `lumen-crash-v0.1.0` when you intentionally freeze a semver
 
 ### 3) Verify download integrity
 
@@ -223,41 +330,44 @@ This is the recommended way for **external Android apps** to consume the publish
 
 Use this checklist when you only need the shortest path:
 
-1. Confirm a published version exists on the Packages page or Release page.
+1. Automatically resolve the latest Project Lumen `main` auto release for `lumen-crash` (see [section 2](#2-choose--resolve-a-version)).
 2. Create a GitHub token with `read:packages`.
 3. Put credentials in `~/.gradle/gradle.properties` (do **not** commit them).
 4. Add the GitHub Packages Maven repository in `settings.gradle.kts`.
-5. Depend on `com.chloemlla.lumen:lumen-crash:<version>`.
+5. Depend on `com.chloemlla.lumen:lumen-crash:<resolved-version>`.
 6. Sync Gradle and wire `LumenCrash.install(...)` + pending-report UI.
 
 | Field | Value |
 |---|---|
 | Group ID | `com.chloemlla.lumen` |
 | Artifact ID | `lumen-crash` |
-| Example version | `0.1.0` |
-| Full coordinates | `com.chloemlla.lumen:lumen-crash:0.1.0` |
+| Default version source | Latest `main` auto release (`0.1.0-<shortSha>`) |
+| Example resolved version | `0.1.0-1a2b3c4d` |
+| Full coordinates | `com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d` |
 | Maven repository | `https://maven.pkg.github.com/Chloemlla/Project-Lumen` |
 | Packages page | `https://github.com/Chloemlla/Project-Lumen/packages` |
-| Stable release pattern | `https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v0.1.0` |
+| Auto release tag pattern | `https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v0.1.0-<shortSha>` |
+| Optional stable freeze | `lumen-crash-v0.1.0` |
 
-Gradle dependency line:
+Gradle dependency line after auto-resolve:
 
 ```kotlin
-implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
 ```
 
-#### 5.2 Find the published version
+#### 5.2 Find / resolve the published version
 
-Pick one source and keep the version exact:
+Default path: auto-resolve the newest `lumen-crash-v*` release published from Project Lumen `main` (section 2.1), then pin that exact string.
 
 | Source | What to copy |
 |---|---|
-| GitHub Packages package version list | package version string such as `0.1.0` |
-| GitHub Release tag | `lumen-crash-v0.1.0` => dependency version `0.1.0` |
+| **Recommended:** latest main auto release | run the resolver in section 2.1; form `0.1.0-<shortSha>` |
+| GitHub Release tag | `lumen-crash-v0.1.0-1a2b3c4d` => dependency version `0.1.0-1a2b3c4d` |
 | Release asset `sdk-manifest.json` | field `version` and `maven.coordinates` |
-| main-branch auto release | form `0.1.0-<shortSha>` |
+| GitHub Packages package version list | package version string such as `0.1.0-1a2b3c4d` |
+| Optional stable freeze | pure semver tag `lumen-crash-v0.1.0` => `0.1.0` |
 
-Stable consumer apps should prefer a pure semver tag (`0.1.0`). Use `0.1.0-<shortSha>` only when you intentionally track a main-branch build.
+For day-to-day external integration, track the latest main auto release (`0.1.0-<shortSha>`). Switch to a pure semver tag only when you intentionally freeze a production pin.
 
 #### 5.3 Create a read token
 
@@ -379,10 +489,11 @@ In the host module, usually `app/build.gradle.kts`:
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+    // Prefer the auto-resolved latest main release from section 2.1 / 5.2
+    implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
 
-    // main-branch auto-published build example:
-    // implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
+    // Optional production freeze:
+    // implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
 }
 ```
 
@@ -390,11 +501,11 @@ Groovy:
 
 ```groovy
 dependencies {
-    implementation "com.chloemlla.lumen:lumen-crash:0.1.0"
+    implementation "com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d"
 }
 ```
 
-Replace `0.1.0` with the exact published version you selected in step 5.2.
+Replace the version with the exact string returned by the latest-main resolver (or a stable freeze if you intentionally pin).
 
 #### 5.7 Sync, resolve, and verify
 
@@ -407,7 +518,7 @@ Replace `0.1.0` with the exact published version you selected in step 5.2.
 2. Confirm the tree includes:
 
 ```text
-com.chloemlla.lumen:lumen-crash:0.1.0
+com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d
 ```
 
 3. Optional smoke checks:
@@ -702,11 +813,13 @@ For private package access from another repository, use a PAT secret with `read:
 
 For external host apps:
 
-1. Prefer a stable tag version (`lumen-crash-vX.Y.Z`)
-2. Consume via **GitHub Packages Maven coordinates**
+1. Auto-resolve the latest Project Lumen `main` auto release for `lumen-crash` (`lumen-crash-vX.Y.Z-<shortSha>`)
+2. Consume via **GitHub Packages Maven coordinates** with that exact version
 3. Keep credentials outside VCS
-4. Verify `sdk-manifest.json` / checksums when promoting a version
-5. Wire `install` + pending-report UI gate before shipping
+4. Re-resolve / re-pin when you intentionally move to a newer main auto release
+5. Optionally freeze on a pure stable tag (`lumen-crash-vX.Y.Z`) only for long-lived production pins
+6. Verify `sdk-manifest.json` / checksums when promoting a version
+7. Wire `install` + pending-report UI gate before shipping
 
 For this monorepo:
 

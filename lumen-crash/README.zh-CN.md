@@ -20,6 +20,7 @@
 - [自动发布](#自动发布)
 - [消费已发布 SDK](#消费已发布-sdk)
   - [每次发布会产出什么](#1每次发布会产出什么)
+  - [自动解析 main 最新自动发版](#2如何选择解析版本)
   - [GitHub Packages](#5方式-bgithub-packages外部应用推荐)
   - [GitHub Packages Maven 使用教程](#51快速开始github-packages-maven-包)
   - [Release 资产 / 本地 Maven](#6方式-c只使用-github-release-资产不走-packages-鉴权)
@@ -151,19 +152,125 @@ Release 页面模式：
 https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v<version>
 ```
 
-### 2）如何选择版本
+### 2）如何选择 / 解析版本
+
+默认消费方式：**自动解析 Project Lumen 上 `main` 分支为 `lumen-crash` 自动发版的最新版本**，再把该精确版本号写进 Gradle。
 
 | 场景 | 版本形态 | 推荐来源 |
 |---|---|---|
-| 外部应用稳定接入 | `0.1.0` | tag 发布 `lumen-crash-v0.1.0` |
-| 跟踪 main 的构建 | `0.1.0-<shortSha>` | `main` 自动发布的最新版 |
+| 外部应用默认接入 | `0.1.0-<shortSha>` | 最新 `main` 自动发版（`lumen-crash-v0.1.0-<shortSha>`） |
+| 稳定冻结 / 生产固定 | `0.1.0` | tag 发布 `lumen-crash-v0.1.0` |
 | 本 monorepo 本地开发 | 工程模块 | `implementation(project(":lumen-crash"))` |
 
-版本可从这些地方读取：
+#### 2.1 自动解析最新 main 自动发版
 
-- GitHub Release 标题 / tag（`lumen-crash-v0.1.0` => `0.1.0`）
-- `sdk-manifest.json` 的 `version` 字段
+`main` 自动发版由 `.github/workflows/lumen-crash-sdk-release.yml` 生成，规则为：
+
+- 版本形态：`<sdk.version>-<shortSha>`（示例：`0.1.0-1a2b3c4d`）
+- tag 形态：`lumen-crash-v<version>`（示例：`lumen-crash-v0.1.0-1a2b3c4d`）
+
+请使用 GitHub Releases API，并按 `lumen-crash-v` 前缀过滤。**不要单独使用** `/releases/latest`，因为本仓库还可能发布非 SDK 的 release。
+
+bash / Git Bash：
+
+```bash
+# 依赖：curl + jq
+# 可选：export GH_TOKEN=...（API 鉴权 / 限流时需要）
+
+OWNER_REPO="Chloemlla/Project-Lumen"
+API="https://api.github.com/repos/${OWNER_REPO}/releases?per_page=100"
+AUTH_HEADER=()
+if [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
+  AUTH_HEADER=(-H "Authorization: Bearer ${GH_TOKEN:-$GITHUB_TOKEN}")
+fi
+
+VERSION="$(
+  curl -fsSL "${AUTH_HEADER[@]}" \
+    -H "Accept: application/vnd.github+json" \
+    "$API" \
+  | jq -r '
+      [.[]
+        | select(.draft == false)
+        | select(.tag_name | startswith("lumen-crash-v"))
+      ]
+      | sort_by(.published_at // .created_at)
+      | reverse
+      | .[0].tag_name
+      | sub("^lumen-crash-v"; "")
+    '
+)"
+
+if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+  echo "No lumen-crash release found" >&2
+  exit 1
+fi
+
+echo "Resolved latest lumen-crash main auto release: ${VERSION}"
+echo "implementation(\"com.chloemlla.lumen:lumen-crash:${VERSION}\")"
+echo "Release page: https://github.com/${OWNER_REPO}/releases/tag/lumen-crash-v${VERSION}"
+```
+
+PowerShell：
+
+```powershell
+# 可选：$env:GH_TOKEN = "..."
+$ownerRepo = "Chloemlla/Project-Lumen"
+$headers = @{
+  Accept = "application/vnd.github+json"
+  "User-Agent" = "lumen-crash-version-resolver"
+}
+$token = $env:GH_TOKEN
+if (-not $token) { $token = $env:GITHUB_TOKEN }
+if ($token) { $headers.Authorization = "Bearer $token" }
+
+$releases = Invoke-RestMethod `
+  -Uri "https://api.github.com/repos/$ownerRepo/releases?per_page=100" `
+  -Headers $headers
+
+$latest = $releases |
+  Where-Object { -not $_.draft -and $_.tag_name -like "lumen-crash-v*" } |
+  Sort-Object { if ($_.published_at) { [datetime]$_.published_at } else { [datetime]$_.created_at } } -Descending |
+  Select-Object -First 1
+
+if (-not $latest) {
+  throw "No lumen-crash release found"
+}
+
+$version = $latest.tag_name -replace '^lumen-crash-v', ''
+Write-Host "Resolved latest lumen-crash main auto release: $version"
+Write-Host "implementation(\"com.chloemlla.lumen:lumen-crash:$version\")"
+Write-Host "Release page: https://github.com/$ownerRepo/releases/tag/lumen-crash-v$version"
+```
+
+GitHub CLI 一行命令：
+
+```bash
+gh release list --repo Chloemlla/Project-Lumen --limit 100   | awk '/^lumen-crash-v/ { print $1; exit }'   | sed 's/^lumen-crash-v//'
+```
+
+解析完成后，把精确版本写入依赖：
+
+```kotlin
+implementation("com.chloemlla.lumen:lumen-crash:<resolved-version>")
+// 示例：implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
+```
+
+可选 CI 模式（先解析，再导出给 Gradle）：
+
+```bash
+VERSION="$(...上面的解析命令...)"
+echo "LUMEN_CRASH_VERSION=${VERSION}" >> "$GITHUB_ENV"
+# 然后依赖 com.chloemlla.lumen:lumen-crash:${LUMEN_CRASH_VERSION}
+```
+
+#### 2.2 其他版本来源
+
+你也可以从这些地方读取版本：
+
+- GitHub Release 标题 / tag（`lumen-crash-v0.1.0-1a2b3c4d` => `0.1.0-1a2b3c4d`）
+- release 资产 `sdk-manifest.json` 的 `version` 字段
 - GitHub Packages 的 package 版本列表
+- 纯稳定 tag `lumen-crash-v0.1.0`（仅在你明确要冻结 semver 时）
 
 ### 3）下载后先做完整性校验
 
@@ -223,41 +330,44 @@ dependencies {
 
 只需要最短路径时，按这份清单走：
 
-1. 在 Packages 页面或 Release 页面确认已有发布版本。
+1. 自动解析 Project Lumen 上 `main` 为 `lumen-crash` 自动发版的最新版本（见 [第 2 节](#2如何选择解析版本)）。
 2. 创建带 `read:packages` 权限的 GitHub token。
 3. 把凭证写到 `~/.gradle/gradle.properties`（**不要提交**到仓库）。
 4. 在 `settings.gradle.kts` 添加 GitHub Packages Maven 仓库。
-5. 依赖 `com.chloemlla.lumen:lumen-crash:<version>`。
+5. 依赖 `com.chloemlla.lumen:lumen-crash:<resolved-version>`。
 6. Sync Gradle，并接入 `LumenCrash.install(...)` 与待处理崩溃报告 UI。
 
 | 字段 | 值 |
 |---|---|
 | Group ID | `com.chloemlla.lumen` |
 | Artifact ID | `lumen-crash` |
-| 示例版本 | `0.1.0` |
-| 完整坐标 | `com.chloemlla.lumen:lumen-crash:0.1.0` |
+| 默认版本来源 | 最新 `main` 自动发版（`0.1.0-<shortSha>`） |
+| 示例解析版本 | `0.1.0-1a2b3c4d` |
+| 完整坐标 | `com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d` |
 | Maven 仓库 | `https://maven.pkg.github.com/Chloemlla/Project-Lumen` |
 | Packages 页面 | `https://github.com/Chloemlla/Project-Lumen/packages` |
-| 稳定版 Release 模式 | `https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v0.1.0` |
+| 自动发版 tag 模式 | `https://github.com/Chloemlla/Project-Lumen/releases/tag/lumen-crash-v0.1.0-<shortSha>` |
+| 可选稳定冻结 | `lumen-crash-v0.1.0` |
 
-Gradle 依赖行：
+自动解析后的 Gradle 依赖行：
 
 ```kotlin
-implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
 ```
 
-#### 5.2 查找已发布版本
+#### 5.2 查找 / 解析已发布版本
 
-只从一个来源复制，并保持版本号完全一致：
+默认路径：自动解析 Project Lumen `main` 发布的最新 `lumen-crash-v*`（见 2.1），再固定该精确字符串。
 
 | 来源 | 复制内容 |
 |---|---|
-| GitHub Packages 的 package 版本列表 | 如 `0.1.0` |
-| GitHub Release tag | `lumen-crash-v0.1.0` => 依赖版本 `0.1.0` |
+| **推荐：** 最新 main 自动发版 | 运行 2.1 解析脚本；形态 `0.1.0-<shortSha>` |
+| GitHub Release tag | `lumen-crash-v0.1.0-1a2b3c4d` => 依赖版本 `0.1.0-1a2b3c4d` |
 | Release 资产 `sdk-manifest.json` | 字段 `version` 与 `maven.coordinates` |
-| main 自动发布 | 形如 `0.1.0-<shortSha>` |
+| GitHub Packages 的 package 版本列表 | 如 `0.1.0-1a2b3c4d` |
+| 可选稳定冻结 | 纯 semver tag `lumen-crash-v0.1.0` => `0.1.0` |
 
-稳定宿主应用应优先使用纯 semver（`0.1.0`）。只有在你明确要跟踪 main 构建时，才使用 `0.1.0-<shortSha>`。
+日常外部接入请跟踪最新 main 自动发版（`0.1.0-<shortSha>`）。只有在你明确要做生产冻结时，才切到纯 semver tag。
 
 #### 5.3 创建读权限 token
 
@@ -379,10 +489,11 @@ dependencyResolutionManagement {
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
+    // 优先使用 2.1 / 5.2 自动解析出的最新 main 版本
+    implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
 
-    // main 自动发布构建示例：
-    // implementation("com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d")
+    // 可选生产冻结：
+    // implementation("com.chloemlla.lumen:lumen-crash:0.1.0")
 }
 ```
 
@@ -390,11 +501,11 @@ Groovy：
 
 ```groovy
 dependencies {
-    implementation "com.chloemlla.lumen:lumen-crash:0.1.0"
+    implementation "com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d"
 }
 ```
 
-把 `0.1.0` 替换为你在 5.2 选中的精确版本。
+把版本替换成 latest-main 解析器返回的精确字符串（或你明确要冻结的稳定版）。
 
 #### 5.7 Sync、解析并验证
 
@@ -407,7 +518,7 @@ dependencies {
 2. 确认依赖树包含：
 
 ```text
-com.chloemlla.lumen:lumen-crash:0.1.0
+com.chloemlla.lumen:lumen-crash:0.1.0-1a2b3c4d
 ```
 
 3. 可选冒烟检查：
@@ -702,11 +813,13 @@ runCatching { riskyWork() }
 
 外部宿主应用建议：
 
-1. 优先使用稳定 tag 版本（`lumen-crash-vX.Y.Z`）
-2. 通过 **GitHub Packages Maven 坐标** 消费
+1. 自动解析 Project Lumen `main` 上 `lumen-crash` 的最新自动发版（`lumen-crash-vX.Y.Z-<shortSha>`）
+2. 用该精确版本通过 **GitHub Packages Maven 坐标** 消费
 3. 凭证不进版本库
-4. 晋级版本前核对 `sdk-manifest.json` 与 checksums
-5. 上线前完成 `install` + 待处理报告 UI 拦截
+4. 需要跟进更新时重新解析 / 重新固定版本
+5. 仅在长期生产冻结时，才切到纯稳定 tag（`lumen-crash-vX.Y.Z`）
+6. 晋级版本前核对 `sdk-manifest.json` 与 checksums
+7. 上线前完成 `install` + 待处理报告 UI 拦截
 
 本 monorepo 建议：
 
