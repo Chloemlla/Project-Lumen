@@ -567,9 +567,35 @@ If resolution fails, jump to [Troubleshooting](#9-troubleshooting).
 Because the SDK is Compose-first and publishes Material3 / window-size-class as `api` dependencies:
 
 - Host `minSdk` should be `>= 26`
-- Host should enable Compose
+- Host should enable Compose **if** it renders `LumenCrashReportScreen`
 - Kotlin / JVM 17 is recommended
-- No extra Compose dependency wiring is usually required if the host already uses Compose Material3
+- **Required for every host (including capture-only / Flutter bridges):** import a Compose BOM so the unversioned `api` Compose artifacts resolve
+- No extra per-artifact Compose version pins are usually required if the host already uses Compose Material3 **and** already imports a Compose BOM
+
+The published POM lists Compose UI / Material3 / icons / window-size-class **without versions**. Those versions come from the Compose BOM. If the host does not import a BOM, Gradle fails with empty-version coordinates such as:
+
+```text
+Could not find androidx.compose.ui:ui:.
+Could not find androidx.compose.material3:material3:.
+Could not find androidx.compose.material:material-icons-extended:.
+Could not find androidx.compose.material3:material3-window-size-class:.
+Required by:
+    project ':app' > com.chloemlla.lumen:lumen-crash:<version>
+```
+
+Host fix (match the SDK BOM generation when possible):
+
+```kotlin
+// app/build.gradle.kts
+dependencies {
+    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+    implementation(composeBom)
+    // optional but recommended so the BOM also applies to api/compile classpaths
+    // androidTestImplementation(composeBom)
+
+    implementation("com.chloemlla.lumen:lumen-crash:$lumenCrashVersion")
+}
+```
 
 Example host flags:
 
@@ -582,7 +608,7 @@ android {
     }
 
     buildFeatures {
-        compose = true
+        compose = true // required only if the host renders LumenCrashReportScreen
     }
 
     compileOptions {
@@ -834,6 +860,7 @@ For private package access from another repository, use a PAT secret with `read:
 | `Could not find com.chloemlla.lumen:lumen-crash:...` | Missing GitHub Packages repo or wrong version | Add repo URL and confirm exact version from release/manifest |
 | `401 Unauthorized` / `403 Forbidden` | Token missing `read:packages` or SSO not authorized | Recreate/authorize token; verify `gpr.user` / `gpr.key` |
 | Dependency resolves but Compose UI symbols missing | Host Compose not enabled | Enable `buildFeatures.compose = true` and use a Compose-capable host |
+| `Could not find androidx.compose.ui:ui:.` (empty version) / same for `material3` / `material-icons-extended` / `material3-window-size-class` | Host did not import Compose BOM; SDK publishes unversioned Compose `api` deps | Add `implementation(platform("androidx.compose:compose-bom:2024.12.01"))` (or your host BOM) before `lumen-crash` |
 | File share action unavailable | No `fileProviderAuthority` | Configure host FileProvider and pass authority in config |
 | Preview/manual `fromThrowable` fails compile | Missing `CrashAppInfo` | Pass app metadata, or prefer `LumenCrash.record(throwable)` |
 | Checksum mismatch | Partial/corrupt download | Re-download assets and re-check `checksums.txt` |
@@ -1358,8 +1385,16 @@ High-frequency host integration mistakes. Use this as a pre-ship checklist; deta
 ### Host environment
 
 - Host `minSdk` must be `>= 26`. Kotlin / JVM 17 is recommended.
-- The SDK is Compose-first. Hosts must enable `buildFeatures.compose = true`, or dependency resolution can succeed while crash UI symbols/runtime still fail.
-- Material3 and window-size-class are published as `api` dependencies; hosts that already use Compose Material3 usually need no extra Compose wiring.
+- The SDK is Compose-first. Hosts that render `LumenCrashReportScreen` must enable `buildFeatures.compose = true`, or dependency resolution can succeed while crash UI symbols/runtime still fail.
+- Material3 and window-size-class are published as **unversioned** `api` dependencies managed by the Compose BOM.
+- **Every host must import a Compose BOM**, even capture-only / Flutter bridges that never open the Compose crash screen. Without it, Gradle fails with empty versions like `androidx.compose.ui:ui:.`.
+- Recommended host import:
+  ```kotlin
+  val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+  implementation(composeBom)
+  implementation("com.chloemlla.lumen:lumen-crash:$lumenCrashVersion")
+  ```
+- Hosts that already use Compose Material3 usually need no extra per-artifact version pins **once the BOM is present**.
 - Do not add broad release minify rules that strip Compose runtime classes used by the crash UI.
 
 ### Required host touchpoints
