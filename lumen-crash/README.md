@@ -2,9 +2,34 @@
 
 Reusable Android crash collection + adaptive Compose crash report UI, extracted from Project Lumen.
 
-Module path: `:lumen-crash`  
-Package: `com.chloemlla.lumen.crash`  
-minSdk: 26 · compileSdk: 37 · Java/Kotlin: 17
+[English](./README.md) | [中文](./README.zh-CN.md)
+
+| Item | Value |
+|---|---|
+| Module | `:lumen-crash` |
+| Package | `com.chloemlla.lumen.crash` |
+| minSdk | 26 |
+| compileSdk | 37 |
+| Language level | Java / Kotlin 17 |
+
+## Table of contents
+
+- [Features](#features)
+- [Module layout](#module-layout)
+- [Install](#install)
+- [Minimal integration](#minimal-integration-3-host-touchpoints)
+- [Public API](#public-api)
+- [Crash capture behavior](#crash-capture-behavior)
+- [Persistence](#persistence)
+- [Breadcrumbs](#breadcrumbs)
+- [Adaptive UI](#adaptive-ui)
+- [File share setup](#file-share-setup)
+- [Host product copy](#host-product-copy)
+- [Author protection](#author-protection)
+- [ProGuard / R8](#proguard--r8)
+- [Testing](#testing)
+- [Project Lumen host notes](#project-lumen-host-notes)
+- [Out of scope](#out-of-scope)
 
 ## Features
 
@@ -14,7 +39,7 @@ minSdk: 26 · compileSdk: 37 · Java/Kotlin: 17
 - Adaptive Material3 crash report screen (`WindowSizeClass`)
 - Copy report ID / copy full report / share text / share file (file share needs host `FileProvider`)
 - Host-configurable app metadata and product strings
-- Upload stays in host app via `onCrashSaved`
+- Upload stays in the host app via `onCrashSaved`
 - **Non-removable author attribution**: ChloeMlla + https://github.com/Chloemlla/
 - Strict author integrity checks (fail-closed)
 
@@ -25,6 +50,7 @@ lumen-crash/
   build.gradle.kts
   consumer-rules.pro
   README.md
+  README.zh-CN.md
   src/main/
     AndroidManifest.xml
     java/com/chloemlla/lumen/crash/
@@ -126,6 +152,7 @@ LumenCrash.record(throwable) // also persists + invokes onCrashSaved
 | `LumenCrashReportScreen(...)` | Adaptive crash UI |
 | `CrashReport.toClipboardText()` | Full export text (author-verified) |
 | `CrashReport.toJson()` / `crashReportFromJson(...)` | Persistence format helpers |
+| `CrashReport.fromThrowable(throwable, appInfo)` | Build a report from a throwable (needs `CrashAppInfo`) |
 
 ### `LumenCrashConfig`
 
@@ -143,6 +170,19 @@ LumenCrash.record(throwable) // also persists + invokes onCrashSaved
 | `killProcessWhenNoPreviousHandler` | no | Default `true`; kill process if no previous handler |
 
 Author fields are **not** part of config and cannot be overridden.
+
+### `CrashAppInfo`
+
+Used by low-level report builders such as `CrashReport.fromThrowable(...)`.
+
+| Field | Required | Notes |
+|---|---|---|
+| `appDisplayName` | yes | Product/app display name |
+| `versionName` | yes | Version name |
+| `versionCode` | yes | Version code |
+| `commitHash` | yes | Commit / short hash string |
+
+Normal host integration should prefer `LumenCrash.record(throwable)`, which derives `CrashAppInfo` from `LumenCrashConfig`. Direct `fromThrowable` callers (for example developer crash-page previews) must supply `CrashAppInfo` themselves.
 
 ### `LumenCrashReportScreen`
 
@@ -323,6 +363,7 @@ In this monorepo, `:app` already depends on `:lumen-crash` and:
 - can also present an in-session report from `ProjectLumenApp`
 - schedules crash report upload from host hooks (`onCrashSaved` / clear callbacks)
 - reuses the existing host FileProvider authority `${applicationId}.fileprovider`
+- developer debug crash preview builds `CrashReport.fromThrowable(..., CrashAppInfo(...))` with app name + `BuildConfig` metadata
 
 Old app-local crash core sources were removed after extraction; do not reintroduce app-local duplicates under `core/crash` or `ProjectLumenCrashReportScreen`.
 
