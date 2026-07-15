@@ -36,6 +36,7 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 - [Author protection](#author-protection)
 - [ProGuard / R8](#proguard--r8)
   - [Required third-party minify exemption](#required-third-party-minify-exemption)
+  - [Field lesson: white-screen / instant exit on release cold start](#field-lesson-white-screen--instant-exit-on-release-cold-start)
 - [Integration pitfalls](#integration-pitfalls)
 - [Testing](#testing)
 - [Project Lumen host notes](#project-lumen-host-notes)
@@ -1173,14 +1174,27 @@ add this **required exemption block** to host `app/proguard-rules.pro`:
 # Put this in the host app proguard-rules.pro
 ############################################################
 
-# Required: author attribution + integrity checks
+# Keep annotations / signatures used by integrity + public API.
+-keepattributes *Annotation*, InnerClasses, EnclosingMethod, Signature
+-keepattributes RuntimeVisibleAnnotations, AnnotationDefault
+-keepattributes SourceFile, LineNumberTable
+
+# Required: author attribution constants must keep source values/names.
 -keep class com.chloemlla.lumen.crash.CrashAuthorAttribution {
     public static final java.lang.String *;
+    public static *** payload();
 }
+-keepclassmembers class com.chloemlla.lumen.crash.CrashAuthorAttribution {
+    public static final java.lang.String *;
+}
+
+# Required: integrity entry points used on install / report / UI open.
 -keep class com.chloemlla.lumen.crash.AuthorIntegrity {
-    public static *** verifyOrThrow();
+    public static *** verifyOrThrow(...);
     public static *** fingerprintHex();
+    public static *** verifiedAuthorBlock();
 }
+-keep class com.chloemlla.lumen.crash.AuthorBlock { *; }
 
 # Required backup: keep public SDK API used by host integration
 -keep class com.chloemlla.lumen.crash.LumenCrash { *; }
@@ -1193,6 +1207,8 @@ add this **required exemption block** to host `app/proguard-rules.pro`:
 
 # Package-level exemption (safe default for third-party hosts)
 -keep class com.chloemlla.lumen.crash.** { *; }
+-keepclassmembers class com.chloemlla.lumen.crash.** { *; }
+-keepnames class com.chloemlla.lumen.crash.**
 -dontwarn com.chloemlla.lumen.crash.**
 ```
 
@@ -1227,11 +1243,85 @@ This SDK is Compose-first and publishes Material3 / window-size-class as `api` d
 ### Verify after enabling minify
 
 1. Build a minified release APK/AAB that depends on `lumen-crash`.
-2. Force a test crash or open the crash report preview path.
-3. Confirm:
+2. Cold-start the release build once before any crash test.
+3. Force a test crash or open the crash report preview path.
+4. Confirm:
+   - app does **not** white-screen / immediately process-die on cold start
    - `LumenCrash.install(...)` still succeeds
    - pending report UI opens
    - copy / share still include author attribution
+
+### Field lesson: white-screen / instant exit on release cold start
+
+Seen in a real external host (Seal) after enabling:
+
+- `isMinifyEnabled = true`
+- `isShrinkResources = true`
+- early `LumenCrash.install(...)` in `Application.attachBaseContext`
+- startup gate via `LumenCrash.loadPendingReport()`
+
+**What happened**
+
+1. R8 renamed/stripped author constants or integrity entry points.
+2. `AuthorIntegrity.verifyOrThrow(...)` failed closed with `SecurityException`.
+3. That exception escaped host `Application` / `MainActivity` startup.
+4. User-visible symptom: **white screen then instant exit**, with little useful UI.
+
+**Root-cause checklist**
+
+| Check | Why it matters |
+|---|---|
+| Host minify on, but no explicit Lumen Crash keep backup | consumer-rules may be stripped or ignored by custom pipelines |
+| `CrashAuthorAttribution` constants / `payload()` not kept | fingerprint / author-name checks fail closed |
+| `AuthorIntegrity.verifyOrThrow(...)` stripped or renamed | install / load / UI open all fail closed |
+| `isShrinkResources = true` without keeping `@string/lumen_crash_*` | crash UI labels can disappear after resource shrink |
+| Host calls install / loadPendingReport without `runCatching` | one integrity failure becomes a process-killing startup crash |
+
+**Hardening that fixed the host**
+
+1. Put the explicit keep block above into host `app/proguard-rules.pro` even if consumer-rules should already merge.
+2. Keep the package-level exemption:
+   - `-keep class com.chloemlla.lumen.crash.** { *; }`
+   - `-keepclassmembers class com.chloemlla.lumen.crash.** { *; }`
+   - `-keepnames class com.chloemlla.lumen.crash.**`
+3. If resource shrink is on, keep SDK strings:
+
+```xml
+<!-- host app/src/main/res/raw/keep.xml -->
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@string/lumen_crash_*,@plurals/lumen_crash_*" />
+```
+
+4. Treat crash-sdk startup as non-fatal for the host process:
+
+```kotlin
+class MyApp : Application() {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        runCatching {
+            LumenCrash.install(this, /* config */)
+            LumenCrash.recordBreadcrumb("Application.attachBaseContext")
+        }.onFailure { it.printStackTrace() }
+    }
+}
+
+// MainActivity
+val pending = runCatching { LumenCrash.loadPendingReport() }
+    .onFailure { it.printStackTrace() }
+    .getOrNull()
+```
+
+Integrity is still fail-closed inside the SDK. Host hardening only prevents one failed integrity check from taking down the whole process before normal UI can start.
+
+**Release smoke matrix**
+
+| Step | Expected |
+|---|---|
+| Cold start minified release | No white-screen, reaches normal UI or crash-report UI |
+| Force crash + relaunch | Pending `LumenCrashReportScreen` opens |
+| Copy / share | Author footer still present |
+| Continue / clear | Next cold start does not reopen the same report |
 
 ## Integration pitfalls
 
@@ -1266,6 +1356,7 @@ Also:
 - Prefer `LumenCrash.record(throwable)` over hand-building reports. Direct `CrashReport.fromThrowable(...)` requires a full `CrashAppInfo`.
 - `LumenCrash.store()` throws if install has not run.
 - On continue, clear storage (`clearPendingReport()` or the screen clear path). Otherwise the next cold start still blocks on the same report.
+- Host startup calls (`install`, `loadPendingReport`, breadcrumbs) should be wrapped in `runCatching`. Integrity remains fail-closed inside the SDK, but the host process should still reach a recoverable UI path.
 
 ### File share and product copy
 
@@ -1284,9 +1375,11 @@ Also:
 
 - When host minify is enabled, treat `com.chloemlla.lumen.crash.**` as a third-party exemption surface. See [ProGuard / R8](#proguard--r8).
 - Prefer automatic AAR `consumer-rules.pro` merge. If the host strips consumer rules or uses a custom shrinker, copy the explicit keep block into host `proguard-rules.pro`.
-- Keep at least: `CrashAuthorAttribution`, `AuthorIntegrity`, public API classes, and package-level keep/dontwarn for `com.chloemlla.lumen.crash.**`.
-- Obfuscating/stripping author constants or integrity entry points causes install/`SecurityException`, blocked crash UI, or missing author footers on copy/share.
-- After enabling minify, verify: install succeeds, pending UI opens, copy/share still include author attribution.
+- Keep at least: `CrashAuthorAttribution` (including `payload()`), `AuthorIntegrity`, public API classes, package-level keep/keepnames/dontwarn for `com.chloemlla.lumen.crash.**`.
+- If `isShrinkResources = true`, also keep `@string/lumen_crash_*` and `@plurals/lumen_crash_*` via host `res/raw/keep.xml`.
+- Obfuscating/stripping author constants or integrity entry points causes install/`SecurityException`, blocked crash UI, missing author footers, or **white-screen/instant exit on cold start**.
+- Wrap host `install` / `loadPendingReport` / breadcrumb calls in `runCatching` so one integrity failure cannot kill process startup.
+- After enabling minify, verify: cold start survives, install succeeds, pending UI opens, copy/share still include author attribution.
 
 ### Author integrity is fail-closed
 
@@ -1303,11 +1396,11 @@ Also:
 
 1. Auto-resolve the latest main auto-release version (`lumen-crash-vX.Y.Z-<shortSha>`) and inject it; do **not** hard-pin.
 2. Consume via GitHub Packages with out-of-repo credentials.
-3. Install in `attachBaseContext`.
-4. Gate startup with pending-report UI.
+3. Install in `attachBaseContext` inside `runCatching`.
+4. Gate startup with pending-report UI; load pending report inside `runCatching`.
 5. Configure FileProvider if file share is required.
-6. Verify release minify keeps author integrity + public API.
-7. Smoke-test crash capture, pending UI, copy, and share before shipping.
+6. Verify release minify keeps author integrity + public API, and keep crash strings if resource shrink is on.
+7. Cold-start a minified release once, then smoke-test crash capture, pending UI, copy, and share before shipping.
 
 ## Testing
 

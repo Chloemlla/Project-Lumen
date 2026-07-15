@@ -36,6 +36,7 @@
 - [作者保护](#作者保护)
 - [ProGuard / R8](#proguard--r8)
   - [第三方必须配置的混淆豁免](#第三方必须配置的混淆豁免)
+  - [实战教训：release 冷启动白屏 / 秒退](#实战教训release-冷启动白屏--秒退)
 - [接入坑点](#接入坑点)
 - [测试](#测试)
 - [Project Lumen 宿主说明](#project-lumen-宿主说明)
@@ -1173,14 +1174,27 @@ Android Gradle Plugin 通常会自动把这些 consumer rules 合并进**宿主 
 # 放到宿主 app/proguard-rules.pro
 ############################################################
 
-# 必需：作者署名 + 完整性校验
+# 保留 integrity / 公开 API 可能依赖的注解与签名信息
+-keepattributes *Annotation*, InnerClasses, EnclosingMethod, Signature
+-keepattributes RuntimeVisibleAnnotations, AnnotationDefault
+-keepattributes SourceFile, LineNumberTable
+
+# 必需：作者署名常量必须保留源码值/名称
 -keep class com.chloemlla.lumen.crash.CrashAuthorAttribution {
     public static final java.lang.String *;
+    public static *** payload();
 }
+-keepclassmembers class com.chloemlla.lumen.crash.CrashAuthorAttribution {
+    public static final java.lang.String *;
+}
+
+# 必需：install / report / UI 打开路径会调用的完整性入口
 -keep class com.chloemlla.lumen.crash.AuthorIntegrity {
-    public static *** verifyOrThrow();
+    public static *** verifyOrThrow(...);
     public static *** fingerprintHex();
+    public static *** verifiedAuthorBlock();
 }
+-keep class com.chloemlla.lumen.crash.AuthorBlock { *; }
 
 # 必需备份：保留宿主会调用的公开 SDK API
 -keep class com.chloemlla.lumen.crash.LumenCrash { *; }
@@ -1193,6 +1207,8 @@ Android Gradle Plugin 通常会自动把这些 consumer rules 合并进**宿主 
 
 # 包级豁免（第三方宿主的安全默认）
 -keep class com.chloemlla.lumen.crash.** { *; }
+-keepclassmembers class com.chloemlla.lumen.crash.** { *; }
+-keepnames class com.chloemlla.lumen.crash.**
 -dontwarn com.chloemlla.lumen.crash.**
 ```
 
@@ -1227,11 +1243,85 @@ android {
 ### 开启混淆后如何验证
 
 1. 构建依赖了 `lumen-crash` 的 minify release APK/AAB。
-2. 触发测试崩溃，或打开崩溃报告预览路径。
-3. 确认：
+2. 先冷启动一次 release 包，再做崩溃测试。
+3. 触发测试崩溃，或打开崩溃报告预览路径。
+4. 确认：
+   - 冷启动**不会**白屏 / 立刻进程退出
    - `LumenCrash.install(...)` 仍成功
    - 待处理报告 UI 能打开
    - 复制 / 分享内容仍包含作者署名
+
+### 实战教训：release 冷启动白屏 / 秒退
+
+外部宿主（Seal）在同时满足以下条件时真实踩过：
+
+- `isMinifyEnabled = true`
+- `isShrinkResources = true`
+- 在 `Application.attachBaseContext` 尽早调用 `LumenCrash.install(...)`
+- 启动时用 `LumenCrash.loadPendingReport()` 做 UI 闸门
+
+**现象链路**
+
+1. R8 重命名/裁剪了作者常量或 integrity 入口
+2. `AuthorIntegrity.verifyOrThrow(...)` fail-closed，抛出 `SecurityException`
+3. 异常穿透宿主 `Application` / `MainActivity` 启动路径
+4. 用户侧表现：**白屏后立刻退出**，几乎看不到可用 UI
+
+**根因 checklist**
+
+| 检查项 | 为什么重要 |
+|---|---|
+| 宿主开了 minify，但没有显式 Lumen Crash keep 备份 | consumer-rules 可能被剥离，或自定义 shrinker 忽略 |
+| 未 keep `CrashAuthorAttribution` 常量 / `payload()` | fingerprint / 作者名校验直接 fail-closed |
+| `AuthorIntegrity.verifyOrThrow(...)` 被裁剪或改名 | install / load / UI 打开都会 fail-closed |
+| 开了 `isShrinkResources = true`，却未 keep `@string/lumen_crash_*` | 崩溃页字符串可能被资源收缩删掉 |
+| 宿主未用 `runCatching` 包住 install / loadPendingReport | 一次 integrity 失败会变成进程级启动崩溃 |
+
+**宿主侧已验证有效的加固**
+
+1. 即使理论上已有 consumer-rules，也把上面的显式 keep 块写进宿主 `app/proguard-rules.pro`
+2. 保留 package-level 豁免：
+   - `-keep class com.chloemlla.lumen.crash.** { *; }`
+   - `-keepclassmembers class com.chloemlla.lumen.crash.** { *; }`
+   - `-keepnames class com.chloemlla.lumen.crash.**`
+3. 若开启 resource shrink，再 keep SDK 字符串：
+
+```xml
+<!-- 宿主 app/src/main/res/raw/keep.xml -->
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@string/lumen_crash_*,@plurals/lumen_crash_*" />
+```
+
+4. 把 crash-sdk 启动路径视为“可失败但不应杀死进程”：
+
+```kotlin
+class MyApp : Application() {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        runCatching {
+            LumenCrash.install(this, /* config */)
+            LumenCrash.recordBreadcrumb("Application.attachBaseContext")
+        }.onFailure { it.printStackTrace() }
+    }
+}
+
+// MainActivity
+val pending = runCatching { LumenCrash.loadPendingReport() }
+    .onFailure { it.printStackTrace() }
+    .getOrNull()
+```
+
+SDK 内部完整性仍是 fail-closed。宿主加固只是避免“一次校验失败”在正常 UI 起来前直接杀掉进程。
+
+**Release 冒烟矩阵**
+
+| 步骤 | 期望 |
+|---|---|
+| 冷启动 minify release | 不白屏，进入正常 UI 或崩溃报告页 |
+| 强制崩溃 + 再启动 | 出现 pending `LumenCrashReportScreen` |
+| 复制 / 分享 | 作者 footer 仍在 |
+| 继续 / 清除 | 下次冷启动不再打开同一份报告 |
 
 ## 接入坑点
 
@@ -1266,6 +1356,7 @@ android {
 - 优先用 `LumenCrash.record(throwable)`，不要轻易手写报告构建。直接调用 `CrashReport.fromThrowable(...)` 时必须自备完整 `CrashAppInfo`。
 - 未 install 时调用 `LumenCrash.store()` 会抛异常。
 - continue 时要清存储（`clearPendingReport()` 或 screen 的 clear 路径）。否则下次冷启动仍会被同一份报告拦截。
+- 宿主启动路径里的 `install` / `loadPendingReport` / breadcrumb 建议包在 `runCatching` 中。SDK 内部 integrity 仍 fail-closed，但宿主进程应尽量落到可恢复 UI。
 
 ### 文件分享与产品文案
 
@@ -1284,9 +1375,11 @@ android {
 
 - 宿主开启 minify 时，必须把 `com.chloemlla.lumen.crash.**` 当作第三方豁免面。见 [ProGuard / R8](#proguard--r8)。
 - 优先依赖 AAR 自带 `consumer-rules.pro` 自动合并。若宿主剥离 consumer rules 或使用自定义 shrinker，必须把显式 keep 块写入宿主 `proguard-rules.pro`。
-- 至少 keep：`CrashAuthorAttribution`、`AuthorIntegrity`、公开 API 类，以及对 `com.chloemlla.lumen.crash.**` 的 package-level keep/dontwarn。
-- 混淆/裁剪作者常量或 integrity 入口会导致 install/`SecurityException`、崩溃页 blocked，或 copy/share 丢失作者 footer。
-- 开启 minify 后务必验证：install 成功、pending UI 可打开、copy/share 仍含作者署名。
+- 至少 keep：`CrashAuthorAttribution`（含 `payload()`）、`AuthorIntegrity`、公开 API 类，以及对 `com.chloemlla.lumen.crash.**` 的 package-level keep/keepnames/dontwarn。
+- 若开启 `isShrinkResources = true`，还要用宿主 `res/raw/keep.xml` 保留 `@string/lumen_crash_*` 与 `@plurals/lumen_crash_*`。
+- 混淆/裁剪作者常量或 integrity 入口会导致 install/`SecurityException`、崩溃页 blocked、copy/share 丢失作者 footer，或 **冷启动白屏/秒退**。
+- 宿主侧的 `install` / `loadPendingReport` / breadcrumb 调用建议包在 `runCatching` 中，避免一次 integrity 失败直接杀死启动流程。
+- 开启 minify 后务必验证：冷启动可活、install 成功、pending UI 可打开、copy/share 仍含作者署名。
 
 ### 作者完整性是 fail-closed
 
@@ -1303,11 +1396,11 @@ android {
 
 1. 自动解析最新 main 自动发版版本（`lumen-crash-vX.Y.Z-<shortSha>`）并注入依赖；**不要**硬编码钉死。
 2. 通过 GitHub Packages 接入，凭据放仓库外。
-3. 在 `attachBaseContext` 安装。
-4. 启动时用 pending-report UI 闸门。
+3. 在 `attachBaseContext` 中 `runCatching` 安装。
+4. 启动时用 pending-report UI 闸门；`loadPendingReport` 也包在 `runCatching` 中。
 5. 如需文件分享，配置 FileProvider。
-6. 验证 release minify 保留作者完整性与公开 API。
-7. 发版前冒烟：崩溃捕获、pending UI、复制、分享。
+6. 验证 release minify 保留作者完整性与公开 API；若开启 resource shrink，再 keep 崩溃页字符串。
+7. 先冷启动一次 minify release，再冒烟：崩溃捕获、pending UI、复制、分享。
 
 ## 测试
 
