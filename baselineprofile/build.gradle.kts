@@ -15,7 +15,8 @@ android {
         minSdk = 28
         targetSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "EMULATOR,LOW-BATTERY"
+        testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] =
+            "EMULATOR,LOW-BATTERY"
     }
 
     compileOptions {
@@ -30,6 +31,7 @@ android {
                     device = "Pixel 6"
                     apiLevel = 35
                     systemImageSource = "aosp"
+                    require64Bit = true
                 }
             }
         }

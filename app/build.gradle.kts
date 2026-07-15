@@ -203,9 +203,19 @@ android {
         }
     }
 
+    // Managed-device baseline generation runs on x86_64 emulators. ABI splits can install a
+    // single-ABI APK without x86_64 native libs and make the target process die immediately
+    // after launch ("Target package is not running"). Disable splits while generating profiles.
+    val isBaselineProfileTask = gradle.startParameter.taskNames.any { taskName ->
+        val normalized = taskName.lowercase()
+        normalized.contains("generatebaselineprofile") ||
+            normalized.contains("nonminified") ||
+            normalized.contains("pixel6api35") ||
+            normalized.contains("assemblebenchmark")
+    }
     splits {
         abi {
-            isEnable = true
+            isEnable = !isBaselineProfileTask
             reset()
             include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
             isUniversalApk = true
