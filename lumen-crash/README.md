@@ -932,12 +932,18 @@ SDK share-as-file writes a UTF-8 `.txt` under cache and grants URI read permissi
 
 ## Host product copy
 
-Library defaults ship in:
+Shared crash UI labels, actions, share-option copy, and stack-hint text live only in the SDK:
 
 - `src/main/res/values/strings.xml` (EN)
 - `src/main/res/values-zh/strings.xml` (ZH)
 
-Override product-facing title/message/subject through config, not by forking author strings:
+Project Lumen keeps only the three product-facing overrides in the host app and injects them through config:
+
+- `crash_report_title`
+- `crash_report_message`
+- `crash_report_share_subject`
+
+Do not reintroduce host-side duplicates of the shared UI strings, and do not override author attribution.
 
 ```kotlin
 LumenCrashConfig(

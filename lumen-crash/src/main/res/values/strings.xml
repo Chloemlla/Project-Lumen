@@ -13,8 +13,8 @@
     <string name="lumen_crash_report_recent_events">Recent app events</string>
     <string name="lumen_crash_report_stack_trace">Stack trace</string>
     <plurals name="lumen_crash_report_stack_hint">
-        <item quantity="one">%1$d stack line recorded. Showing a preview by default.</item>
-        <item quantity="other">%1$d stack lines recorded. Showing a preview by default.</item>
+        <item quantity="one">%1$d stack line captured. The preview is shortened for readability.</item>
+        <item quantity="other">%1$d stack lines captured. The preview is shortened for readability.</item>
     </plurals>
     <string name="lumen_crash_report_show_full_stack">Show full</string>
     <string name="lumen_crash_report_collapse_stack">Collapse</string>
