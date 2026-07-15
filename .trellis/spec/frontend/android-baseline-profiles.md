@@ -63,6 +63,7 @@ run: gradle :app:generateBaselineProfile --no-daemon --warning-mode all
 - Producer contract: `baselineprofile` is a standalone `com.android.test` module targeting `:app`; profile journeys live under `baselineprofile/src/main/java`.
 - Package contract: generator tests must collect profiles for the real application id, currently `com.chloemlla.projectlumen`, not the app namespace.
 - Startup contract: startup profile generation should launch the app and cover the first high-value screen path. If onboarding appears on clean install, the journey may dismiss it before exercising the home surface.
+- Managed-device boot contract: Application/Activity startup paths used by the generator must not hard-crash on AOSP emulators. Vendor-only APIs (for example hestub `HapticPlayer`) must be optional/reflective, and crash-SDK install/load plus integrity enforcement should not process-kill cold start during profile generation.
 - CI contract: profile generation runs in GitHub Actions with Android emulator acceleration before release assembly. With `mergeIntoMain = true` on current AndroidX Benchmark/ProfileInstaller releases, the app workflow invokes the consumer aggregate task `:app:generateBaselineProfile`; local machines are limited to static inspection.
 - Version contract: keep `androidx.baselineprofile`, `androidx.benchmark:benchmark-macro-junit4`, and `androidx.profileinstaller` on compatible AndroidX Benchmark/ProfileInstaller releases.
 
@@ -76,6 +77,7 @@ run: gradle :app:generateBaselineProfile --no-daemon --warning-mode all
 | GitHub runner lacks KVM access | Managed device startup is slow or fails; workflow must enable KVM before profile generation. |
 | Profile generation is attempted locally | Stop and move execution to GitHub Actions per repository policy. |
 | Onboarding appears on clean install | Generator should dismiss it or profile the intended first-run journey deliberately. |
+| Target package launches then dies immediately | Check ABI packaging (universal/x86_64), optional vendor API class-loading, and Application startup exceptions. |
 | AndroidX Benchmark versions drift | Align plugin, macrobenchmark, and ProfileInstaller versions before CI execution. |
 
 ## 5. Good/Base/Bad Cases

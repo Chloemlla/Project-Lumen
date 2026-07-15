@@ -31,18 +31,20 @@ open class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        CrashBreadcrumbs.record("MainActivity.onCreate")
+        runCatching { CrashBreadcrumbs.record("MainActivity.onCreate") }
         enableEdgeToEdge()
         handleOpenIntent(intent)
         val app = application as ProjectLumenApplication
-        var initialStartupReport = app.startupCrashReport ?: app.crashReports.load()
+        var initialStartupReport = app.startupCrashReport
+            ?: runCatching { app.crashReports.load() }.getOrNull()
         val initialViewModel = if (initialStartupReport == null) {
             createProjectLumenViewModel(app)
         } else {
             null
         }
         if (initialStartupReport == null && initialViewModel == null) {
-            initialStartupReport = app.startupCrashReport ?: app.crashReports.load()
+            initialStartupReport = app.startupCrashReport
+                ?: runCatching { app.crashReports.load() }.getOrNull()
         }
         setContent {
             var startupReport by remember { mutableStateOf(initialStartupReport) }
@@ -69,7 +71,7 @@ open class MainActivity : ComponentActivity() {
             if (viewModel == null) return@setContent
             ProjectLumenApp(
                 viewModel = viewModel,
-                crashReport = app.crashReports.load(),
+                crashReport = runCatching { app.crashReports.load() }.getOrNull(),
                 openLaunchRequest = openLaunchRequest.value,
             )
         }

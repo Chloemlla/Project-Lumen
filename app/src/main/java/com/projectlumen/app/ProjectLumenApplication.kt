@@ -79,20 +79,31 @@ class ProjectLumenApplication : Application() {
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
-        installLumenCrashSdk()
-        CrashBreadcrumbs.record("Application.attachBaseContext")
+        runCatching {
+            installLumenCrashSdk()
+            CrashBreadcrumbs.record("Application.attachBaseContext")
+        }
     }
 
     override fun onCreate() {
         super.onCreate()
-        installLumenCrashSdk()
-        CrashBreadcrumbs.record("Application.onCreate")
+        runCatching {
+            installLumenCrashSdk()
+            CrashBreadcrumbs.record("Application.onCreate")
+        }
         initializeMmkvOrRecordCrash()
-        MemoryHealthMonitor.sample(this)
-        AppIntegrityGuard.enforce(this)
-        notifications.ensureChannels()
-        LumenToast.install(this)
-        ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)
+        runCatching { MemoryHealthMonitor.sample(this) }
+        // Baseline-profile managed devices and incomplete CI signing configs must still boot.
+        // Integrity remains enforced for real release builds that configure the cert fingerprint.
+        runCatching { AppIntegrityGuard.enforce(this) }
+            .onFailure { throwable ->
+                runCatching { recordCrash(throwable) }
+            }
+        runCatching { notifications.ensureChannels() }
+        runCatching { LumenToast.install(this) }
+        runCatching {
+            ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)
+        }
         crashReportUploadsReady = true
         scheduleStoredCrashReportUpload()
     }

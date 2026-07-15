@@ -60,25 +60,32 @@ class BaselineProfileGenerator {
             startActivityAndWait()
         }
 
-        val becameVisible = device.wait(
-            Until.hasObject(By.pkg(TARGET_PACKAGE).depth(0)),
-            APP_VISIBLE_TIMEOUT_MILLIS,
-        )
+        // Macrobenchmark validates that the process remains running; allow cold start + first frame.
+        val deadlineMillis = System.currentTimeMillis() + APP_VISIBLE_TIMEOUT_MILLIS
+        var becameVisible = false
+        var processStillRunning = false
+        while (System.currentTimeMillis() < deadlineMillis) {
+            becameVisible = device.hasObject(By.pkg(TARGET_PACKAGE).depth(0))
+            processStillRunning = device.executeShellCommand("pidof $TARGET_PACKAGE")
+                .trim()
+                .isNotEmpty()
+            if (becameVisible && processStillRunning) {
+                break
+            }
+            device.waitForIdle(PROCESS_POLL_INTERVAL_MILLIS)
+        }
+
         check(becameVisible) {
             "Target package $TARGET_PACKAGE did not become visible after launch " +
                 "(api=${Build.VERSION.SDK_INT})."
         }
-
-        // Macrobenchmark validates that the process remains running; give startup a short settle.
-        device.waitForIdle(IDLE_TIMEOUT_MILLIS)
-        val processStillRunning = device.executeShellCommand("pidof $TARGET_PACKAGE")
-            .trim()
-            .isNotEmpty()
         check(processStillRunning) {
             "Target package $TARGET_PACKAGE is not running after launch settle. " +
                 "This usually means Application/Activity crashed on the managed emulator " +
                 "(missing x86_64 libs, integrity enforcement, or startup exception)."
         }
+
+        device.waitForIdle(IDLE_TIMEOUT_MILLIS)
     }
 
     private fun MacrobenchmarkScope.dismissBlockingUiIfPresent() {
@@ -119,9 +126,10 @@ class BaselineProfileGenerator {
 
     private companion object {
         private const val TARGET_PACKAGE = "com.chloemlla.projectlumen"
-        private const val APP_VISIBLE_TIMEOUT_MILLIS = 15_000L
+        private const val APP_VISIBLE_TIMEOUT_MILLIS = 30_000L
         private const val FIND_UI_TIMEOUT_MILLIS = 2_000L
         private const val IDLE_TIMEOUT_MILLIS = 2_000L
+        private const val PROCESS_POLL_INTERVAL_MILLIS = 500L
         private const val HOME_SCROLL_BOTTOM_FRACTION = 0.78f
         private const val HOME_SCROLL_TOP_FRACTION = 0.30f
         private const val HOME_SCROLL_PASSES = 2

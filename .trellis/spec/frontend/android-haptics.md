@@ -30,7 +30,8 @@
 - Transient events use `Type = "transient"`, non-negative `RelativeTime`, and `Parameters.Intensity/Frequency` clamped to `[0, 100]`.
 - Continuous events use `Type = "continuous"`, positive `Duration`, and a `Curve` whose first and last points have `Intensity = 0`.
 - Playback options clamp `intervalMillis` to `[0, 1000]` and `amplitude` to `[1, 255]`; `loop = 1` means no repeat and `loop = -1` means infinite repeat.
-- `HapticPlaybackService` must call `android.os.DynamicEffect` and `android.os.HapticPlayer` through the hestub SDK and wrap every player call so unsupported devices fail closed.
+- `HapticPlaybackService` must access `android.os.DynamicEffect` and `android.os.HapticPlayer` only through reflection / runtime class lookup (hestub is compile-time), so stock AOSP emulators and baseline-profile managed devices never fail class loading.
+- Every vendor player call must fail closed; unsupported devices fall back to platform vibration.
 - `AudioService` should try `HapticPlaybackService.playReminderNudge()` first when `vibrate = true`, then fall back to platform `VibrationEffect` if the vendor player is unavailable or playback fails.
 - The vendor Maven repository uses the credentials provided by the haptic SDK integration guide.
 
@@ -48,7 +49,8 @@
 
 - Good: reminders on supported high-voltage linear motor devices play a short HE nudge and can still update interval/amplitude/frequency through `HapticPlaybackService`.
 - Base: ordinary Android devices without vendor haptic APIs retain the previous one-shot vibration behavior.
-- Bad: calling `HapticPlayer.start(...)` without `HapticPlayer.isAvailable()` and exception handling.
+- Bad: hard-importing `android.os.HapticPlayer` / `DynamicEffect` so the class fails to load on AOSP emulators.
+- Bad: calling vendor `start(...)` without availability checks and exception handling.
 - Bad: removing the platform `VibrationEffect` fallback and making reminders silent on unsupported devices.
 
 ### 6. Tests Required
@@ -63,12 +65,16 @@
 #### Wrong
 
 ```kotlin
+// Hard dependency crashes class loading on AOSP / baseline managed devices.
+import android.os.HapticPlayer
+import android.os.DynamicEffect
 HapticPlayer(DynamicEffect.create(json)).start(1)
 ```
 
 #### Correct
 
 ```kotlin
+// Reflective vendor access fails closed when framework classes are absent.
 if (!haptics.playReminderNudge()) {
     vibrator.vibrate(VibrationEffect.createOneShot(90L, VibrationEffect.DEFAULT_AMPLITUDE))
 }
