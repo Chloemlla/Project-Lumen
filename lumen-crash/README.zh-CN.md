@@ -36,6 +36,7 @@
 - [作者保护](#作者保护)
 - [ProGuard / R8](#proguard--r8)
   - [第三方必须配置的混淆豁免](#第三方必须配置的混淆豁免)
+- [接入坑点](#接入坑点)
 - [测试](#测试)
 - [Project Lumen 宿主说明](#project-lumen-宿主说明)
 - [范围外事项](#范围外事项)
@@ -1207,6 +1208,81 @@ android {
    - `LumenCrash.install(...)` 仍成功
    - 待处理报告 UI 能打开
    - 复制 / 分享内容仍包含作者署名
+
+## 接入坑点
+
+宿主接入中的高频踩坑点。可当作上线前 checklist；细节见下文链接章节。
+
+### 依赖与版本
+
+- **不要**单独使用 `/releases/latest`。本仓库可能同时发布非 SDK release。只认 `lumen-crash-v*` 前缀 tag。
+- 解析后 pin 精确版本：`0.1.0-<shortSha>`（main 自动发版）或纯 `X.Y.Z`（有意冻结）。不要留下浮动的 `latest` 坐标。
+- GitHub Packages 需要鉴权读取（`read:packages`）。若组织启用 SSO，token 必须先完成 SSO 授权。
+- 凭据放仓库外（`~/.gradle/gradle.properties` 或 CI secrets），**不要提交** token。
+- `Could not find` / `401` / `403` 几乎总是：Packages 仓库 URL、版本字符串、token 三者之一错误。见 [排障清单](#9排障清单)。
+
+### 宿主环境
+
+- 宿主 `minSdk` 必须 `>= 26`。建议 Kotlin / JVM 17。
+- SDK 是 Compose-first。宿主必须开启 `buildFeatures.compose = true`，否则可能出现“依赖解析成功但崩溃 UI 符号/运行失败”。
+- Material3 与 window-size-class 以 `api` 依赖对外暴露；宿主若已使用 Compose Material3，通常无需再手写一遍 Compose 依赖。
+- 不要在 release minify 中加入会 strip Compose runtime 的宽泛规则。
+
+### 必做的 3 个宿主触点
+
+缺任何一个都算接入不完整：
+
+1. **尽早 install**：放在 `Application.attachBaseContext`，确保未捕获异常 handler 在后期启动逻辑前生效。见 [最小集成](#最小集成3-个宿主接入点)。
+2. **启动 UI 闸门**：先 `LumenCrash.loadPendingReport()` -> `LumenCrashReportScreen`，再进入正常应用内容。
+3. **记录面包屑 / 可恢复失败**：关键路径调用 `recordBreadcrumb` / `record(throwable)`。
+
+另外：
+
+- 优先用 `LumenCrash.record(throwable)`，不要轻易手写报告构建。直接调用 `CrashReport.fromThrowable(...)` 时必须自备完整 `CrashAppInfo`。
+- 未 install 时调用 `LumenCrash.store()` 会抛异常。
+- continue 时要清存储（`clearPendingReport()` 或 screen 的 clear 路径）。否则下次冷启动仍会被同一份报告拦截。
+
+### 文件分享与产品文案
+
+- 文本分享无需宿主额外配置。文件分享需要宿主 `FileProvider` + `LumenCrashConfig.fileProviderAuthority`。未配置 authority 时仍可文本分享，UI 会显示库内 “file share unavailable” 文案。
+- Provider paths 必须覆盖 SDK 分享写入使用的 cache / external-cache。见 [文件分享配置](#文件分享配置)。
+- 产品向文案只通过配置注入（`reportTitle`、`reportMessage`、`shareSubject`）。不要在宿主重抄整套共享 UI 字符串。
+- 作者署名不可配置、不可隐藏。尝试剥离会 fail-closed。
+
+### 持久化假设
+
+- 报告主路径写在应用专属**外部**目录（`getExternalFilesDir` / external cache），不是内部 private storage。
+- 只要任一外部路径写成功即算保存成功。legacy private 路径仅用于迁移。
+- 不要假设“清应用数据”只对应内部 `filesDir`。应调用 `LumenCrash.clearPendingReport()`，或同时清理外部存储位置。
+
+### ProGuard / R8
+
+- 宿主开启 minify 时，必须把 `com.chloemlla.lumen.crash.**` 当作第三方豁免面。见 [ProGuard / R8](#proguard--r8)。
+- 优先依赖 AAR 自带 `consumer-rules.pro` 自动合并。若宿主剥离 consumer rules 或使用自定义 shrinker，必须把显式 keep 块写入宿主 `proguard-rules.pro`。
+- 至少 keep：`CrashAuthorAttribution`、`AuthorIntegrity`、公开 API 类，以及对 `com.chloemlla.lumen.crash.**` 的 package-level keep/dontwarn。
+- 混淆/裁剪作者常量或 integrity 入口会导致 install/`SecurityException`、崩溃页 blocked，或 copy/share 丢失作者 footer。
+- 开启 minify 后务必验证：install 成功、pending UI 可打开、copy/share 仍含作者署名。
+
+### 作者完整性是 fail-closed
+
+- 校验会在 install、报告构建/加载/导出、UI 打开时执行。
+- mismatch 不是软提示：会抛异常或进入阻断页。
+- 这用于抬高“静默去署名”的成本；对源码级 fork 的绝对防护不在范围内。
+
+### 职责边界
+
+- 上传/遥测留在宿主（`onCrashSaved` / continue 钩子）。SDK 不提供崩溃后端。
+- 抽离到本模块后，不要再在宿主重写一套 crash 核心克隆（如 `core/crash`、替代 `LumenCrashReportScreen` 的自定义崩溃页）。
+
+### 稳妥生产路径
+
+1. 解析并 pin 精确的 main 自动发版版本（`lumen-crash-vX.Y.Z-<shortSha>`）。
+2. 通过 GitHub Packages 接入，凭据放仓库外。
+3. 在 `attachBaseContext` 安装。
+4. 启动时用 pending-report UI 闸门。
+5. 如需文件分享，配置 FileProvider。
+6. 验证 release minify 保留作者完整性与公开 API。
+7. 发版前冒烟：崩溃捕获、pending UI、复制、分享。
 
 ## 测试
 

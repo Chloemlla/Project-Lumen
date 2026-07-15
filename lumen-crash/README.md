@@ -36,6 +36,7 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 - [Author protection](#author-protection)
 - [ProGuard / R8](#proguard--r8)
   - [Required third-party minify exemption](#required-third-party-minify-exemption)
+- [Integration pitfalls](#integration-pitfalls)
 - [Testing](#testing)
 - [Project Lumen host notes](#project-lumen-host-notes)
 - [Out of scope](#out-of-scope)
@@ -1207,6 +1208,81 @@ This SDK is Compose-first and publishes Material3 / window-size-class as `api` d
    - `LumenCrash.install(...)` still succeeds
    - pending report UI opens
    - copy / share still include author attribution
+
+## Integration pitfalls
+
+High-frequency host integration mistakes. Use this as a pre-ship checklist; details live in the sections linked below.
+
+### Dependency and version
+
+- Do **not** use `/releases/latest` alone. This repository may publish non-SDK releases. Only accept tags with the `lumen-crash-v*` prefix.
+- Pin an exact version string after resolve: `0.1.0-<shortSha>` for main auto releases, or pure `X.Y.Z` for intentional freezes. Do not leave a floating `latest` coordinate.
+- GitHub Packages needs authenticated reads (`read:packages`). Org SSO tokens must be SSO-authorized.
+- Keep credentials outside VCS (`~/.gradle/gradle.properties` or CI secrets). Never commit tokens.
+- `Could not find` / `401` / `403` almost always means one of: missing Packages repo URL, wrong version string, missing/invalid token. See [Troubleshooting](#9-troubleshooting).
+
+### Host environment
+
+- Host `minSdk` must be `>= 26`. Kotlin / JVM 17 is recommended.
+- The SDK is Compose-first. Hosts must enable `buildFeatures.compose = true`, or dependency resolution can succeed while crash UI symbols/runtime still fail.
+- Material3 and window-size-class are published as `api` dependencies; hosts that already use Compose Material3 usually need no extra Compose wiring.
+- Do not add broad release minify rules that strip Compose runtime classes used by the crash UI.
+
+### Required host touchpoints
+
+Missing any of these three is a broken integration:
+
+1. **Install early** in `Application.attachBaseContext` so the uncaught handler is active before late startup work. See [Minimal integration](#minimal-integration-3-host-touchpoints).
+2. **Gate startup UI** with `LumenCrash.loadPendingReport()` -> `LumenCrashReportScreen` before normal app content.
+3. **Record breadcrumbs / handled failures** on important paths via `recordBreadcrumb` / `record(throwable)`.
+
+Also:
+
+- Prefer `LumenCrash.record(throwable)` over hand-building reports. Direct `CrashReport.fromThrowable(...)` requires a full `CrashAppInfo`.
+- `LumenCrash.store()` throws if install has not run.
+- On continue, clear storage (`clearPendingReport()` or the screen clear path). Otherwise the next cold start still blocks on the same report.
+
+### File share and product copy
+
+- Text share works without host setup. File share requires a host `FileProvider` plus `LumenCrashConfig.fileProviderAuthority`. Without authority, the UI keeps text share and shows the library "file share unavailable" string.
+- Provider paths must expose cache / external-cache locations used by the SDK share writer. See [File share setup](#file-share-setup).
+- Override only product-facing strings through config (`reportTitle`, `reportMessage`, `shareSubject`). Do not re-copy the full shared UI string set into the host app.
+- Author attribution is not configurable and cannot be hidden. Attempts to strip it fail closed.
+
+### Persistence assumptions
+
+- Reports are stored under app-specific **external** directories (`getExternalFilesDir` / external cache), not internal private storage as the primary path.
+- Save succeeds if **any** external path succeeds. Legacy private paths exist only for migration.
+- Do not assume "clear app data" semantics map 1:1 to internal `filesDir` only. Clear via `LumenCrash.clearPendingReport()` or wipe the external store locations too.
+
+### ProGuard / R8
+
+- When host minify is enabled, treat `com.chloemlla.lumen.crash.**` as a third-party exemption surface. See [ProGuard / R8](#proguard--r8).
+- Prefer automatic AAR `consumer-rules.pro` merge. If the host strips consumer rules or uses a custom shrinker, copy the explicit keep block into host `proguard-rules.pro`.
+- Keep at least: `CrashAuthorAttribution`, `AuthorIntegrity`, public API classes, and package-level keep/dontwarn for `com.chloemlla.lumen.crash.**`.
+- Obfuscating/stripping author constants or integrity entry points causes install/`SecurityException`, blocked crash UI, or missing author footers on copy/share.
+- After enabling minify, verify: install succeeds, pending UI opens, copy/share still include author attribution.
+
+### Author integrity is fail-closed
+
+- Integrity checks run on install, report build/load/export, and UI open.
+- Mismatch is not a soft warning: it throws or shows a blocked screen.
+- This raises the bar against silent attribution removal; absolute anti-fork protection is intentionally out of scope.
+
+### Responsibility boundary
+
+- Upload/telemetry stays in the host (`onCrashSaved` / continue-time hooks). The SDK does not ship a crash backend.
+- Do not reintroduce host-local crash core clones (`core/crash`, custom crash screens that replace `LumenCrashReportScreen`) after extracting to this module.
+
+### Safe production path
+
+1. Resolve and pin the exact latest main auto-release version (`lumen-crash-vX.Y.Z-<shortSha>`).
+2. Consume via GitHub Packages with out-of-repo credentials.
+3. Install in `attachBaseContext`.
+4. Gate startup with pending-report UI.
+5. Configure FileProvider if file share is required.
+6. Verify release minify keeps author integrity + public API.
+7. Smoke-test crash capture, pending UI, copy, and share before shipping.
 
 ## Testing
 
