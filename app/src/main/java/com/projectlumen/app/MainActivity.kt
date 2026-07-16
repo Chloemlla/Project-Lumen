@@ -10,18 +10,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.chloemlla.lumen.crash.ui.LumenCrashReportScreen
 import com.projectlumen.app.app.ProjectLumenApp
 import com.projectlumen.app.app.ProjectLumenViewModel
 import com.chloemlla.lumen.crash.CrashBreadcrumbs
 import com.chloemlla.lumen.crash.LumenCrash
+import com.chloemlla.lumen.crash.ui.LumenCrashGate
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.openapi.LumenOpenIntents
 import com.projectlumen.app.openapi.LumenOpenLaunchRequest
@@ -43,55 +40,46 @@ open class MainActivity : ComponentActivity() {
             enableEdgeToEdge()
             handleOpenIntent(intent)
             val app = application as ProjectLumenApplication
-            var initialStartupReport = app.startupCrashReport
-                ?: runCatching { if (LumenCrash.isInstalled()) app.crashReports.load() else null }.getOrNull()
+            val initialStartupReport = app.startupCrashReport
+                ?: LumenCrash.loadPendingReportSafely()
+                    ?: runCatching { if (LumenCrash.isInstalled()) app.crashReports.load() else null }.getOrNull()
             val initialViewModel = if (initialStartupReport == null) {
                 createProjectLumenViewModel(app)
             } else {
                 null
             }
-            if (initialStartupReport == null && initialViewModel == null) {
-                initialStartupReport = app.startupCrashReport
-                    ?: runCatching { if (LumenCrash.isInstalled()) app.crashReports.load() else null }.getOrNull()
-            }
             setContent {
-                var startupReport by remember { mutableStateOf(initialStartupReport) }
-                startupReport?.let { report ->
-                    ProjectLumenTheme(themeMode = AppThemeMode.SYSTEM, useDynamicColors = false) {
-                        LumenCrashReportScreen(
-                            report = report,
-                            onContinue = {
-                                app.clearStartupCrashReport()
-                                startupReport = null
-                                if (initialViewModel == null) recreate()
-                            },
-                            clearStoredReportOnContinue = true,
-                            onClearStoredReport = {
-                                app.scheduleCrashReportUpload(report)
-                                runCatching { app.crashReports.clear() }
-                                app.clearStartupCrashReport()
-                            },
-                        )
-                    }
-                    return@setContent
-                }
-                val viewModel = initialViewModel
-                if (viewModel == null) {
-                    // Keep a non-empty surface so process stays visibly alive for macrobenchmark.
-                    ProjectLumenTheme(themeMode = AppThemeMode.SYSTEM, useDynamicColors = false) {
-                        Surface(modifier = Modifier.fillMaxSize()) {
-                            Box(modifier = Modifier.fillMaxSize())
+                ProjectLumenTheme(themeMode = AppThemeMode.SYSTEM, useDynamicColors = false) {
+                    LumenCrashGate(
+                        initialReport = initialStartupReport,
+                        onContinue = {
+                            app.clearStartupCrashReport()
+                            if (initialViewModel == null) recreate()
+                        },
+                        clearStoredReportOnContinue = true,
+                        onClearStoredReport = {
+                            initialStartupReport?.let { app.scheduleCrashReportUpload(it) }
+                            runCatching { app.crashReports.clear() }
+                            app.clearStartupCrashReport()
+                        },
+                    ) {
+                        val viewModel = initialViewModel
+                        if (viewModel == null) {
+                            // Keep a non-empty surface so process stays visibly alive for macrobenchmark.
+                            Surface(modifier = Modifier.fillMaxSize()) {
+                                Box(modifier = Modifier.fillMaxSize())
+                            }
+                        } else {
+                            ProjectLumenApp(
+                                viewModel = viewModel,
+                                crashReport = runCatching {
+                                    if (LumenCrash.isInstalled()) app.crashReports.load() else null
+                                }.getOrNull(),
+                                openLaunchRequest = openLaunchRequest.value,
+                            )
                         }
                     }
-                    return@setContent
                 }
-                ProjectLumenApp(
-                    viewModel = viewModel,
-                    crashReport = runCatching {
-                        if (LumenCrash.isInstalled()) app.crashReports.load() else null
-                    }.getOrNull(),
-                    openLaunchRequest = openLaunchRequest.value,
-                )
             }
         }.onFailure { error ->
             Log.e(TAG, "MainActivity.onCreate failed", error)

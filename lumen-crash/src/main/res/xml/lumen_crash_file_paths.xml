@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- SDK share-as-file writes under cacheDir/lumen-crash-share first. -->
+    <cache-path name="lumen_crash_cache" path="lumen-crash-share/" />
+    <!-- Fallback used on devices where external cache is preferred/available. -->
+    <external-cache-path name="lumen_crash_external_cache" path="lumen-crash-share/" />
+</paths>

@@ -7,7 +7,6 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.projectlumen.app.core.api.ProjectLumenApiClient
-import com.chloemlla.lumen.crash.LumenCrashConfig
 import com.chloemlla.lumen.crash.LumenCrash
 import com.chloemlla.lumen.crash.CrashBreadcrumbs
 import com.chloemlla.lumen.crash.CrashReport
@@ -133,20 +132,19 @@ class ProjectLumenApplication : Application() {
     private fun installLumenCrashSdk() {
         if (LumenCrash.isInstalled()) return
         val appName = runCatching { getString(R.string.app_name) }.getOrDefault("Project Lumen")
-        LumenCrash.install(
-            this,
-            LumenCrashConfig(
-                appDisplayName = appName,
-                versionName = BuildConfig.VERSION_NAME,
-                versionCode = BuildConfig.VERSION_CODE,
-                commitHash = BuildConfig.SHORT_HASH,
-                fileProviderAuthority = "${packageName}.fileprovider",
-                shareSubject = runCatching { getString(R.string.crash_report_share_subject) }.getOrNull(),
-                reportTitle = runCatching { getString(R.string.crash_report_title) }.getOrNull(),
-                reportMessage = runCatching { getString(R.string.crash_report_message) }.getOrNull(),
-                onCrashSaved = { report -> scheduleCrashReportUpload(report) },
-            ),
-        )
+        // Keep product copy + telemetry hook; metadata can still be explicit for BuildConfig.
+        LumenCrash.install(this) {
+            appDisplayName = appName
+            versionName = BuildConfig.VERSION_NAME
+            versionCode = BuildConfig.VERSION_CODE
+            commitHash = BuildConfig.SHORT_HASH
+            // Prefer existing host provider so app file-share paths stay unchanged.
+            fileProviderAuthority = "${packageName}.fileprovider"
+            shareSubject = runCatching { getString(R.string.crash_report_share_subject) }.getOrNull()
+            reportTitle = runCatching { getString(R.string.crash_report_title) }.getOrNull()
+            reportMessage = runCatching { getString(R.string.crash_report_message) }.getOrNull()
+            onCrashSaved = { report -> scheduleCrashReportUpload(report) }
+        }
     }
 
     private fun initializeMmkvOrRecordCrash() {

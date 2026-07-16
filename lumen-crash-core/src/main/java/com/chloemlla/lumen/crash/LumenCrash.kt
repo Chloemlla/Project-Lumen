@@ -25,6 +25,47 @@ object LumenCrash {
         CrashBreadcrumbs.record("LumenCrash installed")
     }
 
+    /**
+     * Convenience install path.
+     *
+     * Auto-fills app metadata and defaults file-share authority to the SDK-owned
+     * FileProvider. Hosts can still override any field through [configure].
+     */
+    fun install(
+        application: Application,
+        configure: LumenCrashConfigBuilder.() -> Unit = {},
+    ) {
+        val builder = LumenCrashConfigBuilder(application)
+        builder.configure()
+        install(application, builder.build())
+    }
+
+    /**
+     * Host-safe install wrapper.
+     *
+     * Integrity remains fail-closed inside [install]; this only prevents one failed
+     * install path from process-killing host startup.
+     */
+    fun installSafely(
+        application: Application,
+        configure: LumenCrashConfigBuilder.() -> Unit = {},
+    ): Boolean {
+        return runCatching {
+            install(application, configure)
+            true
+        }.getOrDefault(false)
+    }
+
+    fun installSafely(
+        application: Application,
+        config: LumenCrashConfig,
+    ): Boolean {
+        return runCatching {
+            install(application, config)
+            true
+        }.getOrDefault(false)
+    }
+
     fun isInstalled(): Boolean = installedConfig.get() != null && handlerRef.get() != null
 
     fun configOrNull(): LumenCrashConfig? = installedConfig.get()
@@ -55,6 +96,13 @@ object LumenCrash {
     fun loadPendingReport(): CrashReport? {
         AuthorIntegrity.verifyOrThrow("load-pending")
         return startupCrashReport ?: runCatching { store().load() }.getOrNull()
+    }
+
+    /**
+     * Host-safe pending-report load. Returns null when install/integrity fails.
+     */
+    fun loadPendingReportSafely(): CrashReport? {
+        return runCatching { loadPendingReport() }.getOrNull()
     }
 
     fun clearPendingReport() {

@@ -6,8 +6,6 @@ plugins {
     id("androidx.baselineprofile")
 }
 
-val projectLumenUseDebugSigning =
-    providers.gradleProperty("PROJECT_LUMEN_USE_DEBUG_SIGNING").orNull.toBoolean()
 val projectLumenStoreFile = providers.gradleProperty("PROJECT_LUMEN_STORE_FILE").orNull
 val projectLumenStorePassword = providers.gradleProperty("PROJECT_LUMEN_STORE_PASSWORD").orNull
 val projectLumenKeyAlias = providers.gradleProperty("PROJECT_LUMEN_KEY_ALIAS").orNull
@@ -196,9 +194,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            if (projectLumenUseDebugSigning) {
-                signingConfig = signingConfigs.getByName("debug")
-            } else if (projectLumenReleaseSigningConfigured) {
+            if (projectLumenReleaseSigningConfigured) {
                 signingConfig = signingConfigs.getByName("release")
             }
             proguardFiles(

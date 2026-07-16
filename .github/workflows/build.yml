@@ -59,29 +59,70 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          KEY_ALIAS="$(printf '%s' "$KEY_ALIAS" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+          set -euo pipefail
+
+          KEY_ALIAS="$(printf '%s' "${KEY_ALIAS:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+          KEYSTORE_PASSWORD="$(printf '%s' "${KEYSTORE_PASSWORD:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+          KEY_PASSWORD="$(printf '%s' "${KEY_PASSWORD:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+          KEYSTORE_BASE64="$(printf '%s' "${KEYSTORE_BASE64:-}" | tr -d '[:space:]')"
+
+          echo "=== Release signing secret presence (values redacted) ==="
+          echo "KEYSTORE_BASE64 present: $([ -n "$KEYSTORE_BASE64" ] && echo yes || echo no)"
+          echo "KEYSTORE_BASE64 length: ${#KEYSTORE_BASE64}"
+          echo "KEYSTORE_PASSWORD present: $([ -n "$KEYSTORE_PASSWORD" ] && echo yes || echo no)"
+          echo "KEY_ALIAS present: $([ -n "$KEY_ALIAS" ] && echo yes || echo no)"
+          echo "KEY_ALIAS value: ${KEY_ALIAS:-<empty>}"
+          echo "KEY_PASSWORD present: $([ -n "$KEY_PASSWORD" ] && echo yes || echo no)"
 
           if [ -f "gradle.properties" ]; then
             sed -i 's/\r$//' gradle.properties
+            sed -i '/^PROJECT_LUMEN_USE_DEBUG_SIGNING=/d' gradle.properties
+            sed -i '/^PROJECT_LUMEN_STORE_FILE=/d' gradle.properties
+            sed -i '/^PROJECT_LUMEN_STORE_PASSWORD=/d' gradle.properties
+            sed -i '/^PROJECT_LUMEN_KEY_ALIAS=/d' gradle.properties
+            sed -i '/^PROJECT_LUMEN_KEY_PASSWORD=/d' gradle.properties
             [ -n "$(tail -c 1 gradle.properties)" ] && echo "" >> gradle.properties
           fi
 
           if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
-            echo "Release signing secrets are incomplete; using debug signing for the release APK."
-            printf 'PROJECT_LUMEN_USE_DEBUG_SIGNING=true\n' >> gradle.properties
-          else
-            printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "${{ github.workspace }}/project_lumen.jks" || {
-              echo "Failed to decode KEYSTORE_BASE64; using debug signing for the release APK."
-              printf 'PROJECT_LUMEN_USE_DEBUG_SIGNING=true\n' >> gradle.properties
-              exit 0
-            }
-
-            printf 'PROJECT_LUMEN_STORE_FILE=%s\n' "${{ github.workspace }}/project_lumen.jks" >> gradle.properties
-            printf 'PROJECT_LUMEN_STORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD" >> gradle.properties
-            printf 'PROJECT_LUMEN_KEY_ALIAS=%s\n' "$KEY_ALIAS" >> gradle.properties
-            printf 'PROJECT_LUMEN_KEY_PASSWORD=%s\n' "$KEY_PASSWORD" >> gradle.properties
-            echo "Release signing configured."
+            echo "::error::Release signing secrets are incomplete. Required repository secrets: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD."
+            exit 1
           fi
+
+          KEYSTORE_PATH="${{ github.workspace }}/project_lumen.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          if [ ! -s "$KEYSTORE_PATH" ]; then
+            echo "::error::Failed to decode KEYSTORE_BASE64 into a non-empty keystore file."
+            exit 1
+          fi
+
+          echo "Decoded keystore path: $KEYSTORE_PATH"
+          echo "Decoded keystore size bytes: $(wc -c < "$KEYSTORE_PATH")"
+
+          if ! keytool -list -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/tmp/keystore-alias.txt 2>/tmp/keystore-alias.err; then
+            echo "::error::Keystore validation failed for alias '$KEY_ALIAS'."
+            cat /tmp/keystore-alias.err
+            exit 1
+          fi
+
+          echo "=== Keystore alias validation ==="
+          cat /tmp/keystore-alias.txt
+
+          CERT_SHA256="$(keytool -exportcert -alias "$KEY_ALIAS" -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" 2>/dev/null | openssl dgst -sha256 -hex | awk '{print toupper($2)}')"
+          CERT_SHA256_COLON="$(printf '%s' "$CERT_SHA256" | sed 's/../&:/g; s/:$//')"
+          echo "Release cert SHA-256: $CERT_SHA256"
+          echo "Release cert SHA-256 (colon): $CERT_SHA256_COLON"
+          echo "PROJECT_LUMEN_RELEASE_CERT_SHA256=${CERT_SHA256}" >> "$GITHUB_ENV"
+
+          printf 'PROJECT_LUMEN_STORE_FILE=%s\n' "$KEYSTORE_PATH" >> gradle.properties
+          printf 'PROJECT_LUMEN_STORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD" >> gradle.properties
+          printf 'PROJECT_LUMEN_KEY_ALIAS=%s\n' "$KEY_ALIAS" >> gradle.properties
+          printf 'PROJECT_LUMEN_KEY_PASSWORD=%s\n' "$KEY_PASSWORD" >> gradle.properties
+
+          echo "=== gradle.properties signing keys (passwords redacted) ==="
+          grep -E '^PROJECT_LUMEN_(STORE_FILE|KEY_ALIAS)=' gradle.properties || true
+          grep -E '^PROJECT_LUMEN_(STORE_PASSWORD|KEY_PASSWORD)=' gradle.properties | sed 's/=.*/=<redacted>/' || true
+          echo "Release signing configured with repository secrets."
 
       - name: Enable Android emulator acceleration
         run: |
@@ -97,15 +138,17 @@ jobs:
           PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
           PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
         run: |
-          # Ensure managed-device profile generation can install/run even when release
-          # signing secrets are present but native cert pinning metadata is not.
+          # Always use release signing. Never fall back to debug signing.
           if [ -f gradle.properties ]; then
             sed -i 's/\r$//' gradle.properties
-            [ -n "$(tail -c 1 gradle.properties)" ] && echo "" >> gradle.properties
-            grep -q '^PROJECT_LUMEN_USE_DEBUG_SIGNING=' gradle.properties || \
-              printf 'PROJECT_LUMEN_USE_DEBUG_SIGNING=true\n' >> gradle.properties
-          else
-            printf 'PROJECT_LUMEN_USE_DEBUG_SIGNING=true\n' > gradle.properties
+            sed -i '/^PROJECT_LUMEN_USE_DEBUG_SIGNING=/d' gradle.properties
+          fi
+          if ! grep -q '^PROJECT_LUMEN_STORE_FILE=' gradle.properties || \
+             ! grep -q '^PROJECT_LUMEN_STORE_PASSWORD=' gradle.properties || \
+             ! grep -q '^PROJECT_LUMEN_KEY_ALIAS=' gradle.properties || \
+             ! grep -q '^PROJECT_LUMEN_KEY_PASSWORD=' gradle.properties; then
+            echo "::error::Release signing properties missing before baseline profile generation."
+            exit 1
           fi
           gradle :app:generateBaselineProfile --no-daemon --warning-mode all
 
@@ -124,9 +167,67 @@ jobs:
           PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS: ${{ secrets.PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS }}
           PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN: ${{ secrets.PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN }}
           PROJECT_LUMEN_REQUEST_SIGNING_SECRET: ${{ secrets.PROJECT_LUMEN_REQUEST_SIGNING_SECRET }}
-          PROJECT_LUMEN_RELEASE_CERT_SHA256: ${{ secrets.PROJECT_LUMEN_RELEASE_CERT_SHA256 }}
+          PROJECT_LUMEN_RELEASE_CERT_SHA256: ${{ secrets.PROJECT_LUMEN_RELEASE_CERT_SHA256 || env.PROJECT_LUMEN_RELEASE_CERT_SHA256 }}
           PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256: ${{ secrets.PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256 }}
-        run: gradle assembleRelease --no-daemon --warning-mode all
+        run: |
+          set -euo pipefail
+          if [ -f gradle.properties ]; then
+            sed -i '/^PROJECT_LUMEN_USE_DEBUG_SIGNING=/d' gradle.properties
+          fi
+          if ! grep -q '^PROJECT_LUMEN_STORE_FILE=' gradle.properties || \
+             ! grep -q '^PROJECT_LUMEN_STORE_PASSWORD=' gradle.properties || \
+             ! grep -q '^PROJECT_LUMEN_KEY_ALIAS=' gradle.properties || \
+             ! grep -q '^PROJECT_LUMEN_KEY_PASSWORD=' gradle.properties; then
+            echo "::error::Release signing properties missing before assembleRelease."
+            exit 1
+          fi
+          echo "=== Signing properties before assembleRelease (passwords redacted) ==="
+          grep -E '^PROJECT_LUMEN_(STORE_FILE|KEY_ALIAS)=' gradle.properties || true
+          grep -E '^PROJECT_LUMEN_(STORE_PASSWORD|KEY_PASSWORD)=' gradle.properties | sed 's/=.*/=<redacted>/' || true
+          gradle assembleRelease --no-daemon --warning-mode all
+
+      - name: Inspect APK signing
+        run: |
+          set -euo pipefail
+          APK_DIR="app/build/outputs/apk/release"
+          echo "=== Release APK outputs ==="
+          ls -lh "$APK_DIR" || true
+
+          mapfile -t APKS < <(find "$APK_DIR" -maxdepth 1 -type f -name "*.apk" | sort)
+          if [ "${#APKS[@]}" -eq 0 ]; then
+            echo "::error::No release APKs found for signature inspection."
+            exit 1
+          fi
+
+          ANDROID_BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* 2>/dev/null | sort -V | tail -n 1 || true)"
+          APKSIGNER=""
+          if [ -n "$ANDROID_BUILD_TOOLS" ] && [ -x "$ANDROID_BUILD_TOOLS/apksigner" ]; then
+            APKSIGNER="$ANDROID_BUILD_TOOLS/apksigner"
+          elif command -v apksigner >/dev/null 2>&1; then
+            APKSIGNER="$(command -v apksigner)"
+          fi
+
+          for apk in "${APKS[@]}"; do
+            echo "============================================================"
+            echo "APK: $apk"
+            echo "Size bytes: $(wc -c < "$apk")"
+            echo "SHA-256: $(sha256sum "$apk" | awk '{print $1}')"
+
+            if [ -n "$APKSIGNER" ]; then
+              echo "--- apksigner verify --print-certs --verbose ---"
+              "$APKSIGNER" verify --print-certs --verbose "$apk" || {
+                echo "::error::apksigner verification failed for $apk"
+                exit 1
+              }
+            else
+              echo "apksigner not found; falling back to jarsigner/keytool inspection."
+            fi
+
+            echo "--- jarsigner -verify -verbose -certs ---"
+            jarsigner -verify -verbose -certs "$apk" | sed -n '1,120p' || true
+
+            unzip -p "$apk" META-INF/*.RSA META-INF/*.DSA META-INF/*.EC 2>/dev/null | openssl pkcs7 -inform DER -print_certs 2>/dev/null | openssl x509 -noout -fingerprint -sha256 -subject -issuer 2>/dev/null || true
+          done
 
       - name: Prepare release assets
         run: |

@@ -77,7 +77,7 @@ run: gradle :app:generateBaselineProfile --no-daemon --warning-mode all
 | GitHub runner lacks KVM access | Managed device startup is slow or fails; workflow must enable KVM before profile generation. |
 | Profile generation is attempted locally | Stop and move execution to GitHub Actions per repository policy. |
 | Onboarding appears on clean install | Generator should dismiss it or profile the intended first-run journey deliberately. |
-| Target package launches then dies immediately | Check ABI packaging (universal/x86_64), optional vendor API class-loading, and Application startup exceptions. |
+| Target package launches then dies immediately | Check ABI packaging (universal/x86_64), `hestub` must be `compileOnly`, optional vendor API class-loading, and Application/MainActivity startup must be non-fatal. |
 | AndroidX Benchmark versions drift | Align plugin, macrobenchmark, and ProfileInstaller versions before CI execution. |
 
 ## 5. Good/Base/Bad Cases

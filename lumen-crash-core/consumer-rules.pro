@@ -1,9 +1,5 @@
-# Lumen Crash SDK consumer ProGuard / R8 rules
+# Lumen Crash SDK Core consumer ProGuard / R8 rules
 # Merged into host apps that depend on this AAR / project module.
-#
-# Required minify exemption:
-# keep author attribution, integrity checks, and public crash API so
-# host release builds do not white-screen / fail-closed on startup.
 
 -keepattributes *Annotation*, InnerClasses, EnclosingMethod, Signature, RuntimeVisibleAnnotations
 
@@ -29,14 +25,11 @@
 -keep class com.chloemlla.lumen.crash.LumenCrashConfig { *; }
 -keep class com.chloemlla.lumen.crash.LumenCrashConfigBuilder { *; }
 -keep class com.chloemlla.lumen.crash.LumenCrashDefaults { *; }
--keep class com.chloemlla.lumen.crash.LumenCrashFileProvider { *; }
 -keep class com.chloemlla.lumen.crash.CrashReport { *; }
 -keep class com.chloemlla.lumen.crash.CrashAppInfo { *; }
 -keep class com.chloemlla.lumen.crash.CrashReportStore { *; }
 -keep class com.chloemlla.lumen.crash.CrashBreadcrumbs { *; }
 -keep class com.chloemlla.lumen.crash.CrashReportPasteUploader { *; }
--keep class com.chloemlla.lumen.crash.ui.LumenCrashReportScreenKt { *; }
--keep class com.chloemlla.lumen.crash.ui.LumenCrashGateKt { *; }
 
 # Package-level exemption (safe default for release minify hosts).
 -keep class com.chloemlla.lumen.crash.** { *; }
