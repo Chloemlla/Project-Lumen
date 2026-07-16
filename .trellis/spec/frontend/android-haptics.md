@@ -6,7 +6,7 @@
 
 - Trigger: Android client code adds or changes reminder vibration, tactile feedback, HE waveform generation, or vendor haptic playback.
 - Source scope: `app/src/main/java/com/projectlumen/app/core/haptics/**`, `AudioService`, and any UI/open API path that emits `AudioEvent.ReminderTone(vibrate = true)`.
-- Dependency scope: vendor `android.os.DynamicEffect` / `android.os.HapticPlayer` APIs come from `gsai.sdk:hestub:1.0.0`.
+- Dependency scope: vendor `android.os.DynamicEffect` / `android.os.HapticPlayer` APIs come from `compileOnly("gsai.sdk:hestub:1.0.0")`. Never package hestub as `implementation`; stub `android.os.*` classes can crash AOSP / baseline managed devices on cold start.
 - Repository scope: dependency resolution includes `http://nexus.itgsa.com:5566/repository/release/` with insecure protocol explicitly allowed.
 
 ### 2. Signatures

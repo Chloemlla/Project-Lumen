@@ -11,6 +11,12 @@ data class LumenCrashConfig(
     val versionName: String,
     val versionCode: Int,
     val commitHash: String = "unknown",
+    /**
+     * Optional override for share-as-file.
+     *
+     * When null/blank, the SDK uses its bundled provider:
+     * `${applicationId}.lumen.crash.fileprovider`.
+     */
     val fileProviderAuthority: String? = null,
     val shareSubject: String? = null,
     val reportTitle: String? = null,

@@ -42,13 +42,73 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 - [Project Lumen host notes](#project-lumen-host-notes)
 - [Out of scope](#out-of-scope)
 
+
+## Quick start (default path)
+
+Default external integration is three steps. Capture, crash UI, text share, file share, paste upload, and author attribution all stay available.
+
+1. Depend on the bundle and a Compose BOM:
+
+```kotlin
+val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+implementation(composeBom)
+implementation("com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>")
+// capture-only hosts can use: com.chloemlla.lumen:lumen-crash-core
+```
+
+Resolve `<auto-resolved-latest>` with:
+
+```bash
+./scripts/resolve-lumen-crash-latest.sh
+# or
+pwsh ./scripts/Resolve-LumenCrashLatest.ps1
+```
+
+Release assets also include `lumen-crash-latest.json`.
+
+2. Install early:
+
+```kotlin
+class MyApp : Application() {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        LumenCrash.installSafely(this) {
+            // optional product copy / telemetry hook only
+            onCrashSaved = { /* host upload */ }
+        }
+    }
+}
+```
+
+3. Gate startup UI:
+
+```kotlin
+setContent {
+    LumenCrashGate {
+        RealApp()
+    }
+}
+```
+
+Notes:
+
+- File share works by default through the SDK-owned provider (`${applicationId}.lumen.crash.fileprovider`).
+- Explicit `install(application, config)` and direct `LumenCrashReportScreen` remain supported.
+- Capture-only hosts can depend on `:lumen-crash-core` / `lumen-crash-core` and skip Compose UI.
+- Host minify templates: `host-proguard-template.pro`, `host-keep-resources.xml`.
+- Print templates: `gradle :lumen-crash:printHostProguard`.
+- No-auth release sync:
+  - `./scripts/sync-lumen-crash-release-maven.sh`
+  - `pwsh ./scripts/Sync-LumenCrashReleaseMaven.ps1`
+- Sample app: `:lumen-crash-sample`.
+
 ## Features
 
 - Uncaught exception capture with previous-handler chaining
 - Multi-path atomic persistence under app-specific **external** storage (`getExternalFilesDir` / `externalCacheDir`)
 - Breadcrumbs ring buffer (max 40 events, sanitized)
 - Adaptive Material3 crash report screen (`WindowSizeClass`)
-- Copy report ID / copy full report / share text / share file (file share needs host `FileProvider`) / upload paste link (default `https://paste.gentoo.zip`)
+- Copy report ID / copy full report / share text / share file (default SDK FileProvider; host override optional) / upload paste link (default `https://paste.gentoo.zip`)
 - Host-configurable app metadata and product strings
 - Upload stays in the host app via `onCrashSaved`
 - **Non-removable author attribution**: Chloemlla + https://github.com/Chloemlla/

@@ -24,5 +24,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "Project-Lumen"
 include(":app")
+include(":lumen-crash-core")
 include(":lumen-crash")
+include(":lumen-crash-sample")
 include(":baselineprofile")

@@ -42,13 +42,73 @@
 - [Project Lumen 宿主说明](#project-lumen-宿主说明)
 - [范围外事项](#范围外事项)
 
+
+## 最短接入路径（默认）
+
+外部默认接入只需 3 步。崩溃采集、崩溃页、文本分享、文件分享、粘贴上传、作者署名默认都可用。
+
+1. 依赖 bundle + Compose BOM：
+
+```kotlin
+val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+implementation(composeBom)
+implementation("com.chloemlla.lumen:lumen-crash:<auto-resolved-latest>")
+// 仅采集宿主可改用: com.chloemlla.lumen:lumen-crash-core
+```
+
+解析 `<auto-resolved-latest>`：
+
+```bash
+./scripts/resolve-lumen-crash-latest.sh
+# 或
+pwsh ./scripts/Resolve-LumenCrashLatest.ps1
+```
+
+Release 资产也会包含 `lumen-crash-latest.json`。
+
+2. 尽早安装：
+
+```kotlin
+class MyApp : Application() {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        LumenCrash.installSafely(this) {
+            // 仅在需要时覆盖产品文案 / 遥测钩子
+            onCrashSaved = { /* host upload */ }
+        }
+    }
+}
+```
+
+3. 启动闸门：
+
+```kotlin
+setContent {
+    LumenCrashGate {
+        RealApp()
+    }
+}
+```
+
+说明：
+
+- 文件分享默认走 SDK 内建 provider（`${applicationId}.lumen.crash.fileprovider`）。
+- 显式 `install(application, config)` 与直接使用 `LumenCrashReportScreen` 仍兼容。
+- 仅采集宿主可依赖 `:lumen-crash-core` / `lumen-crash-core`，无需 Compose UI。
+- 宿主混淆模板：`host-proguard-template.pro`、`host-keep-resources.xml`。
+- 打印模板：`gradle :lumen-crash:printHostProguard`。
+- 无鉴权 Release 同步：
+  - `./scripts/sync-lumen-crash-release-maven.sh`
+  - `pwsh ./scripts/Sync-LumenCrashReleaseMaven.ps1`
+- Sample：`:lumen-crash-sample`。
+
 ## 功能特性
 
 - 未捕获异常采集，并与既有 `UncaughtExceptionHandler` 链式衔接
 - 多路径原子持久化到应用专属**外部**存储（`getExternalFilesDir` / `externalCacheDir`）
 - 面包屑环形缓冲（最多 40 条，自动脱敏）
 - 自适应 Material3 崩溃报告页（`WindowSizeClass`）
-- 复制报告 ID / 复制完整报告 / 分享文本 / 分享文件（文件分享需要宿主 `FileProvider`）/ 上传粘贴链接（默认 `https://paste.gentoo.zip`）
+- 复制报告 ID / 复制完整报告 / 分享文本 / 分享文件（默认 SDK FileProvider；宿主可覆盖）/ 上传粘贴链接（默认 `https://paste.gentoo.zip`）
 - 宿主可配置应用元信息与产品文案
 - 上报逻辑保留在宿主侧，通过 `onCrashSaved` 回调接入
 - **不可配置/不可移除的作者署名**：Chloemlla + https://github.com/Chloemlla/

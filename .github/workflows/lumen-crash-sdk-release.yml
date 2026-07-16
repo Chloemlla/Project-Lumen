@@ -46,6 +46,12 @@ jobs:
           filters: |
             sdk:
               - 'lumen-crash/**'
+              - 'lumen-crash-core/**'
+              - 'lumen-crash-sample/**'
+              - 'scripts/resolve-lumen-crash-latest.sh'
+              - 'scripts/Resolve-LumenCrashLatest.ps1'
+              - 'scripts/sync-lumen-crash-release-maven.sh'
+              - 'scripts/Sync-LumenCrashReleaseMaven.ps1'
               - '.github/workflows/lumen-crash-sdk-release.yml'
 
       - name: Decide whether to release
@@ -133,18 +139,19 @@ jobs:
           echo "Resolved SDK version=${VERSION_NAME}, tag=${RELEASE_TAG}"
 
       - name: Run lumen-crash unit tests
-        run: gradle :lumen-crash:test --no-daemon --warning-mode all
+        run: gradle :lumen-crash-core:test :lumen-crash:test :lumen-crash-sample:lintDebug --no-daemon --warning-mode all
 
       - name: Assemble release AAR
         run: |
-          gradle :lumen-crash:assembleRelease \
+          gradle :lumen-crash-core:test :lumen-crash-core:assembleRelease :lumen-crash:assembleRelease :lumen-crash-sample:assembleDebug :lumen-crash-sample:compileReleaseKotlin \
             -PlumenCrashSdkVersion="${VERSION_NAME}" \
             --no-daemon \
             --warning-mode all
 
       - name: Publish Maven artifacts to local repository
         run: |
-          gradle :lumen-crash:publishReleasePublicationToLocalReleaseRepository \
+          gradle :lumen-crash-core:publishReleasePublicationToLocalReleaseRepository \
+            :lumen-crash:publishReleasePublicationToLocalReleaseRepository \
             -PlumenCrashSdkVersion="${VERSION_NAME}" \
             --no-daemon \
             --warning-mode all
@@ -154,6 +161,7 @@ jobs:
           set -euo pipefail
           mkdir -p sdk-release-assets
           LOCAL_REPO="lumen-crash/build/repo/com/chloemlla/lumen/lumen-crash/${VERSION_NAME}"
+          CORE_LOCAL_REPO="lumen-crash-core/build/repo/com/chloemlla/lumen/lumen-crash-core/${VERSION_NAME}"
           if [ ! -d "$LOCAL_REPO" ]; then
             echo "Local Maven publication directory was not found: $LOCAL_REPO"
             find lumen-crash/build -maxdepth 6 -type d -print || true
@@ -169,6 +177,16 @@ jobs:
                 ;;
             esac
           done
+          if [ -d "$CORE_LOCAL_REPO" ]; then
+            for path in "$CORE_LOCAL_REPO"/*; do
+              name="$(basename "$path")"
+              case "$name" in
+                *.aar|*.pom|*.jar|*.module)
+                  cp "$path" "sdk-release-assets/"
+                  ;;
+              esac
+            done
+          fi
 
           AAR_COUNT=$(find sdk-release-assets -maxdepth 1 -type f -name "*.aar" | wc -l | tr -d ' ')
           if [ "$AAR_COUNT" -lt 1 ]; then
@@ -188,8 +206,10 @@ jobs:
 
           notes = f"""## Lumen Crash SDK {version}
 
-          - Module: `:lumen-crash`
-          - Maven coordinates: `com.chloemlla.lumen:lumen-crash:{version}`
+          - Modules: `:lumen-crash` (bundle), `:lumen-crash-core` (capture-only)
+          - Maven coordinates:
+            - `com.chloemlla.lumen:lumen-crash:{version}`
+            - `com.chloemlla.lumen:lumen-crash-core:{version}`
           - Commit: `{commit}`
           - Tag: `{tag}`
 
@@ -215,6 +235,8 @@ jobs:
 
           dependencies {{
               implementation("com.chloemlla.lumen:lumen-crash:{version}")
+              // capture-only hosts:
+              // implementation("com.chloemlla.lumen:lumen-crash-core:{version}")
           }}
           ```
 
@@ -274,11 +296,29 @@ jobs:
               "maven": {
                   "coordinates": f"com.chloemlla.lumen:lumen-crash:{version}",
                   "repository": f"https://maven.pkg.github.com/{repository}",
+                  "coreCoordinates": f"com.chloemlla.lumen:lumen-crash-core:{version}",
               },
               "assets": assets,
           }
           (asset_dir / "sdk-manifest.json").write_text(
               json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          latest = {
+              "schemaVersion": 1,
+              "sdk": "lumen-crash",
+              "version": version,
+              "tagName": tag,
+              "commitHash": commit,
+              "releaseUrl": f"https://github.com/{repository}/releases/tag/{tag}",
+              "maven": {
+                  "bundle": f"com.chloemlla.lumen:lumen-crash:{version}",
+                  "core": f"com.chloemlla.lumen:lumen-crash-core:{version}",
+                  "repository": f"https://maven.pkg.github.com/{repository}",
+              },
+          }
+          (asset_dir / "lumen-crash-latest.json").write_text(
+              json.dumps(latest, ensure_ascii=False, indent=2) + "\n",
               encoding="utf-8",
           )
           subprocess.check_call("sha256sum * > checksums.txt", shell=True, cwd=asset_dir)
@@ -318,6 +358,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gradle :lumen-crash:publishReleasePublicationToGitHubPackagesRepository \
+            :lumen-crash-core:publishReleasePublicationToGitHubPackagesRepository \
             -PlumenCrashSdkVersion="${VERSION_NAME}" \
             --no-daemon \
             --warning-mode all

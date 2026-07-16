@@ -87,7 +87,8 @@ import com.chloemlla.lumen.crash.CrashAuthorAttribution
 import com.chloemlla.lumen.crash.CrashReportPasteUploader
 import com.chloemlla.lumen.crash.CrashReport
 import com.chloemlla.lumen.crash.LumenCrash
-import com.chloemlla.lumen.crash.R
+import com.chloemlla.lumen.crash.LumenCrashDefaults
+import com.chloemlla.lumen.crash.ui.R
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -420,7 +421,7 @@ fun LumenCrashReportScreen(
 
     if (shareOptionsVisible) {
         CrashReportShareOptionsDialog(
-            fileShareEnabled = !config?.fileProviderAuthority.isNullOrBlank(),
+            fileShareEnabled = true,
             pasteShareEnabled = config?.pasteUploadEnabled != false,
             onDismiss = { shareOptionsVisible = false },
             onShareText = {
@@ -429,8 +430,8 @@ fun LumenCrashReportScreen(
             },
             onShareFile = {
                 shareOptionsVisible = false
-                val authority = config?.fileProviderAuthority
-                if (authority.isNullOrBlank()) {
+                val authority = resolveFileProviderAuthority(context, config?.fileProviderAuthority)
+                if (authority.isBlank()) {
                     Toast.makeText(
                         context,
                         context.getString(R.string.lumen_crash_report_file_share_unavailable),
@@ -1280,8 +1281,8 @@ private fun shareCrashReportFile(
 
 private fun resolveCrashShareDirectory(context: Context): File {
     val candidates = listOfNotNull(
-        File(context.cacheDir, "lumen-crash-share"),
-        context.externalCacheDir?.let { File(it, "lumen-crash-share") },
+        File(context.cacheDir, LumenCrashDefaults.SHARE_DIRECTORY_NAME),
+        context.externalCacheDir?.let { File(it, LumenCrashDefaults.SHARE_DIRECTORY_NAME) },
     )
     for (dir in candidates) {
         if (dir.exists() || dir.mkdirs()) {
@@ -1290,6 +1291,15 @@ private fun resolveCrashShareDirectory(context: Context): File {
     }
     // Last resort: root internal cache is covered by the host <cache-path path="." /> entry.
     return context.cacheDir
+}
+
+private fun resolveFileProviderAuthority(
+    context: Context,
+    configuredAuthority: String?,
+): String {
+    val explicit = configuredAuthority?.takeIf { it.isNotBlank() }
+    if (explicit != null) return explicit
+    return LumenCrashDefaults.fileProviderAuthority(context.packageName)
 }
 
 private fun launchCrashReportShare(

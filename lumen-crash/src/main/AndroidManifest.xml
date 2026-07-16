@@ -2,4 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Merged into hosts so paste upload works without extra host setup. -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <application>
+        <!-- Default share-as-file provider. Hosts may still override authority in config. -->
+        <provider
+            android:name="com.chloemlla.lumen.crash.LumenCrashFileProvider"
+            android:authorities="${applicationId}.lumen.crash.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/lumen_crash_file_paths" />
+        </provider>
+    </application>
 </manifest>
