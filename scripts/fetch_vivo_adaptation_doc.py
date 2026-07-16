@@ -291,6 +291,19 @@ def scan_repo(repo_root: Path, keywords: list[str]) -> dict[str, list[str]]:
     return hits
 
 
+def markdown_safe_ref(text: str) -> str:
+    """Make scanned source snippets safe for VitePress markdown/Vue parsing.
+
+    Nested backticks end an inline code span early, and raw tags like
+    ``<queries>`` are then treated as HTML elements during docs:build.
+    """
+    return (
+        text.replace("`", "'")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
 def write_report(
     docs: list[DocPayload],
     package_dirs: list[Path],
@@ -345,7 +358,7 @@ def write_report(
             lines.append(f"### `{keyword}` ({len(refs)} hit lines, showing up to 8)")
             lines.append("")
             for ref in refs[:8]:
-                lines.append(f"- `{ref}`")
+                lines.append(f"- `{markdown_safe_ref(ref)}`")
             lines.append("")
         if not any_hit:
             lines.append("No default keywords were found in the scanned source set.")

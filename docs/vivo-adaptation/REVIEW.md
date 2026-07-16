@@ -303,7 +303,7 @@ This is a helper scan, not a full compliance verdict. Use it to jump into likely
 - `app/build.gradle.kts:159:targetSdk = 37`
 - `baselineprofile/build.gradle.kts:16:targetSdk = 37`
 - `docs/ANDROID_11_VIVO_ADAPTATION.md:13:Project Lumen currently ships with `compileSdk/targetSdk = 37` (above Android 11 / API 30). This note tracks the Android 11 items that still matter after the 20`
-- `docs/ANDROID_11_VIVO_ADAPTATION.md:41:`targetSdk 30+` can only see packages the system allows unless the app declares `<queries>` or holds a broader package-query permission.`
+- `docs/ANDROID_11_VIVO_ADAPTATION.md:41:'targetSdk 30+' can only see packages the system allows unless the app declares &lt;queries&gt; or holds a broader package-query permission.`
 - `docs/ANDROID_12_VIVO_ADAPTATION.md:13:Project Lumen currently ships with `compileSdk/targetSdk = 37` (above Android 12 / API 31). This note tracks the Android 12 items that still matter after the 20`
 - `docs/ANDROID_13_VIVO_ADAPTATION.md:13:Project Lumen currently ships with `compileSdk/targetSdk = 37` (above Android 13 / API 33). This note tracks the Android 13 items that still matter after the 20`
 - `docs/ANDROID_14_VIVO_ADAPTATION.md:13:Project Lumen currently ships with `compileSdk/targetSdk = 37` (above Android 14 / API 34). This note tracks the Android 14 items that still matter after the 20`
