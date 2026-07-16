@@ -3,7 +3,8 @@ package com.projectlumen.app.app
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
+import com.projectlumen.app.core.toast.LumenToastKind
+import com.projectlumen.app.core.toast.showLumenToast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -103,7 +104,7 @@ internal fun HomeConvenienceCard(
                                     ClipData.newPlainText("home summary", summaryText),
                                 ),
                             )
-                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                            context.showLumenToast(copiedMessage, kind = LumenToastKind.SUCCESS)
                         }
                     },
                 ) {
@@ -145,6 +146,6 @@ private fun shareHomeConvenienceSummary(context: Context, summaryText: String) {
         context.getString(R.string.home_convenience_share_title),
     )
     runCatching { context.startActivity(chooser) }.onFailure {
-        Toast.makeText(context, R.string.share_action_failed, Toast.LENGTH_SHORT).show()
+        context.showLumenToast(R.string.share_action_failed, kind = LumenToastKind.WARNING)
     }
 }

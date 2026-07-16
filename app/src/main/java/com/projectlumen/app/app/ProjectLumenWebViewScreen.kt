@@ -19,7 +19,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageView
-import android.widget.Toast
+import com.projectlumen.app.core.toast.LumenToastKind
+import com.projectlumen.app.core.toast.showLumenToast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -410,13 +411,13 @@ internal fun copyWebPageUrl(context: Context, url: String) {
     context.getSystemService<ClipboardManager>()?.setPrimaryClip(
         ClipData.newPlainText(context.packageName, url),
     )
-    Toast.makeText(context, context.getString(R.string.webview_link_copied), Toast.LENGTH_SHORT).show()
+    context.showLumenToast(R.string.webview_link_copied, kind = LumenToastKind.SUCCESS)
 }
 
 internal fun openUri(context: Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     runCatching { context.startActivity(intent) }
-        .onFailure { Toast.makeText(context, context.getString(R.string.webview_open_failed), Toast.LENGTH_SHORT).show() }
+        .onFailure { context.showLumenToast(R.string.webview_open_failed, kind = LumenToastKind.WARNING) }
 }
 
 @Suppress("DEPRECATION")
