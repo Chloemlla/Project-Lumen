@@ -109,3 +109,4 @@ Avoid HiddenApiBypass and unsupported packers that rely on ART internals.
 ## Refresh log
 
 - 2026-07-16: Re-fetched doc 832 via `scripts/fetch_vivo_adaptation_doc.py 832 --scan-repo`, revalidated high-priority items, added `intentMatchingFlags=enforceIntentFilter`.
+- 2026-07-16: Re-fetched docs 797 + 832 together; reconfirmed predictive back, adaptive layout, intentMatchingFlags, and non-use of fixed-rate executors.

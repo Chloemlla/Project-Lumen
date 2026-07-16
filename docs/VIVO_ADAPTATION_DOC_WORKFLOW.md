@@ -36,13 +36,13 @@ Referer: https://dev.vivo.com.cn/documentCenter/doc/<id>
 ```bash
 python scripts/fetch_vivo_adaptation_doc.py 832
 python scripts/fetch_vivo_adaptation_doc.py 1010
-python scripts/fetch_vivo_adaptation_doc.py 832 1010 --scan-repo
+python scripts/fetch_vivo_adaptation_doc.py 797 832 1010 --scan-repo
 ```
 
 Windows PowerShell 同样可用：
 
 ```powershell
-python scripts/fetch_vivo_adaptation_doc.py 832 1010 --scan-repo
+python scripts/fetch_vivo_adaptation_doc.py 797 832 1010 --scan-repo
 ```
 
 ### 常用参数
@@ -88,7 +88,7 @@ docs/vivo-adaptation/
 
 1. **拉文档**
    ```bash
-   python scripts/fetch_vivo_adaptation_doc.py 832 1010 --scan-repo
+   python scripts/fetch_vivo_adaptation_doc.py 797 832 1010 --scan-repo
    ```
 2. **读 `headings.txt` / `content.txt`**
    先标高优先级章节，再下钻细节。
