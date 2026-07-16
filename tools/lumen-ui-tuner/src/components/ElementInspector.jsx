@@ -70,7 +70,8 @@ function buildElementInfo(selectedElement, tokens, metrics) {
       ],
       notes: [
         "Drag horizontally to tune the root page title start offset.",
-        "This maps to Spacer(width = primaryTitleStartDp.dp) in Android Compose.",
+        "Used by the UI tuner preview and LumenTopBarScreenshotTest title-alignment contract.",
+        "Android LargeTopAppBar root pages use Material title insets; keep this slightly left of secondaryLeadingWidthDp.",
       ],
     },
     secondaryTitle: {
@@ -85,7 +86,7 @@ function buildElementInfo(selectedElement, tokens, metrics) {
       ],
       notes: [
         "Drag horizontally to tune the title start used when the back button exists.",
-        "The back button uses the same width token in Android Compose.",
+        "LumenTopBar sizes the back IconButton with secondaryLeadingWidthDp.",
       ],
     },
     backButton: {
@@ -94,7 +95,7 @@ function buildElementInfo(selectedElement, tokens, metrics) {
         ["Compose", "IconButton + ArrowBack"],
         ["Size token", "topBar.secondaryLeadingWidthDp"],
         ["Size", `${topBar.secondaryLeadingWidthDp}dp`],
-        ["Tint", "topBar.onPrimaryColor or MaterialTheme.onPrimary"],
+        ["Tint", "MaterialTheme.onSurface via LargeTopAppBar colors"],
       ],
       notes: ["This element appears only on secondary pages."],
     },

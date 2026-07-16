@@ -219,17 +219,26 @@ internal fun LumenTopBar(
     scrollBehavior: TopAppBarScrollBehavior? = null,
     onNavigateBack: (() -> Unit)? = null,
 ) {
+    val topBarTokens = rememberLumenUiTokens(LocalContext.current).topBar
+    val titleStyle = MaterialTheme.typography.headlineMedium.copy(
+        fontSize = topBarTokens.titleFontSizeSp.sp,
+        fontWeight = FontWeight(topBarTokens.titleFontWeight),
+    )
     LargeTopAppBar(
         title = {
             Text(
                 text = title,
-                maxLines = 2,
+                style = titleStyle,
+                maxLines = topBarTokens.titleMaxLines,
                 overflow = TextOverflow.Ellipsis,
             )
         },
         navigationIcon = {
             if (onNavigateBack != null) {
-                IconButton(onClick = onNavigateBack) {
+                IconButton(
+                    onClick = onNavigateBack,
+                    modifier = Modifier.size(topBarTokens.secondaryLeadingWidthDp.dp),
+                ) {
                     Icon(
                         Icons.AutoMirrored.Outlined.ArrowBack,
                         contentDescription = stringResource(R.string.navigate_back),
