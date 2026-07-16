@@ -20,8 +20,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageView
-import com.projectlumen.app.core.toast.LumenToastKind
-import com.projectlumen.app.core.toast.showLumenToast
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -472,7 +471,7 @@ private fun startSettingsActivity(context: Context, intent: Intent) {
             )
         }
         .onFailure {
-            context.showLumenToast(R.string.system_settings_open_failed, kind = LumenToastKind.WARNING)
+            Toast.makeText(context, R.string.system_settings_open_failed, Toast.LENGTH_SHORT).show()
         }
 }
 

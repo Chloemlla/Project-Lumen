@@ -20,8 +20,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ImageView
-import com.projectlumen.app.core.toast.LumenToastKind
-import com.projectlumen.app.core.toast.showLumenToast
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -208,7 +207,7 @@ internal fun rememberNotificationPermissionGate(): ((() -> Unit) -> Unit) {
         if (granted) {
             action?.invoke()
         } else {
-            context.showLumenToast(R.string.notification_permission_denied_message, kind = LumenToastKind.WARNING, long = true)
+            Toast.makeText(context, context.getString(R.string.notification_permission_denied_message), Toast.LENGTH_LONG).show()
         }
     }
     return { action ->
@@ -231,7 +230,7 @@ internal fun rememberCameraPermissionGate(): ((() -> Unit) -> Unit) {
         if (granted) {
             action?.invoke()
         } else {
-            context.showLumenToast(R.string.camera_permission_denied_message, kind = LumenToastKind.WARNING, long = true)
+            Toast.makeText(context, context.getString(R.string.camera_permission_denied_message), Toast.LENGTH_LONG).show()
         }
     }
     return { action ->
