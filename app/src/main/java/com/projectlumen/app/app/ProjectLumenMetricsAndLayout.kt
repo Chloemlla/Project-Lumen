@@ -122,6 +122,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -201,8 +202,9 @@ import kotlinx.coroutines.launch
 
 internal val LocalLumenPageScrollState = staticCompositionLocalOf<ScrollState?> { null }
 
+@OptIn(ExperimentalMaterial3Api::class)
 internal val LocalLumenTopBarScrollBehavior =
-    staticCompositionLocalOf<androidx.compose.material3.TopAppBarScrollBehavior?> { null }
+    staticCompositionLocalOf<TopAppBarScrollBehavior?> { null }
 
 internal fun smartWrapDisplayText(value: String): String {
     val normalized = value.trim().ifBlank { "-" }
