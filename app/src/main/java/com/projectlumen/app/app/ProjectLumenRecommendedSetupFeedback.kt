@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -83,8 +82,7 @@ internal fun RecommendedEyeCareSetupFeedback(
         modifier = modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
