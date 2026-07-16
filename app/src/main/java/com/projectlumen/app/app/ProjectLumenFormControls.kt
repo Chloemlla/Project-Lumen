@@ -200,6 +200,11 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+internal val SettingsPreferenceItemGap = 8.dp
+internal val SettingsPreferenceInnerGap = 8.dp
+internal val SettingsPreferenceHorizontalPadding = 14.dp
+internal val SettingsPreferenceVerticalPadding = 12.dp
+
 @Composable
 internal fun SwitchRow(
     @StringRes labelRes: Int,
@@ -223,7 +228,10 @@ internal fun SwitchRow(
             .clickable(enabled = enabled) { toggle(!checked) }
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .graphicsLayer { alpha = if (enabled) 1f else 0.52f }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(
+                horizontal = SettingsPreferenceHorizontalPadding,
+                vertical = SettingsPreferenceVerticalPadding,
+            ),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -251,8 +259,11 @@ internal fun NumberSlider(
             .fillMaxWidth()
             .clip(LumenPreferenceShape)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(
+                horizontal = SettingsPreferenceHorizontalPadding,
+                vertical = SettingsPreferenceVerticalPadding,
+            ),
+        verticalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             LabelWithIcon(icon, labelRes, Modifier.weight(1f), maxLines = labelMaxLines)
@@ -287,7 +298,7 @@ internal fun LabelWithIcon(
     modifier: Modifier = Modifier,
     maxLines: Int = 2,
 ) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap)) {
         Box(
             modifier = Modifier
                 .size(40.dp)
@@ -317,8 +328,8 @@ internal fun LabelWithIcon(
 internal fun LumenFlowRow(content: @Composable () -> Unit) {
     FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
+        verticalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
         content = { content() },
     )
 }

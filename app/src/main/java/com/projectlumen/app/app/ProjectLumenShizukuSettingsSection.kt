@@ -64,7 +64,7 @@ internal fun ShizukuAdvancedSettingsSection(
             enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
             exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
                 ShizukuQuickActions(settings, state, viewModel)
                 ShizukuDiagnosticUploadSettings(settings, state, viewModel)
                 ShizukuNativeEyeProtectionSettings(settings, viewModel)
@@ -145,7 +145,7 @@ private fun ShizukuDiagnosticUploadSettings(
         enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
         exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
             Text(
                 stringResource(R.string.diagnostic_telemetry_upload_summary),
                 style = MaterialTheme.typography.bodySmall,
@@ -251,7 +251,7 @@ private fun ShizukuNativeEyeProtectionSettings(
         enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
         exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
             Text(
                 stringResource(R.string.shizuku_native_eye_protection_summary),
                 style = MaterialTheme.typography.bodySmall,

@@ -608,7 +608,7 @@ internal fun SettingsScreen(
                 enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
                 exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
                     NumberSlider(
                         R.string.auto_dark_start,
                         Icons.Outlined.Schedule,
@@ -1100,7 +1100,7 @@ internal fun SettingsScreen(
                 enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
                 exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
                     TemplatePreviewCard(template)
                     LumenFlowRow {
                         uiState.templates.filter { !it.isPremium || proEnabled }.forEach { template ->
@@ -1150,7 +1150,7 @@ internal fun SettingsScreen(
                 enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
                 exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
                     NumberSlider(R.string.quiet_start, Icons.Outlined.Schedule, settings.quietStartMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietStartMinute)) {
                         viewModel.updateSettings { current -> current.copy(quietStartMinute = snapTimeMinute(it)) }
                     }

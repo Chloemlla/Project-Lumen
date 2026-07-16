@@ -435,7 +435,10 @@ internal fun SettingsSection(
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -449,7 +452,7 @@ internal fun SettingsSection(
                     ) { expanded = !expanded }
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
             ) {
                 Box(
                     modifier = Modifier
@@ -480,7 +483,10 @@ internal fun SettingsSection(
                 )
             }
             summary?.let { summaryContent ->
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = summaryContent)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
+                    content = summaryContent,
+                )
             }
             AnimatedVisibility(
                 visible = expanded,
@@ -488,8 +494,7 @@ internal fun SettingsSection(
                 exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 8 },
             ) {
                 Column(
-                    modifier = Modifier.padding(top = 2.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
                     content = content,
                 )
             }
@@ -628,14 +633,27 @@ internal fun FileSettingRow(
     onChoose: () -> Unit,
     onClear: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(labelRes), style = MaterialTheme.typography.titleSmall)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(
+                horizontal = SettingsPreferenceHorizontalPadding,
+                vertical = SettingsPreferenceVerticalPadding,
+            ),
+        verticalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
+    ) {
+        Text(stringResource(labelRes), style = MaterialTheme.typography.titleMedium)
         Text(
             stringResource(if (path.isBlank()) R.string.not_set else R.string.custom_file_selected),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
+        ) {
             OutlinedButton(
                 modifier = Modifier.weight(if (path.isBlank()) 1f else 0.62f),
                 onClick = onChoose,
@@ -686,12 +704,15 @@ internal fun NotificationRequirementCard(
             .clip(LumenCardShape)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(
+                horizontal = SettingsPreferenceHorizontalPadding,
+                vertical = SettingsPreferenceVerticalPadding,
+            ),
+        verticalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(

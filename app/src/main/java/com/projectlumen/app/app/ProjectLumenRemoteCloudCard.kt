@@ -125,7 +125,7 @@ internal fun RemoteCloudAccountCard(
             }
 
             AnimatedVisibility(visible = !state.signedIn) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
                     OutlinedTextField(
                         modifier = Modifier.fillMaxWidth(),
                         value = email,
@@ -147,7 +147,7 @@ internal fun RemoteCloudAccountCard(
                         }
                     }
                     AnimatedVisibility(visible = state.waitingForCode) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
                             OutlinedTextField(
                                 modifier = Modifier.fillMaxWidth(),
                                 value = code,
@@ -172,7 +172,7 @@ internal fun RemoteCloudAccountCard(
             }
 
             AnimatedVisibility(visible = state.signedIn) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
                     LumenFlowRow {
                         Button(enabled = !state.busy, onClick = onSyncNow) {
                             ButtonLabel(Icons.Outlined.Sync, R.string.remote_cloud_sync_now)

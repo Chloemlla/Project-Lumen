@@ -294,7 +294,7 @@ private fun PermissionControlTileItem(
             )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -368,11 +368,11 @@ private fun PrivacyPermissionRow(
             )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PermissionIcon(icon)
