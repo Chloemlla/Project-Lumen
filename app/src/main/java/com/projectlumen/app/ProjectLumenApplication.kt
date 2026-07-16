@@ -1,8 +1,11 @@
 package com.projectlumen.app
 
+import android.app.ActivityManager
 import android.app.Application
+import android.app.ApplicationExitInfo
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -102,6 +105,7 @@ class ProjectLumenApplication : Application() {
                 installLumenCrashSdk()
                 CrashBreadcrumbs.record("Application.onCreate")
             }.onFailure { Log.e(TAG, "LumenCrash install failed in onCreate", it) }
+            runCatching { recordRecentProcessExitReason() }
             initializeMmkvOrRecordCrash()
             runCatching { MemoryHealthMonitor.sample(this) }
             // Integrity remains enforced for real release builds that configure the cert fingerprint,
@@ -151,6 +155,37 @@ class ProjectLumenApplication : Application() {
         runCatching { ProjectLumenMmkv.initialize(this) }
             .onSuccess { CrashBreadcrumbs.record("MMKV initialized") }
             .onFailure(::recordCrash)
+    }
+
+    /**
+     * Android 11+ exposes historical process exit reasons. Capture the newest entry as a breadcrumb
+     * so cold-start diagnostics can distinguish ANR / low-memory / force-stop from pure crashes.
+     */
+    private fun recordRecentProcessExitReason() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        val activityManager = getSystemService(ActivityManager::class.java) ?: return
+        val exit = activityManager.getHistoricalProcessExitReasons(packageName, 0, 1).firstOrNull()
+            ?: return
+        val reason = when (exit.reason) {
+            ApplicationExitInfo.REASON_EXIT_SELF -> "EXIT_SELF"
+            ApplicationExitInfo.REASON_SIGNALED -> "SIGNALED"
+            ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY"
+            ApplicationExitInfo.REASON_CRASH -> "CRASH"
+            ApplicationExitInfo.REASON_CRASH_NATIVE -> "CRASH_NATIVE"
+            ApplicationExitInfo.REASON_ANR -> "ANR"
+            ApplicationExitInfo.REASON_INITIALIZATION_FAILURE -> "INIT_FAILURE"
+            ApplicationExitInfo.REASON_PERMISSION_CHANGE -> "PERMISSION_CHANGE"
+            ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "EXCESSIVE_RESOURCE"
+            ApplicationExitInfo.REASON_USER_REQUESTED -> "USER_REQUESTED"
+            ApplicationExitInfo.REASON_USER_STOPPED -> "USER_STOPPED"
+            ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "DEPENDENCY_DIED"
+            ApplicationExitInfo.REASON_OTHER -> "OTHER"
+            ApplicationExitInfo.REASON_FREEZER -> "FREEZER"
+            else -> "UNKNOWN(${exit.reason})"
+        }
+        CrashBreadcrumbs.record(
+            "Last process exit reason=$reason status=${exit.status} importance=${exit.importance} pss=${exit.pss}",
+        )
     }
 
     fun recordStartupCrash(throwable: Throwable): CrashReport? {

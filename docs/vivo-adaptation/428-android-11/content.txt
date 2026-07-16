@@ -1,0 +1,122 @@
+Android 11应用适配指南
+
+1、如何体验升级Android 11
+1.1 vivo机器升级Android 11指导
+请开发者更新到市场最新系统版本进行对应调试。
+1.2 vivo云真机调试
+vivo云测服务上线了搭载有Android 11开发者预览版的测试机，提供了iQOO3、NEX 3S两款测试机型。官网链接：https://dev.vivo.com.cn/vcl/#/remote/device/list
+1.3 google原生机升级Android 11
+开发者持有Pixel系列的机器可以直接ota升级，或者下载镜像升级，具体见此链接。
+
+2、Android 11上的主要变更
+2.1 兼容性
+2.1.1 分区存储
+说明：分区存储机制使得应用在外部存储空间能有一块属于自己的专用存储区域，这块区域是私有的，因此，这块区域非常适用于保存用户的私有数据。当然，应用无法访问其他应用的专用存储区域。但如果应用需要将自己专用存储区域的特定文件让其他应用也访问得到，可以通过设置文件分享的方式，去为这些文件做可共享的标记。分区存储将在文件管理、应用程序保护、用户隐私数据保护等方面上有很好的作用。
+影响范围：
+（1）targetSdkVersion为30的应用。
+（2）targetSdkVersion为29，且未将requestLegacyExternalStorage设为true以停用分区存储的应用。
+适配建议：
+若您的应用依然使用旧版存储机制，现则需要将数据迁移到与分区存储兼容的目录。
+访问文件的位置
+所需权限
+访问方法
+
+应用的私有目录
+无需权限即可访问
+getExternalFilesDir()
+
+其他应用的私有目录
+无，但目标文件要被其应用使用FileProvider标记为可共享文件
+通过ParcelFileDescriptor与FileDescriptor获取
+
+媒体文件目录（音频、照片、视频文件）
+READ_EXTERNAL_STORAGE（仅当访问其他应用的文件时需要）
+MediaStore   API
+
+下载目录（文档文件等）
+无需权限即可访问
+存储访问框架SAF
+
+分区存储的详细介绍：https://developer.android.google.cn/preview/privacy/storage
+
+2.1.2 单次授权
+说明：Android 11开发者预览版本对权限进行了更细颗粒度的划分，引入了“单次授权”的概念。用户可以进行单次授权，让应用获得对用户位置、相机或麦克风的临时性访问权限，如下图所示。在获得本次的授权后，应用可以在以下时间段内获得对应数据的访问：
+（1）当应用的Activity可见时。
+（2）应用转为后台运行后的一小段时间。
+（3）Activity可见时启动了一项前台服务，并且随后将应用转到后台，那么应用可以继续访问相关数据，直到该前台服务停止。
+影响范围：运行于Android 11上的所有应用。
+适配建议：如果您的应用已遵循与权限相关的最佳做法（https://developer.android.google.cn/privacy/best-practices），您无需更改应用即可支持单次授权。
+图：应用内的权限申请窗口提供一次性权限选项
+
+2.1.3 后台位置信息访问权限获取方式
+说明：当应用申请后台位置信息访问权限时，让用户授予权限的弹窗中，将不再提供“始终允许”的选项，这个选项只存在于设置中的应用权限授予页面，一定程度上能减少应用的“走后门”情况发生，如下图所示，并且后台位置权限的申请需要应用已经拥有前台位置权限。
+影响范围：运行于Android 11开发者预览版本上的所有应用
+适配建议：若您的应用确定需要获得后台位置信息访问的权限，现在则需要分为两个步骤，因为已无法在没有前台位置信息访问权限的时候直接申请后台位置信息访问权限。
+（1）先申请前台位置信息访问权限
+（2）再申请后台位置信息访问权限，也就是所谓的“始终允许”，而用户将被引导到设置中进行授予
+图：申请后台位置信息访问权限时，应用内的权限申请弹框不再包含“始终允许”
+图：后台位置信息访问权限的授予只能在设置中进行
+
+2.1.4 软件包可见性
+说明：Android 11开发者预览版本更改了应用查询同一设备上的其他已安装应用的方式，以及与之交互的方式。
+影响范围：targetSdkVersion为30的应用
+适配建议：应用需要在应用的清单文件中添加<queries>元素，以便系统了解应向其显示哪些其他已安装的应用。如果您的应用执行与其他应用的常见互动，那么您无需更改应用。更多关于Android 11开发者预览版本软件包可见性的信息可参考https://developer.android.google.cn/preview/privacy/package-visibility。
+
+2.1.5 新的前台服务类型
+说明： Android 11更改了前台服务访问摄像头和麦克风相关数据的方式以进一步保护用户隐私。
+影响范围：targetSdkVersion为30的应用
+适配建议：您需要在该前台服务声明的foregroundServiceType属性中添加新的camera和microphone类型，否则将无法获取摄像头与麦克风的数据。
+
+2.1.6 自定义视图消息框使用受限
+说明：从后台发布的自定义视图消息框将会被系统屏蔽。这类消息框使用setView()为自己定义了一个布局，如图所示。出于安全与用户体验上的考虑，系统屏蔽了从后台发起的自定义视图消息框。但从前台发布的自定义视图消息框依然可以正常生效，且使用Toast.makeText()创建的文本消息框不受影响，在前后台发布均可正常生效。
+影响范围：targetSdkVersion为30的应用
+适配建议：建议使用信息提示控件（Snackbar）来做代替。
+
+图：Android Q上从后台发布的自定义视图消息框示例
+
+2.1.7 非SDK接口名单更新
+说明：Android 11有大量的非SDK接口名单更新，各接口名单更新情况可查询https://developer.android.google.cn/about/versions/11/non-sdk-11。这些变更可能会对一些依赖了非SDK接口的应用带来不同程度的兼容性问题，特别是依赖了Android Q灰名单接口的应用，因为这些接口有一部分已经在Android 11中已归入黑名单中。
+影响范围：运行于Android 11上的所有应用。
+适配建议：如果您的应用依赖于Android 11的受限接口，您应该开始计划升级SDK并迁移到SDK替代方案。
+
+2.2 新的交互体验和方式
+每次Android系统的升级，几乎都会在交互体验上带来一些新变化，此次Android 11也不例外。
+例如：
+2.2.1 聊天气泡
+聊天气泡（chat bubbles）的会话方式正式推出，不再是实验性功能，该特性支持会话窗口最小化为一个或多个悬浮气泡，气泡可以展开为小窗口模式的页面；
+图：气泡形式的消息通知
+
+图：气泡展开为会话小窗口
+
+2.2.2 新的输入法键盘过渡动画
+借助两个新的API接口——边衬区动画监听器（Insets Animation Listener）与窗口动画控制器（WindowInsets Animation Controller），Android 11为每天都要与我们打交道的输入法键盘带来了新的过渡动画，这些API可让您更轻松地调整应用内容，与IME的出现和消失以及状态和导航栏等其他元素保持同步。这是一个谷歌所提供的示例https://github.com/android/user-interface-samples/tree/master/WindowInsetsAnimation。和当前主流版本中直接从底部弹出的动画相比，新的输入法键盘动画可以跟随我们手指的实际划动逐帧变换，呈现出更加流畅也更加自然的滑入、滑出效果等等。
+
+2.3 硬件层面的新支持
+2.3.1 Android 11将更好地支持各类手机屏幕，以提升用户体验
+- 瀑布屏：瀑布屏的“瀑布”区域，会带来边缘内容显示失真和误触的情况。在Android 11上，开发者已可以控制“瀑布”区域的交互，现有的DisplayCutout.getSafeInset…()方法现在会返回能够避开瀑布区域以及刘海的安全边衬区。
+
+- 高刷屏：Android 11加入了新的API——Surface.setFrameRate()来允许应用设置自身运行的首选刷新率，以发挥高刷屏的优势获得更好的使用体验，同时也帮助系统在运行应用时智能切换，从系统层面解决高刷新率可能会带来的功耗问题。
+
+2.3.2 Android 11支持并发使用多个摄像头
+开发者可以通过新的API以查询对同时使用多个摄像头（包括前置摄像头和后置摄像头）的支持。如需在运行应用的设备上检查支持情况，可以使用以下2个方法，getConcurrentCameraIds()方法可返回摄像头ID的组合，isConcurrentSessionConfigurationSupported()可查询摄像头设备是否可以并发支持相应的会话配置。
+
+2.4 增强5G支持
+Android 11 带来了针对5G的“动态计量”和“带宽估算”，更好地发挥5G的高带宽和低延迟特性。灵活地针对不同的场景，不同的网络情况，自适应流媒体质量。
+
+2.5 其他功能
+2.5.1 ADB增量APK安装
+在设备上安装大型APK可能需要很长的时间。ADB增量APK安装可以安装足够的APK以启动应用，同时在后台流式传输剩余数据，从而加速这一过程。如果设备支持该功能，并且您安装了最新的SDK平台工具，adb install命令将自动使用此功能。或运行此命令adb install –incremental以使用该功能。在运行ADB增量APK安装之前，您必须先为APK签名并创建一个APK签名方案v4文件。且必须将v4签名文件放在APK旁边，才能使此功能正常运行。
+2.5.2 应用进程退出原因
+Android 11引入了ActivityManager.getHistoricalProcessExitReasons()方法，用于报告近期任何进程终止的原因。应用可以使用此方法收集崩溃诊断信息，例如进程终止是由于ANR、内存问题还是其他原因所致。此外，您还可以使用新的setProcessStateSummary()方法存储自定义状态信息，以便日后进行分析。
+2.5.3 动态资源加载器
+Android 11引入了两个新API类ResourcesLoader和ResourcesProvider，用来支持应用动态扩展资源的搜索和加载方式。主要的一个用例就是让应用去访问APK外特定目录的资源。
+
+3、参考链接
+[1] Android 11中的存储机制更新：https://developer.android.google.cn/preview/privacy/storage
+[2] 遵循权限方面的最佳做法：https://developer.android.google.cn/privacy/best-practices
+[3] Android 11中的软件包可见性：https://developer.android.google.cn/preview/privacy/package-visibility
+[4] Android 11中消息框的更新：https://developer.android.google.cn/guide/topics/ui/notifiers/toasts
+[5] 非SDK接口名单更新：https://developer.android.google.cn/about/versions/11/non-sdk-11
+[6] 新的输入法键盘过渡动画示例：https://github.com/android/user-interface-samples/tree/master/WindowInsetsAnimation
+[7] Android 11中的重大隐私权变更：https://developer.android.google.cn/preview/privacy
+[8] Android 11新的功能和API概览：https://developer.android.google.cn/preview/features
