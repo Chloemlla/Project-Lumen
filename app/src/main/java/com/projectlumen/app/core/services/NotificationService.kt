@@ -204,7 +204,6 @@ class NotificationService(private val context: Context) {
 
     fun showUpdateAvailable(tagName: String, releaseName: String) {
         if (!canPostNotifications()) return
-        val updateIntent = Intent(context, MainActivity::class.java).setPackage(context.packageName)
         show(
             id = NotificationIds.POMODORO + 1000,
             channel = NotificationChannels.STATUS,
@@ -220,12 +219,9 @@ class NotificationService(private val context: Context) {
                     .setSmallIcon(R.drawable.ic_notification_lumen)
                     .setContentTitle(context.getString(R.string.about_update_status))
                     .setContentText("$tagName $releaseName")
-                    .setContentIntent(PendingIntent.getActivity(
-                        context,
-                        NotificationIds.POMODORO + 1001,
-                        updateIntent,
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                    ))
+                    // Reuse the explicit MainActivity PendingIntent builder so Android 14
+                    // package/component requirements stay centralized.
+                    .setContentIntent(openAppPendingIntent(NotificationIds.POMODORO + 1001))
                     .setAutoCancel(true)
                     .build(),
             )

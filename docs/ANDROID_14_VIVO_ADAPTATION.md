@@ -42,6 +42,7 @@ Internal components must not rely on package-less implicit intents; PendingInten
 - Open-app intents set class + package.
 - Open API launch parsing trusts action + sanitized string extras only.
 - Share/install streams use `SecureShareIntents` with explicit URI grants.
+- Update-available notification content intent reuses the same explicit `openAppPendingIntent()` path.
 
 ### 4. Safer dynamic code loading
 Dynamically loaded files must be read-only.
@@ -57,6 +58,7 @@ PendingIntent / bindService paths must not silently grant BAL.
 - Reminder full-screen intents and notification content intents target explicit `MainActivity`.
 - No `bindService(... BIND_ALLOW_ACTIVITY_STARTS)` usage found.
 - Background timer continuity relies on AlarmManager + typed FGS, not background activity starts.
+- Open API "return to caller" only starts the foreign launcher while this Activity is still STARTED; otherwise fail closed.
 
 ### 6. Minimum installable targetSdk
 Apps with very old targetSdk cannot install on Android 14.
@@ -98,3 +100,4 @@ Media library grants may be partial; apps should not assume full gallery access.
 ## Refresh log
 
 - 2026-07-16: Fetched doc 699 via workflow script, scanned repo, confirmed exact-alarm, FGS types, implicit-intent, DCL, BAL, and media-access paths.
+- 2026-07-16 (second pass): Re-fetched doc 699, revalidated all high-priority items, and centralized update-notification content intents onto the explicit `openAppPendingIntent()` helper.
