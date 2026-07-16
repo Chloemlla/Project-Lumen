@@ -129,6 +129,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -212,8 +213,11 @@ import kotlinx.coroutines.launch
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
-    val scrollBehavior = LocalLumenTopBarScrollBehavior.current
+internal fun LumenTopBar(
+    title: String,
+    scrollBehavior: TopAppBarScrollBehavior? = null,
+    onNavigateBack: (() -> Unit)? = null,
+) {
     LargeTopAppBar(
         title = {
             Text(

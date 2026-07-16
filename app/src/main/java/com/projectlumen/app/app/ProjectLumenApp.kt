@@ -351,7 +351,6 @@ fun ProjectLumenApp(
             }
             CompositionLocalProvider(
                 LocalLumenPageScrollState provides topBarScrollState,
-                LocalLumenTopBarScrollBehavior provides topBarScrollBehavior,
             ) {
                 Scaffold(
                     modifier = Modifier.nestedScroll(topBarScrollBehavior.nestedScrollConnection),
@@ -360,6 +359,7 @@ fun ProjectLumenApp(
                     topBar = {
                         LumenTopBar(
                             title = stringResource(currentDestination.labelRes),
+                            scrollBehavior = topBarScrollBehavior,
                             onNavigateBack = if (currentDestination.showInBottomNav) null else {
                                 { navigateBackFromSecondaryPage() }
                             },
