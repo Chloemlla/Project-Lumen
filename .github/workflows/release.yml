@@ -92,27 +92,57 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          KEY_ALIAS="$(printf '%s' "$KEY_ALIAS" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+          set -euo pipefail
+
+          KEY_ALIAS="$(printf '%s' "${KEY_ALIAS:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+          KEYSTORE_PASSWORD="$(printf '%s' "${KEYSTORE_PASSWORD:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+          KEY_PASSWORD="$(printf '%s' "${KEY_PASSWORD:-}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+          KEYSTORE_BASE64="$(printf '%s' "${KEYSTORE_BASE64:-}" | tr -d '[:space:]')"
+
+          echo "=== Release signing secret presence (values redacted) ==="
+          echo "KEYSTORE_BASE64 present: $([ -n "$KEYSTORE_BASE64" ] && echo yes || echo no)"
+          echo "KEYSTORE_BASE64 length: ${#KEYSTORE_BASE64}"
+          echo "KEYSTORE_PASSWORD present: $([ -n "$KEYSTORE_PASSWORD" ] && echo yes || echo no)"
+          echo "KEY_ALIAS present: $([ -n "$KEY_ALIAS" ] && echo yes || echo no)"
+          echo "KEY_ALIAS value: ${KEY_ALIAS:-<empty>}"
+          echo "KEY_PASSWORD present: $([ -n "$KEY_PASSWORD" ] && echo yes || echo no)"
 
           if [ -f "gradle.properties" ]; then
             sed -i 's/\r$//' gradle.properties
+            sed -i '/^PROJECT_LUMEN_USE_DEBUG_SIGNING=/d' gradle.properties
+            sed -i '/^PROJECT_LUMEN_STORE_FILE=/d' gradle.properties
+            sed -i '/^PROJECT_LUMEN_STORE_PASSWORD=/d' gradle.properties
+            sed -i '/^PROJECT_LUMEN_KEY_ALIAS=/d' gradle.properties
+            sed -i '/^PROJECT_LUMEN_KEY_PASSWORD=/d' gradle.properties
             [ -n "$(tail -c 1 gradle.properties)" ] && echo "" >> gradle.properties
           fi
 
           if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
-            echo "Release signing secrets are incomplete; building an unsigned release APK."
-          else
-            printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "${{ github.workspace }}/project_lumen.jks" || {
-              echo "Failed to decode KEYSTORE_BASE64; building an unsigned release APK."
-              exit 0
-            }
-
-            printf 'PROJECT_LUMEN_STORE_FILE=%s\n' "${{ github.workspace }}/project_lumen.jks" >> gradle.properties
-            printf 'PROJECT_LUMEN_STORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD" >> gradle.properties
-            printf 'PROJECT_LUMEN_KEY_ALIAS=%s\n' "$KEY_ALIAS" >> gradle.properties
-            printf 'PROJECT_LUMEN_KEY_PASSWORD=%s\n' "$KEY_PASSWORD" >> gradle.properties
-            echo "Release signing configured."
+            echo "::error::Release signing secrets are incomplete. Required repository secrets: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD."
+            exit 1
           fi
+
+          KEYSTORE_PATH="${{ github.workspace }}/project_lumen.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          if [ ! -s "$KEYSTORE_PATH" ]; then
+            echo "::error::Failed to decode KEYSTORE_BASE64 into a non-empty keystore file."
+            exit 1
+          fi
+
+          if ! keytool -list -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/tmp/keystore-alias.txt 2>/tmp/keystore-alias.err; then
+            echo "::error::Keystore validation failed for alias '$KEY_ALIAS'."
+            cat /tmp/keystore-alias.err
+            exit 1
+          fi
+
+          echo "=== Keystore alias validation ==="
+          cat /tmp/keystore-alias.txt
+
+          printf 'PROJECT_LUMEN_STORE_FILE=%s\n' "$KEYSTORE_PATH" >> gradle.properties
+          printf 'PROJECT_LUMEN_STORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD" >> gradle.properties
+          printf 'PROJECT_LUMEN_KEY_ALIAS=%s\n' "$KEY_ALIAS" >> gradle.properties
+          printf 'PROJECT_LUMEN_KEY_PASSWORD=%s\n' "$KEY_PASSWORD" >> gradle.properties
+          echo "Release signing configured with repository secrets."
 
       - name: Build release APK
         env:
@@ -131,7 +161,19 @@ jobs:
           PROJECT_LUMEN_REQUEST_SIGNING_SECRET: ${{ secrets.PROJECT_LUMEN_REQUEST_SIGNING_SECRET }}
           PROJECT_LUMEN_RELEASE_CERT_SHA256: ${{ secrets.PROJECT_LUMEN_RELEASE_CERT_SHA256 }}
           PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256: ${{ secrets.PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256 }}
-        run: gradle assembleRelease --no-daemon --warning-mode all
+        run: |
+          set -euo pipefail
+          if [ -f gradle.properties ]; then
+            sed -i '/^PROJECT_LUMEN_USE_DEBUG_SIGNING=/d' gradle.properties
+          fi
+          if ! grep -q '^PROJECT_LUMEN_STORE_FILE=' gradle.properties || \
+             ! grep -q '^PROJECT_LUMEN_STORE_PASSWORD=' gradle.properties || \
+             ! grep -q '^PROJECT_LUMEN_KEY_ALIAS=' gradle.properties || \
+             ! grep -q '^PROJECT_LUMEN_KEY_PASSWORD=' gradle.properties; then
+            echo "::error::Release signing properties missing before assembleRelease."
+            exit 1
+          fi
+          gradle assembleRelease --no-daemon --warning-mode all
 
       # - name: Verify 16 KB native library alignment
       #   run: python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*.apk
