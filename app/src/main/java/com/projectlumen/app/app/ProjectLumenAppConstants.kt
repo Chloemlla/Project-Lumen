@@ -225,27 +225,28 @@ internal enum class SystemBackgroundColor(
     SURFACE_CONTAINER("surfaceContainer", R.string.system_color_surface, "primary"),
 }
 
-internal val LumenCardShape = RoundedCornerShape(8.dp)
+internal val LumenCardShape = RoundedCornerShape(20.dp)
+
+internal val LumenPreferenceShape = RoundedCornerShape(20.dp)
+
+internal val LumenIconChipShape = RoundedCornerShape(12.dp)
 @Composable
 internal fun lumenCardElevation() = CardDefaults.cardElevation(
-    defaultElevation = 2.dp,
+    defaultElevation = 0.dp,
     pressedElevation = 0.dp,
-    focusedElevation = 2.dp,
-    hoveredElevation = 3.dp,
-    draggedElevation = 4.dp,
+    focusedElevation = 0.dp,
+    hoveredElevation = 0.dp,
+    draggedElevation = 1.dp,
     disabledElevation = 0.dp,
 )
 
 @Composable
 internal fun lumenCardColors() = CardDefaults.cardColors(
-    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     contentColor = MaterialTheme.colorScheme.onSurface,
 )
 
 @Composable
-internal fun lumenCardBorder() = BorderStroke(
-    width = 1.dp,
-    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
-)
+internal fun lumenCardBorder(): BorderStroke? = null
 
 

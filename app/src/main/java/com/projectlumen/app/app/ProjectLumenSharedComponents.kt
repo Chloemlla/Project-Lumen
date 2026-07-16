@@ -126,6 +126,9 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -208,89 +211,35 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 internal fun LumenTopBar(title: String, onNavigateBack: (() -> Unit)? = null) {
-    val uiTokens = rememberLumenUiTokens(LocalContext.current)
-    val topBarTokens = uiTokens.topBar
-    val scrollState = LocalLumenPageScrollState.current
-    val density = LocalDensity.current
-    val topInsetHeight = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
-    val contentTopGap = topBarTokens.contentTopGapDp.dp
-    val contentHeight = topBarTokens.contentHeightDp.dp
-    val contentBottomGap = topBarTokens.contentBottomGapDp.dp
-    val expandedTopBarHeight = topInsetHeight + contentTopGap + contentHeight + contentBottomGap
-    val collapseThresholdPx = with(density) { topBarTokens.collapseThresholdDp.dp.toPx() }
-    val scrollProgress = ((scrollState?.value ?: 0).toFloat() / collapseThresholdPx).coerceIn(0f, 1f)
-    val collapseProgress by animateFloatAsState(
-        targetValue = scrollProgress,
-        animationSpec = tween(160),
-        label = "topBarCollapseProgress",
-    )
-    val topBarAlpha = 1f - collapseProgress
-    val visibleTopBarHeight = expandedTopBarHeight * topBarAlpha
-    val topBarOffsetY = with(density) { -expandedTopBarHeight.toPx() * collapseProgress }
-    val topBarBackground = topBarTokens.primaryColor ?: MaterialTheme.colorScheme.primary
-    val topBarContentColor = topBarTokens.onPrimaryColor ?: MaterialTheme.colorScheme.onPrimary
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(visibleTopBarHeight)
-            .clipToBounds(),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .requiredHeight(expandedTopBarHeight)
-                .background(topBarBackground)
-                .graphicsLayer {
-                    alpha = topBarAlpha
-                    translationY = topBarOffsetY
-                },
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = topBarTokens.containerStartPaddingDp.dp,
-                        top = topInsetHeight + contentTopGap,
-                        end = topBarTokens.containerEndPaddingDp.dp,
-                    )
-                    .height(contentHeight),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (onNavigateBack != null) {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.size(topBarTokens.secondaryLeadingWidthDp.dp),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = stringResource(R.string.navigate_back),
-                            tint = topBarContentColor,
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier.width(topBarTokens.primaryTitleStartDp.dp))
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(contentHeight),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium.copy(fontSize = topBarTokens.titleFontSizeSp.sp),
-                        fontWeight = FontWeight(topBarTokens.titleFontWeight),
-                        color = topBarContentColor,
-                        maxLines = topBarTokens.titleMaxLines,
-                        softWrap = true,
-                        overflow = TextOverflow.Ellipsis,
+    val scrollBehavior = LocalLumenTopBarScrollBehavior.current
+    LargeTopAppBar(
+        title = {
+            Text(
+                text = title,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        navigationIcon = {
+            if (onNavigateBack != null) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = stringResource(R.string.navigate_back),
                     )
                 }
             }
-        }
-    }
+        },
+        colors = TopAppBarDefaults.largeTopAppBarColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        scrollBehavior = scrollBehavior,
+    )
 }
 
 @Composable
@@ -304,24 +253,27 @@ internal fun PageIntroText(icon: ImageVector, title: String, message: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.34f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
-            .padding(18.dp),
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+                .size(40.dp)
+                .clip(LumenIconChipShape)
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(22.dp),
+            )
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -430,23 +382,36 @@ internal fun SettingsSection(
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(LumenCardShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f))
                     .clickable(
                         role = Role.Button,
                         onClickLabel = stringResource(
                             if (expanded) R.string.settings_section_collapse else R.string.settings_section_expand,
                         ),
                     ) { expanded = !expanded }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(LumenIconChipShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
                 Text(
                     stringResource(titleRes),
                     modifier = Modifier.weight(1f),
@@ -469,7 +434,11 @@ internal fun SettingsSection(
                 enter = fadeIn(tween(160)) + slideInVertically(tween(160)) { -it / 8 },
                 exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 8 },
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+                Column(
+                    modifier = Modifier.padding(top = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    content = content,
+                )
             }
         }
     }
@@ -523,8 +492,8 @@ internal fun ActionCard(content: @Composable ColumnScope.() -> Unit) {
         border = lumenCardBorder(),
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             content = content,
         )
     }
@@ -537,8 +506,7 @@ internal fun EmptyStateMessage(@StringRes messageRes: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(14.dp),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -552,8 +520,7 @@ internal fun StatusLine(icon: ImageVector, text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -664,8 +631,7 @@ internal fun NotificationRequirementCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -675,7 +641,20 @@ internal fun NotificationRequirementCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(LumenIconChipShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(titleRes),

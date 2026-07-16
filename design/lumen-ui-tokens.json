@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "topBar": {
-    "containerStartPaddingDp": 8,
-    "containerEndPaddingDp": 16,
-    "contentTopGapDp": 8,
-    "contentHeightDp": 56,
-    "contentBottomGapDp": 8,
-    "collapseThresholdDp": 72,
-    "primaryTitleStartDp": 40,
+    "containerStartPaddingDp": 4,
+    "containerEndPaddingDp": 12,
+    "contentTopGapDp": 0,
+    "contentHeightDp": 64,
+    "contentBottomGapDp": 0,
+    "collapseThresholdDp": 96,
+    "primaryTitleStartDp": 16,
     "secondaryLeadingWidthDp": 48,
-    "titleFontSizeSp": 16,
+    "titleFontSizeSp": 22,
     "titleFontWeight": 600,
     "titleMaxLines": 2,
     "primaryColor": null,
@@ -20,10 +20,10 @@
   "page": {
     "maxContentWidthDp": 720,
     "contentPaddingStartDp": 12,
-    "contentPaddingTopDp": 12,
+    "contentPaddingTopDp": 8,
     "contentPaddingEndDp": 12,
-    "contentPaddingBottomDp": 18,
-    "sectionGapDp": 12
+    "contentPaddingBottomDp": 24,
+    "sectionGapDp": 10
   },
   "preview": {
     "deviceWidthDp": 393,

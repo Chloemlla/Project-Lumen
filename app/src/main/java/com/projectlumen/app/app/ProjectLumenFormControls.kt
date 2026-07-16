@@ -218,13 +218,12 @@ internal fun SwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .clip(LumenPreferenceShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .clickable(enabled = enabled) { toggle(!checked) }
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .graphicsLayer { alpha = if (enabled) 1f else 0.52f }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -250,10 +249,9 @@ internal fun NumberSlider(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .clip(LumenPreferenceShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -290,11 +288,24 @@ internal fun LabelWithIcon(
     maxLines: Int = 2,
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(LumenIconChipShape)
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(22.dp),
+            )
+        }
         Text(
             stringResource(labelRes),
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleMedium,
             maxLines = maxLines,
             overflow = if (maxLines == Int.MAX_VALUE) TextOverflow.Clip else TextOverflow.Ellipsis,
         )

@@ -32,15 +32,15 @@ internal data class LumenUiTokens(
 }
 
 internal data class LumenTopBarTokens(
-    val containerStartPaddingDp: Float = 8f,
-    val containerEndPaddingDp: Float = 16f,
-    val contentTopGapDp: Float = 8f,
-    val contentHeightDp: Float = 56f,
-    val contentBottomGapDp: Float = 8f,
-    val collapseThresholdDp: Float = 72f,
-    val primaryTitleStartDp: Float = 40f,
+    val containerStartPaddingDp: Float = 4f,
+    val containerEndPaddingDp: Float = 12f,
+    val contentTopGapDp: Float = 0f,
+    val contentHeightDp: Float = 64f,
+    val contentBottomGapDp: Float = 0f,
+    val collapseThresholdDp: Float = 96f,
+    val primaryTitleStartDp: Float = 16f,
     val secondaryLeadingWidthDp: Float = 48f,
-    val titleFontSizeSp: Float = 16f,
+    val titleFontSizeSp: Float = 22f,
     val titleFontWeight: Int = 600,
     val titleMaxLines: Int = 2,
     val primaryColor: Color? = null,
@@ -72,10 +72,10 @@ internal data class LumenTopBarTokens(
 internal data class LumenPageTokens(
     val maxContentWidthDp: Float = 720f,
     val contentPaddingStartDp: Float = 12f,
-    val contentPaddingTopDp: Float = 12f,
+    val contentPaddingTopDp: Float = 8f,
     val contentPaddingEndDp: Float = 12f,
-    val contentPaddingBottomDp: Float = 18f,
-    val sectionGapDp: Float = 12f,
+    val contentPaddingBottomDp: Float = 24f,
+    val sectionGapDp: Float = 10f,
 ) {
     companion object {
         fun fromJson(json: JSONObject?): LumenPageTokens {

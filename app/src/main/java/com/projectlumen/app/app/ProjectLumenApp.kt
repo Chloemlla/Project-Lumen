@@ -37,6 +37,8 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -51,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -112,6 +115,7 @@ internal enum class Destination(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun ProjectLumenApp(
     viewModel: ProjectLumenViewModel,
     crashReport: CrashReport?,
@@ -322,6 +326,7 @@ fun ProjectLumenApp(
             ) {
                 ScrollState(0)
             }
+            val topBarScrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
             fun navigateBackFromSecondaryPage() {
                 if (!navController.navigateUp()) {
                     navController.navigate(Destination.SETTINGS.route) {
@@ -344,8 +349,12 @@ fun ProjectLumenApp(
                     restoreState = true
                 }
             }
-            CompositionLocalProvider(LocalLumenPageScrollState provides topBarScrollState) {
+            CompositionLocalProvider(
+                LocalLumenPageScrollState provides topBarScrollState,
+                LocalLumenTopBarScrollBehavior provides topBarScrollBehavior,
+            ) {
                 Scaffold(
+                    modifier = Modifier.nestedScroll(topBarScrollBehavior.nestedScrollConnection),
                     containerColor = MaterialTheme.colorScheme.background,
                     contentWindowInsets = WindowInsets.safeDrawing,
                     topBar = {
@@ -358,8 +367,8 @@ fun ProjectLumenApp(
                     },
                     bottomBar = {
                         NavigationBar(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            tonalElevation = 3.dp,
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            tonalElevation = 0.dp,
                         ) {
                             Destination.entries.filter { it.showInBottomNav }.forEach { destination ->
                                 val selected = backStackEntry?.destination?.hierarchy?.any {

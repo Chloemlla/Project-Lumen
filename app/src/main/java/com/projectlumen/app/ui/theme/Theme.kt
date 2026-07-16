@@ -92,6 +92,7 @@ fun ProjectLumenTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = LumenTypography,
+        shapes = LumenShapes,
         content = content,
     )
 }

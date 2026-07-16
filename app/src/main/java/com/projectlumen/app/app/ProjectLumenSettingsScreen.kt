@@ -552,11 +552,6 @@ internal fun SettingsScreen(
     val sectionGroupController = rememberSettingsSectionGroupController()
     CompositionLocalProvider(LocalSettingsSectionGroup provides sectionGroupController) {
     LumenPage {
-        PageIntro(
-            icon = Icons.Outlined.Settings,
-            titleRes = R.string.nav_settings,
-            message = stringResource(R.string.settings_subtitle),
-        )
         SettingsSectionToolbar(controller = sectionGroupController)
         SettingsPrivacyPermissionCenter(
             uiState = uiState,

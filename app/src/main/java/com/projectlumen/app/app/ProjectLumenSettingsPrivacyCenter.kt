@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -267,12 +268,12 @@ private fun PermissionControlTileItem(
     val tileColor = when {
         actionNeeded -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f)
         tile.checked -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)
-        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
+        else -> MaterialTheme.colorScheme.surfaceContainerLow
     }
     val borderColor = when {
-        actionNeeded -> MaterialTheme.colorScheme.error
-        tile.checked -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.outlineVariant
+        actionNeeded -> MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
+        tile.checked -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+        else -> Color.Transparent
     }
     val iconTint = when {
         actionNeeded -> MaterialTheme.colorScheme.error
@@ -285,7 +286,7 @@ private fun PermissionControlTileItem(
             .widthIn(min = 158.dp)
             .clip(LumenCardShape)
             .background(tileColor)
-            .border(1.dp, borderColor, LumenCardShape)
+            .border(if (borderColor == Color.Transparent) 0.dp else 1.dp, borderColor, LumenCardShape)
             .toggleable(
                 value = tile.checked,
                 role = Role.Switch,
@@ -358,11 +359,12 @@ private fun PrivacyPermissionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (active) 0.72f else 0.38f))
-            .border(
-                width = 1.dp,
-                color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                shape = LumenCardShape,
+            .background(
+                if (active) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerLow
+                },
             )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(12.dp),

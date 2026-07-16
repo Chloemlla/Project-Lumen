@@ -201,6 +201,9 @@ import kotlinx.coroutines.launch
 
 internal val LocalLumenPageScrollState = staticCompositionLocalOf<ScrollState?> { null }
 
+internal val LocalLumenTopBarScrollBehavior =
+    staticCompositionLocalOf<androidx.compose.material3.TopAppBarScrollBehavior?> { null }
+
 internal fun smartWrapDisplayText(value: String): String {
     val normalized = value.trim().ifBlank { "-" }
     if (normalized.length <= DISPLAY_WRAP_CHUNK_SIZE) return normalized
@@ -240,8 +243,7 @@ internal fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
         modifier = Modifier
             .weight(1f)
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -285,8 +287,7 @@ internal fun MetricRow(label: String, value: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -328,7 +329,7 @@ internal fun ColorSwatch(color: Color, size: Dp = 44.dp) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(animatedColor),
     )
 }
