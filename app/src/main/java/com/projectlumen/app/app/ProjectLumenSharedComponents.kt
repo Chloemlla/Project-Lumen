@@ -179,6 +179,7 @@ import androidx.navigation.compose.rememberNavController
 import com.projectlumen.app.BuildConfig
 import androidx.compose.ui.semantics.Role
 import com.projectlumen.app.R
+import com.projectlumen.app.core.preferences.SettingsSectionExpansionStore
 import com.chloemlla.lumen.crash.CrashReport
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
@@ -399,7 +400,15 @@ internal fun SettingsSection(
     summary: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    var expanded by rememberSaveable(titleRes) { mutableStateOf(initiallyExpanded) }
+    val context = LocalContext.current
+    val restoredExpanded = remember(titleRes, initiallyExpanded) {
+        SettingsSectionExpansionStore.isExpanded(context, titleRes, initiallyExpanded)
+    }
+    // Saveable keeps in-session/nav restore; SharedPreferences keeps cross-session continuity.
+    var expanded by rememberSaveable(titleRes) { mutableStateOf(restoredExpanded) }
+    LaunchedEffect(titleRes, expanded) {
+        SettingsSectionExpansionStore.setExpanded(context, titleRes, expanded)
+    }
     LaunchedEffect(forceExpanded) {
         if (forceExpanded) expanded = true
     }
