@@ -9,45 +9,68 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+/**
+ * Rebuild pending schedules after device boot / package replace.
+ *
+ * Android 15 force-stop cancels pending intents; when the app later leaves STOPPED state the
+ * system may re-deliver BOOT_COMPLETED-like opportunities. We treat boot and package-replace as
+ * recovery points to re-register alarms/workers.
+ */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        if (!isRecoveryAction(intent.action)) return
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             val app = context.applicationContext as? ProjectLumenApplication
             runCatching {
                 app ?: return@runCatching
-                val settingsRepository = app.settingsRepository()
-                val settings = settingsRepository.get()
-                val runtime = app.runtimeRepository().get()
-                if (settings?.proximityMonitoringEnabled == true || settings?.blinkMonitoringEnabled == true) {
-                    app.scheduleProximityMonitoring()
-                }
-                if (settings?.ambientLightMonitoringEnabled == true || settings?.autoBrightnessEnabled == true) {
-                    app.startLightMonitoring()
-                }
-                if (
-                    settings?.shizukuAdvancedModeEnabled == true &&
-                    (settings.shizukuServiceRecoveryEnabled || settings.shizukuNativeEyeProtectionEnabled)
-                ) {
-                    ShizukuResilienceWorker.enqueue(
-                        context = app,
-                        delayMinutes = if (settings.shizukuNativeEyeProtectionEnabled) 0L else 15L,
-                    )
-                }
-                if (settings?.keepAliveEnabled == true && runtime?.activeEngine != ActiveEngine.IDLE.name) {
+                restoreScheduledWork(app)
+            }.onFailure { throwable -> app?.recordCrash(throwable) }
+            pendingResult.finish()
+        }
+    }
+
+    companion object {
+        fun isRecoveryAction(action: String?): Boolean {
+            return action == Intent.ACTION_BOOT_COMPLETED ||
+                action == Intent.ACTION_LOCKED_BOOT_COMPLETED ||
+                action == Intent.ACTION_MY_PACKAGE_REPLACED ||
+                action == "android.intent.action.QUICKBOOT_POWERON"
+        }
+
+        suspend fun restoreScheduledWork(app: ProjectLumenApplication) {
+            val settingsRepository = app.settingsRepository()
+            val settings = settingsRepository.get()
+            val runtime = app.runtimeRepository().get()
+            if (settings?.proximityMonitoringEnabled == true || settings?.blinkMonitoringEnabled == true) {
+                app.scheduleProximityMonitoring()
+            }
+            if (settings?.ambientLightMonitoringEnabled == true || settings?.autoBrightnessEnabled == true) {
+                app.startLightMonitoring()
+            }
+            if (
+                settings?.shizukuAdvancedModeEnabled == true &&
+                (settings.shizukuServiceRecoveryEnabled || settings.shizukuNativeEyeProtectionEnabled)
+            ) {
+                ShizukuResilienceWorker.enqueue(
+                    context = app,
+                    delayMinutes = if (settings.shizukuNativeEyeProtectionEnabled) 0L else 15L,
+                )
+            }
+            if (settings?.keepAliveEnabled == true && runtime?.activeEngine != ActiveEngine.IDLE.name) {
+                app.startTimerService()
+            }
+            if (settings != null && runtime != null && runtime.activeEngine != ActiveEngine.IDLE.name) {
+                app.notifications.syncRuntimeAlarms(settings, runtime)
+                if (settings.notificationEnabled) {
                     app.startTimerService()
-                }
-                if (settings != null && runtime != null && runtime.activeEngine != ActiveEngine.IDLE.name) {
-                    app.notifications.syncRuntimeAlarms(settings, runtime)
-                    if (settings.notificationEnabled) {
-                        app.startTimerService()
-                        app.notifications.showOngoingStatus(runtime)
-                    }
+                    app.notifications.showOngoingStatus(runtime)
                 }
             }
-                .onFailure { throwable -> app?.recordCrash(throwable) }
-            pendingResult.finish()
+            // Even when idle, exact-alarm permission may have changed after force-stop recovery.
+            if (settings != null && runtime != null && runtime.activeEngine == ActiveEngine.IDLE.name) {
+                app.notifications.syncRuntimeAlarms(settings, runtime)
+            }
         }
     }
 }

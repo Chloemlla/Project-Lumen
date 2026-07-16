@@ -1,0 +1,21 @@
+1.1 Stable configuration
+1.2 dataSync/mediaProcessing foreground service timeout behavior
+1.3 OpenJdk变更
+1.4 Stopped状态的变化
+1.5 Edge-to-edge 模式
+1.6 使用Spatializer替代Virtualizer
+1.7 AndroidManifest 字符串属性长度和子标签数量限制
+1.8 TargetSdk安装限制
+2.1 弱光增强
+2.2 HDR 余量控制
+2.3 封面屏幕支持
+3.1 对 PdfRenderer API 做重大改进
+3.2 ApplicationStartInfo API
+3.3 详细的应用大小信息
+3.4 SQLite 数据库改进
+4.1 敏感通知保护服务
+4.2 屏幕录制检测
+4.3 扩展的 IntentFilter 功能
+4.4 Health Connect
+4.5 端到端加密的密钥管理
+4.6 使用 fs-verity 保护文件

@@ -1,5 +1,6 @@
 package com.projectlumen.app.core.lifecycle
 
+import android.app.ActivityManager
 import android.os.Build
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -10,6 +11,7 @@ import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
+import com.projectlumen.app.core.services.BootReceiver
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +33,11 @@ class AppLifecycleCoordinator(
     override fun onStart(owner: LifecycleOwner) {
         app.scheduleStoredCrashReportUpload()
         scope.launch {
+            // Android 15 force-stop cancels pending intents; if we detect a force-stop start,
+            // rebuild alarms/workers before normal foreground resume work.
+            if (wasForceStoppedSinceLastStart()) {
+                BootReceiver.restoreScheduledWork(app)
+            }
             val nowMillis = System.currentTimeMillis()
             val settings = settingsRepository.getOrDefault()
             val runtime = runtimeRepository.getOrDefault()
@@ -214,6 +221,16 @@ class AppLifecycleCoordinator(
 
     private fun Long.shiftIfSet(deltaMillis: Long): Long {
         return if (this > 0L) this + deltaMillis else this
+    }
+
+
+    private fun wasForceStoppedSinceLastStart(): Boolean {
+        if (Build.VERSION.SDK_INT < 35) return false
+        return runCatching {
+            val activityManager = app.getSystemService(ActivityManager::class.java) ?: return false
+            val info = activityManager.getHistoricalProcessStartReasons(1).firstOrNull() ?: return false
+            info.wasForceStopped()
+        }.getOrDefault(false)
     }
 
     private companion object {

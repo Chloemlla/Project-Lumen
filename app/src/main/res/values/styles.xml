@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.ProjectLumen" parent="android:style/Theme.Material.Light.NoActionBar">
+        <!-- Android 15 enforces edge-to-edge; keep system bars transparent and draw under them. -->
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:navigationBarColor">#F8FAF7</item>
-        <item name="android:statusBarColor">#F8FAF7</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
     </style>
     <style name="Theme.Lumen.TransparentOverlay" parent="Theme.ProjectLumen">
         <item name="android:windowIsTranslucent">true</item>

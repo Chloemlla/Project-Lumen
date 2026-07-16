@@ -272,6 +272,7 @@ class ProximityCameraSampler(private val context: Context) {
                     addTarget(reader.surface)
                     set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
                     set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+                    applyLowLightBoostIfSupported(camera.id, this)
                 }
                 .build()
             session.setRepeatingRequest(
@@ -289,6 +290,30 @@ class ProximityCameraSampler(private val context: Context) {
             )
         }.onFailure {
             complete(Result.success(null))
+        }
+    }
+
+
+    /**
+     * Android 15 low-light boost: if the front camera supports
+     * ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY, prefer it for dark-room face sampling.
+     */
+    private fun applyLowLightBoostIfSupported(
+        cameraId: String,
+        builder: CaptureRequest.Builder,
+    ) {
+        val cameraManager = context.getSystemService(CameraManager::class.java) ?: return
+        val characteristics = runCatching { cameraManager.getCameraCharacteristics(cameraId) }.getOrNull() ?: return
+        val modes = characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES) ?: return
+        val lowLightMode = if (Build.VERSION.SDK_INT >= 35) {
+            CaptureRequest.CONTROL_AE_MODE_ON_LOW_LIGHT_BOOST_BRIGHTNESS_PRIORITY
+        } else {
+            CaptureRequest.CONTROL_AE_MODE_ON
+        }
+        if (modes.contains(lowLightMode)) {
+            builder.set(CaptureRequest.CONTROL_AE_MODE, lowLightMode)
+        } else {
+            builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
         }
     }
 
