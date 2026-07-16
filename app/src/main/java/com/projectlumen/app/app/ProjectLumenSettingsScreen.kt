@@ -568,9 +568,19 @@ internal fun SettingsScreen(
             onApplyRecommended = { applyRecommendedEyeCareSettings(viewModel) },
             onExportReport = viewModel::shareMonthlyReportPdf,
         )
-        SettingsScrollAnchor(GrowthConfigTarget.REPORTS, settingsScrollState, growthAnchorPositions)
-        SettingsScrollAnchor(GrowthConfigTarget.GUIDANCE, settingsScrollState, growthAnchorPositions)
-        SettingsScrollAnchor(PermissionSetupTarget.STATISTICS, settingsScrollState, permissionAnchorPositions)
+        SettingsScrollAnchors(
+            targets = listOf(
+                GrowthConfigTarget.REPORTS,
+                GrowthConfigTarget.GUIDANCE,
+            ),
+            scrollState = settingsScrollState,
+            anchorPositions = growthAnchorPositions,
+        ) {
+        SettingsScrollAnchor(
+            target = PermissionSetupTarget.STATISTICS,
+            scrollState = settingsScrollState,
+            anchorPositions = permissionAnchorPositions,
+        ) {
         SettingsSection(R.string.section_general, Icons.Outlined.Settings) {
             Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall)
             LumenFlowRow {
@@ -635,6 +645,8 @@ internal fun SettingsScreen(
                 viewModel.setAutoUpdateCheckEnabled(it)
             }
         }
+        }
+        }
         SettingsSection(R.string.section_goals, Icons.Outlined.CheckCircle, initiallyExpanded = false) {
             NumberSlider(R.string.daily_rest_goal, Icons.Outlined.Spa, uiState.dailyGoal.restBreakGoal, 1f..20f, 18, "${uiState.dailyGoal.restBreakGoal}") {
                 viewModel.updateDailyGoal { current -> current.copy(restBreakGoal = it) }
@@ -659,7 +671,11 @@ internal fun SettingsScreen(
                 }
             }
         }
-        SettingsScrollAnchor(GrowthConfigTarget.CLOUD, settingsScrollState, growthAnchorPositions)
+        SettingsScrollAnchor(
+            target = GrowthConfigTarget.CLOUD,
+            scrollState = settingsScrollState,
+            anchorPositions = growthAnchorPositions,
+        ) {
         RemoteCloudAccountCard(
             state = remoteState,
             onCheckHealth = viewModel::checkRemoteHealth,
@@ -671,6 +687,7 @@ internal fun SettingsScreen(
             onRestoreBackup = viewModel::restoreLatestCloudBackup,
             onSignOut = viewModel::signOutRemote,
         )
+        }
         EyeCareGrowthCapabilityCard(
             uiState = uiState,
             remoteState = remoteState,
@@ -699,9 +716,15 @@ internal fun SettingsScreen(
                 }
             }
         }
-        SettingsScrollAnchor(PermissionSetupTarget.NOTIFICATIONS, settingsScrollState, permissionAnchorPositions)
-        SettingsScrollAnchor(PermissionSetupTarget.EXACT_ALARM, settingsScrollState, permissionAnchorPositions)
-        SettingsScrollAnchor(PermissionSetupTarget.FULL_SCREEN, settingsScrollState, permissionAnchorPositions)
+        SettingsScrollAnchors(
+            targets = listOf(
+                PermissionSetupTarget.NOTIFICATIONS,
+                PermissionSetupTarget.EXACT_ALARM,
+                PermissionSetupTarget.FULL_SCREEN,
+            ),
+            scrollState = settingsScrollState,
+            anchorPositions = permissionAnchorPositions,
+        ) {
         SettingsSection(
             R.string.section_notifications,
             Icons.Outlined.NotificationsActive,
@@ -771,7 +794,12 @@ internal fun SettingsScreen(
                 }
             }
         }
-        SettingsScrollAnchor(PermissionSetupTarget.KEEP_ALIVE, settingsScrollState, permissionAnchorPositions)
+        }
+        SettingsScrollAnchor(
+            target = PermissionSetupTarget.KEEP_ALIVE,
+            scrollState = settingsScrollState,
+            anchorPositions = permissionAnchorPositions,
+        ) {
         SettingsSection(
             R.string.section_keep_alive,
             Icons.Outlined.Schedule,
@@ -782,8 +810,15 @@ internal fun SettingsScreen(
                 viewModel.setKeepAliveEnabled(it)
             }
         }
-        SettingsScrollAnchor(PermissionSetupTarget.DIAGNOSTICS, settingsScrollState, permissionAnchorPositions)
-        SettingsScrollAnchor(PermissionSetupTarget.SHIZUKU, settingsScrollState, permissionAnchorPositions)
+        }
+        SettingsScrollAnchors(
+            targets = listOf(
+                PermissionSetupTarget.DIAGNOSTICS,
+                PermissionSetupTarget.SHIZUKU,
+            ),
+            scrollState = settingsScrollState,
+            anchorPositions = permissionAnchorPositions,
+        ) {
         ShizukuAdvancedSettingsSection(
             settings = settings,
             state = shizukuState,
@@ -791,8 +826,17 @@ internal fun SettingsScreen(
             forceExpanded = activePermissionSetupTarget == PermissionSetupTarget.SHIZUKU ||
                 activePermissionSetupTarget == PermissionSetupTarget.DIAGNOSTICS,
         )
-        SettingsScrollAnchor(GrowthConfigTarget.FAMILY, settingsScrollState, growthAnchorPositions)
-        SettingsScrollAnchor(PermissionSetupTarget.DISTANCE_CAMERA, settingsScrollState, permissionAnchorPositions)
+        }
+        SettingsScrollAnchor(
+            target = GrowthConfigTarget.FAMILY,
+            scrollState = settingsScrollState,
+            anchorPositions = growthAnchorPositions,
+        ) {
+        SettingsScrollAnchor(
+            target = PermissionSetupTarget.DISTANCE_CAMERA,
+            scrollState = settingsScrollState,
+            anchorPositions = permissionAnchorPositions,
+        ) {
         SettingsSection(
             R.string.section_proximity,
             Icons.Outlined.PhotoCamera,
@@ -905,10 +949,18 @@ internal fun SettingsScreen(
                 viewModel.updateSettings { current -> current.copy(proximityAlertCooldownSeconds = it) }
             }
         }
-        SettingsScrollAnchor(PermissionSetupTarget.BLINK_CAMERA, settingsScrollState, permissionAnchorPositions)
-        SettingsScrollAnchor(PermissionSetupTarget.AMBIENT_LIGHT, settingsScrollState, permissionAnchorPositions)
-        SettingsScrollAnchor(PermissionSetupTarget.BRIGHTNESS, settingsScrollState, permissionAnchorPositions)
-        SettingsScrollAnchor(PermissionSetupTarget.OVERLAY, settingsScrollState, permissionAnchorPositions)
+        }
+        }
+        SettingsScrollAnchors(
+            targets = listOf(
+                PermissionSetupTarget.BLINK_CAMERA,
+                PermissionSetupTarget.AMBIENT_LIGHT,
+                PermissionSetupTarget.BRIGHTNESS,
+                PermissionSetupTarget.OVERLAY,
+            ),
+            scrollState = settingsScrollState,
+            anchorPositions = permissionAnchorPositions,
+        ) {
         SettingsSection(
             R.string.section_eye_protection,
             Icons.Outlined.PhotoCamera,
@@ -1009,6 +1061,7 @@ internal fun SettingsScreen(
             NumberSlider(R.string.overlay_strict_distance, Icons.Outlined.PhotoCamera, settings.overlayStrictDistancePercent, 120f..250f, 26, stringResource(R.string.percent_value, settings.overlayStrictDistancePercent)) {
                 viewModel.updateSettings { current -> current.copy(overlayStrictDistancePercent = it) }
             }
+        }
         }
         SettingsSection(R.string.section_sound, Icons.AutoMirrored.Outlined.VolumeUp, initiallyExpanded = false) {
             SwitchRow(R.string.enable_sound, Icons.AutoMirrored.Outlined.VolumeUp, settings.soundEnabled) {
