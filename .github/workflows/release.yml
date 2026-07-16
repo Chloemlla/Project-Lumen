@@ -173,7 +173,7 @@ jobs:
             echo "::error::Release signing properties missing before assembleRelease."
             exit 1
           fi
-          gradle assembleRelease --no-daemon --warning-mode all
+          gradle :app:assembleRelease --no-daemon --warning-mode all
 
       # - name: Verify 16 KB native library alignment
       #   run: python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*.apk

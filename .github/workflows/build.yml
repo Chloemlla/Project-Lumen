@@ -184,7 +184,7 @@ jobs:
           echo "=== Signing properties before assembleRelease (passwords redacted) ==="
           grep -E '^PROJECT_LUMEN_(STORE_FILE|KEY_ALIAS)=' gradle.properties || true
           grep -E '^PROJECT_LUMEN_(STORE_PASSWORD|KEY_PASSWORD)=' gradle.properties | sed 's/=.*/=<redacted>/' || true
-          gradle assembleRelease --no-daemon --warning-mode all
+          gradle :app:assembleRelease --no-daemon --warning-mode all
 
       - name: Inspect APK signing
         run: |

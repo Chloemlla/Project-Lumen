@@ -22,10 +22,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+                Surface(Modifier.fillMaxSize()) {
                     LumenCrashGate {
                         Column(
-                            modifier = Modifier
+                            Modifier
                                 .fillMaxSize()
                                 .padding(24.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
                             Button(
                                 onClick = {
                                     LumenCrash.recordBreadcrumb("sample:force-crash")
-                                    throw IllegalStateException("Forced sample crash")
+                                    error("Forced sample crash")
                                 },
                             ) {
                                 Text("Force crash")
