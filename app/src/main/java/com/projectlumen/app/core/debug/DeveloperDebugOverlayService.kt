@@ -320,7 +320,16 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         private const val MEMORY_HEALTH_SAMPLE_INTERVAL_MILLIS = 5_000L
 
         fun start(context: Context) {
-            ContextCompat.startForegroundService(context, Intent(context, DeveloperDebugOverlayService::class.java))
+            // Developer-only, but still subject to Android 12+ background FGS start limits if
+            // invoked from a delayed/background path. Refuse safely instead of crashing.
+            runCatching {
+                ContextCompat.startForegroundService(
+                    context,
+                    Intent(context, DeveloperDebugOverlayService::class.java),
+                )
+            }.onFailure { throwable ->
+                (context.applicationContext as? ProjectLumenApplication)?.recordCrash(throwable)
+            }
         }
 
         fun stop(context: Context) {
@@ -328,10 +337,15 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         }
 
         fun simulateLowMemory(context: Context) {
-            ContextCompat.startForegroundService(
-                context,
-                Intent(context, DeveloperDebugOverlayService::class.java).setAction(ACTION_SIMULATE_LOW_MEMORY),
-            )
+            runCatching {
+                ContextCompat.startForegroundService(
+                    context,
+                    Intent(context, DeveloperDebugOverlayService::class.java)
+                        .setAction(ACTION_SIMULATE_LOW_MEMORY),
+                )
+            }.onFailure { throwable ->
+                (context.applicationContext as? ProjectLumenApplication)?.recordCrash(throwable)
+            }
         }
     }
 }
