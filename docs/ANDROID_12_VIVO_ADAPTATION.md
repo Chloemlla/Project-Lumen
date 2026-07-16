@@ -93,3 +93,4 @@ Motion sensors are capped around 200 Hz unless `HIGH_SAMPLING_RATE_SENSORS` is d
 ## Refresh log
 
 - 2026-07-16: Fetched doc 509 via workflow script, scanned repo, hardened developer-debug FGS starts, and added this Android 12 decision note.
+- 2026-07-16: Re-fetched doc 509 again; confirmed FGS refuse-safely, immutable PendingIntents, exported flags, overlay touch model, and sensor rate limits remain green.
