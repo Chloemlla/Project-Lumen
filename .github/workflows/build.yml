@@ -401,7 +401,7 @@ jobs:
           PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
           PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
           PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
-        run: gradle lintDebug --no-daemon --warning-mode all
+        run: gradle :app:lintDebug --no-daemon --warning-mode all
 
       - name: Upload verification reports
         if: always()

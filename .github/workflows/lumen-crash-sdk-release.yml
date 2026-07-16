@@ -139,7 +139,7 @@ jobs:
           echo "Resolved SDK version=${VERSION_NAME}, tag=${RELEASE_TAG}"
 
       - name: Run lumen-crash unit tests
-        run: gradle :lumen-crash-core:test :lumen-crash:test --no-daemon --warning-mode all
+        run: gradle :lumen-crash-core:test :lumen-crash:test :lumen-crash-sample:lintDebug --no-daemon --warning-mode all
 
       - name: Assemble release AAR
         run: |
