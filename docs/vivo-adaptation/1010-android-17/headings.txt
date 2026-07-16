@@ -1,0 +1,30 @@
+一、概览
+二、应用适配 -> 所有应用
+2.1 后台音频强化
+2.2 限制隐式 URI 授权
+2.3 密钥库限制
+2.4 在旋转后恢复默认 IME 可见性
+2.5 触控板指针捕获模式变更
+2.6 线程优先级设置范围强制校验
+2.7 已回收 Parcel 对象的访问限制
+2.8 文件操作模式严格校验
+2.9 以下config变化不会触发activity relaunch
+2.10 短信动态密码保护
+2.11 Android developer verification
+三、应用适配 -> targetSdk 37
+3.1 本地网络权限保护
+3.2 新的 MessageQueue 无锁实现
+3.3 本地主机保护
+3.4 更安全的本地动态代码加载
+3.5 大屏自适应
+3.6 Activity安全性增强
+3.7 默认启用证书透明度
+3.8 Parcel 数据加固
+3.9 静态 final 字段现在不可修改
+3.10 NPU权限声明
+3.11 usesClearTraffic 弃用计划
+四、新功能和api
+4.1 复杂 IME 实体键盘输入的无障碍支持
+4.2 新的 ProfilingManager 触发器
+4.3 JobDebugInfo API
+五、参考链接

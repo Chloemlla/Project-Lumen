@@ -1,0 +1,28 @@
+1.1 scheduleAtFixedRate方法适配
+1.2 优雅字体 API 已废弃并停用
+1.3 自适应布局
+1.4 需要迁移或停用预测性返回
+1.5 健康与健身权限适配
+1.6 本地网络权限
+2.1 ART内部变更
+2.2 增强了针对 intent 重定向攻击的安全性
+2.3 JobScheduler配额优化
+2.4 被废弃的空作业停止原因
+2.5 完全弃用JobInfo#setImportantWhileForeground
+2.6 有序广播优先级有效范围不再是全局
+2.7 无边框设计停用退出选项
+2.8 后台启动Activity权限变更
+2.9 自动填充API弃用
+2.10 用于处理键盘绑定丢失和加密更改的新 intent
+2.11 Java API变更
+2.11.1 java.lang.Thread类变更
+2.11.2 java.util.Locale类变更
+2.12 改进了无障碍功能API
+3.1 密钥共享API
+3.2 在 ApplicationStartInfo 中增加启动的组件类型
+3.3 以进度为中心的通知
+3.3.1 效果
+3.3.2 模版样式
+3.3.3 使用方式
+3.4 使用用带缓存的Binder接口减少IPC调用次数
+3.5 自适应刷新率
