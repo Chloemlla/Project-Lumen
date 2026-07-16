@@ -199,12 +199,24 @@ jobs:
             exit 1
           fi
 
-          ANDROID_BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* 2>/dev/null | sort -V | tail -n 1 || true)"
+          SDK_ROOTS=()
+          [ -n "${ANDROID_HOME:-}" ] && SDK_ROOTS+=("$ANDROID_HOME")
+          [ -n "${ANDROID_SDK_ROOT:-}" ] && SDK_ROOTS+=("$ANDROID_SDK_ROOT")
+          SDK_ROOTS+=("/usr/local/lib/android/sdk" "$HOME/Android/Sdk" "$HOME/.android/sdk")
           APKSIGNER=""
-          if [ -n "$ANDROID_BUILD_TOOLS" ] && [ -x "$ANDROID_BUILD_TOOLS/apksigner" ]; then
-            APKSIGNER="$ANDROID_BUILD_TOOLS/apksigner"
-          elif command -v apksigner >/dev/null 2>&1; then
+          for sdk in "${SDK_ROOTS[@]}"; do
+            if [ -d "$sdk/build-tools" ]; then
+              ANDROID_BUILD_TOOLS="$(ls -d "$sdk"/build-tools/* 2>/dev/null | sort -V | tail -n 1 || true)"
+              if [ -n "$ANDROID_BUILD_TOOLS" ] && [ -x "$ANDROID_BUILD_TOOLS/apksigner" ]; then
+                APKSIGNER="$ANDROID_BUILD_TOOLS/apksigner"
+                echo "Using apksigner: $APKSIGNER"
+                break
+              fi
+            fi
+          done
+          if [ -z "$APKSIGNER" ] && command -v apksigner >/dev/null 2>&1; then
             APKSIGNER="$(command -v apksigner)"
+            echo "Using apksigner from PATH: $APKSIGNER"
           fi
 
           for apk in "${APKS[@]}"; do
