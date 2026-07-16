@@ -27,7 +27,7 @@ Referer: https://dev.vivo.com.cn/documentCenter/doc/<id>
 
 脚本路径：
 
-- [`scripts/fetch_vivo_adaptation_doc.py`](../scripts/fetch_vivo_adaptation_doc.py)
+- `scripts/fetch_vivo_adaptation_doc.py`
 
 ### 基本用法
 
