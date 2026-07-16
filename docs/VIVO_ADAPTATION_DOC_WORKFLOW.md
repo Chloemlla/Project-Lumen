@@ -122,7 +122,7 @@ docs/vivo-adaptation/
 ## 与现有文档的关系
 
 - 本文件：描述**怎么拉、怎么对照**
-- `ANDROID_15_VIVO_ADAPTATION.md` / `ANDROID_16_VIVO_ADAPTATION.md` / `ANDROID_17_VIVO_ADAPTATION.md`：记录**对本项目的适配决策与结果**
+- `ANDROID_14_VIVO_ADAPTATION.md` / `ANDROID_15_VIVO_ADAPTATION.md` / `ANDROID_16_VIVO_ADAPTATION.md` / `ANDROID_17_VIVO_ADAPTATION.md`：记录**对本项目的适配决策与结果**
 - `docs/vivo-adaptation/`：脚本生成的**原始材料包**，可按需要提交或仅本地使用
 
 如果要把某次拉取结果入库，建议至少提交：

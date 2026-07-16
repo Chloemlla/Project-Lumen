@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -168,10 +169,19 @@ open class MainActivity : ComponentActivity() {
         if (targetPackage == packageName) return
         lifecycleScope.launch {
             delay(durationSeconds.coerceAtLeast(1) * 1000L + EXTERNAL_REST_RETURN_GRACE_MILLIS)
+            // Android 14 further restricts background activity starts. Only attempt the hand-off
+            // while this activity is still at least STARTED; otherwise fail closed.
+            if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                CrashBreadcrumbs.record("Skip return-to-caller; activity not started for $targetPackage")
+                return@launch
+            }
             val launchIntent = packageManager.getLaunchIntentForPackage(targetPackage)
                 ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                 ?: return@launch
             runCatching { startActivity(launchIntent) }
+                .onFailure { error ->
+                    CrashBreadcrumbs.record("Return-to-caller failed for $targetPackage: ${error.javaClass.simpleName}")
+                }
         }
     }
 

@@ -136,6 +136,22 @@ class NotificationService(private val context: Context) {
         }
     }
 
+
+    /**
+     * Android 14+ FGS notifications should publish immediately and remain service-scoped.
+     * Users may dismiss ongoing FGS notifications on Android 14 except for a few media/call styles;
+     * we keep a stop action on the timer notification so dismissal is not the only exit path.
+     */
+    private fun NotificationCompat.Builder.applyForegroundServiceDefaults(): NotificationCompat.Builder {
+        setOngoing(true)
+        setOnlyAlertOnce(true)
+        setCategory(NotificationCompat.CATEGORY_SERVICE)
+        setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+        setPriority(NotificationCompat.PRIORITY_LOW)
+        setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+        return this
+    }
+
     fun canScheduleExactAlarms(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
         return context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
@@ -231,13 +247,10 @@ class NotificationService(private val context: Context) {
             .setContentText(content.message)
             .setSubText(content.subText)
             .setContentIntent(openAppPendingIntent(NotificationIds.FOREGROUND_TIMER))
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
+            .applyForegroundServiceDefaults()
             .setSilent(true)
             .setShowWhen(false)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setRequestPromotedOngoing(content.requestPromotedOngoing)
             .setStyle(content.progressStyle)
             .addAction(
@@ -266,10 +279,7 @@ class NotificationService(private val context: Context) {
             .setContentTitle(context.getString(R.string.proximity_check_running_title))
             .setContentText(context.getString(R.string.proximity_check_running_message))
             .setContentIntent(openAppPendingIntent(NotificationIds.PROXIMITY_FOREGROUND))
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .applyForegroundServiceDefaults()
             .build()
     }
 
@@ -279,10 +289,7 @@ class NotificationService(private val context: Context) {
             .setContentTitle(context.getString(R.string.light_monitor_running_title))
             .setContentText(context.getString(R.string.light_monitor_running_message))
             .setContentIntent(openAppPendingIntent(NotificationIds.LOW_LIGHT_FOREGROUND))
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .applyForegroundServiceDefaults()
             .build()
     }
 
@@ -292,10 +299,7 @@ class NotificationService(private val context: Context) {
             .setContentTitle(context.getString(R.string.overlay_running_title))
             .setContentText(context.getString(R.string.overlay_running_message))
             .setContentIntent(openAppPendingIntent(NotificationIds.OVERLAY_FOREGROUND))
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .applyForegroundServiceDefaults()
             .build()
     }
 
@@ -305,10 +309,7 @@ class NotificationService(private val context: Context) {
             .setContentTitle(context.getString(R.string.developer_debug_running_title))
             .setContentText(context.getString(R.string.developer_debug_running_message))
             .setContentIntent(openAppPendingIntent(NotificationIds.DEVELOPER_DEBUG_FOREGROUND))
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .applyForegroundServiceDefaults()
             .build()
     }
 
