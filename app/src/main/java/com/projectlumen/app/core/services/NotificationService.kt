@@ -544,8 +544,11 @@ class NotificationService(private val context: Context) {
     }
 
     private fun openAppIntent(): Intent {
+        // Explicit component + package keeps notification launches safe under Android 16 intent redirection hardening.
         return Intent(context, MainActivity::class.java)
+            .setClass(context, MainActivity::class.java)
             .setPackage(context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
     }
 
     private data class OngoingLiveUpdateContent(

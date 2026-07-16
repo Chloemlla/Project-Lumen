@@ -142,6 +142,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -340,6 +341,15 @@ internal fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Sta
     val pageTokens = rememberLumenUiTokens(LocalContext.current).page
     val fallbackScrollState = rememberScrollState()
     val scrollState = LocalLumenPageScrollState.current ?: fallbackScrollState
+    // Android 16+ large screens ignore forced orientation/aspect locks. Keep content readable
+    // with a centered max-width column and slightly larger horizontal gutters on wide pages.
+    val configuration = LocalConfiguration.current
+    val widthDp = configuration.screenWidthDp
+    val horizontalPadding = when {
+        widthDp >= 840 -> maxOf(pageTokens.contentPaddingStartDp, 24f)
+        widthDp >= 600 -> maxOf(pageTokens.contentPaddingStartDp, 16f)
+        else -> pageTokens.contentPaddingStartDp
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -354,9 +364,9 @@ internal fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Sta
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
                 .padding(
                     PaddingValues(
-                        start = pageTokens.contentPaddingStartDp.dp,
+                        start = horizontalPadding.dp,
                         top = pageTokens.contentPaddingTopDp.dp,
-                        end = pageTokens.contentPaddingEndDp.dp,
+                        end = horizontalPadding.dp,
                         bottom = pageTokens.contentPaddingBottomDp.dp,
                     ),
                 ),

@@ -2,6 +2,8 @@
 
 Source: [vivo Android 17 开发者适配文档](https://dev.vivo.com.cn/documentCenter/doc/1010)
 
+Related: [Android 16 / Vivo notes](./ANDROID_16_VIVO_ADAPTATION.md)
+
 Project Lumen currently ships with `compileSdk/targetSdk = 37`. This note tracks the high-priority items from the Vivo guide and the repo response.
 
 ## High priority for this app
