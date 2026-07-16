@@ -146,3 +146,40 @@ Defaulted backend request-signature verification off, made deployment opt-in via
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Seal UI/UX MVP close-out
+
+**Date**: 2026-07-16
+**Task**: Seal UI/UX MVP close-out
+**Branch**: `main`
+
+### Summary
+
+Closed Seal surface/settings chrome MVP: accepted dock compact top bar, captured Android Compose surface spec, softened leftover recommended-setup borders, archived task.
+
+### Main Changes
+
+* Softened recommended-setup feedback card and color swatches onto shared soft-surface tokens
+* Added `.trellis/spec/frontend/android-compose-surfaces.md` and linked it from the frontend index
+* Finalized PRD acceptance criteria with destination-aware top-bar decision
+* Archived `07-16-seal-ui-ux-optimize`
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6e50414` | (see git log) |
+| `ab2a645` | archive seal-ui-ux-optimize |
+
+### Testing
+
+- [OK] Static review only; local full build/test skipped per AGENTS.md (GitHub workflow owns verification)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
