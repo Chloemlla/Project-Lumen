@@ -1,9 +1,9 @@
 package com.projectlumen.app.core.services
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
+import com.projectlumen.app.core.share.SecureShareIntents
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
@@ -41,16 +41,12 @@ class DataBackupService(
         val file = File(context.cacheDir, "project_lumen_backup.json")
         file.writeText(exportBackupJson().toString(2), Charsets.UTF_8)
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/json"
-            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.backup_export))
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(
-            Intent.createChooser(intent, context.getString(R.string.backup_export))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        SecureShareIntents.shareStream(
+            context = context,
+            uri = uri,
+            mimeType = "application/json",
+            subject = context.getString(R.string.backup_export),
+            chooserTitle = context.getString(R.string.backup_export),
         )
     }
 

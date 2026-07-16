@@ -41,22 +41,39 @@ class NotificationService(private val context: Context) {
                     NotificationChannels.REMINDER,
                     context.getString(R.string.channel_reminder),
                     NotificationManager.IMPORTANCE_HIGH,
-                ),
+                ).apply {
+                    description = context.getString(R.string.channel_reminder)
+                    // Transient cue only; continuous media belongs to mediaPlayback FGS under Android 17.
+                    setSound(null, null)
+                    enableVibration(true)
+                },
                 NotificationChannel(
                     NotificationChannels.POMODORO,
                     context.getString(R.string.channel_pomodoro),
                     NotificationManager.IMPORTANCE_DEFAULT,
-                ),
+                ).apply {
+                    description = context.getString(R.string.channel_pomodoro)
+                    setSound(null, null)
+                    enableVibration(true)
+                },
                 NotificationChannel(
                     NotificationChannels.STATUS,
                     context.getString(R.string.channel_status),
                     NotificationManager.IMPORTANCE_LOW,
-                ),
+                ).apply {
+                    description = context.getString(R.string.channel_status)
+                    setSound(null, null)
+                    enableVibration(false)
+                },
                 NotificationChannel(
                     NotificationChannels.PROXIMITY,
                     context.getString(R.string.channel_proximity),
                     NotificationManager.IMPORTANCE_HIGH,
-                ),
+                ).apply {
+                    description = context.getString(R.string.channel_proximity)
+                    setSound(null, null)
+                    enableVibration(true)
+                },
             ),
         )
     }

@@ -1,7 +1,6 @@
 package com.projectlumen.app.core.services
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -9,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
+import com.projectlumen.app.core.share.SecureShareIntents
 import androidx.core.graphics.createBitmap
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
@@ -24,16 +24,12 @@ class ExportService(private val context: Context) {
         val file = File(context.cacheDir, "project_lumen_stats.csv")
         file.writeText(buildCsv(eyeStats, pomodoroStats), Charsets.UTF_8)
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/csv"
-            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.export_subject))
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(
-            Intent.createChooser(intent, context.getString(R.string.export_share))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        SecureShareIntents.shareStream(
+            context = context,
+            uri = uri,
+            mimeType = "text/csv",
+            subject = context.getString(R.string.export_subject),
+            chooserTitle = context.getString(R.string.export_share),
         )
     }
 
@@ -48,16 +44,12 @@ class ExportService(private val context: Context) {
             }
         }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/pdf"
-            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.monthly_report_subject))
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(
-            Intent.createChooser(intent, context.getString(R.string.export_share))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        SecureShareIntents.shareStream(
+            context = context,
+            uri = uri,
+            mimeType = "application/pdf",
+            subject = context.getString(R.string.monthly_report_subject),
+            chooserTitle = context.getString(R.string.export_share),
         )
     }
 
@@ -67,16 +59,12 @@ class ExportService(private val context: Context) {
             buildStatsBitmap(eyeStats, pomodoroStats).compress(Bitmap.CompressFormat.PNG, 100, output)
         }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "image/png"
-            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.export_subject))
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        context.startActivity(
-            Intent.createChooser(intent, context.getString(R.string.export_share))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        SecureShareIntents.shareStream(
+            context = context,
+            uri = uri,
+            mimeType = "image/png",
+            subject = context.getString(R.string.export_subject),
+            chooserTitle = context.getString(R.string.export_share),
         )
     }
 

@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 17 notes (Vivo adaptation doc):
+  - Prefer networkSecurityConfig over android:usesCleartextTraffic.
+  - usesCleartextTraffic is planned for deprecation; cleartext must be domain-scoped here if ever needed.
+  - Certificate Transparency becomes default for targetSdk 37+.
+-->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
     <domain-config cleartextTrafficPermitted="false">

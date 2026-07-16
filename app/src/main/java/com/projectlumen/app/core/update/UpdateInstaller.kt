@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import com.projectlumen.app.core.share.SecureShareIntents
 import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -73,12 +74,7 @@ class UpdateInstaller(private val context: Context) {
 
     fun installApk(file: File) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-            addCategory(Intent.CATEGORY_DEFAULT)
-        }
-        context.startActivity(intent)
+        context.startActivity(SecureShareIntents.viewApk(context, uri))
     }
 
     private fun buildCacheFileName(assetName: String): String {

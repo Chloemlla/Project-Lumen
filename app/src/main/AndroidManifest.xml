@@ -51,10 +51,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ProjectLumen"
         android:usesCleartextTraffic="false"
-        tools:targetApi="tiramisu">
+        tools:targetApi="37">
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:resizeableActivity="true"
             android:theme="@style/Theme.ProjectLumen">
             <intent-filter>
@@ -70,6 +71,7 @@
             android:name=".openapi.DashboardActivity"
             android:exported="true"
             android:permission="com.project.lumen.permission.ACCESS_LUMEN_CORE"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:resizeableActivity="true"
             android:theme="@style/Theme.ProjectLumen">
             <intent-filter>
@@ -81,6 +83,7 @@
             android:name=".openapi.RestOverlayActivity"
             android:exported="true"
             android:permission="com.project.lumen.permission.TRIGGER_LUMEN_CONTROL"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:resizeableActivity="true"
             android:theme="@style/Theme.Lumen.TransparentOverlay">
             <intent-filter>
@@ -92,6 +95,7 @@
             android:name=".openapi.VisualMonitorActivity"
             android:exported="true"
             android:permission="com.project.lumen.permission.ACCESS_LUMEN_CORE"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:resizeableActivity="true"
             android:theme="@style/Theme.ProjectLumen">
             <intent-filter>
