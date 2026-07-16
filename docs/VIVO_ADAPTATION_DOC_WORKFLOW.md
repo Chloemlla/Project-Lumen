@@ -34,6 +34,8 @@ Referer: https://dev.vivo.com.cn/documentCenter/doc/<id>
 在仓库根目录执行：
 
 ```bash
+python scripts/fetch_vivo_adaptation_doc.py 699
+python scripts/fetch_vivo_adaptation_doc.py 797
 python scripts/fetch_vivo_adaptation_doc.py 832
 python scripts/fetch_vivo_adaptation_doc.py 1010
 python scripts/fetch_vivo_adaptation_doc.py 797 832 1010 --scan-repo
