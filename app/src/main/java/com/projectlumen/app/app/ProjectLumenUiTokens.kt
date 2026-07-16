@@ -38,7 +38,7 @@ internal data class LumenTopBarTokens(
     val contentHeightDp: Float = 64f,
     val contentBottomGapDp: Float = 0f,
     val collapseThresholdDp: Float = 96f,
-    val primaryTitleStartDp: Float = 16f,
+    val primaryTitleStartDp: Float = 40f,
     val secondaryLeadingWidthDp: Float = 48f,
     val titleFontSizeSp: Float = 22f,
     val titleFontWeight: Int = 600,

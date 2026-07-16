@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.projectlumen.app.app
 
 import android.annotation.SuppressLint
@@ -212,7 +214,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 internal fun LumenTopBar(
     title: String,
     scrollBehavior: TopAppBarScrollBehavior? = null,

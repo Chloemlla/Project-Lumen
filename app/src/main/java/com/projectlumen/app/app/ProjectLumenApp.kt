@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.projectlumen.app.app
 
 import android.content.Context
@@ -115,7 +117,6 @@ internal enum class Destination(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun ProjectLumenApp(
     viewModel: ProjectLumenViewModel,
     crashReport: CrashReport?,

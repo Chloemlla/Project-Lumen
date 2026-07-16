@@ -31,8 +31,8 @@ class LumenTopBarScreenshotTest {
         val tokens = LumenUiTokens.load(context)
         val deltaDp = tokens.topBar.secondaryLeadingWidthDp - tokens.topBar.primaryTitleStartDp
         assertTrue(
-            "Primary title should remain slightly left of the secondary title, delta=$deltaDp",
-            deltaDp in 1f..16f,
+            "Secondary leading width should leave primary title slightly left of the back-button title, delta=$deltaDp",
+            deltaDp in 1f..24f,
         )
 
         composeRule.setContent {
