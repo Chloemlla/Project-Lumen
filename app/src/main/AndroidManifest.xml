@@ -52,7 +52,6 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.ProjectLumen"
-        android:usesCleartextTraffic="false"
         tools:targetApi="37">
         <activity
             android:name=".MainActivity"
