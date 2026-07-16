@@ -327,7 +327,14 @@ fun ProjectLumenApp(
             ) {
                 ScrollState(0)
             }
-            val topBarScrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+            // Bottom-nav (dock) destinations use a compact title bar. Large/collapsing bars
+            // leave a big empty band above content before the user scrolls, which looks sparse.
+            val useExpandedTopBar = !currentDestination.showInBottomNav
+            val topBarScrollBehavior = if (useExpandedTopBar) {
+                TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+            } else {
+                TopAppBarDefaults.pinnedScrollBehavior()
+            }
             fun navigateBackFromSecondaryPage() {
                 if (!navController.navigateUp()) {
                     navController.navigate(Destination.SETTINGS.route) {
@@ -361,6 +368,7 @@ fun ProjectLumenApp(
                         LumenTopBar(
                             title = stringResource(currentDestination.labelRes),
                             scrollBehavior = topBarScrollBehavior,
+                            expanded = useExpandedTopBar,
                             onNavigateBack = if (currentDestination.showInBottomNav) null else {
                                 { navigateBackFromSecondaryPage() }
                             },
