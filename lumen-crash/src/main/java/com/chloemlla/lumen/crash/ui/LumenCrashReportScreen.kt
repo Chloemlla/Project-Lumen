@@ -88,7 +88,7 @@ import com.chloemlla.lumen.crash.CrashReportPasteUploader
 import com.chloemlla.lumen.crash.CrashReport
 import com.chloemlla.lumen.crash.LumenCrash
 import com.chloemlla.lumen.crash.LumenCrashDefaults
-import com.chloemlla.lumen.crash.R
+import com.chloemlla.lumen.crash.ui.R
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId

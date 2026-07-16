@@ -50,6 +50,8 @@ jobs:
               - 'lumen-crash-sample/**'
               - 'scripts/resolve-lumen-crash-latest.sh'
               - 'scripts/Resolve-LumenCrashLatest.ps1'
+              - 'scripts/sync-lumen-crash-release-maven.sh'
+              - 'scripts/Sync-LumenCrashReleaseMaven.ps1'
               - '.github/workflows/lumen-crash-sdk-release.yml'
 
       - name: Decide whether to release

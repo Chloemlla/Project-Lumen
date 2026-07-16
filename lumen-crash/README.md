@@ -96,6 +96,10 @@ Notes:
 - Explicit `install(application, config)` and direct `LumenCrashReportScreen` remain supported.
 - Capture-only hosts can depend on `:lumen-crash-core` / `lumen-crash-core` and skip Compose UI.
 - Host minify templates: `host-proguard-template.pro`, `host-keep-resources.xml`.
+- Print templates: `gradle :lumen-crash:printHostProguard`.
+- No-auth release sync:
+  - `./scripts/sync-lumen-crash-release-maven.sh`
+  - `pwsh ./scripts/Sync-LumenCrashReleaseMaven.ps1`
 - Sample app: `:lumen-crash-sample`.
 
 ## Features

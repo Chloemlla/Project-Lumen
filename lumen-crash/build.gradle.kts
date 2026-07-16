@@ -26,7 +26,7 @@ group = "com.chloemlla.lumen"
 version = lumenCrashSdkVersion
 
 android {
-    namespace = "com.chloemlla.lumen.crash"
+    namespace = "com.chloemlla.lumen.crash.ui"
     compileSdk = 37
 
     defaultConfig {
@@ -140,3 +140,26 @@ publishing {
         }
     }
 }
+
+tasks.register("printHostProguard") {
+    group = "help"
+    description = "Print host ProGuard / resource-shrink keep templates for lumen-crash."
+    doLast {
+        val proguardTemplate = rootProject.file("lumen-crash/host-proguard-template.pro")
+        val keepXmlTemplate = rootProject.file("lumen-crash/host-keep-resources.xml")
+        println("===== host-proguard-template.pro =====")
+        if (proguardTemplate.isFile) {
+            println(proguardTemplate.readText(Charsets.UTF_8).trimEnd())
+        } else {
+            println("Missing: ${proguardTemplate.path}")
+        }
+        println()
+        println("===== host-keep-resources.xml (place under host res/raw/keep.xml) =====")
+        if (keepXmlTemplate.isFile) {
+            println(keepXmlTemplate.readText(Charsets.UTF_8).trimEnd())
+        } else {
+            println("Missing: ${keepXmlTemplate.path}")
+        }
+    }
+}
+

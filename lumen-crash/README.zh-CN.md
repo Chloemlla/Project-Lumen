@@ -96,6 +96,10 @@ setContent {
 - 显式 `install(application, config)` 与直接使用 `LumenCrashReportScreen` 仍兼容。
 - 仅采集宿主可依赖 `:lumen-crash-core` / `lumen-crash-core`，无需 Compose UI。
 - 宿主混淆模板：`host-proguard-template.pro`、`host-keep-resources.xml`。
+- 打印模板：`gradle :lumen-crash:printHostProguard`。
+- 无鉴权 Release 同步：
+  - `./scripts/sync-lumen-crash-release-maven.sh`
+  - `pwsh ./scripts/Sync-LumenCrashReleaseMaven.ps1`
 - Sample：`:lumen-crash-sample`。
 
 ## 功能特性
