@@ -130,6 +130,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -218,42 +219,71 @@ internal fun LumenTopBar(
     title: String,
     scrollBehavior: TopAppBarScrollBehavior? = null,
     onNavigateBack: (() -> Unit)? = null,
+    /**
+     * Dock primary destinations stay compact so the title bar does not reserve a large
+     * expanded blank band before the user scrolls. Secondary pages may still expand.
+     */
+    expanded: Boolean = false,
 ) {
     val topBarTokens = rememberLumenUiTokens(LocalContext.current).topBar
-    val titleStyle = MaterialTheme.typography.headlineMedium.copy(
-        fontSize = topBarTokens.titleFontSizeSp.sp,
-        fontWeight = FontWeight(topBarTokens.titleFontWeight),
-    )
-    LargeTopAppBar(
-        title = {
-            Text(
-                text = title,
-                style = titleStyle,
-                maxLines = topBarTokens.titleMaxLines,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        navigationIcon = {
-            if (onNavigateBack != null) {
-                IconButton(
-                    onClick = onNavigateBack,
-                    modifier = Modifier.size(topBarTokens.secondaryLeadingWidthDp.dp),
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = stringResource(R.string.navigate_back),
-                    )
-                }
+    val titleStyle = if (expanded) {
+        MaterialTheme.typography.headlineMedium.copy(
+            fontSize = topBarTokens.titleFontSizeSp.sp,
+            fontWeight = FontWeight(topBarTokens.titleFontWeight),
+        )
+    } else {
+        MaterialTheme.typography.titleLarge.copy(
+            fontSize = minOf(topBarTokens.titleFontSizeSp, 22f).sp,
+            fontWeight = FontWeight(topBarTokens.titleFontWeight),
+        )
+    }
+    val titleContent = @Composable {
+        Text(
+            text = title,
+            style = titleStyle,
+            maxLines = if (expanded) topBarTokens.titleMaxLines else 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    val navigationIcon = @Composable {
+        if (onNavigateBack != null) {
+            IconButton(
+                onClick = onNavigateBack,
+                modifier = Modifier.size(topBarTokens.secondaryLeadingWidthDp.dp),
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Outlined.ArrowBack,
+                    contentDescription = stringResource(R.string.navigate_back),
+                )
             }
-        },
-        colors = TopAppBarDefaults.largeTopAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        scrollBehavior = scrollBehavior,
-    )
+        }
+    }
+
+    if (expanded) {
+        LargeTopAppBar(
+            title = titleContent,
+            navigationIcon = navigationIcon,
+            colors = TopAppBarDefaults.largeTopAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+            scrollBehavior = scrollBehavior,
+        )
+    } else {
+        TopAppBar(
+            title = titleContent,
+            navigationIcon = navigationIcon,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+                navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+            scrollBehavior = scrollBehavior,
+        )
+    }
 }
 
 @Composable
