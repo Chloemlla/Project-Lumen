@@ -153,7 +153,13 @@ class ProjectLumenViewModel(
     )
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
     private val _ossNoticeState = MutableStateFlow(
-        ProjectLumenOssNoticeState(),
+        ProjectLumenOssNoticeState(
+            // Avoid a first-frame flash of the main UI for incomplete first-run notices.
+            // Existing users who already finished product onboarding are settled in refresh.
+            visible = installProfile.ossNoticeCompletedAt <= 0L &&
+                installProfile.onboardingCompletedAt <= 0L,
+            reopenMode = false,
+        ),
     )
     private val _onboardingState = MutableStateFlow(
         ProjectLumenOnboardingState(deviceFingerprint = deviceFingerprint),
@@ -326,15 +332,26 @@ class ProjectLumenViewModel(
 
     fun completeOssNotice() {
         val reopenMode = _ossNoticeState.value.reopenMode
-        secureCredentials.markOssNoticeCompleted()
+        if (!reopenMode) {
+            secureCredentials.markOssNoticeCompleted()
+        }
         _ossNoticeState.value = ProjectLumenOssNoticeState(visible = false, reopenMode = false)
         if (reopenMode) return
         val onboardingStillPending = runCatching {
             secureCredentials.installProfile().onboardingCompletedAt <= 0L
-        }.getOrDefault(false)
+        }.getOrDefault(true)
         if (onboardingStillPending) {
-            _onboardingState.value = _onboardingState.value.copy(visible = true)
+            _onboardingState.value = _onboardingState.value.copy(
+                visible = true,
+                deviceFingerprint = deviceFingerprint,
+            )
         }
+    }
+
+    fun dismissOssNotice() {
+        // Used by system back while reopening from About. Do not re-arm first-run.
+        if (!_ossNoticeState.value.visible) return
+        _ossNoticeState.value = ProjectLumenOssNoticeState(visible = false, reopenMode = false)
     }
 
     fun reopenOssNotice() {
@@ -432,17 +449,30 @@ class ProjectLumenViewModel(
             nowMillis - firstInstallAt <= FRESH_INSTALL_WINDOW_MILLIS
         val newInstallDetected = !installProfile.hadDeviceCredentialBeforeLaunch &&
             (freshPackageInstall || installProfile.firstSeenAt >= nowMillis - FIRST_SEEN_GRACE_MILLIS)
-        val shouldShowOssNotice = installProfile.ossNoticeCompletedAt <= 0L &&
-            !installProfile.hadDeviceCredentialBeforeLaunch &&
-            !hadExistingLocalUse
+
+        // Gate solely on the OSS completion flag so killing the process mid-notice still
+        // re-shows the page. Existing users who already finished product onboarding before
+        // this feature are silently settled instead of being forced through the notice.
+        val ossAlreadyCompleted = installProfile.ossNoticeCompletedAt > 0L
+        val existingUserBeforeOssFeature = !ossAlreadyCompleted &&
+            installProfile.onboardingCompletedAt > 0L
+        if (existingUserBeforeOssFeature) {
+            runCatching { secureCredentials.markOssNoticeCompleted() }
+        }
+        val shouldShowOssNotice = !ossAlreadyCompleted && !existingUserBeforeOssFeature
+
         val shouldShow = installProfile.onboardingCompletedAt <= 0L &&
             !installProfile.hadDeviceCredentialBeforeLaunch &&
             !hadExistingLocalUse &&
             !shouldShowOssNotice
-        _ossNoticeState.value = ProjectLumenOssNoticeState(
-            visible = shouldShowOssNotice,
-            reopenMode = false,
-        )
+        // Preserve an in-progress About reopen; only auto-drive first-run visibility here.
+        val currentOss = _ossNoticeState.value
+        if (!currentOss.reopenMode) {
+            _ossNoticeState.value = ProjectLumenOssNoticeState(
+                visible = shouldShowOssNotice,
+                reopenMode = false,
+            )
+        }
         _onboardingState.value = ProjectLumenOnboardingState(
             visible = shouldShow,
             deviceFingerprint = deviceFingerprint,

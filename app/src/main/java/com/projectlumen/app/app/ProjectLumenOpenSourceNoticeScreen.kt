@@ -1,5 +1,6 @@
 package com.projectlumen.app.app
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,11 +53,18 @@ private data class OssCredit(
 @Composable
 internal fun ProjectLumenOpenSourceNoticeScreen(
     onContinue: () -> Unit,
+    onDismiss: (() -> Unit)? = null,
     onOpenUrl: ((String) -> Unit)? = null,
 ) {
     val uriHandler = LocalUriHandler.current
     val credits = rememberProjectLumenCredits()
     val projectLicense = stringResource(R.string.oss_notice_project_license_name)
+
+    // First-run: leave system back to finish the activity.
+    // Reopen from About: dismiss notice and return to the host screen.
+    if (onDismiss != null) {
+        BackHandler(onBack = onDismiss)
+    }
 
     fun openUrl(url: String) {
         if (onOpenUrl != null) {

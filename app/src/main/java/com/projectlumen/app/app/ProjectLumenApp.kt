@@ -18,6 +18,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material.icons.Icons
@@ -310,7 +312,7 @@ fun ProjectLumenApp(
                 )
                 return@ProjectLumenTheme
             }
-            if (ossNoticeState.visible) {
+            if (ossNoticeState.visible && !ossNoticeState.reopenMode) {
                 ProjectLumenOpenSourceNoticeScreen(
                     onContinue = viewModel::completeOssNotice,
                 )
@@ -323,6 +325,7 @@ fun ProjectLumenApp(
                 )
                 return@ProjectLumenTheme
             }
+            Box(modifier = Modifier.fillMaxSize()) {
             val navController = rememberNavController()
             val backStackEntry by navController.currentBackStackEntryAsState()
             val currentDestination = Destination.entries.firstOrNull {
@@ -496,6 +499,14 @@ fun ProjectLumenApp(
                     }
                 }
             }
+            if (ossNoticeState.visible && ossNoticeState.reopenMode) {
+                ProjectLumenOpenSourceNoticeScreen(
+                    onContinue = viewModel::completeOssNotice,
+                    onDismiss = viewModel::dismissOssNotice,
+                )
+            }
+            } // end host Box (main UI + reopen overlay)
+
             if (updateDialogState !is UpdateDialogState.Hidden) {
                 UpdateDialog(
                     viewModel = viewModel,
