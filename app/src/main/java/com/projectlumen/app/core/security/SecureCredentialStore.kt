@@ -287,6 +287,7 @@ class SecureCredentialStore(context: Context) {
         private const val KEY_DEVICE_FINGERPRINT_VERSION = "device_fingerprint_version"
         private const val KEY_FIRST_SEEN_AT = "first_seen_at"
         private const val KEY_ONBOARDING_COMPLETED_AT = "onboarding_completed_at"
+        private const val KEY_OSS_NOTICE_COMPLETED_AT = "oss_notice_completed_at"
         private const val KEY_MMKV_CRYPT_KEY = "mmkv_crypt_key"
         private const val KEY_MMKV_MIGRATION_COMPLETE = "mmkv_migration_complete"
         private const val DEVICE_FINGERPRINT_LENGTH = 64
