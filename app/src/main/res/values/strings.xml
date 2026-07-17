@@ -799,4 +799,34 @@
     <string name="product_demo_scene_advanced_detail">Templates, exports, cloud backup, Shizuku, diagnostics, and open API close the product story.</string>
     <string name="product_demo_capability_title">Capability wall</string>
     <string name="product_demo_capability_open_api">Open API</string>
+
+    <string name="oss_notice_title">Open source notice</string>
+    <string name="oss_notice_intro">Please read this notice before using Project Lumen. It covers the official source, free distribution, project license, and third-party credits.</string>
+    <string name="oss_notice_repo_title">Official open-source repository</string>
+    <string name="oss_notice_repo_body">Get Project Lumen only from the official GitHub repository. That is the only source we maintain.</string>
+    <string name="oss_notice_open_repo">Open official repository</string>
+    <string name="oss_notice_free_title">Permanently free - beware of scams</string>
+    <string name="oss_notice_free_body">Project Lumen is permanently free and open source. Do not buy paid, cracked, or \"VIP\" redistributions. Anyone charging money for this app is likely scamming you.</string>
+    <string name="oss_notice_project_license_title">Project license</string>
+    <string name="oss_notice_project_license_name">Apache License, Version 2.0</string>
+    <string name="oss_notice_project_license_body">This project is released under %1$s. You may use, study, share, and improve it under that license. See the official repository for source and license details.</string>
+    <string name="oss_notice_credits_title">Third-party dependencies</string>
+    <string name="oss_notice_credits_body">Project Lumen stands on these open-source projects and libraries. Tap an item to open its homepage when available.</string>
+    <string name="oss_notice_continue">Continue</string>
+    <string name="oss_notice_reopen">Open-source notice &amp; credits</string>
+    <string name="credit_lumen_crash_desc">In-app crash collection and adaptive crash UI used by Project Lumen</string>
+    <string name="credit_compose_desc">Modern declarative UI toolkit and Material 3 components</string>
+    <string name="credit_androidx_desc">Core Android Jetpack libraries for runtime, lifecycle, navigation, and background work</string>
+    <string name="credit_room_desc">Local persistence layer for settings, stats, templates, and runtime state</string>
+    <string name="credit_datastore_desc">Preferences storage for lightweight local configuration</string>
+    <string name="credit_security_crypto_desc">Encrypted preferences used for secure credential and install profile storage</string>
+    <string name="credit_profileinstaller_desc">Baseline profile installation for faster cold starts</string>
+    <string name="credit_coroutines_desc">Structured concurrency for asynchronous app work</string>
+    <string name="credit_mmkv_desc">High-performance key-value storage for preferences and runtime data</string>
+    <string name="credit_okhttp_desc">HTTP client for updates, API, and cloud-related network calls</string>
+    <string name="credit_shizuku_desc">Privileged helper integration for advanced system controls</string>
+    <string name="credit_mlkit_desc">On-device face and mesh detection for distance and blink sensing</string>
+    <string name="credit_constraintlayout_desc">Constraint-based layout helpers for Compose screens</string>
+    <string name="credit_material_icons_desc">Extended Material icon set used throughout the interface</string>
+
 </resources>

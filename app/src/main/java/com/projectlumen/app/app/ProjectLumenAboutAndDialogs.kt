@@ -329,6 +329,11 @@ internal fun AboutLinksCard(viewModel: ProjectLumenViewModel) {
     Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = lumenCardColors(), elevation = lumenCardElevation(), border = lumenCardBorder()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
+            OutlinedButton(onClick = viewModel::reopenOssNotice) {
+                Icon(Icons.Outlined.Gavel, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.oss_notice_reopen))
+            }
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL, viewModel)
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL, viewModel)
         }

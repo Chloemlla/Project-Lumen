@@ -16,6 +16,7 @@ data class DeviceInstallProfile(
     val firstSeenAt: Long,
     val packageFirstInstallAt: Long,
     val onboardingCompletedAt: Long,
+    val ossNoticeCompletedAt: Long,
 )
 
 data class StoredAuthSession(
@@ -124,6 +125,7 @@ class SecureCredentialStore(context: Context) {
                 firstSeenAt = firstSeenAt,
                 packageFirstInstallAt = packageFirstInstallAt(),
                 onboardingCompletedAt = encryptedMmkv.decodeLong(KEY_ONBOARDING_COMPLETED_AT, 0L),
+                ossNoticeCompletedAt = encryptedMmkv.decodeLong(KEY_OSS_NOTICE_COMPLETED_AT, 0L),
             )
         }.getOrElse { error ->
             Log.e(TAG, "installProfile failed; using ephemeral defaults", error)
@@ -132,6 +134,7 @@ class SecureCredentialStore(context: Context) {
                 firstSeenAt = nowMillis,
                 packageFirstInstallAt = packageFirstInstallAt(),
                 onboardingCompletedAt = 0L,
+                ossNoticeCompletedAt = 0L,
             )
         }
     }
@@ -139,6 +142,11 @@ class SecureCredentialStore(context: Context) {
     fun markOnboardingCompleted(nowMillis: Long = System.currentTimeMillis()) {
         migrateLegacyCredentialsIfNeeded()
         encryptedMmkv.encode(KEY_ONBOARDING_COMPLETED_AT, nowMillis.coerceAtLeast(1L))
+    }
+
+    fun markOssNoticeCompleted(nowMillis: Long = System.currentTimeMillis()) {
+        migrateLegacyCredentialsIfNeeded()
+        encryptedMmkv.encode(KEY_OSS_NOTICE_COMPLETED_AT, nowMillis.coerceAtLeast(1L))
     }
 
     fun deviceInstallationId(): String {

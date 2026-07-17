@@ -70,6 +70,7 @@ class ProjectLumenViewModel(
                 firstSeenAt = System.currentTimeMillis(),
                 packageFirstInstallAt = 0L,
                 onboardingCompletedAt = 0L,
+                ossNoticeCompletedAt = 0L,
             )
         }
     private val deviceFingerprint = runCatching { secureCredentials.deviceInstallationId() }
@@ -151,11 +152,15 @@ class ProjectLumenViewModel(
         tipTemplateRepository = repositories.tipTemplates,
     )
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    private val _ossNoticeState = MutableStateFlow(
+        ProjectLumenOssNoticeState(),
+    )
     private val _onboardingState = MutableStateFlow(
         ProjectLumenOnboardingState(deviceFingerprint = deviceFingerprint),
     )
 
     val webPageRequests = _webPageRequests.asSharedFlow()
+    val ossNoticeState = _ossNoticeState.asStateFlow()
     val onboardingState = _onboardingState.asStateFlow()
     val backupImportPreview = backupEntry.importPreview
     internal val remoteState = remoteEntry.state
@@ -319,6 +324,23 @@ class ProjectLumenViewModel(
         stateStore.clearCrashReport()
     }
 
+    fun completeOssNotice() {
+        val reopenMode = _ossNoticeState.value.reopenMode
+        secureCredentials.markOssNoticeCompleted()
+        _ossNoticeState.value = ProjectLumenOssNoticeState(visible = false, reopenMode = false)
+        if (reopenMode) return
+        val onboardingStillPending = runCatching {
+            secureCredentials.installProfile().onboardingCompletedAt <= 0L
+        }.getOrDefault(false)
+        if (onboardingStillPending) {
+            _onboardingState.value = _onboardingState.value.copy(visible = true)
+        }
+    }
+
+    fun reopenOssNotice() {
+        _ossNoticeState.value = ProjectLumenOssNoticeState(visible = true, reopenMode = true)
+    }
+
     fun completeOnboarding(applyRecommendedSetup: Boolean) {
         secureCredentials.markOnboardingCompleted()
         _onboardingState.value = _onboardingState.value.copy(visible = false)
@@ -410,9 +432,17 @@ class ProjectLumenViewModel(
             nowMillis - firstInstallAt <= FRESH_INSTALL_WINDOW_MILLIS
         val newInstallDetected = !installProfile.hadDeviceCredentialBeforeLaunch &&
             (freshPackageInstall || installProfile.firstSeenAt >= nowMillis - FIRST_SEEN_GRACE_MILLIS)
-        val shouldShow = installProfile.onboardingCompletedAt <= 0L &&
+        val shouldShowOssNotice = installProfile.ossNoticeCompletedAt <= 0L &&
             !installProfile.hadDeviceCredentialBeforeLaunch &&
             !hadExistingLocalUse
+        val shouldShow = installProfile.onboardingCompletedAt <= 0L &&
+            !installProfile.hadDeviceCredentialBeforeLaunch &&
+            !hadExistingLocalUse &&
+            !shouldShowOssNotice
+        _ossNoticeState.value = ProjectLumenOssNoticeState(
+            visible = shouldShowOssNotice,
+            reopenMode = false,
+        )
         _onboardingState.value = ProjectLumenOnboardingState(
             visible = shouldShow,
             deviceFingerprint = deviceFingerprint,

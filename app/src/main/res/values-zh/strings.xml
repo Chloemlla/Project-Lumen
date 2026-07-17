@@ -798,4 +798,34 @@
     <string name="product_demo_scene_advanced_detail">模板、导出、云备份、Shizuku、诊断和开放 API 收束完整产品故事。</string>
     <string name="product_demo_capability_title">能力墙</string>
     <string name="product_demo_capability_open_api">开放 API</string>
+
+    <string name="oss_notice_title">开源说明</string>
+    <string name="oss_notice_intro">使用 Project Lumen 前请先阅读本说明。内容包括官方开源地址、永久免费与防骗提示、本项目开源协议，以及第三方依赖鸣谢。</string>
+    <string name="oss_notice_repo_title">官方开源仓库</string>
+    <string name="oss_notice_repo_body">请仅从官方 GitHub 仓库获取 Project Lumen。这是我们维护的唯一来源。</string>
+    <string name="oss_notice_open_repo">打开官方仓库</string>
+    <string name="oss_notice_free_title">永久免费，谨防上当受骗</string>
+    <string name="oss_notice_free_body">Project Lumen 永久免费且开源。请勿购买付费、破解或所谓“VIP”二次分发版本。任何以此收费的行为都可能是诈骗。</string>
+    <string name="oss_notice_project_license_title">本项目开源协议</string>
+    <string name="oss_notice_project_license_name">Apache License, Version 2.0</string>
+    <string name="oss_notice_project_license_body">本项目以 %1$s 发布。你可以在该协议允许范围内使用、学习、分享和改进本项目。源码与协议详情见官方仓库。</string>
+    <string name="oss_notice_credits_title">第三方依赖鸣谢</string>
+    <string name="oss_notice_credits_body">Project Lumen 基于以下开源项目与库构建。若有主页，点击条目可打开。</string>
+    <string name="oss_notice_continue">继续</string>
+    <string name="oss_notice_reopen">开源说明与鸣谢</string>
+    <string name="credit_lumen_crash_desc">Project Lumen 使用的应用内崩溃采集与自适应崩溃界面</string>
+    <string name="credit_compose_desc">现代声明式 UI 工具包与 Material 3 组件</string>
+    <string name="credit_androidx_desc">覆盖运行时、生命周期、导航与后台任务的 Android Jetpack 核心库</string>
+    <string name="credit_room_desc">用于设置、统计、模板与运行态的本地持久化</string>
+    <string name="credit_datastore_desc">用于轻量本地配置的 Preferences 存储</string>
+    <string name="credit_security_crypto_desc">用于安全凭证与安装画像的加密偏好存储</string>
+    <string name="credit_profileinstaller_desc">用于加速冷启动的 Baseline Profile 安装</string>
+    <string name="credit_coroutines_desc">用于异步任务的结构化并发库</string>
+    <string name="credit_mmkv_desc">用于偏好与运行时数据的高性能键值存储</string>
+    <string name="credit_okhttp_desc">用于更新、API 与云相关请求的 HTTP 客户端</string>
+    <string name="credit_shizuku_desc">用于高级系统控制的特权助手集成</string>
+    <string name="credit_mlkit_desc">用于距离与眨眼感知的端侧人脸/网格检测</string>
+    <string name="credit_constraintlayout_desc">Compose 页面使用的约束布局辅助库</string>
+    <string name="credit_material_icons_desc">界面中使用的 Material 扩展图标集</string>
+
 </resources>

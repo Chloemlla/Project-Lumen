@@ -123,6 +123,7 @@ fun ProjectLumenApp(
     openLaunchRequest: LumenOpenLaunchRequest? = null,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val ossNoticeState by viewModel.ossNoticeState.collectAsStateWithLifecycle()
     val onboardingState by viewModel.onboardingState.collectAsStateWithLifecycle()
     val configuredThemeMode = runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }
         .getOrDefault(AppThemeMode.SYSTEM)
@@ -306,6 +307,12 @@ fun ProjectLumenApp(
                 WebViewScreen(
                     url = url,
                     onDismiss = { pendingWebUrl = null },
+                )
+                return@ProjectLumenTheme
+            }
+            if (ossNoticeState.visible) {
+                ProjectLumenOpenSourceNoticeScreen(
+                    onContinue = viewModel::completeOssNotice,
                 )
                 return@ProjectLumenTheme
             }
