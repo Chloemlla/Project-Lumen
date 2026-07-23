@@ -62,6 +62,7 @@ async fn openapi(State(state): State<AppState>) -> Json<Value> {
             "/v1/device-control/vision/sessions": { "post": { "summary": "Start privileged silent vision session" } },
             "/v1/device-control/vision/heartbeat": { "post": { "summary": "Heartbeat for silent vision session" } },
             "/v1/device-control/vision/frames": { "post": { "summary": "Upload silent vision analyzer frame" } },
+            "/v1/device-control/vision/surface-frames": { "post": { "summary": "Upload Surface analysis frames for vision stream" } },
             "/v1/device-control/lifecycle/events": { "post": { "summary": "Report lifecycle lock and self-heal events" } },
             "/v1/config/feature-flags": { "get": { "summary": "Fetch remote feature flags" } },
             "/v1/config/sync": { "get": { "summary": "Fetch cursor-based templates, feature flags, and remote policies" } },
@@ -309,6 +310,7 @@ fn remote_policy_payload(updated_at: i64) -> Vec<Value> {
                 "maxFps": 2,
                 "maxSessionMinutes": 120,
                 "frameUploadEnabled": true,
+                "surfaceAnalysisUploadEnabled": true,
                 "endpointPrefix": "/v1/device-control"
             },
             "updatedAt": updated_at,
@@ -450,4 +452,4 @@ impl EmptyFallback for String {
 }
 
 const DEFAULT_CHANNEL: &str = "stable";
-const CONFIG_STATIC_CURSOR: i64 = 2;
+const CONFIG_STATIC_CURSOR: i64 = 3;

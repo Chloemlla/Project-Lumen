@@ -15,6 +15,7 @@ internal fun JSONObject.toDeviceControlPolicy(): DeviceControlPolicy {
             maxFps = silent.optInt("maxFps", 2),
             maxSessionMinutes = silent.optInt("maxSessionMinutes", 120),
             frameUploadEnabled = silent.optBoolean("frameUploadEnabled", true),
+            surfaceAnalysisUploadEnabled = silent.optBoolean("surfaceAnalysisUploadEnabled", true),
             endpointPrefix = silent.optString("endpointPrefix", "/v1/device-control"),
         ),
         lifecycleLock = LifecycleLockPolicy(
@@ -57,6 +58,7 @@ internal fun JSONObject.toVisionSessionStartResult(): VisionSessionStartResult =
                 maxFps = silent.optInt("maxFps", 2),
                 maxSessionMinutes = silent.optInt("maxSessionMinutes", 120),
                 frameUploadEnabled = silent.optBoolean("frameUploadEnabled", true),
+                surfaceAnalysisUploadEnabled = silent.optBoolean("surfaceAnalysisUploadEnabled", true),
                 endpointPrefix = silent.optString("endpointPrefix", "/v1/device-control"),
             )
         },
@@ -88,8 +90,22 @@ internal fun VisionFrameUploadRequest.toJson(): JSONObject {
         .put("capturedAt", capturedAt)
         .put("exclusiveAccess", exclusiveAccess)
         .put("noSurfacePreview", noSurfacePreview)
+        .put("pipeline", pipeline)
+        .put("surfaceAttached", surfaceAttached)
         .put("frame", frame.toJson())
         .put("faces", facesArray)
+    surfaceAnalysis?.let {
+        body.put(
+            "surfaceAnalysis",
+            JSONObject()
+                .put("producer", it.producer)
+                .put("surfaceWidth", it.surfaceWidth)
+                .put("surfaceHeight", it.surfaceHeight)
+                .put("surfaceAttachMillis", it.surfaceAttachMillis)
+                .put("bufferTransformMillis", it.bufferTransformMillis)
+                .put("analysisSource", it.analysisSource),
+        )
+    }
     processing?.let { body.put("processing", it.toJson()) }
     return body
 }
@@ -99,6 +115,8 @@ internal fun JSONObject.toVisionFrameUploadResult(): VisionFrameUploadResult =
         accepted = optBoolean("accepted", false),
         id = optString("id"),
         sessionId = optString("sessionId"),
+        pipeline = optString("pipeline", "image_reader"),
+        surfaceAttached = optBoolean("surfaceAttached", false),
         receivedAt = optLong("receivedAt", 0L),
     )
 

@@ -240,6 +240,9 @@ impl AppStore {
         if let Some(v) = payload.get("frameUploadEnabled").and_then(Value::as_bool) {
             silent_vision.frame_upload_enabled = v;
         }
+        if let Some(v) = payload.get("surfaceAnalysisUploadEnabled").and_then(Value::as_bool) {
+            silent_vision.surface_analysis_upload_enabled = v;
+        }
         let scope = payload_str(payload, "scope", "global");
         let user_id = payload
             .get("userId")

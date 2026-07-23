@@ -22,6 +22,7 @@ pub fn router() -> Router<AppState> {
         .route("/device-control/vision/sessions", post(start_vision_session))
         .route("/device-control/vision/heartbeat", post(vision_heartbeat))
         .route("/device-control/vision/frames", post(upload_vision_frame))
+        .route("/device-control/vision/surface-frames", post(upload_surface_vision_frame))
         .route("/device-control/lifecycle/events", post(report_lifecycle_event))
 }
 
@@ -76,6 +77,20 @@ async fn upload_vision_frame(
     Json(payload): Json<VisionFrameUploadRequest>,
 ) -> Result<Json<VisionFrameUploadResponse>, ApiError> {
     let user = require_user(&headers, &state).await?;
+    Ok(Json(
+        state.store.upload_vision_frame(&user.id, payload).await?,
+    ))
+}
+
+async fn upload_surface_vision_frame(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(mut payload): Json<VisionFrameUploadRequest>,
+) -> Result<Json<VisionFrameUploadResponse>, ApiError> {
+    let user = require_user(&headers, &state).await?;
+    payload.pipeline = "surface".to_owned();
+    payload.surface_attached = true;
+    payload.no_surface_preview = false;
     Ok(Json(
         state.store.upload_vision_frame(&user.id, payload).await?,
     ))

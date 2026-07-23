@@ -100,6 +100,7 @@ export function buildActionPayload(
         maxFps: Number(readField("silentVisionMaxFpsInput") || data.deviceControlPolicy.maxFps || 2),
         maxSessionMinutes: Number(readField("silentVisionMaxSessionInput") || data.deviceControlPolicy.maxSessionMinutes || 120),
         frameUploadEnabled: true,
+        surfaceAnalysisUploadEnabled: (readField("silentVisionSurfaceUploadInput") || "true") === "true",
       };
     case "set-lifecycle-lock-policy":
       return {

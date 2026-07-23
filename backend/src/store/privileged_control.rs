@@ -54,6 +54,8 @@ pub(crate) struct VisionStreamFrameRecord {
     pub received_at: i64,
     pub exclusive_access: bool,
     pub no_surface_preview: bool,
+    pub pipeline: String,
+    pub surface_attached: bool,
     pub payload: VisionFrameUploadRequest,
 }
 
@@ -312,6 +314,7 @@ impl AppStore {
         })
     }
 
+    
     pub async fn upload_vision_frame(
         &self,
         user_id: &str,
@@ -320,6 +323,8 @@ impl AppStore {
         validate_vision_frame(&request)?;
         let session_id = request.session_id.trim().to_owned();
         let device_installation_id = request.device_installation_id.trim().to_owned();
+        let pipeline = normalize_pipeline(&request.pipeline);
+        let surface_attached = request.surface_attached || pipeline == "surface";
         let mut session = self
             .vision_stream_sessions
             .find_one(doc! { "_id": &session_id, "userId": user_id }, None)
@@ -340,6 +345,23 @@ impl AppStore {
                 "silent vision frame upload is disabled by policy".to_owned(),
             ));
         }
+        if pipeline == "surface" && !policy.surface_analysis_upload_enabled {
+            return Err(ApiError::BadRequest(
+                "surface analysis frame upload is disabled by policy".to_owned(),
+            ));
+        }
+        if pipeline == "surface" {
+            let metrics = request.surface_analysis.as_ref().ok_or_else(|| {
+                ApiError::BadRequest(
+                    "surfaceAnalysis metrics are required for surface pipeline frames".to_owned(),
+                )
+            })?;
+            if metrics.surface_width <= 0 || metrics.surface_height <= 0 {
+                return Err(ApiError::BadRequest(
+                    "surfaceAnalysis surfaceWidth/surfaceHeight must be positive".to_owned(),
+                ));
+            }
+        }
         let now = now_millis();
         if session.expires_at < now || session.status != "active" {
             session.status = "expired".to_owned();
@@ -353,6 +375,10 @@ impl AppStore {
         }
 
         let id = Uuid::new_v4().to_string();
+        let request_pipeline = pipeline.clone();
+        let request_surface_attached = surface_attached;
+        let exclusive_access = request.exclusive_access;
+        let no_surface_preview = request.no_surface_preview;
         self.vision_stream_frames
             .insert_one(
                 VisionStreamFrameRecord {
@@ -361,8 +387,10 @@ impl AppStore {
                     session_id: session_id.clone(),
                     device_installation_id,
                     received_at: now,
-                    exclusive_access: request.exclusive_access,
-                    no_surface_preview: request.no_surface_preview,
+                    exclusive_access,
+                    no_surface_preview,
+                    pipeline: request_pipeline.clone(),
+                    surface_attached: request_surface_attached,
                     payload: request,
                 },
                 None,
@@ -373,8 +401,8 @@ impl AppStore {
         session.frames_uploaded = session.frames_uploaded.saturating_add(1);
         session.frames_captured = session.frames_captured.max(session.frames_uploaded);
         session.last_heartbeat_at = now;
-        session.exclusive_held = request.exclusive_access;
-        session.surface_detached = request.no_surface_preview;
+        session.exclusive_held = exclusive_access;
+        session.surface_detached = !request_surface_attached;
         self.vision_stream_sessions
             .replace_one(doc! { "_id": &session_id }, session, None)
             .await
@@ -384,11 +412,13 @@ impl AppStore {
             accepted: true,
             id,
             session_id,
+            pipeline: request_pipeline,
+            surface_attached: request_surface_attached,
             received_at: now,
         })
     }
 
-    pub async fn record_lifecycle_event(
+pub async fn record_lifecycle_event(
         &self,
         user_id: &str,
         request: LifecycleEventRequest,

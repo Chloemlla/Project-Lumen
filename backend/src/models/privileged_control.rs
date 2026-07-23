@@ -12,6 +12,7 @@ pub struct SilentVisionPolicy {
     pub max_fps: i32,
     pub max_session_minutes: i32,
     pub frame_upload_enabled: bool,
+    pub surface_analysis_upload_enabled: bool,
     pub endpoint_prefix: String,
 }
 
@@ -26,6 +27,7 @@ impl Default for SilentVisionPolicy {
             max_fps: 2,
             max_session_minutes: 120,
             frame_upload_enabled: true,
+            surface_analysis_upload_enabled: true,
             endpoint_prefix: "/v1/device-control".to_owned(),
         }
     }
@@ -135,10 +137,41 @@ pub struct VisionFrameUploadRequest {
     pub captured_at: i64,
     pub exclusive_access: bool,
     pub no_surface_preview: bool,
+    #[serde(default = "default_pipeline")]
+    pub pipeline: String,
+    #[serde(default)]
+    pub surface_attached: bool,
+    pub surface_analysis: Option<SurfaceAnalysisMetrics>,
     pub frame: crate::models::CameraFramePayload,
     #[serde(default)]
     pub faces: Vec<crate::models::FaceAnalysisFace>,
     pub processing: Option<crate::models::FaceAnalysisProcessingMetrics>,
+}
+
+fn default_pipeline() -> String {
+    "image_reader".to_owned()
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SurfaceAnalysisMetrics {
+    pub producer: String,
+    pub surface_width: i32,
+    pub surface_height: i32,
+    pub surface_attach_millis: i64,
+    pub buffer_transform_millis: i64,
+    pub analysis_source: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SurfaceVisionFrameUploadResponse {
+    pub accepted: bool,
+    pub id: String,
+    pub session_id: String,
+    pub pipeline: String,
+    pub surface_attached: bool,
+    pub received_at: i64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -147,6 +180,8 @@ pub struct VisionFrameUploadResponse {
     pub accepted: bool,
     pub id: String,
     pub session_id: String,
+    pub pipeline: String,
+    pub surface_attached: bool,
     pub received_at: i64,
 }
 

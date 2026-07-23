@@ -9,6 +9,7 @@ data class SilentVisionPolicy(
     val maxFps: Int = 2,
     val maxSessionMinutes: Int = 120,
     val frameUploadEnabled: Boolean = true,
+    val surfaceAnalysisUploadEnabled: Boolean = true,
     val endpointPrefix: String = "/v1/device-control",
 )
 
@@ -64,12 +65,24 @@ data class VisionHeartbeatResult(
     val receivedAt: Long,
 )
 
+data class SurfaceAnalysisMetrics(
+    val producer: String,
+    val surfaceWidth: Int,
+    val surfaceHeight: Int,
+    val surfaceAttachMillis: Long,
+    val bufferTransformMillis: Long,
+    val analysisSource: String,
+)
+
 data class VisionFrameUploadRequest(
     val sessionId: String,
     val deviceInstallationId: String,
     val capturedAt: Long,
     val exclusiveAccess: Boolean,
     val noSurfacePreview: Boolean,
+    val pipeline: String = "image_reader",
+    val surfaceAttached: Boolean = false,
+    val surfaceAnalysis: SurfaceAnalysisMetrics? = null,
     val frame: RemoteCameraFramePayload,
     val faces: List<RemoteFaceAnalysisFace> = emptyList(),
     val processing: RemoteFaceAnalysisProcessingMetrics? = null,
@@ -79,6 +92,8 @@ data class VisionFrameUploadResult(
     val accepted: Boolean,
     val id: String,
     val sessionId: String,
+    val pipeline: String = "image_reader",
+    val surfaceAttached: Boolean = false,
     val receivedAt: Long,
 )
 

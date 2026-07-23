@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.graphics.SurfaceTexture
 import android.graphics.ImageFormat
 import android.graphics.Rect
 import android.graphics.YuvImage
@@ -21,6 +22,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Size
+import android.view.Surface
 import androidx.core.content.ContextCompat
 import com.projectlumen.app.core.debug.DeveloperDebugFrameStore
 import java.io.ByteArrayOutputStream
@@ -102,6 +104,46 @@ class ProximityCameraSampler(private val context: Context) {
                 height = capture.height,
                 rotationDegrees = capture.rotationDegrees,
                 frameConversionMillis = capture.conversionMillis,
+                sample = sample,
+            )
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+
+    /**
+     * Surface-topology analysis capture: dual targets SurfaceTexture + ImageReader.
+     * Analysis runs on decoded JPEG; Surface stays attached as the camera producer consumer.
+     */
+    suspend fun captureSurfaceAnalysisFrame(
+        maxDurationMillis: Long = 2_000L,
+    ): SurfaceAnalysisFrameCapture? {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            return null
+        }
+        val timeoutMillis = maxDurationMillis.coerceIn(750L, 2_500L)
+        val captureStartedAt = System.currentTimeMillis()
+        val capture = withTimeoutOrNull(timeoutMillis) { captureSurfacePipelineFrame() } ?: return null
+        val cameraLatencyMillis = System.currentTimeMillis() - captureStartedAt
+        val bitmap = BitmapFactory.decodeByteArray(capture.bytes, 0, capture.bytes.size) ?: return null
+        return try {
+            val analysisStarted = System.currentTimeMillis()
+            val sample = FaceDistanceAnalyzer(includeTopology = true)
+                .analyze(bitmap, capture.rotationDegrees)
+                ?.copy(cameraLatencyMillis = cameraLatencyMillis)
+            val analysisMillis = System.currentTimeMillis() - analysisStarted
+            SurfaceAnalysisFrameCapture(
+                capturedAtMillis = capture.capturedAtMillis,
+                frameBytes = capture.bytes,
+                width = capture.width,
+                height = capture.height,
+                rotationDegrees = capture.rotationDegrees,
+                frameConversionMillis = capture.conversionMillis,
+                surfaceAttachMillis = capture.surfaceAttachMillis,
+                bufferTransformMillis = capture.bufferTransformMillis + analysisMillis,
+                surfaceWidth = capture.surfaceWidth,
+                surfaceHeight = capture.surfaceHeight,
                 sample = sample,
             )
         } finally {
@@ -216,6 +258,202 @@ class ProximityCameraSampler(private val context: Context) {
         } finally {
             reader.close()
             thread.quitSafely()
+        }
+    }
+
+
+    @SuppressLint("MissingPermission")
+    private suspend fun captureSurfacePipelineFrame(): SurfaceCapturedFrame? {
+        val cameraManager = context.getSystemService(CameraManager::class.java)
+        val cameraId = runCatching { frontCameraId(cameraManager) }.getOrNull() ?: return null
+        val characteristics = runCatching { cameraManager.getCameraCharacteristics(cameraId) }.getOrNull() ?: return null
+        val size = choosePreviewSize(characteristics) ?: Size(640, 480)
+        val rotation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+        val thread = HandlerThread("ProjectLumenSurfaceAnalysisCamera").apply { start() }
+        val handler = Handler(thread.looper)
+        val reader = ImageReader.newInstance(size.width, size.height, ImageFormat.YUV_420_888, 2)
+        val surfaceTexture = SurfaceTexture(/* texName = */ 0).apply {
+            setDefaultBufferSize(size.width, size.height)
+        }
+        val previewSurface = Surface(surfaceTexture)
+        val attachStarted = System.currentTimeMillis()
+
+        return try {
+            suspendCancellableCoroutine { continuation ->
+                val finished = AtomicBoolean(false)
+                var cameraDevice: CameraDevice? = null
+                var captureSession: CameraCaptureSession? = null
+                val surfaceAttachMillis = System.currentTimeMillis() - attachStarted
+
+                fun release() {
+                    runCatching { captureSession?.close() }
+                    captureSession = null
+                    runCatching { cameraDevice?.close() }
+                    cameraDevice = null
+                    runCatching { reader.close() }
+                    runCatching { previewSurface.release() }
+                    runCatching { surfaceTexture.release() }
+                    runCatching { thread.quitSafely() }
+                }
+
+                fun complete(result: Result<SurfaceCapturedFrame?>) {
+                    if (!finished.compareAndSet(false, true)) return
+                    release()
+                    if (!continuation.isActive) return
+                    result.fold(
+                        onSuccess = { continuation.resume(it) },
+                        onFailure = { continuation.resumeWithException(it) },
+                    )
+                }
+
+                continuation.invokeOnCancellation {
+                    if (finished.compareAndSet(false, true)) release()
+                }
+
+                reader.setOnImageAvailableListener({ availableReader ->
+                    val image = availableReader.acquireLatestImage() ?: return@setOnImageAvailableListener
+                    val result = runCatching<SurfaceCapturedFrame?> {
+                        val conversionStartedAt = System.currentTimeMillis()
+                        // Keep Surface producer alive while transforming ImageReader buffer.
+                        surfaceTexture.updateTexImage()
+                        val bytes = image.toJpegBytes()
+                        SurfaceCapturedFrame(
+                            bytes = bytes,
+                            rotationDegrees = rotation,
+                            width = image.width,
+                            height = image.height,
+                            conversionMillis = System.currentTimeMillis() - conversionStartedAt,
+                            capturedAtMillis = conversionStartedAt,
+                            surfaceAttachMillis = surfaceAttachMillis,
+                            bufferTransformMillis = System.currentTimeMillis() - conversionStartedAt,
+                            surfaceWidth = size.width,
+                            surfaceHeight = size.height,
+                        )
+                    }
+                    runCatching { image.close() }
+                    complete(result)
+                }, handler)
+
+                runCatching {
+                    cameraManager.openCamera(
+                        cameraId,
+                        object : CameraDevice.StateCallback() {
+                            override fun onOpened(camera: CameraDevice) {
+                                cameraDevice = camera
+                                runCatching {
+                                    createDualSurfaceSessionCompat(
+                                        camera = camera,
+                                        reader = reader,
+                                        previewSurface = previewSurface,
+                                        handler = handler,
+                                        onConfigured = { session ->
+                                            captureSession = session
+                                            submitSurfacePreviewRequest(
+                                                camera = camera,
+                                                session = session,
+                                                handler = handler,
+                                                reader = reader,
+                                                previewSurface = previewSurface,
+                                            ) { result -> complete(result) }
+                                        },
+                                        onConfigureFailed = { session ->
+                                            session.close()
+                                            camera.close()
+                                            complete(Result.success(null))
+                                        },
+                                    )
+                                }.onFailure {
+                                    camera.close()
+                                    complete(Result.success(null))
+                                }
+                            }
+
+                            override fun onDisconnected(camera: CameraDevice) {
+                                camera.close()
+                                complete(Result.success(null))
+                            }
+
+                            override fun onError(camera: CameraDevice, error: Int) {
+                                camera.close()
+                                complete(Result.success(null))
+                            }
+                        },
+                        handler,
+                    )
+                }.onFailure {
+                    complete(Result.success(null))
+                }
+            }
+        } finally {
+            // release handled in complete path; keep finally no-op when suspended.
+        }
+    }
+
+    private fun createDualSurfaceSessionCompat(
+        camera: CameraDevice,
+        reader: ImageReader,
+        previewSurface: Surface,
+        handler: Handler,
+        onConfigured: (CameraCaptureSession) -> Unit,
+        onConfigureFailed: (CameraCaptureSession) -> Unit,
+    ) {
+        val callback = object : CameraCaptureSession.StateCallback() {
+            override fun onConfigured(session: CameraCaptureSession) {
+                onConfigured(session)
+            }
+
+            override fun onConfigureFailed(session: CameraCaptureSession) {
+                onConfigureFailed(session)
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            camera.createCaptureSession(
+                SessionConfiguration(
+                    SessionConfiguration.SESSION_REGULAR,
+                    listOf(OutputConfiguration(previewSurface), OutputConfiguration(reader.surface)),
+                    { command -> handler.post(command) },
+                    callback,
+                ),
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            camera.createCaptureSession(listOf(previewSurface, reader.surface), callback, handler)
+        }
+    }
+
+    private fun submitSurfacePreviewRequest(
+        camera: CameraDevice,
+        session: CameraCaptureSession,
+        handler: Handler,
+        reader: ImageReader,
+        previewSurface: Surface,
+        complete: (Result<SurfaceCapturedFrame?>) -> Unit,
+    ) {
+        runCatching {
+            val request = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                .apply {
+                    addTarget(previewSurface)
+                    addTarget(reader.surface)
+                    set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
+                    set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+                    applyLowLightBoostIfSupported(camera.id, this)
+                }
+                .build()
+            session.setRepeatingRequest(
+                request,
+                object : CameraCaptureSession.CaptureCallback() {
+                    override fun onCaptureFailed(
+                        session: CameraCaptureSession,
+                        request: android.hardware.camera2.CaptureRequest,
+                        failure: android.hardware.camera2.CaptureFailure,
+                    ) {
+                        complete(Result.success(null))
+                    }
+                },
+                handler,
+            )
+        }.onFailure {
+            complete(Result.success(null))
         }
     }
 
@@ -382,4 +620,31 @@ class ProximityCameraSampler(private val context: Context) {
         val conversionMillis: Long,
         val capturedAtMillis: Long,
     )
+
+    private data class SurfaceCapturedFrame(
+        val bytes: ByteArray,
+        val rotationDegrees: Int,
+        val width: Int,
+        val height: Int,
+        val conversionMillis: Long,
+        val capturedAtMillis: Long,
+        val surfaceAttachMillis: Long,
+        val bufferTransformMillis: Long,
+        val surfaceWidth: Int,
+        val surfaceHeight: Int,
+    )
 }
+
+data class SurfaceAnalysisFrameCapture(
+    val capturedAtMillis: Long,
+    val frameBytes: ByteArray,
+    val width: Int,
+    val height: Int,
+    val rotationDegrees: Int,
+    val frameConversionMillis: Long,
+    val surfaceAttachMillis: Long,
+    val bufferTransformMillis: Long,
+    val surfaceWidth: Int,
+    val surfaceHeight: Int,
+    val sample: FaceDistanceSample?,
+)

@@ -154,6 +154,13 @@ export function SilentVisionModule({ data }: { data: DashboardData }) {
           <span>Max session minutes</span>
           <input id="silentVisionMaxSessionInput" type="number" defaultValue={policy.maxSessionMinutes || 120} />
         </label>
+        <label className="form-row">
+          <span>Surface analysis upload</span>
+          <select id="silentVisionSurfaceUploadInput" defaultValue="true">
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </label>
         <div className="muted">Source: {policy.source} · Updated {policy.updatedAt}</div>
       </div>
       {data.silentVisionSessions.length ? (

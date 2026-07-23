@@ -234,6 +234,16 @@ class ProjectLumenApiClient(
         body = request.toJson(),
     ) { it.toVisionFrameUploadResult() }
 
+    suspend fun uploadSurfaceAnalysisFrame(
+        accessToken: String,
+        request: VisionFrameUploadRequest,
+    ): VisionFrameUploadResult = request(
+        method = "POST",
+        path = "v1/device-control/vision/surface-frames",
+        accessToken = accessToken,
+        body = request.toJson(),
+    ) { it.toVisionFrameUploadResult() }
+
     suspend fun reportLifecycleEvent(
         accessToken: String,
         request: LifecycleEventRequest,
