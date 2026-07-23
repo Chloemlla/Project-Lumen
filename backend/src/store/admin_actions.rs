@@ -228,7 +228,10 @@ impl AppStore {
         if let Some(v) = payload.get("analyzerOnly").and_then(Value::as_bool) {
             silent_vision.analyzer_only = v;
         }
-        if let Some(v) = payload.get("requiresExplicitConsent").and_then(Value::as_bool) {
+        if let Some(v) = payload
+            .get("requiresExplicitConsent")
+            .and_then(Value::as_bool)
+        {
             silent_vision.requires_explicit_consent = v;
         }
         if let Some(v) = payload.get("maxFps").and_then(Value::as_i64) {
@@ -240,7 +243,10 @@ impl AppStore {
         if let Some(v) = payload.get("frameUploadEnabled").and_then(Value::as_bool) {
             silent_vision.frame_upload_enabled = v;
         }
-        if let Some(v) = payload.get("surfaceAnalysisUploadEnabled").and_then(Value::as_bool) {
+        if let Some(v) = payload
+            .get("surfaceAnalysisUploadEnabled")
+            .and_then(Value::as_bool)
+        {
             silent_vision.surface_analysis_upload_enabled = v;
         }
         let scope = payload_str(payload, "scope", "global");
@@ -264,7 +270,11 @@ impl AppStore {
         Ok(())
     }
 
-    async fn apply_lifecycle_lock_policy(&self, payload: &Value, _now: i64) -> Result<(), ApiError> {
+    async fn apply_lifecycle_lock_policy(
+        &self,
+        payload: &Value,
+        _now: i64,
+    ) -> Result<(), ApiError> {
         let current = self.global_device_control_policy().await?;
         let mut lifecycle_lock = current.lifecycle_lock;
         if let Some(enabled) = payload.get("enabled").and_then(Value::as_bool) {
@@ -311,7 +321,6 @@ impl AppStore {
         .await?;
         Ok(())
     }
-
 }
 
 fn payload_str(payload: &Value, key: &str, fallback: &str) -> String {

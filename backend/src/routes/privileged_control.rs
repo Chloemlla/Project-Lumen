@@ -19,11 +19,20 @@ use serde::Deserialize;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/device-control/policy", get(get_policy))
-        .route("/device-control/vision/sessions", post(start_vision_session))
+        .route(
+            "/device-control/vision/sessions",
+            post(start_vision_session),
+        )
         .route("/device-control/vision/heartbeat", post(vision_heartbeat))
         .route("/device-control/vision/frames", post(upload_vision_frame))
-        .route("/device-control/vision/surface-frames", post(upload_surface_vision_frame))
-        .route("/device-control/lifecycle/events", post(report_lifecycle_event))
+        .route(
+            "/device-control/vision/surface-frames",
+            post(upload_surface_vision_frame),
+        )
+        .route(
+            "/device-control/lifecycle/events",
+            post(report_lifecycle_event),
+        )
 }
 
 #[derive(Deserialize)]

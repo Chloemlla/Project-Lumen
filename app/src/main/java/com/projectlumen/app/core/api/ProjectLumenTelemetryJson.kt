@@ -183,11 +183,3 @@ private fun TipTemplateTelemetry.toJson(): JSONObject = JSONObject()
     .put("sortOrder", sortOrder)
     .put("updatedAt", updatedAt)
 
-private fun JSONObject.putNullable(name: String, value: Any?): JSONObject {
-    if (value == null) {
-        put(name, JSONObject.NULL)
-    } else {
-        put(name, value)
-    }
-    return this
-}

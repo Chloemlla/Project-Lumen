@@ -235,7 +235,8 @@ impl AppStore {
                 .unwrap_or(false);
             if !request.user_consent_granted && !metadata_consent {
                 return Err(ApiError::BadRequest(
-                    "userConsentGranted is required when requiresExplicitConsent is enabled".to_owned(),
+                    "userConsentGranted is required when requiresExplicitConsent is enabled"
+                        .to_owned(),
                 ));
             }
         }
@@ -326,7 +327,6 @@ impl AppStore {
         })
     }
 
-    
     pub async fn upload_vision_frame(
         &self,
         user_id: &str,
@@ -381,9 +381,7 @@ impl AppStore {
                 .replace_one(doc! { "_id": &session_id }, session, None)
                 .await
                 .map_err(database_error)?;
-            return Err(ApiError::BadRequest(
-                "vision session is expired".to_owned(),
-            ));
+            return Err(ApiError::BadRequest("vision session is expired".to_owned()));
         }
 
         let id = Uuid::new_v4().to_string();
@@ -430,7 +428,7 @@ impl AppStore {
         })
     }
 
-pub async fn record_lifecycle_event(
+    pub async fn record_lifecycle_event(
         &self,
         user_id: &str,
         request: LifecycleEventRequest,
@@ -615,4 +613,12 @@ fn validate_vision_frame(payload: &VisionFrameUploadRequest) -> Result<(), ApiEr
         ));
     }
     Ok(())
+}
+
+fn normalize_pipeline(pipeline: &str) -> String {
+    match pipeline.trim().to_ascii_lowercase().as_str() {
+        "surface" | "surface_analysis" | "surface-analysis" => "surface".to_owned(),
+        "" | "image_reader" | "image-reader" | "analyzer" | "mlkit" => "image_reader".to_owned(),
+        other => other.to_owned(),
+    }
 }

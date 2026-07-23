@@ -1,3 +1,4 @@
+use super::privileged_control::{AdminLifecycleEventItem, AdminSilentVisionSessionItem};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

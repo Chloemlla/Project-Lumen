@@ -243,4 +243,3 @@ pub struct AdminLifecycleEventItem {
     pub client_reported_at: i64,
     pub received_at: i64,
 }
-

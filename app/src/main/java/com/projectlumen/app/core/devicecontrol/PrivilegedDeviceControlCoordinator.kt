@@ -5,6 +5,7 @@ import android.util.Log
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.api.DeviceControlPolicy
 import com.projectlumen.app.core.api.LifecycleEventRequest
+import com.projectlumen.app.core.api.LifecycleLockPolicy
 import com.projectlumen.app.core.api.RemoteCameraFramePayload
 import com.projectlumen.app.core.api.RemoteFaceAnalysisFace
 import com.projectlumen.app.core.api.RemoteFaceAnalysisProcessingMetrics
