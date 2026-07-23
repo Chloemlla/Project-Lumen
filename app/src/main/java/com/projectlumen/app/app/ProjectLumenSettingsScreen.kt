@@ -160,6 +160,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.R
+import com.projectlumen.app.core.network.ClashPartnerCompat
 import com.chloemlla.lumen.crash.CrashReport
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
@@ -644,6 +645,23 @@ internal fun SettingsScreen(
             SwitchRow(R.string.auto_update_check, Icons.Outlined.Sync, settings.autoUpdateCheckEnabled) {
                 viewModel.setAutoUpdateCheckEnabled(it)
             }
+            val clashContext = LocalContext.current
+            var clashAutoAdapt by remember {
+                mutableStateOf(ClashPartnerCompat.isAutoAdaptEnabled(clashContext))
+            }
+            SwitchRow(
+                R.string.clash_vpn_auto_adapt,
+                Icons.Outlined.Security,
+                clashAutoAdapt,
+            ) {
+                clashAutoAdapt = it
+                ClashPartnerCompat.setAutoAdaptEnabled(clashContext, it)
+            }
+            Text(
+                text = ClashPartnerCompat.statusLabel(clashContext),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         }
         }

@@ -143,6 +143,8 @@
     <string name="about_update_grant_permission">Open settings</string>
     <string name="about_install_now">Install now</string>
     <string name="auto_update_check">Auto update check</string>
+    <string name="clash_vpn_auto_adapt">Clash VPN auto adapt</string>
+    <string name="clash_vpn_auto_adapt_summary">When Clash Meta VPN is on, traffic is routed automatically without manual proxy setup.</string>
     <string name="section_general">General</string>
     <string name="section_reminder">Reminder</string>
     <string name="section_pre_alert">Pre-alert</string>

@@ -21,6 +21,7 @@ import com.projectlumen.app.core.haptics.HapticPlaybackService
 import com.projectlumen.app.core.devicecontrol.PrivilegedDeviceControlCoordinator
 import com.projectlumen.app.core.lifecycle.AppLifecycleCoordinator
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
+import com.projectlumen.app.core.network.ClashPartnerCompat
 import com.projectlumen.app.core.mmkv.ProjectLumenMmkv
 import com.projectlumen.app.core.security.AppIntegrityGuard
 import com.projectlumen.app.core.security.SecureCredentialStore
@@ -101,6 +102,7 @@ class ProjectLumenApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        ClashPartnerCompat.start(this)
         // Keep cold start non-fatal for managed-device baseline profile generation.
         runCatching {
             runCatching {

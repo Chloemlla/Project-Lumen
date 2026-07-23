@@ -143,6 +143,8 @@
     <string name="about_update_grant_permission">打开设置</string>
     <string name="about_install_now">立即安装</string>
     <string name="auto_update_check">自动检查更新</string>
+    <string name="clash_vpn_auto_adapt">Clash VPN 自动适配</string>
+    <string name="clash_vpn_auto_adapt_summary">Clash Meta 开启 VPN 时流量自动经其处理，无需手填代理。</string>
     <string name="section_general">通用</string>
     <string name="section_reminder">提醒</string>
     <string name="section_pre_alert">预提醒</string>
