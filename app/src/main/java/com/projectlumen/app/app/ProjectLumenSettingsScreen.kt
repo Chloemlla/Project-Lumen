@@ -651,7 +651,7 @@ internal fun SettingsScreen(
             }
             SwitchRow(
                 R.string.clash_vpn_auto_adapt,
-                Icons.Outlined.Security,
+                Icons.Outlined.Lock,
                 clashAutoAdapt,
             ) {
                 clashAutoAdapt = it
