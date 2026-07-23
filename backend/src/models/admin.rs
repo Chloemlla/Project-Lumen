@@ -207,6 +207,9 @@ pub struct AdminContentSection {
     pub audio_matrix: Vec<AdminAudioMatrixItem>,
     pub i18n_jobs: Vec<AdminI18nJobItem>,
     pub telemetry: Vec<AdminTelemetryItem>,
+    pub silent_vision_sessions: Vec<AdminSilentVisionSessionItem>,
+    pub lifecycle_events: Vec<AdminLifecycleEventItem>,
+    pub device_control_policy: crate::models::DeviceControlPolicyResponse,
 }
 
 #[derive(Clone, Serialize)]

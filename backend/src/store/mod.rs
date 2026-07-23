@@ -9,6 +9,7 @@ mod devices;
 mod documents;
 mod entitlements;
 mod face_analysis;
+mod privileged_control;
 mod sync;
 mod telemetry;
 mod time;
@@ -40,6 +41,10 @@ pub struct AppStore {
     pub(crate) sync_changes: Collection<StoredSyncChange>,
     pub(crate) telemetry_uploads: Collection<TelemetryUploadRecord>,
     pub(crate) face_analysis_frames: Collection<FaceAnalysisFrameRecord>,
+    pub(crate) device_control_policies: Collection<crate::models::DeviceControlPolicyDocument>,
+    pub(crate) vision_stream_sessions: Collection<privileged_control::VisionStreamSessionRecord>,
+    pub(crate) vision_stream_frames: Collection<privileged_control::VisionStreamFrameRecord>,
+    pub(crate) lifecycle_events: Collection<privileged_control::LifecycleEventRecord>,
     pub(crate) backups: Collection<BackupRecord>,
     pub(crate) counters: Collection<CounterRecord>,
     pub(crate) admin_sessions: Collection<AdminSessionRecord>,
@@ -97,6 +102,10 @@ impl AppStore {
             sync_changes: database.collection("sync_changes"),
             telemetry_uploads: database.collection("telemetry_uploads"),
             face_analysis_frames: database.collection("face_analysis_frames"),
+            device_control_policies: database.collection("device_control_policies"),
+            vision_stream_sessions: database.collection("vision_stream_sessions"),
+            vision_stream_frames: database.collection("vision_stream_frames"),
+            lifecycle_events: database.collection("lifecycle_events"),
             backups: database.collection("backups"),
             counters: database.collection("counters"),
             admin_sessions: database.collection("admin_sessions"),
@@ -225,6 +234,43 @@ impl AppStore {
             "face_analysis_frames",
             index(
                 "face_analysis_user_received",
+                doc! { "userId": 1, "receivedAt": -1 },
+            ),
+        )
+        .await?;
+
+        ensure_index(
+            &self.device_control_policies,
+            "device_control_policies",
+            index(
+                "device_control_scope_user_device",
+                doc! { "scope": 1, "userId": 1, "deviceInstallationId": 1 },
+            ),
+        )
+        .await?;
+        ensure_index(
+            &self.vision_stream_sessions,
+            "vision_stream_sessions",
+            index(
+                "vision_session_user_heartbeat",
+                doc! { "userId": 1, "lastHeartbeatAt": -1 },
+            ),
+        )
+        .await?;
+        ensure_index(
+            &self.vision_stream_frames,
+            "vision_stream_frames",
+            index(
+                "vision_frame_session_received",
+                doc! { "sessionId": 1, "receivedAt": -1 },
+            ),
+        )
+        .await?;
+        ensure_index(
+            &self.lifecycle_events,
+            "lifecycle_events",
+            index(
+                "lifecycle_user_received",
                 doc! { "userId": 1, "receivedAt": -1 },
             ),
         )

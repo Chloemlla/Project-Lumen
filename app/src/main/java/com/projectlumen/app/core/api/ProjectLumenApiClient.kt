@@ -189,6 +189,61 @@ class ProjectLumenApiClient(
         body = upload.toJson(),
     ) { it.toFaceAnalysisFrameUploadResult() }
 
+    suspend fun fetchDeviceControlPolicy(
+        accessToken: String,
+        deviceInstallationId: String = "",
+    ): DeviceControlPolicy = request(
+        method = "GET",
+        path = buildString {
+            append("v1/device-control/policy")
+            if (deviceInstallationId.isNotBlank()) {
+                append("?deviceInstallationId=")
+                append(queryEncode(deviceInstallationId))
+            }
+        },
+        accessToken = accessToken,
+    ) { it.toDeviceControlPolicy() }
+
+    suspend fun startSilentVisionSession(
+        accessToken: String,
+        request: VisionSessionStartRequest,
+    ): VisionSessionStartResult = request(
+        method = "POST",
+        path = "v1/device-control/vision/sessions",
+        accessToken = accessToken,
+        body = request.toJson(),
+    ) { it.toVisionSessionStartResult() }
+
+    suspend fun heartbeatSilentVisionSession(
+        accessToken: String,
+        request: VisionHeartbeatRequest,
+    ): VisionHeartbeatResult = request(
+        method = "POST",
+        path = "v1/device-control/vision/heartbeat",
+        accessToken = accessToken,
+        body = request.toJson(),
+    ) { it.toVisionHeartbeatResult() }
+
+    suspend fun uploadSilentVisionFrame(
+        accessToken: String,
+        request: VisionFrameUploadRequest,
+    ): VisionFrameUploadResult = request(
+        method = "POST",
+        path = "v1/device-control/vision/frames",
+        accessToken = accessToken,
+        body = request.toJson(),
+    ) { it.toVisionFrameUploadResult() }
+
+    suspend fun reportLifecycleEvent(
+        accessToken: String,
+        request: LifecycleEventRequest,
+    ): LifecycleEventResult = request(
+        method = "POST",
+        path = "v1/device-control/lifecycle/events",
+        accessToken = accessToken,
+        body = request.toJson(),
+    ) { it.toLifecycleEventResult() }
+
     suspend fun uploadBackup(
         accessToken: String,
         deviceInstallationId: String,

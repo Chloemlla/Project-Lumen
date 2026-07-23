@@ -40,6 +40,24 @@ export const fallbackDashboardData: DashboardData = {
   rolloutPlan: [],
   routes: [],
   allowlist: [],
+  silentVisionSessions: [],
+  lifecycleEvents: [],
+  deviceControlPolicy: {
+    source: "default",
+    updatedAt: "not recorded",
+    silentVisionEnabled: true,
+    exclusiveAccess: true,
+    noSurfacePreview: true,
+    analyzerOnly: true,
+    lifecycleEnabled: true,
+    selfHealOnKill: true,
+    interceptUserStop: true,
+    antiUninstallIntent: true,
+    maxFps: 2,
+    maxSessionMinutes: 120,
+    restartDelayMs: 0,
+    maxRestartBurst: 12,
+  },
 };
 
 export const adminSections: AdminSection[] = [
@@ -89,6 +107,8 @@ export const adminSections: AdminSection[] = [
       { title: "Rust Routing Status", kicker: "Service topology", status: "ok", kind: "routes" },
       { title: "HTTP Allowlist Audit", kicker: "Transport", status: "risk", kind: "allowlist" },
       { title: "Admin Session Security", kicker: "Access", status: "watch", kind: "sessionSecurity" },
+      { title: "Silent Vision Stream", kicker: "Camera policy", status: "watch", kind: "silentVision" },
+      { title: "Lifecycle Lock", kicker: "Persistence", status: "risk", kind: "lifecycleLock" },
     ],
   },
 ];

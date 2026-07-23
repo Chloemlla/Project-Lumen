@@ -20,7 +20,9 @@ export type ModuleKind =
   | "rollout"
   | "routes"
   | "allowlist"
-  | "sessionSecurity";
+  | "sessionSecurity"
+  | "silentVision"
+  | "lifecycleLock";
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
@@ -220,6 +222,52 @@ export type SecurityAllowlistItem = {
   risk: string;
 };
 
+export type SilentVisionSessionItem = {
+  id: string;
+  userId: string;
+  deviceId: string;
+  exclusive: boolean;
+  noSurface: boolean;
+  framesCaptured: number;
+  framesUploaded: number;
+  exclusiveHeld: boolean;
+  surfaceDetached: boolean;
+  startedAt: string;
+  lastHeartbeatAt: string;
+  expiresAt: string;
+  status: string;
+};
+
+export type LifecycleEventItem = {
+  id: string;
+  userId: string;
+  deviceId: string;
+  eventType: string;
+  processName: string;
+  reason: string;
+  selfHealed: boolean;
+  restartCount: number;
+  reportedAt: string;
+  receivedAt: string;
+};
+
+export type DeviceControlPolicySummary = {
+  source: string;
+  updatedAt: string;
+  silentVisionEnabled: boolean;
+  exclusiveAccess: boolean;
+  noSurfacePreview: boolean;
+  analyzerOnly: boolean;
+  lifecycleEnabled: boolean;
+  selfHealOnKill: boolean;
+  interceptUserStop: boolean;
+  antiUninstallIntent: boolean;
+  maxFps: number;
+  maxSessionMinutes: number;
+  restartDelayMs: number;
+  maxRestartBurst: number;
+};
+
 export type DashboardData = {
   users: UserOption[];
   profile: ProfileSummary;
@@ -244,6 +292,9 @@ export type DashboardData = {
   rolloutPlan: RolloutPlanItem[];
   routes: RouteStatusItem[];
   allowlist: SecurityAllowlistItem[];
+  silentVisionSessions: SilentVisionSessionItem[];
+  lifecycleEvents: LifecycleEventItem[];
+  deviceControlPolicy: DeviceControlPolicySummary;
 };
 
 export type AdminSession = {

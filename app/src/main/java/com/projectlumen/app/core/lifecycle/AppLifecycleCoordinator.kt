@@ -37,6 +37,7 @@ class AppLifecycleCoordinator(
             // rebuild alarms/workers before normal foreground resume work.
             if (wasForceStoppedSinceLastStart()) {
                 BootReceiver.restoreScheduledWork(app)
+                app.deviceControl.onForceStopRecovered()
             }
             val nowMillis = System.currentTimeMillis()
             val settings = settingsRepository.getOrDefault()
@@ -80,7 +81,9 @@ class AppLifecycleCoordinator(
             val nowMillis = System.currentTimeMillis()
             val settings = settingsRepository.getOrDefault()
             val runtime = runtimeRepository.getOrDefault()
-            if (!settings.keepAliveEnabled) {
+            val lifecycleLock = app.deviceControl.currentPolicy.lifecycleLock
+            val enforceKeepalive = settings.keepAliveEnabled || (lifecycleLock.enabled && lifecycleLock.enforceKeepalive)
+            if (!enforceKeepalive) {
                 runtimeRepository.upsert(
                     runtime.copy(
                         lastBackgroundAt = nowMillis,
@@ -92,11 +95,18 @@ class AppLifecycleCoordinator(
                 app.stopTimerService()
             } else {
                 runtimeRepository.upsert(runtime.copy(updatedAt = nowMillis))
+                if (lifecycleLock.enabled && lifecycleLock.interceptUserStop) {
+                    app.deviceControl.onUserStopIntercepted("process_background")
+                }
             }
-            if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) {
+            if (!(settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) &&
+                !(lifecycleLock.enabled && lifecycleLock.enforceKeepalive)
+            ) {
                 app.cancelProximityMonitoring()
             }
-            if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) {
+            if (!(settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) &&
+                !(lifecycleLock.enabled && lifecycleLock.enforceKeepalive)
+            ) {
                 app.stopLightMonitoring()
             }
         }

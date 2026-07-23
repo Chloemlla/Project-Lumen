@@ -21,6 +21,8 @@ pub mod health;
 pub mod me;
 #[path = "routes/platform.rs"]
 pub mod platform;
+#[path = "routes/privileged_control.rs"]
+pub mod privileged_control;
 #[path = "routes/purchases.rs"]
 pub mod purchases;
 #[path = "routes/security.rs"]
@@ -44,6 +46,7 @@ pub fn router(state: AppState) -> Router {
         .merge(devices::router())
         .merge(entitlements::router())
         .merge(face_analysis::router())
+        .merge(privileged_control::router())
         .merge(platform::router())
         .merge(purchases::router())
         .merge(sync::router())

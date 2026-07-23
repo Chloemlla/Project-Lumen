@@ -60,4 +60,12 @@ export const moduleActions: Record<ModuleKind, ActionButtonConfig[]> = {
     { label: "Copy warning", action: "copy-security", icon: KeyRound },
   ],
   sessionSecurity: [{ label: "Refresh token state", action: "refresh-token", icon: RefreshCw }],
+  silentVision: [
+    { label: "Save vision policy", action: "set-silent-vision-policy", sensitive: true, icon: Save },
+    { label: "Copy sessions", action: "copy-silent-vision", icon: Copy },
+  ],
+  lifecycleLock: [
+    { label: "Save lifecycle policy", action: "set-lifecycle-lock-policy", sensitive: true, icon: Lock },
+    { label: "Copy events", action: "copy-lifecycle-events", icon: Copy },
+  ],
 };

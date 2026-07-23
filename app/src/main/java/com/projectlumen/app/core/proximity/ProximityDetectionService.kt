@@ -68,6 +68,10 @@ class ProximityDetectionService : Service() {
         val app = application as? ProjectLumenApplication
         if (app != null) {
             CoroutineScope(Dispatchers.IO).launch { recordForegroundServiceStop(app, System.currentTimeMillis()) }
+            app.deviceControl.onServiceDestroyed(
+                processName = packageName,
+                reason = "proximity_service_destroy",
+            )
         }
         scope.cancel()
         super.onDestroy()

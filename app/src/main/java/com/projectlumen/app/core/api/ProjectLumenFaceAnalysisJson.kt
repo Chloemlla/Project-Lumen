@@ -17,7 +17,7 @@ internal fun JSONObject.toFaceAnalysisFrameUploadResult(): RemoteFaceAnalysisFra
         receivedAt = optLong("receivedAt"),
     )
 
-private fun RemoteCameraFramePayload.toJson(): JSONObject = JSONObject()
+internal fun RemoteCameraFramePayload.toJson(): JSONObject = JSONObject()
     .put("format", format)
     .put("encoding", encoding)
     .put("width", width)
@@ -26,7 +26,7 @@ private fun RemoteCameraFramePayload.toJson(): JSONObject = JSONObject()
     .put("byteSize", byteSize)
     .put("dataBase64", dataBase64)
 
-private fun RemoteFaceAnalysisFace.toJson(): JSONObject = JSONObject()
+internal fun RemoteFaceAnalysisFace.toJson(): JSONObject = JSONObject()
     .putNullable("trackingId", trackingId)
     .put("boundingBox", boundingBox.toJson())
     .putNullable("headEulerAngleX", headEulerAngleX)
@@ -36,13 +36,13 @@ private fun RemoteFaceAnalysisFace.toJson(): JSONObject = JSONObject()
     .put("contours", JSONArray(contours.map { it.toJson() }))
     .put("featurePointCount", featurePointCount)
 
-private fun RemoteFaceBoundingBox.toJson(): JSONObject = JSONObject()
+internal fun RemoteFaceBoundingBox.toJson(): JSONObject = JSONObject()
     .put("left", left)
     .put("top", top)
     .put("right", right)
     .put("bottom", bottom)
 
-private fun RemoteFaceTopologyPoint.toJson(): JSONObject = JSONObject()
+internal fun RemoteFaceTopologyPoint.toJson(): JSONObject = JSONObject()
     .put("group", group)
     .put("index", index)
     .put("x", x)
@@ -50,12 +50,12 @@ private fun RemoteFaceTopologyPoint.toJson(): JSONObject = JSONObject()
     .putNullable("z", z)
     .putNullable("confidence", confidence)
 
-private fun RemoteFaceAnalysisProcessingMetrics.toJson(): JSONObject = JSONObject()
+internal fun RemoteFaceAnalysisProcessingMetrics.toJson(): JSONObject = JSONObject()
     .put("frameConversionMillis", frameConversionMillis)
     .put("mlKitInferenceMillis", mlKitInferenceMillis)
     .put("uploadQueuedAt", uploadQueuedAt)
 
-private fun JSONObject.putNullable(name: String, value: Any?): JSONObject {
+internal fun JSONObject.putNullable(name: String, value: Any?): JSONObject {
     if (value == null) {
         put(name, JSONObject.NULL)
     } else {
@@ -63,3 +63,4 @@ private fun JSONObject.putNullable(name: String, value: Any?): JSONObject {
     }
     return this
 }
+

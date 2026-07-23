@@ -18,10 +18,12 @@ import {
 } from "./ObservabilityModules";
 import {
   AllowlistModule,
+  LifecycleLockModule,
   OtaModule,
   RolloutModule,
   RoutesModule,
   SessionSecurityModule,
+  SilentVisionModule,
 } from "./ReleaseModules";
 import {
   AccessAuditModule,
@@ -127,6 +129,10 @@ function ModuleBody({ kind, data, state, secure, session }: {
       return <AllowlistModule data={data} />;
     case "sessionSecurity":
       return <SessionSecurityModule session={session} secure={secure} />;
+    case "silentVision":
+      return <SilentVisionModule data={data} />;
+    case "lifecycleLock":
+      return <LifecycleLockModule data={data} />;
     default:
       return <EmptyState label={`No renderer is available for ${state.section}.`} />;
   }

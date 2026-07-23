@@ -18,6 +18,7 @@ import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.debug.DeveloperDebugOverlayService
 import com.projectlumen.app.core.debug.MemoryHealthMonitor
 import com.projectlumen.app.core.haptics.HapticPlaybackService
+import com.projectlumen.app.core.devicecontrol.PrivilegedDeviceControlCoordinator
 import com.projectlumen.app.core.lifecycle.AppLifecycleCoordinator
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.mmkv.ProjectLumenMmkv
@@ -82,6 +83,7 @@ class ProjectLumenApplication : Application() {
     }
     val shizuku: ShizukuCapabilityManager by lazy { ShizukuCapabilityManager(this) }
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
+    val deviceControl: PrivilegedDeviceControlCoordinator by lazy { PrivilegedDeviceControlCoordinator(this) }
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val crashReportUploadInFlight = AtomicBoolean(false)
     @Volatile
@@ -120,6 +122,7 @@ class ProjectLumenApplication : Application() {
             runCatching {
                 ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)
             }
+            runCatching { deviceControl.start() }
             crashReportUploadsReady = true
             scheduleStoredCrashReportUpload()
         }.onFailure { error ->

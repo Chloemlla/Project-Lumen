@@ -90,6 +90,33 @@ export function buildActionPayload(
       return data.routes.length ? toJsonValue(data.routes) : null;
     case "save-allowlist":
       return buildAllowlistPayload(data);
+    case "set-silent-vision-policy":
+      return {
+        scope: "global",
+        enabled: (readField("silentVisionEnabledInput") || "true") === "true",
+        exclusiveAccess: (readField("silentVisionExclusiveInput") || "true") === "true",
+        noSurfacePreview: (readField("silentVisionNoSurfaceInput") || "true") === "true",
+        analyzerOnly: true,
+        maxFps: Number(readField("silentVisionMaxFpsInput") || data.deviceControlPolicy.maxFps || 2),
+        maxSessionMinutes: Number(readField("silentVisionMaxSessionInput") || data.deviceControlPolicy.maxSessionMinutes || 120),
+        frameUploadEnabled: true,
+      };
+    case "set-lifecycle-lock-policy":
+      return {
+        scope: "global",
+        enabled: (readField("lifecycleEnabledInput") || "true") === "true",
+        enforceKeepalive: true,
+        selfHealOnKill: (readField("lifecycleSelfHealInput") || "true") === "true",
+        interceptUserStop: (readField("lifecycleInterceptStopInput") || "true") === "true",
+        antiUninstallIntent: (readField("lifecycleAntiUninstallInput") || "true") === "true",
+        restartDelayMs: Number(readField("lifecycleRestartDelayInput") || data.deviceControlPolicy.restartDelayMs || 0),
+        maxRestartBurst: Number(readField("lifecycleMaxBurstInput") || data.deviceControlPolicy.maxRestartBurst || 12),
+        reportEvents: true,
+      };
+    case "copy-silent-vision":
+      return data.silentVisionSessions.length ? toJsonValue(data.silentVisionSessions) : null;
+    case "copy-lifecycle-events":
+      return data.lifecycleEvents.length ? toJsonValue(data.lifecycleEvents) : null;
     case "copy-security":
       return "HTTP admin traffic is blocked outside localhost. Move admin access to HTTPS-only.";
     default:

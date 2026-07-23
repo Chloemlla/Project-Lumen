@@ -63,6 +63,9 @@ impl AppStore {
             releases,
             allowlist,
             devices,
+            silent_vision_sessions,
+            lifecycle_events,
+            device_control_policy,
         ) = tokio::try_join!(
             self.access_audit(),
             self.purchase_audit(),
@@ -76,6 +79,9 @@ impl AppStore {
             self.releases(),
             self.security_allowlist(),
             self.device_assets(&users),
+            self.recent_vision_sessions(40),
+            self.recent_lifecycle_events(40),
+            self.global_device_control_policy(),
         )?;
         let clean_stack = crash_groups
             .first()
@@ -106,6 +112,9 @@ impl AppStore {
                 audio_matrix,
                 templates,
                 telemetry,
+                silent_vision_sessions,
+                lifecycle_events,
+                device_control_policy,
             },
             release: AdminReleaseSection {
                 rollout_plan: rollout_plan(&releases, &routes, &allowlist),
@@ -566,6 +575,8 @@ fn route_module(path: &str) -> &'static str {
         "routes/telemetry.rs"
     } else if path.contains("/face-analysis/") {
         "routes/face_analysis.rs"
+    } else if path.contains("/device-control/") {
+        "routes/privileged_control.rs"
     } else if path.contains("/admin/") {
         "routes/admin.rs"
     } else if path.contains("/entitlements") {

@@ -4,6 +4,7 @@ pub mod backups;
 pub mod common;
 pub mod entitlements;
 pub mod face_analysis;
+pub mod privileged_control;
 pub mod sync;
 pub mod telemetry;
 
@@ -13,5 +14,6 @@ pub use backups::*;
 pub use common::*;
 pub use entitlements::*;
 pub use face_analysis::*;
+pub use privileged_control::*;
 pub use sync::*;
 pub use telemetry::*;

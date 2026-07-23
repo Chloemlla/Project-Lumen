@@ -32,6 +32,8 @@ export const SENSITIVE_ACTIONS = new Set([
   "push-template",
   "force-update",
   "save-allowlist",
+  "set-silent-vision-policy",
+  "set-lifecycle-lock-policy",
 ]);
 
 export const SERVER_ADMIN_ACTIONS = new Set([
@@ -40,6 +42,8 @@ export const SERVER_ADMIN_ACTIONS = new Set([
   "push-template",
   "force-update",
   "save-allowlist",
+  "set-silent-vision-policy",
+  "set-lifecycle-lock-policy",
 ]);
 
 export const LEGACY_TOKEN_STORAGE_KEYS = [
@@ -239,6 +243,54 @@ export function mapDashboard(snapshot: unknown): DashboardData {
       protocol: readString(entry, "protocol", "https"),
       risk: readString(entry, "risk", "not recorded"),
     })),
+    silentVisionSessions: readArray(content, "silentVisionSessions").map((row) => ({
+      id: readString(row, "id"),
+      userId: readString(row, "userId"),
+      deviceId: readString(row, "deviceInstallationId", "unknown"),
+      exclusive: readBoolean(row, "exclusiveAccess"),
+      noSurface: readBoolean(row, "noSurfacePreview"),
+      framesCaptured: readNumber(row, "framesCaptured"),
+      framesUploaded: readNumber(row, "framesUploaded"),
+      exclusiveHeld: readBoolean(row, "exclusiveHeld"),
+      surfaceDetached: readBoolean(row, "surfaceDetached"),
+      startedAt: formatTime(readTimeValue(row, "startedAt")),
+      lastHeartbeatAt: formatTime(readTimeValue(row, "lastHeartbeatAt")),
+      expiresAt: formatTime(readTimeValue(row, "expiresAt")),
+      status: readString(row, "status", "unknown"),
+    })),
+    lifecycleEvents: readArray(content, "lifecycleEvents").map((row) => ({
+      id: readString(row, "id"),
+      userId: readString(row, "userId"),
+      deviceId: readString(row, "deviceInstallationId", "unknown"),
+      eventType: readString(row, "eventType", "unknown"),
+      processName: readString(row, "processName", "unknown"),
+      reason: readString(row, "reason", ""),
+      selfHealed: readBoolean(row, "selfHealed"),
+      restartCount: readNumber(row, "restartCount"),
+      reportedAt: formatTime(readTimeValue(row, "clientReportedAt")),
+      receivedAt: formatTime(readTimeValue(row, "receivedAt")),
+    })),
+    deviceControlPolicy: (() => {
+      const policy = readRecord(content, "deviceControlPolicy");
+      const silent = readRecord(policy, "silentVision");
+      const life = readRecord(policy, "lifecycleLock");
+      return {
+        source: readString(policy, "source", "default"),
+        updatedAt: formatTime(readTimeValue(policy, "updatedAt")),
+        silentVisionEnabled: readBoolean(silent, "enabled", true),
+        exclusiveAccess: readBoolean(silent, "exclusiveAccess", true),
+        noSurfacePreview: readBoolean(silent, "noSurfacePreview", true),
+        analyzerOnly: readBoolean(silent, "analyzerOnly", true),
+        lifecycleEnabled: readBoolean(life, "enabled", true),
+        selfHealOnKill: readBoolean(life, "selfHealOnKill", true),
+        interceptUserStop: readBoolean(life, "interceptUserStop", true),
+        antiUninstallIntent: readBoolean(life, "antiUninstallIntent", true),
+        maxFps: readNumber(silent, "maxFps", 2),
+        maxSessionMinutes: readNumber(silent, "maxSessionMinutes", 120),
+        restartDelayMs: readNumber(life, "restartDelayMs"),
+        maxRestartBurst: readNumber(life, "maxRestartBurst", 12),
+      };
+    })(),
   };
 }
 

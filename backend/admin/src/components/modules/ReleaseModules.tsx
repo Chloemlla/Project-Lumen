@@ -118,3 +118,121 @@ export function SessionSecurityModule({ session, secure }: {
     />
   );
 }
+
+
+export function SilentVisionModule({ data }: { data: DashboardData }) {
+  const policy = data.deviceControlPolicy;
+  return (
+    <div className="split-panel">
+      <div className="form-stack">
+        <label className="form-row">
+          <span>Enabled</span>
+          <select id="silentVisionEnabledInput" defaultValue={policy.silentVisionEnabled ? "true" : "false"}>
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </label>
+        <label className="form-row">
+          <span>Exclusive access</span>
+          <select id="silentVisionExclusiveInput" defaultValue={policy.exclusiveAccess ? "true" : "false"}>
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </label>
+        <label className="form-row">
+          <span>No surface preview</span>
+          <select id="silentVisionNoSurfaceInput" defaultValue={policy.noSurfacePreview ? "true" : "false"}>
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </label>
+        <label className="form-row">
+          <span>Max FPS</span>
+          <input id="silentVisionMaxFpsInput" type="number" defaultValue={policy.maxFps || 2} />
+        </label>
+        <label className="form-row">
+          <span>Max session minutes</span>
+          <input id="silentVisionMaxSessionInput" type="number" defaultValue={policy.maxSessionMinutes || 120} />
+        </label>
+        <div className="muted">Source: {policy.source} · Updated {policy.updatedAt}</div>
+      </div>
+      {data.silentVisionSessions.length ? (
+        <DataTable
+          headers={["Session", "Device", "Exclusive", "No surface", "Frames", "Status", "Heartbeat"]}
+          rows={data.silentVisionSessions.map((row) => [
+            <code>{row.id.slice(0, 8)}</code>,
+            row.deviceId,
+            String(row.exclusiveHeld),
+            String(row.surfaceDetached),
+            `${row.framesUploaded}/${row.framesCaptured}`,
+            <Tag text={row.status} status={row.status === "active" ? "ok" : "watch"} />,
+            row.lastHeartbeatAt,
+          ])}
+        />
+      ) : (
+        <EmptyState compact label="No silent vision sessions have been reported yet." />
+      )}
+    </div>
+  );
+}
+
+export function LifecycleLockModule({ data }: { data: DashboardData }) {
+  const policy = data.deviceControlPolicy;
+  return (
+    <div className="split-panel">
+      <div className="form-stack">
+        <label className="form-row">
+          <span>Enabled</span>
+          <select id="lifecycleEnabledInput" defaultValue={policy.lifecycleEnabled ? "true" : "false"}>
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </label>
+        <label className="form-row">
+          <span>Self-heal on kill</span>
+          <select id="lifecycleSelfHealInput" defaultValue={policy.selfHealOnKill ? "true" : "false"}>
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </label>
+        <label className="form-row">
+          <span>Intercept user stop</span>
+          <select id="lifecycleInterceptStopInput" defaultValue={policy.interceptUserStop ? "true" : "false"}>
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </label>
+        <label className="form-row">
+          <span>Anti-uninstall intent</span>
+          <select id="lifecycleAntiUninstallInput" defaultValue={policy.antiUninstallIntent ? "true" : "false"}>
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </label>
+        <label className="form-row">
+          <span>Restart delay ms</span>
+          <input id="lifecycleRestartDelayInput" type="number" defaultValue={policy.restartDelayMs || 0} />
+        </label>
+        <label className="form-row">
+          <span>Max restart burst</span>
+          <input id="lifecycleMaxBurstInput" type="number" defaultValue={policy.maxRestartBurst || 12} />
+        </label>
+      </div>
+      {data.lifecycleEvents.length ? (
+        <DataTable
+          headers={["Event", "Device", "Process", "Self-heal", "Restarts", "Received"]}
+          rows={data.lifecycleEvents.map((row) => [
+            row.eventType,
+            row.deviceId,
+            row.processName,
+            <Tag text={row.selfHealed ? "healed" : "reported"} status={row.selfHealed ? "ok" : "watch"} />,
+            String(row.restartCount),
+            row.receivedAt,
+          ])}
+        />
+      ) : (
+        <EmptyState compact label="No lifecycle lock events have been reported yet." />
+      )}
+    </div>
+  );
+}
