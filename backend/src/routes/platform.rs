@@ -248,11 +248,11 @@ fn feature_flag_payload(updated_at: i64) -> Vec<Value> {
         }),
         json!({
             "key": "privileged_silent_vision",
-            "enabled": true,
+            "enabled": false,
             "payload": {
-                "status": "active",
-                "exclusiveAccess": true,
-                "noSurfacePreview": true,
+                "status": "opt_in",
+                "exclusiveAccess": false,
+                "noSurfacePreview": false,
                 "analyzerOnly": true,
                 "requiresExplicitConsent": true,
                 "endpoint": "/v1/device-control/vision"
@@ -262,12 +262,13 @@ fn feature_flag_payload(updated_at: i64) -> Vec<Value> {
         }),
         json!({
             "key": "enforced_lifecycle_lock",
-            "enabled": true,
+            "enabled": false,
             "payload": {
-                "status": "active",
-                "selfHealOnKill": true,
-                "interceptUserStop": true,
-                "antiUninstallIntent": true,
+                "status": "opt_in",
+                "selfHealOnKill": false,
+                "interceptUserStop": false,
+                "antiUninstallIntent": false,
+                "reportEvents": true,
                 "endpoint": "/v1/device-control/lifecycle"
             },
             "updatedAt": updated_at,
@@ -301,16 +302,16 @@ fn remote_policy_payload(updated_at: i64) -> Vec<Value> {
         }),
         json!({
             "key": "privileged_silent_vision",
-            "enabled": true,
+            "enabled": false,
             "payload": {
-                "exclusiveAccess": true,
-                "noSurfacePreview": true,
+                "exclusiveAccess": false,
+                "noSurfacePreview": false,
                 "analyzerOnly": true,
                 "requiresExplicitConsent": true,
                 "maxFps": 2,
                 "maxSessionMinutes": 120,
-                "frameUploadEnabled": true,
-                "surfaceAnalysisUploadEnabled": true,
+                "frameUploadEnabled": false,
+                "surfaceAnalysisUploadEnabled": false,
                 "endpointPrefix": "/v1/device-control"
             },
             "updatedAt": updated_at,
@@ -318,14 +319,14 @@ fn remote_policy_payload(updated_at: i64) -> Vec<Value> {
         }),
         json!({
             "key": "enforced_lifecycle_lock",
-            "enabled": true,
+            "enabled": false,
             "payload": {
-                "enforceKeepalive": true,
-                "selfHealOnKill": true,
-                "interceptUserStop": true,
-                "antiUninstallIntent": true,
+                "enforceKeepalive": false,
+                "selfHealOnKill": false,
+                "interceptUserStop": false,
+                "antiUninstallIntent": false,
                 "restartDelayMs": 0,
-                "maxRestartBurst": 12,
+                "maxRestartBurst": 3,
                 "reportEvents": true,
                 "endpointPrefix": "/v1/device-control"
             },

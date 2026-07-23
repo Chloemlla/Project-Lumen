@@ -82,7 +82,8 @@ class AppLifecycleCoordinator(
             val settings = settingsRepository.getOrDefault()
             val runtime = runtimeRepository.getOrDefault()
             val lifecycleLock = app.deviceControl.currentPolicy.lifecycleLock
-            val enforceKeepalive = settings.keepAliveEnabled || (lifecycleLock.enabled && lifecycleLock.enforceKeepalive)
+            // Keepalive is only user-setting driven; server policy may not force sticky residency.
+            val enforceKeepalive = settings.keepAliveEnabled
             if (!enforceKeepalive) {
                 runtimeRepository.upsert(
                     runtime.copy(
@@ -95,18 +96,14 @@ class AppLifecycleCoordinator(
                 app.stopTimerService()
             } else {
                 runtimeRepository.upsert(runtime.copy(updatedAt = nowMillis))
-                if (lifecycleLock.enabled && lifecycleLock.interceptUserStop) {
-                    app.deviceControl.onUserStopIntercepted("process_background")
-                }
             }
-            if (!(settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) &&
-                !(lifecycleLock.enabled && lifecycleLock.enforceKeepalive)
-            ) {
+            if (lifecycleLock.enabled && lifecycleLock.reportEvents) {
+                app.deviceControl.onUserStopIntercepted("process_background")
+            }
+            if (!(settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled)) {
                 app.cancelProximityMonitoring()
             }
-            if (!(settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) &&
-                !(lifecycleLock.enabled && lifecycleLock.enforceKeepalive)
-            ) {
+            if (!(settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled)) {
                 app.stopLightMonitoring()
             }
         }

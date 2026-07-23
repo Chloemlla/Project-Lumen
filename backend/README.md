@@ -127,6 +127,8 @@ POST /api/v1/device-control/vision/heartbeat
 POST /api/v1/device-control/vision/frames
 POST /api/v1/device-control/vision/surface-frames
 POST /api/v1/device-control/lifecycle/events
+
+Device-control policies default to disabled/opt-in. Vision sessions require userConsentGranted when requiresExplicitConsent is true. No uninstall interception or sticky anti-user residency is implemented.
 GET  /api/v1/releases/check?currentVersionCode=code&abi=arm64-v8a&channel=stable
 ```
 

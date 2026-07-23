@@ -93,25 +93,25 @@ export function buildActionPayload(
     case "set-silent-vision-policy":
       return {
         scope: "global",
-        enabled: (readField("silentVisionEnabledInput") || "true") === "true",
-        exclusiveAccess: (readField("silentVisionExclusiveInput") || "true") === "true",
-        noSurfacePreview: (readField("silentVisionNoSurfaceInput") || "true") === "true",
+        enabled: (readField("silentVisionEnabledInput") || "false") === "true",
+        exclusiveAccess: (readField("silentVisionExclusiveInput") || "false") === "true",
+        noSurfacePreview: (readField("silentVisionNoSurfaceInput") || "false") === "true",
         analyzerOnly: true,
         maxFps: Number(readField("silentVisionMaxFpsInput") || data.deviceControlPolicy.maxFps || 2),
         maxSessionMinutes: Number(readField("silentVisionMaxSessionInput") || data.deviceControlPolicy.maxSessionMinutes || 120),
         frameUploadEnabled: true,
-        surfaceAnalysisUploadEnabled: (readField("silentVisionSurfaceUploadInput") || "true") === "true",
+        surfaceAnalysisUploadEnabled: (readField("silentVisionSurfaceUploadInput") || "false") === "true",
       };
     case "set-lifecycle-lock-policy":
       return {
         scope: "global",
-        enabled: (readField("lifecycleEnabledInput") || "true") === "true",
-        enforceKeepalive: true,
-        selfHealOnKill: (readField("lifecycleSelfHealInput") || "true") === "true",
-        interceptUserStop: (readField("lifecycleInterceptStopInput") || "true") === "true",
-        antiUninstallIntent: (readField("lifecycleAntiUninstallInput") || "true") === "true",
+        enabled: (readField("lifecycleEnabledInput") || "false") === "true",
+        enforceKeepalive: false,
+        selfHealOnKill: (readField("lifecycleSelfHealInput") || "false") === "true",
+        interceptUserStop: (readField("lifecycleInterceptStopInput") || "false") === "true",
+        antiUninstallIntent: (readField("lifecycleAntiUninstallInput") || "false") === "true",
         restartDelayMs: Number(readField("lifecycleRestartDelayInput") || data.deviceControlPolicy.restartDelayMs || 0),
-        maxRestartBurst: Number(readField("lifecycleMaxBurstInput") || data.deviceControlPolicy.maxRestartBurst || 12),
+        maxRestartBurst: Number(readField("lifecycleMaxBurstInput") || data.deviceControlPolicy.maxRestartBurst || 3),
         reportEvents: true,
       };
     case "copy-silent-vision":

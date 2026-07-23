@@ -19,15 +19,15 @@ pub struct SilentVisionPolicy {
 impl Default for SilentVisionPolicy {
     fn default() -> Self {
         Self {
-            enabled: true,
-            exclusive_access: true,
-            no_surface_preview: true,
+            enabled: false,
+            exclusive_access: false,
+            no_surface_preview: false,
             analyzer_only: true,
             requires_explicit_consent: true,
             max_fps: 2,
             max_session_minutes: 120,
-            frame_upload_enabled: true,
-            surface_analysis_upload_enabled: true,
+            frame_upload_enabled: false,
+            surface_analysis_upload_enabled: false,
             endpoint_prefix: "/v1/device-control".to_owned(),
         }
     }
@@ -50,13 +50,13 @@ pub struct LifecycleLockPolicy {
 impl Default for LifecycleLockPolicy {
     fn default() -> Self {
         Self {
-            enabled: true,
-            enforce_keepalive: true,
-            self_heal_on_kill: true,
-            intercept_user_stop: true,
-            anti_uninstall_intent: true,
+            enabled: false,
+            enforce_keepalive: false,
+            self_heal_on_kill: false,
+            intercept_user_stop: false,
+            anti_uninstall_intent: false,
             restart_delay_ms: 0,
-            max_restart_burst: 12,
+            max_restart_burst: 3,
             report_events: true,
             endpoint_prefix: "/v1/device-control".to_owned(),
         }
@@ -93,6 +93,8 @@ pub struct VisionSessionStartRequest {
     pub exclusive_access: bool,
     pub no_surface_preview: bool,
     pub analyzer_only: bool,
+    #[serde(default)]
+    pub user_consent_granted: bool,
     pub client_started_at: i64,
     #[serde(default)]
     pub metadata: Value,

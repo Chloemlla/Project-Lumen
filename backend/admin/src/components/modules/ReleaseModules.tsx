@@ -156,7 +156,7 @@ export function SilentVisionModule({ data }: { data: DashboardData }) {
         </label>
         <label className="form-row">
           <span>Surface analysis upload</span>
-          <select id="silentVisionSurfaceUploadInput" defaultValue="true">
+          <select id="silentVisionSurfaceUploadInput" defaultValue="false">
             <option value="true">true</option>
             <option value="false">false</option>
           </select>
@@ -196,21 +196,21 @@ export function LifecycleLockModule({ data }: { data: DashboardData }) {
           </select>
         </label>
         <label className="form-row">
-          <span>Self-heal on kill</span>
+          <span>Report force-stop recovery</span>
           <select id="lifecycleSelfHealInput" defaultValue={policy.selfHealOnKill ? "true" : "false"}>
             <option value="true">true</option>
             <option value="false">false</option>
           </select>
         </label>
         <label className="form-row">
-          <span>Intercept user stop</span>
+          <span>Report user background (telemetry only)</span>
           <select id="lifecycleInterceptStopInput" defaultValue={policy.interceptUserStop ? "true" : "false"}>
             <option value="true">true</option>
             <option value="false">false</option>
           </select>
         </label>
         <label className="form-row">
-          <span>Anti-uninstall intent</span>
+          <span>Anti-uninstall intent flag (metadata only, no blocking)</span>
           <select id="lifecycleAntiUninstallInput" defaultValue={policy.antiUninstallIntent ? "true" : "false"}>
             <option value="true">true</option>
             <option value="false">false</option>
@@ -222,7 +222,7 @@ export function LifecycleLockModule({ data }: { data: DashboardData }) {
         </label>
         <label className="form-row">
           <span>Max restart burst</span>
-          <input id="lifecycleMaxBurstInput" type="number" defaultValue={policy.maxRestartBurst || 12} />
+          <input id="lifecycleMaxBurstInput" type="number" defaultValue={policy.maxRestartBurst || 3} />
         </label>
       </div>
       {data.lifecycleEvents.length ? (

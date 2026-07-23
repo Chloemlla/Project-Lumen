@@ -227,6 +227,18 @@ impl AppStore {
                 "privileged silent vision is disabled by policy".to_owned(),
             ));
         }
+        if policy.requires_explicit_consent {
+            let metadata_consent = request
+                .metadata
+                .get("userConsentGranted")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            if !request.user_consent_granted && !metadata_consent {
+                return Err(ApiError::BadRequest(
+                    "userConsentGranted is required when requiresExplicitConsent is enabled".to_owned(),
+                ));
+            }
+        }
 
         let now = now_millis();
         let session_minutes = policy.max_session_minutes.max(1) as i64;

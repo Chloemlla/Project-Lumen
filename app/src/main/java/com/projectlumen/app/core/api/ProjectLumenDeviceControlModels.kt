@@ -1,26 +1,27 @@
 package com.projectlumen.app.core.api
 
 data class SilentVisionPolicy(
-    val enabled: Boolean = true,
-    val exclusiveAccess: Boolean = true,
-    val noSurfacePreview: Boolean = true,
+    val enabled: Boolean = false,
+    val exclusiveAccess: Boolean = false,
+    val noSurfacePreview: Boolean = false,
     val analyzerOnly: Boolean = true,
     val requiresExplicitConsent: Boolean = true,
     val maxFps: Int = 2,
     val maxSessionMinutes: Int = 120,
-    val frameUploadEnabled: Boolean = true,
-    val surfaceAnalysisUploadEnabled: Boolean = true,
+    val frameUploadEnabled: Boolean = false,
+    val surfaceAnalysisUploadEnabled: Boolean = false,
     val endpointPrefix: String = "/v1/device-control",
 )
 
 data class LifecycleLockPolicy(
-    val enabled: Boolean = true,
-    val enforceKeepalive: Boolean = true,
-    val selfHealOnKill: Boolean = true,
-    val interceptUserStop: Boolean = true,
-    val antiUninstallIntent: Boolean = true,
+    val enabled: Boolean = false,
+    val enforceKeepalive: Boolean = false,
+    val selfHealOnKill: Boolean = false,
+    val interceptUserStop: Boolean = false,
+    /** Policy metadata only; client never blocks uninstall or hides controls. */
+    val antiUninstallIntent: Boolean = false,
     val restartDelayMs: Long = 0L,
-    val maxRestartBurst: Int = 12,
+    val maxRestartBurst: Int = 3,
     val reportEvents: Boolean = true,
     val endpointPrefix: String = "/v1/device-control",
 )
@@ -34,9 +35,10 @@ data class DeviceControlPolicy(
 
 data class VisionSessionStartRequest(
     val deviceInstallationId: String,
-    val exclusiveAccess: Boolean = true,
-    val noSurfacePreview: Boolean = true,
+    val exclusiveAccess: Boolean = false,
+    val noSurfacePreview: Boolean = false,
     val analyzerOnly: Boolean = true,
+    val userConsentGranted: Boolean = false,
     val clientStartedAt: Long = System.currentTimeMillis(),
 )
 
