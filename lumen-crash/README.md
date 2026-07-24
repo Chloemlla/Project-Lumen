@@ -37,6 +37,7 @@ Reusable Android crash collection + adaptive Compose crash report UI, extracted 
 - [ProGuard / R8](#proguard--r8)
   - [Required third-party minify exemption](#required-third-party-minify-exemption)
   - [Field lesson: white-screen / instant exit on release cold start](#field-lesson-white-screen--instant-exit-on-release-cold-start)
+  - [Field lesson: cold-start flash-exit / wrong install order (ClashMeta)](#field-lesson-cold-start-flash-exit--wrong-install-order-clashmeta)
 - [Integration pitfalls](#integration-pitfalls)
 - [Testing](#testing)
 - [Project Lumen host notes](#project-lumen-host-notes)
@@ -92,8 +93,10 @@ setContent {
 
 Notes:
 
-- File share works by default through the SDK-owned provider (`${applicationId}.lumen.crash.fileprovider`).
-- Explicit `install(application, config)` and direct `LumenCrashReportScreen` remain supported.
+- File share works by default through the SDK-owned provider (`${applicationId}.lumen.crash.fileprovider`). Prefer that authority; host override is optional.
+- Explicit `install(application, config)` and direct `LumenCrashReportScreen` remain supported on every published AAR.
+- `installSafely` / `LumenCrashGate` / `loadPendingReportSafely` exist on current source and recent AARs. If your resolved AAR is older and those symbols are missing, wrap `install` / `loadPendingReport` in `runCatching` instead of compiling against missing APIs.
+- `LumenCrash.install(...)` (or `installSafely` when present) must be the **first host work** after `super.attachBaseContext`. Pending-report gate must run before theme / design / main UI. See [ClashMeta cold-start lesson](#field-lesson-cold-start-flash-exit--wrong-install-order-clashmeta).
 - Capture-only hosts can depend on `:lumen-crash-core` / `lumen-crash-core` and skip Compose UI.
 - Host minify templates: `host-proguard-template.pro`, `host-keep-resources.xml`.
 - Print templates: `gradle :lumen-crash:printHostProguard`.
@@ -960,39 +963,57 @@ The library is Compose-first and exposes Compose Material3 + window-size-class a
 
 Prefer `attachBaseContext` so the uncaught handler is active as early as possible.
 
+**Order is mandatory:** after `super.attachBaseContext(base)`, install LumenCrash as the **first host work**, before Global / DI / logging / Remote / geo / migration / any other host bootstrap that can throw. A crash that happens between `super` and install is invisible to the SDK.
+
 ```kotlin
 class MyApp : Application() {
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
-        LumenCrash.install(
-            this,
-            LumenCrashConfig(
-                appDisplayName = "My App",
-                versionName = BuildConfig.VERSION_NAME,
-                versionCode = BuildConfig.VERSION_CODE,
-                commitHash = BuildConfig.SHORT_HASH,
-                fileProviderAuthority = "${packageName}.fileprovider",
-                shareSubject = "Crash report",
-                reportTitle = null,   // null => library string resource
-                reportMessage = null, // null => library string resource
-                onCrashSaved = { report -> /* optional upload */ },
-                killProcessWhenNoPreviousHandler = true,
-            ),
-        )
+        // FIRST host work after super — before Global / DI / Log / Remote.
+        // Prefer installSafely when the resolved AAR has it; otherwise runCatching { install }.
+        runCatching {
+            LumenCrash.install(
+                this,
+                LumenCrashConfig(
+                    appDisplayName = "My App",
+                    versionName = BuildConfig.VERSION_NAME,
+                    versionCode = BuildConfig.VERSION_CODE,
+                    commitHash = BuildConfig.SHORT_HASH,
+                    // Prefer SDK-owned FileProvider (merged from AAR).
+                    fileProviderAuthority = "${packageName}.lumen.crash.fileprovider",
+                    shareSubject = "Crash report",
+                    reportTitle = null,   // null => library string resource
+                    reportMessage = null, // null => library string resource
+                    onCrashSaved = { report -> /* optional upload */ },
+                    killProcessWhenNoPreviousHandler = true,
+                ),
+            )
+        }.onFailure { it.printStackTrace() }
+        // Only then: Global.init / DI / other bootstrap
     }
 }
 ```
 
 ### 2) Gate app content with the pending report
 
+Run the pending-report gate **before** theme / design / main UI work. Single-Activity Compose hosts can use `LumenCrashGate` (when present) or an explicit `loadPendingReport` branch. Multi-activity hosts need a dedicated report Activity and the same gate on **every** entry Activity (launcher, deep links, control activities, crash deep-links).
+
 ```kotlin
+// Single-Activity Compose host (preferred short path when LumenCrashGate is on the AAR)
 setContent {
-    val report = LumenCrash.loadPendingReport()
+    LumenCrashGate {
+        App()
+    }
+}
+
+// Explicit gate (always available via loadPendingReport)
+setContent {
+    val report = runCatching { LumenCrash.loadPendingReport() }.getOrNull()
     if (report != null) {
         LumenCrashReportScreen(
             report = report,
             onContinue = {
-                LumenCrash.clearPendingReport()
+                runCatching { LumenCrash.clearPendingReport() }
                 // recreate() or continue into normal app content
             },
             clearStoredReportOnContinue = true,
@@ -1003,6 +1024,8 @@ setContent {
 }
 ```
 
+**Do not** `finish()` the only launcher Activity immediately after `startActivity(crashUi)`. On some ROMs that flash-exits the process with no visible UI. Return early from `onCreate` / skip main work instead, and let the crash Activity own the next paint. See [ClashMeta cold-start lesson](#field-lesson-cold-start-flash-exit--wrong-install-order-clashmeta).
+
 ### 3) Record breadcrumbs / manual crashes
 
 ```kotlin
@@ -1012,22 +1035,28 @@ LumenCrash.record(throwable) // also persists + invokes onCrashSaved
 
 ## Public API
 
-| API | Purpose |
-|---|---|
-| `LumenCrash.install(application, config)` | One-time install: config, store, uncaught handler |
-| `LumenCrash.isInstalled()` | Whether install completed |
-| `LumenCrash.configOrNull()` | Current host config, or `null` |
-| `LumenCrash.store()` | `CrashReportStore` (throws if not installed) |
-| `LumenCrash.recordBreadcrumb(event)` | Append sanitized breadcrumb |
-| `LumenCrash.record(throwable)` | Build + persist report, invoke `onCrashSaved` |
-| `LumenCrash.loadPendingReport()` | In-memory startup report, else disk load |
-| `LumenCrash.clearPendingReport()` | Clear store + startup report |
-| `LumenCrash.clearStartupCrashReport()` | Clear in-memory report only |
-| `LumenCrash.startupCrashReport` | Last captured in-memory report (read-only) |
-| `LumenCrashReportScreen(...)` | Adaptive crash UI |
-| `CrashReport.toClipboardText()` | Full export text (author-verified) |
-| `CrashReport.toJson()` / `crashReportFromJson(...)` | Persistence format helpers |
-| `CrashReport.fromThrowable(throwable, appInfo)` | Build a report from a throwable (needs `CrashAppInfo`) |
+| API | Purpose | Always on published AAR? |
+|---|---|---|
+| `LumenCrash.install(application, config)` | One-time install: config, store, uncaught handler | **Yes** — safe default for all hosts |
+| `LumenCrash.install(application, configure = {})` | DSL install that auto-fills metadata / SDK FileProvider | Current source / recent AARs |
+| `LumenCrash.installSafely(application, config\|configure)` | Host-safe install (`runCatching` inside) | Current source / recent AARs only — if missing, wrap `install` in `runCatching` |
+| `LumenCrash.isInstalled()` | Whether install completed | Yes |
+| `LumenCrash.configOrNull()` | Current host config, or `null` | Yes |
+| `LumenCrash.store()` | `CrashReportStore` (throws if not installed) | Yes |
+| `LumenCrash.recordBreadcrumb(event)` | Append sanitized breadcrumb | Yes |
+| `LumenCrash.record(throwable)` | Build + persist report, invoke `onCrashSaved` | Yes |
+| `LumenCrash.loadPendingReport()` | In-memory startup report, else disk load (integrity fail-closed) | Yes |
+| `LumenCrash.loadPendingReportSafely()` | Host-safe pending load (`null` on failure) | Current source / recent AARs only — if missing, wrap `loadPendingReport` in `runCatching` |
+| `LumenCrash.clearPendingReport()` | Clear store + startup report | Yes |
+| `LumenCrash.clearStartupCrashReport()` | Clear in-memory report only | Yes |
+| `LumenCrash.startupCrashReport` | Last captured in-memory report (read-only) | Yes |
+| `LumenCrashGate { content }` | Compose pending-report gate (short path) | UI artifact / recent AARs — fallback to explicit `loadPendingReport` + `LumenCrashReportScreen` |
+| `LumenCrashReportScreen(...)` | Adaptive crash UI | Yes (UI artifact) |
+| `CrashReport.toClipboardText()` | Full export text (author-verified) | Yes |
+| `CrashReport.toJson()` / `crashReportFromJson(...)` | Persistence format helpers | Yes |
+| `CrashReport.fromThrowable(throwable, appInfo)` | Build a report from a throwable (needs `CrashAppInfo`) | Yes |
+
+**Published AAR rule:** always compile against `install` + `loadPendingReport` + `LumenCrashReportScreen`. Treat `installSafely` / `LumenCrashGate` / `loadPendingReportSafely` as convenience APIs that may be absent on an older resolved version — detect at resolve time or fall back to `runCatching { install(...) }` / `runCatching { loadPendingReport() }`.
 
 ### `LumenCrashConfig`
 
@@ -1136,12 +1165,24 @@ Stack preview defaults to 18 collapsed lines; users can expand/collapse. Author 
 
 ## File share setup
 
-Text share works without host setup. File share requires:
+Text share works without host setup. File share prefers the **SDK-owned FileProvider** merged from the AAR:
+
+```text
+${applicationId}.lumen.crash.fileprovider
+```
+
+Pass that authority through config (or accept the DSL install default):
+
+```kotlin
+fileProviderAuthority = "${packageName}.lumen.crash.fileprovider"
+```
+
+Host override is optional when the host already has a FileProvider for other features. If you override, you still need:
 
 1. Host `FileProvider` authority passed as `fileProviderAuthority`
 2. Provider paths that allow cache-dir file exposure
 
-Example host provider:
+Example host provider (only needed when overriding the SDK authority):
 
 ```xml
 <!-- AndroidManifest.xml -->
@@ -1429,6 +1470,145 @@ Integrity is still fail-closed inside the SDK. Host hardening only prevents one 
 | Copy / share | Author footer still present |
 | Continue / clear | Next cold start does not reopen the same report |
 
+These two cold-start field lessons are **independent root causes**. Keep both checklists:
+
+| Lesson | Host | Typical symptom | Primary root cause |
+|---|---|---|---|
+| [White-screen / instant exit](#field-lesson-white-screen--instant-exit-on-release-cold-start) | Seal (minify) | White screen then process die | R8 stripped author / integrity; fail-closed exception escapes startup |
+| [Flash-exit / wrong install order](#field-lesson-cold-start-flash-exit--wrong-install-order-clashmeta) | Clash Meta for Android | Flash exit / no UI / capture missing on cold start | Install too late; gate after theme/main; `finish()` only launcher; crash UI `setContent` not fail-soft |
+
+### Field lesson: cold-start flash-exit / wrong install order (ClashMeta)
+
+Seen in a real multi-activity external host (Clash Meta for Android) while integrating the published AAR. Proof-path host commits: `5ce30a6`, `fe22dbb`, `f763fb2`, `ad87437`.
+
+**What happened**
+
+1. Host called `Global.init` / other bootstrap **before** `LumenCrash.install` in `attachBaseContext`, so early throws never hit the uncaught handler.
+2. Pending-report gate ran **after** dayNight / design / `main()`, so theme or first-paint work could kill the process before the crash UI opened.
+3. Host `finish()`-ed the only launcher Activity immediately after `startActivity(crashUi)`. On some ROMs the process flash-exited with **no visible crash UI**.
+4. Host compiled against `installSafely` / convenience APIs that were not on the **resolved published AAR**, or left crash-UI `setContent` unwrapped so Compose / integrity failures process-killed the report Activity.
+5. Multi-entry apps gated only MainActivity; deep-link / control / legacy crash entries still painted normal UI over a pending report.
+
+**Anti-pattern (wrong order)**
+
+```kotlin
+// Application — WRONG
+override fun attachBaseContext(base: Context) {
+    super.attachBaseContext(base)
+    Global.init(this)              // can throw before handler is live
+    LumenCrash.install(this, ...)  // too late
+}
+
+// Activity — WRONG
+override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    applyDayNight()
+    launch { main() }              // first paint before pending gate
+    if (hasPendingReport()) {
+        startActivity(crashIntent)
+        finish()                   // flash-exit risk on single-activity process
+        return
+    }
+}
+```
+
+**Correct order**
+
+```kotlin
+// Application — CORRECT
+override fun attachBaseContext(base: Context) {
+    super.attachBaseContext(base)
+    // 1) First host work after super: install (installSafely if present, else runCatching)
+    runCatching {
+        LumenCrash.install(
+            this,
+            LumenCrashConfig(
+                appDisplayName = "My App",
+                versionName = BuildConfig.VERSION_NAME,
+                versionCode = BuildConfig.VERSION_CODE,
+                commitHash = BuildConfig.SHORT_HASH,
+                fileProviderAuthority = "${packageName}.lumen.crash.fileprovider",
+            ),
+        )
+    }.onFailure { System.err.println("LumenCrash install failed: ${it.message}") }
+    // 2) Only then: Global / DI / Log / Remote / geo / migration
+    Global.init(this)
+}
+
+// Activity — CORRECT (multi-activity host pattern)
+override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    // Gate BEFORE theme / design / main. Fail-soft the gate itself.
+    val gated = runCatching { presentPendingCrashUiIfNeeded() }.getOrDefault(false)
+    if (gated) return
+    applyDayNight()
+    launch { main() }
+}
+
+// presentPendingCrashUiIfNeeded():
+//   loadPendingReport inside runCatching
+//   startActivity(LumenCrashReportActivity) with NEW_TASK | CLEAR_TOP | SINGLE_TOP
+//   DO NOT finish() the launcher here — return true and skip host work instead
+```
+
+Crash report Activity `setContent` must also be fail-soft:
+
+```kotlin
+val opened = runCatching {
+    setContent {
+        MaterialTheme {
+            LumenCrashReportScreen(
+                report = report,
+                onContinue = {
+                    runCatching { LumenCrash.clearPendingReport() }
+                    startActivity(mainIntent)
+                    finish()
+                },
+            )
+        }
+    }
+    true
+}.getOrDefault(false)
+
+if (!opened) {
+    runCatching { LumenCrash.clearPendingReport() }
+    startActivity(mainIntent)
+    finish()
+}
+```
+
+**Root-cause checklist**
+
+| Check | Why it matters |
+|---|---|
+| `install` is not the first host step after `super.attachBaseContext` | Early Global/DI/Log throws are invisible to the SDK |
+| Pending gate after theme / design / `main()` | First-paint crashes escape the pending-report surface |
+| `finish()` only launcher when starting crash UI | Some ROMs flash-exit the process with no UI |
+| Compiled against `installSafely` / `LumenCrashGate` not on resolved AAR | CI/device builds break or hosts fall back inconsistently |
+| No dedicated report Activity on multi-activity hosts | Deep links / control entries paint normal UI over a pending report |
+| Crash Activity `setContent` not wrapped | Missing Compose deps / integrity block process-kills the report surface |
+| Host authority not `${package}.lumen.crash.fileprovider` | Share-as-file needs extra host path XML or fails silently |
+
+**Hardening that fixed the host**
+
+1. `attachBaseContext`: `super` → `install` (fail-soft) → everything else.
+2. Every entry Activity: pending gate **before** theme/design/main; gate itself wrapped in `runCatching`.
+3. Dedicated `LumenCrashReportActivity` (Compose-only surface is fine when the rest of the app is views).
+4. Do **not** `finish()` the only launcher when handing off to crash UI; return early and skip host work.
+5. Published AAR contract: always use `install`; use `installSafely` / `LumenCrashGate` only when symbols exist on the resolved artifact; otherwise `runCatching { install }` / explicit gate.
+6. Crash Activity: wrap `setContent` + continue/clear paths; on failure clear report and resume main.
+7. Prefer `fileProviderAuthority = "${packageName}.lumen.crash.fileprovider"`.
+
+**Cold-start smoke matrix (add to minify matrix)**
+
+| Step | Expected |
+|---|---|
+| Cold start with no pending report | Reaches normal UI; no flash-exit |
+| Force crash + relaunch | Pending crash UI opens (not flash-exit) |
+| Pending report + deep-link / secondary entry | Same crash UI gate, not silent normal UI |
+| Crash UI Compose deps missing / integrity blocked | Report dropped or blocked screen; process still reaches recoverable UI |
+| Continue / clear | Next cold start does not reopen the same report |
+
 ## Integration pitfalls
 
 High-frequency host integration mistakes. Use this as a pre-ship checklist; details live in the sections linked below.
@@ -1461,8 +1641,8 @@ High-frequency host integration mistakes. Use this as a pre-ship checklist; deta
 
 Missing any of these three is a broken integration:
 
-1. **Install early** in `Application.attachBaseContext` so the uncaught handler is active before late startup work. See [Minimal integration](#minimal-integration-3-host-touchpoints).
-2. **Gate startup UI** with `LumenCrash.loadPendingReport()` -> `LumenCrashReportScreen` before normal app content.
+1. **Install early** in `Application.attachBaseContext` as the **first host work after `super`**, before Global / DI / Log / Remote / geo / migration. See [Minimal integration](#minimal-integration-3-host-touchpoints) and [ClashMeta cold-start lesson](#field-lesson-cold-start-flash-exit--wrong-install-order-clashmeta).
+2. **Gate startup UI** with `loadPendingReport` / `LumenCrashGate` / dedicated report Activity **before** theme / design / main. Multi-activity hosts must gate **every** entry Activity.
 3. **Record breadcrumbs / handled failures** on important paths via `recordBreadcrumb` / `record(throwable)`.
 
 Also:
@@ -1470,12 +1650,16 @@ Also:
 - Prefer `LumenCrash.record(throwable)` over hand-building reports. Direct `CrashReport.fromThrowable(...)` requires a full `CrashAppInfo`.
 - `LumenCrash.store()` throws if install has not run.
 - On continue, clear storage (`clearPendingReport()` or the screen clear path). Otherwise the next cold start still blocks on the same report.
-- Host startup calls (`install`, `loadPendingReport`, breadcrumbs) should be wrapped in `runCatching`. Integrity remains fail-closed inside the SDK, but the host process should still reach a recoverable UI path.
+- Host startup calls (`install`, `loadPendingReport`, breadcrumbs) should be wrapped in `runCatching` (or use `installSafely` / `loadPendingReportSafely` when those APIs exist on the resolved AAR). Integrity remains fail-closed inside the SDK, but the host process should still reach a recoverable UI path.
+- **Published AAR API:** `install` always exists. `installSafely` / `LumenCrashGate` / `loadPendingReportSafely` only if present on the resolved artifact — never assume every release pin has them.
+- **Do not `finish()` the only launcher** when starting crash UI; return early and skip host work. Flash-exit with no UI has been observed on some ROMs.
+- Crash report Activity `setContent` must be fail-soft: if Compose / integrity fails, drop or block without process-killing.
 
 ### File share and product copy
 
-- Text share works without host setup. File share requires a host `FileProvider` plus `LumenCrashConfig.fileProviderAuthority`. Without authority, the UI keeps text share and shows the library "file share unavailable" string.
-- Provider paths must expose cache (required) and preferably external-cache for the SDK share writer fallback. See [File share setup](#file-share-setup).
+- Text share works without host setup. Prefer SDK FileProvider authority `${applicationId}.lumen.crash.fileprovider` via `LumenCrashConfig.fileProviderAuthority` (or the DSL install default). Host override is optional.
+- Without authority, the UI keeps text share and shows the library "file share unavailable" string.
+- If you override with a host provider, paths must expose cache (required) and preferably external-cache for the SDK share writer fallback. See [File share setup](#file-share-setup).
 - Override only product-facing strings through config (`reportTitle`, `reportMessage`, `shareSubject`). Do not re-copy the full shared UI string set into the host app.
 - Author attribution is not configurable and cannot be hidden. Attempts to strip it fail closed.
 
@@ -1510,11 +1694,11 @@ Also:
 
 1. Auto-resolve the latest main auto-release version (`lumen-crash-vX.Y.Z-<shortSha>`) and inject it; do **not** hard-pin.
 2. Consume via GitHub Packages with out-of-repo credentials.
-3. Install in `attachBaseContext` inside `runCatching`.
-4. Gate startup with pending-report UI; load pending report inside `runCatching`.
-5. Configure FileProvider if file share is required.
+3. In `attachBaseContext`: `super` → fail-soft `install` (**first** host work) → other bootstrap. Prefer `installSafely` only when present on the resolved AAR.
+4. Gate **every** entry Activity with pending-report UI **before** theme/design/main; load pending report fail-soft. Do not `finish()` the only launcher when starting crash UI.
+5. Prefer `${package}.lumen.crash.fileprovider`; override host FileProvider only when required.
 6. Verify release minify keeps author integrity + public API, and keep crash strings if resource shrink is on.
-7. Cold-start a minified release once, then smoke-test crash capture, pending UI, copy, and share before shipping.
+7. Cold-start a minified release once, then smoke-test: no flash-exit, crash capture, pending UI on all entries, crash UI fail-soft, copy, and share before shipping.
 
 ## Testing
 
