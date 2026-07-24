@@ -310,7 +310,10 @@ internal fun HomeScreen(
         ActionCard {
             SectionHeader(Icons.Outlined.Schedule, R.string.quick_actions)
             when {
-                !uiState.settings.reminderEnabled && !timerActive -> EmptyStateMessage(R.string.reminder_disabled_hint)
+                !uiState.settings.reminderEnabled && !timerActive -> EmptyStateMessage(
+                    messageRes = R.string.reminder_disabled_hint,
+                    illustration = EmptyStateIllustration.VideoStreaming,
+                )
                 !reminderActive && timerActive -> {
                     EmptyStateMessage(R.string.other_timer_running_hint)
                     OutlinedButton(
@@ -423,7 +426,10 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
         ActionCard {
             SectionHeader(Icons.Outlined.Spa, R.string.quick_actions)
             when {
-                !uiState.settings.reminderEnabled && !timerActive -> EmptyStateMessage(R.string.reminder_disabled_hint)
+                !uiState.settings.reminderEnabled && !timerActive -> EmptyStateMessage(
+                    messageRes = R.string.reminder_disabled_hint,
+                    illustration = EmptyStateIllustration.VideoStreaming,
+                )
                 canStartBreak && canSkip -> {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
@@ -520,7 +526,10 @@ internal fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
         ActionCard {
             SectionHeader(Icons.Outlined.LocalCafe, R.string.quick_actions)
             when {
-                !uiState.settings.pomodoroEnabled && !timerActive -> EmptyStateMessage(R.string.pomodoro_disabled_hint)
+                !uiState.settings.pomodoroEnabled && !timerActive -> EmptyStateMessage(
+                    messageRes = R.string.pomodoro_disabled_hint,
+                    illustration = EmptyStateIllustration.VideoStreaming,
+                )
                 running -> {
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
@@ -662,7 +671,12 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
                 }
             } else {
                 EmptyStateMessage(
-                    if (statsEnabled) R.string.statistics_no_export_data else R.string.statistics_disabled,
+                    messageRes = if (statsEnabled) {
+                        R.string.statistics_no_export_data
+                    } else {
+                        R.string.statistics_disabled
+                    },
+                    illustration = EmptyStateIllustration.Download,
                 )
             }
         }

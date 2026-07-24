@@ -211,7 +211,10 @@ internal fun TrendCard(uiState: ProjectLumenUiState) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.weekly_trend)
             if (recent.isEmpty()) {
-                EmptyStateMessage(R.string.statistics_no_trend_data)
+                EmptyStateMessage(
+                    messageRes = R.string.statistics_no_trend_data,
+                    illustration = EmptyStateIllustration.VideoFiles,
+                )
             } else {
                 val maxSeconds = recent.maxOf { max(it.workingSeconds, 1L) }
                 recent.forEach { stat ->

@@ -10,6 +10,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
@@ -89,12 +90,16 @@ fun ProjectLumenTheme(
             paletteJson = themePaletteJson,
         )
     }
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = LumenTypography,
-        shapes = LumenShapes,
-        content = content,
-    )
+    CompositionLocalProvider(
+        LocalFixedColorRoles provides FixedColorRoles.fromActiveScheme(colorScheme),
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = LumenTypography,
+            shapes = LumenShapes,
+            content = content,
+        )
+    }
 }
 
 private fun ColorScheme.applyTemplatePalette(

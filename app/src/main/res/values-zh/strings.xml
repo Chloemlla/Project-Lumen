@@ -829,5 +829,6 @@
     <string name="credit_mlkit_desc">用于距离与眨眼感知的端侧人脸/网格检测</string>
     <string name="credit_constraintlayout_desc">Compose 页面使用的约束布局辅助库</string>
     <string name="credit_material_icons_desc">界面中使用的 Material 扩展图标集</string>
+    <string name="credit_undraw_desc">开源插画库；空状态与关于页使用随主题色变化的 undraw 矢量插画</string>
 
 </resources>
