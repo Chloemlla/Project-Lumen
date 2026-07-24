@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Project Lumen</string>
     <string name="permission_access_lumen_core_label">Access Project Lumen core</string>
@@ -830,5 +830,6 @@
     <string name="credit_mlkit_desc">On-device face and mesh detection for distance and blink sensing</string>
     <string name="credit_constraintlayout_desc">Constraint-based layout helpers for Compose screens</string>
     <string name="credit_material_icons_desc">Extended Material icon set used throughout the interface</string>
+    <string name="credit_undraw_desc">Open-source illustration library; empty and about screens use theme-aware undraw vectors</string>
 
 </resources>

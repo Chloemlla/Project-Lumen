@@ -46,6 +46,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -60,6 +61,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -187,6 +189,8 @@ import com.projectlumen.app.core.update.ReleaseInfo
 import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
+import com.projectlumen.app.ui.svg.DynamicColorImageVectors
+import com.projectlumen.app.ui.svg.drawablevectors.coder
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
 import org.json.JSONObject
 import java.io.File
@@ -310,6 +314,14 @@ internal fun AboutHeroCard(versionLabel: String, onVersionClick: () -> Unit) {
         ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             SectionHeader(Icons.Outlined.Info, R.string.app_name)
+            Image(
+                imageVector = DynamicColorImageVectors.coder(),
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+                    .aspectRatio(16f / 9f),
+            )
             Text(
                 versionLabel,
                 modifier = Modifier.clickable(onClick = onVersionClick),

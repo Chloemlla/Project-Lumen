@@ -49,6 +49,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,9 +64,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.safeDrawing
@@ -201,6 +204,10 @@ import com.projectlumen.app.core.update.ReleaseInfo
 import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
+import com.projectlumen.app.ui.svg.DynamicColorImageVectors
+import com.projectlumen.app.ui.svg.drawablevectors.download
+import com.projectlumen.app.ui.svg.drawablevectors.videoFiles
+import com.projectlumen.app.ui.svg.drawablevectors.videoSteaming
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
 import org.json.JSONObject
 import java.io.File
@@ -557,19 +564,56 @@ internal fun ActionCard(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+/**
+ * Compact empty-state copy, optionally with a theme-aware undraw illustration.
+ *
+ * Prefer [EmptyStateIllustration.None] inside dense action cards; use a vector when the
+ * empty region is the primary content of the section.
+ */
+enum class EmptyStateIllustration {
+    None,
+    Download,
+    VideoFiles,
+    VideoStreaming,
+}
+
 @Composable
-internal fun EmptyStateMessage(@StringRes messageRes: Int) {
-    Text(
-        text = stringResource(messageRes),
+internal fun EmptyStateMessage(
+    @StringRes messageRes: Int,
+    illustration: EmptyStateIllustration = EmptyStateIllustration.None,
+) {
+    val imageVector = when (illustration) {
+        EmptyStateIllustration.None -> null
+        EmptyStateIllustration.Download -> DynamicColorImageVectors.download()
+        EmptyStateIllustration.VideoFiles -> DynamicColorImageVectors.videoFiles()
+        EmptyStateIllustration.VideoStreaming -> DynamicColorImageVectors.videoSteaming()
+    }
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(14.dp),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-    )
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (imageVector != null) {
+            Image(
+                imageVector = imageVector,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth(0.82f)
+                    .heightIn(max = 148.dp)
+                    .aspectRatio(16f / 9f),
+            )
+        }
+        Text(
+            text = stringResource(messageRes),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
 @Composable

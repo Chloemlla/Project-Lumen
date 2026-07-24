@@ -2,6 +2,7 @@ package com.projectlumen.app.app
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,6 +43,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
+import com.projectlumen.app.ui.svg.DynamicColorImageVectors
+import com.projectlumen.app.ui.svg.drawablevectors.coder
 
 private data class OssCredit(
     val name: String,
@@ -105,6 +109,16 @@ internal fun ProjectLumenOpenSourceNoticeScreen(
                     text = stringResource(R.string.oss_notice_title),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
+                )
+            }
+            item {
+                Image(
+                    imageVector = DynamicColorImageVectors.coder(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 36.dp, vertical = 4.dp)
+                        .aspectRatio(16f / 9f),
                 )
             }
             item {
@@ -373,6 +387,13 @@ private fun rememberProjectLumenCredits(): List<OssCredit> = remember {
             descriptionRes = R.string.credit_material_icons_desc,
             license = "Apache License, Version 2.0",
             url = "https://fonts.google.com/icons",
+        ),
+        OssCredit(
+            name = "unDraw",
+            author = "Katerina Limpitsouni",
+            descriptionRes = R.string.credit_undraw_desc,
+            license = "unDraw License",
+            url = "https://undraw.co/",
         ),
     )
 }
