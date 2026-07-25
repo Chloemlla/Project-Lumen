@@ -9,9 +9,11 @@ import com.projectlumen.app.core.api.ProjectLumenApiConfig
 import com.projectlumen.app.core.api.RemoteReleaseAsset
 import com.projectlumen.app.core.api.RemoteReleaseCheck
 import com.projectlumen.app.core.api.RemoteReleasePatch
+import com.projectlumen.app.core.network.ClashPartnerCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.net.Proxy
 import java.net.URLEncoder
 import java.net.URL
 import java.time.Instant
@@ -282,6 +284,11 @@ class UpdateChecker(
         val parsedUrl = URL(url)
         if (parsedUrl.protocol != "https") {
             throw IOException("Update endpoints must use HTTPS.")
+        }
+        // Clash VPN path: process is bound to VPN; never stack system/app proxy.
+        // openConnection(Proxy.NO_PROXY) still uses the process-bound Network.
+        if (ClashPartnerCompat.shouldSkipManualProxy()) {
+            return parsedUrl.openConnection(Proxy.NO_PROXY) as HttpsURLConnection
         }
         val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
         val network = connectivityManager?.activeNetwork

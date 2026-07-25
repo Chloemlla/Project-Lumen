@@ -16,9 +16,19 @@ import androidx.core.content.getSystemService
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * Zero-config ClashMeta VPN partner adapt for Project-Lumen.
- * VPN TUN routes traffic system-wide; this module detects status and
- * avoids stacking app-level proxies while Clash VPN is active.
+ * Full ClashMeta VPN partner adapt for Project-Lumen (system utility).
+ *
+ * Official Clash Meta packages only:
+ * - com.github.metacubex.clash
+ * - com.github.metacubex.clash.meta
+ * - com.github.metacubex.clash.alpha
+ *
+ * - Detect Clash install / VPN / partnerStatus ContentProvider
+ * - Bind process to VPN Network while auto-adapt is on and Clash is routing
+ *   so OkHttp / WebView / HttpURLConnection cannot escape via allowBypass
+ * - Rebind when VPN Network handle is replaced (Clash restart)
+ * - Clear binding when Clash is off or auto-adapt is disabled
+ * - shouldSkipManualProxy forces Proxy.NO_PROXY on HTTP stacks
  */
 object ClashPartnerCompat {
     private const val PREFS = "clash_partner_compat"
@@ -34,12 +44,28 @@ object ClashPartnerCompat {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val listeners = CopyOnWriteArrayList<(Status) -> Unit>()
 
+    /**
+     * Optional hook invoked after status/binding changes so host code can
+     * rebuild HTTP clients / image loaders on the new process network.
+     */
+    @Volatile
+    private var networkAdaptHook: (() -> Unit)? = null
+
     @Volatile
     private var appContext: Context? = null
+
     @Volatile
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
     @Volatile
     private var lastVpnActive: Boolean? = null
+
+    @Volatile
+    private var lastVpnNetwork: Network? = null
+
+    @Volatile
+    private var boundVpnNetwork: Network? = null
+
     @Volatile
     var status: Status = Status()
         private set
@@ -51,9 +77,21 @@ object ClashPartnerCompat {
         val partnerAppAutoAdapt: Boolean = true,
         val profileName: String? = null,
         val clashPackage: String? = null,
+        /**
+         * True when Clash StatusProvider responded. Prefer [clashVpnRunning]
+         * over generic VPN heuristics so a non-Clash VPN is not treated as
+         * Clash routing.
+         */
+        val partnerStatusAvailable: Boolean = false,
+        val processBound: Boolean = false,
     ) {
         val isClashVpnRouting: Boolean
-            get() = clashVpnRunning || (clashInstalled && vpnActive)
+            get() =
+                if (partnerStatusAvailable) {
+                    clashVpnRunning
+                } else {
+                    clashInstalled && vpnActive
+                }
     }
 
     fun isAutoAdaptEnabled(context: Context): Boolean =
@@ -70,10 +108,14 @@ object ClashPartnerCompat {
         return when {
             !enabled -> "已关闭自动适配"
             !s.clashInstalled -> "未检测到 Clash Meta"
-            s.clashVpnRunning || s.vpnActive -> {
+            s.isClashVpnRouting -> {
                 val profile = s.profileName
-                if (!profile.isNullOrBlank()) "VPN 已连接 · $profile"
-                else "VPN 已连接 · 流量自动经 Clash"
+                val bound = if (s.processBound) " · 进程已绑定" else ""
+                if (!profile.isNullOrBlank()) {
+                    "VPN 已连接 · $profile$bound"
+                } else {
+                    "VPN 已连接 · 流量自动经 Clash$bound"
+                }
             }
             else -> "已安装 Clash · 等待开启 VPN"
         }
@@ -86,12 +128,32 @@ object ClashPartnerCompat {
         startNetworkWatch(app)
     }
 
+    fun setNetworkAdaptHook(hook: (() -> Unit)?) {
+        networkAdaptHook = hook
+    }
+
     fun refresh(context: Context? = null) {
         val ctx = context?.applicationContext ?: appContext ?: return
+        val previousBound = boundVpnNetwork
         val next = buildStatus(ctx)
         status = next
+        // Keep this process on the VPN network while Clash is routing so
+        // OkHttp/WebView/HttpURLConnection cannot escape via allowBypass.
+        applyVpnProcessBinding(ctx, next)
+        // Rebuild status after binding so processBound reflects truth.
+        val bound = boundVpnNetwork != null
+        val published =
+            if (next.processBound == bound) {
+                next
+            } else {
+                next.copy(processBound = bound)
+            }
+        status = published
+        if (previousBound != boundVpnNetwork) {
+            runCatching { networkAdaptHook?.invoke() }
+        }
         listeners.forEach { listener ->
-            mainHandler.post { listener(next) }
+            mainHandler.post { listener(published) }
         }
     }
 
@@ -107,6 +169,18 @@ object ClashPartnerCompat {
     fun shouldSkipManualProxy(context: Context): Boolean =
         isAutoAdaptEnabled(context) && status.isClashVpnRouting
 
+    /**
+     * Context-free variant for HTTP factories that have no [Context] handle.
+     * Uses the [appContext] captured by [start]; returns false before start.
+     *
+     * When true, process sockets are already bound to the VPN network — callers
+     * must not stack an additional app-level or JVM system proxy.
+     */
+    fun shouldSkipManualProxy(): Boolean {
+        val ctx = appContext ?: return false
+        return shouldSkipManualProxy(ctx)
+    }
+
     private fun prefs(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -114,8 +188,13 @@ object ClashPartnerCompat {
         val clashInstalled = isClashInstalled(context)
         val vpnActive = isVpnActive(context)
         val partner = queryPartnerStatus(context)
-        val clashVpnRunning = (partner?.get("vpnRunning") as? Boolean)
-            ?: (clashInstalled && vpnActive)
+        val partnerStatusAvailable = partner != null
+        val clashVpnRunning =
+            if (partnerStatusAvailable) {
+                partner?.get("vpnRunning") as? Boolean ?: false
+            } else {
+                clashInstalled && vpnActive
+            }
         return Status(
             clashInstalled = clashInstalled,
             vpnActive = vpnActive,
@@ -125,25 +204,32 @@ object ClashPartnerCompat {
                 ?: true,
             profileName = partner?.get("name") as? String,
             clashPackage = partner?.get("package") as? String,
+            partnerStatusAvailable = partnerStatusAvailable,
+            processBound = boundVpnNetwork != null,
         )
     }
 
     private fun startNetworkWatch(context: Context) {
         if (networkCallback != null) return
         val cm = context.getSystemService<ConnectivityManager>() ?: return
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) = onNetworkMaybeChanged()
-            override fun onLost(network: Network) = onNetworkMaybeChanged()
-            override fun onCapabilitiesChanged(
-                network: Network,
-                networkCapabilities: NetworkCapabilities,
-            ) = onNetworkMaybeChanged()
-        }
+        val callback =
+            object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) = onNetworkMaybeChanged()
+
+                override fun onLost(network: Network) = onNetworkMaybeChanged()
+
+                override fun onCapabilitiesChanged(
+                    network: Network,
+                    networkCapabilities: NetworkCapabilities,
+                ) = onNetworkMaybeChanged()
+            }
         networkCallback = callback
-        val request = NetworkRequest.Builder()
-            .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
-            .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-            .build()
+        val request =
+            NetworkRequest
+                .Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                .build()
         runCatching { cm.registerNetworkCallback(request, callback) }
             .onFailure {
                 runCatching {
@@ -156,9 +242,14 @@ object ClashPartnerCompat {
 
     private fun onNetworkMaybeChanged() {
         val context = appContext ?: return
+        val cm = context.getSystemService<ConnectivityManager>()
         val vpnActive = isVpnActive(context)
-        if (lastVpnActive == vpnActive) return
+        val vpnNetwork = cm?.let { findVpnNetwork(it) }
+        // Re-evaluate when VPN goes up/down *or* the underlying Network handle
+        // is replaced (Clash restart / re-establish) so process binding follows.
+        if (lastVpnActive == vpnActive && lastVpnNetwork == vpnNetwork) return
         lastVpnActive = vpnActive
+        lastVpnNetwork = vpnNetwork
         refresh(context)
     }
 
@@ -186,21 +277,72 @@ object ClashPartnerCompat {
     private fun queryPartnerStatus(context: Context): Map<String, Any?>? {
         val resolver = context.contentResolver
         for (pkg in clashPackages) {
-            val uri = Uri.Builder().scheme("content").authority("$pkg.status").build()
-            val bundle = runCatching {
-                resolver.call(uri, METHOD_PARTNER_STATUS, null, null)
-            }.getOrNull() ?: continue
+            val uri =
+                Uri
+                    .Builder()
+                    .scheme("content")
+                    .authority("$pkg.status")
+                    .build()
+            val bundle =
+                runCatching {
+                    resolver.call(uri, METHOD_PARTNER_STATUS, null, null)
+                }.getOrNull() ?: continue
             return mapOf(
                 "running" to bundle.getBoolean("running", false),
                 "vpnRunning" to bundle.getBoolean("vpnRunning", false),
-                "partnerAppAutoAdapt" to bundle.getBoolean(
-                    "partnerAppAutoAdapt",
-                    bundle.getBoolean("piliPlusAutoAdapt", true),
-                ),
+                "partnerAppAutoAdapt" to
+                    bundle.getBoolean(
+                        "partnerAppAutoAdapt",
+                        bundle.getBoolean("piliPlusAutoAdapt", true),
+                    ),
                 "piliPlusAutoAdapt" to bundle.getBoolean("piliPlusAutoAdapt", true),
                 "name" to bundle.getString("name"),
                 "package" to (bundle.getString("package") ?: pkg),
             )
+        }
+        return null
+    }
+
+    /**
+     * Bind (or unbind) this process to the active VPN network while Clash is
+     * routing. Without this, [NetworkCapabilities.NET_CAPABILITY_NOT_VPN]
+     * requests and [android.net.VpnService.allowBypass] can let OkHttp/WebView
+     * leave the tunnel even though Clash is "on".
+     */
+    private fun applyVpnProcessBinding(context: Context, status: Status) {
+        val cm = context.getSystemService<ConnectivityManager>() ?: return
+        if (!isAutoAdaptEnabled(context) || !status.isClashVpnRouting) {
+            clearProcessNetworkBinding(cm)
+            return
+        }
+        val vpn = findVpnNetwork(cm)
+        if (vpn == null) {
+            // Status says routing but no VPN Network is visible yet — drop any
+            // stale binding so we do not stick to a dead Network handle.
+            clearProcessNetworkBinding(cm)
+            return
+        }
+        if (boundVpnNetwork == vpn) return
+        runCatching {
+            cm.bindProcessToNetwork(vpn)
+            boundVpnNetwork = vpn
+        }.onFailure {
+            boundVpnNetwork = null
+        }
+    }
+
+    private fun clearProcessNetworkBinding(cm: ConnectivityManager) {
+        if (boundVpnNetwork == null && cm.boundNetworkForProcess == null) return
+        runCatching { cm.bindProcessToNetwork(null) }
+        boundVpnNetwork = null
+    }
+
+    private fun findVpnNetwork(cm: ConnectivityManager): Network? {
+        for (network in cm.allNetworks) {
+            val caps = cm.getNetworkCapabilities(network) ?: continue
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+                return network
+            }
         }
         return null
     }

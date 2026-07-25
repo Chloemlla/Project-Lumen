@@ -5,6 +5,7 @@ import java.io.IOException
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
+import java.net.Proxy
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.UUID
@@ -18,6 +19,15 @@ import java.util.UUID
  */
 object CrashReportPasteUploader {
     const val DEFAULT_BASE_URL: String = "https://paste.gentoo.zip"
+
+    /**
+     * Optional host hook: when it returns true, open connections with
+     * [Proxy.NO_PROXY] so a Clash VPN process-binding path does not also stack
+     * the JVM/system HTTP proxy. Set from the host app (e.g. Project Lumen
+     * ClashPartnerCompat); defaults to null / no skip.
+     */
+    @Volatile
+    var shouldSkipManualProxy: (() -> Boolean)? = null
 
     fun uploadText(
         text: String,
@@ -35,7 +45,16 @@ object CrashReportPasteUploader {
             val boundary = "----LumenCrashPasteBoundary${UUID.randomUUID().toString().replace("-", "")}"
             val body = buildMultipartBody(boundary = boundary, fieldName = "_", value = payload)
 
-            val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+            val url = URL(endpoint)
+            val forceDirect = runCatching { shouldSkipManualProxy?.invoke() == true }.getOrDefault(false)
+            val rawConnection =
+                if (forceDirect) {
+                    // Clash VPN path: process is bound to VPN; never stack system/app proxy.
+                    url.openConnection(Proxy.NO_PROXY)
+                } else {
+                    url.openConnection()
+                }
+            val connection = (rawConnection as HttpURLConnection).apply {
                 requestMethod = "POST"
                 doInput = true
                 doOutput = true

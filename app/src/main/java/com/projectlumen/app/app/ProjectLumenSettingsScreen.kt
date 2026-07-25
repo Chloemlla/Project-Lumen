@@ -649,6 +649,18 @@ internal fun SettingsScreen(
             var clashAutoAdapt by remember {
                 mutableStateOf(ClashPartnerCompat.isAutoAdaptEnabled(clashContext))
             }
+            var clashStatusLabel by remember {
+                mutableStateOf(ClashPartnerCompat.statusLabel(clashContext))
+            }
+            DisposableEffect(clashContext) {
+                val listener: (ClashPartnerCompat.Status) -> Unit = {
+                    clashAutoAdapt = ClashPartnerCompat.isAutoAdaptEnabled(clashContext)
+                    clashStatusLabel = ClashPartnerCompat.statusLabel(clashContext)
+                }
+                ClashPartnerCompat.addListener(listener)
+                ClashPartnerCompat.refresh(clashContext)
+                onDispose { ClashPartnerCompat.removeListener(listener) }
+            }
             SwitchRow(
                 R.string.clash_vpn_auto_adapt,
                 Icons.Outlined.Lock,
@@ -656,9 +668,10 @@ internal fun SettingsScreen(
             ) {
                 clashAutoAdapt = it
                 ClashPartnerCompat.setAutoAdaptEnabled(clashContext, it)
+                clashStatusLabel = ClashPartnerCompat.statusLabel(clashContext)
             }
             Text(
-                text = ClashPartnerCompat.statusLabel(clashContext),
+                text = clashStatusLabel,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

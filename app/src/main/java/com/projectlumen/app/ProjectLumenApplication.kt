@@ -13,6 +13,7 @@ import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.chloemlla.lumen.crash.LumenCrash
 import com.chloemlla.lumen.crash.CrashBreadcrumbs
 import com.chloemlla.lumen.crash.CrashReport
+import com.chloemlla.lumen.crash.CrashReportPasteUploader
 import com.chloemlla.lumen.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.debug.DeveloperDebugOverlayService
@@ -103,6 +104,13 @@ class ProjectLumenApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         ClashPartnerCompat.start(this)
+        // Keep paste-upload HttpURLConnection off stacked system proxies while
+        // Clash VPN process binding is active (module-safe hook, no hard dep).
+        runCatching {
+            CrashReportPasteUploader.shouldSkipManualProxy = {
+                ClashPartnerCompat.shouldSkipManualProxy()
+            }
+        }
         // Keep cold start non-fatal for managed-device baseline profile generation.
         runCatching {
             runCatching {
