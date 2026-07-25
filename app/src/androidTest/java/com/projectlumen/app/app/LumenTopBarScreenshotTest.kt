@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.projectlumen.app.app
 
 import android.graphics.Bitmap
@@ -6,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -24,7 +27,7 @@ class LumenTopBarScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    @OptIn(ExperimentalTestApi::class)
+    @OptIn(ExperimentalTestApi::class, ExperimentalMaterial3Api::class)
     @Test
     fun capturesTopBarAlignment() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
