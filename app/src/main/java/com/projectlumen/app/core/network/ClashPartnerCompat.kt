@@ -41,7 +41,9 @@ object ClashPartnerCompat {
         "com.github.metacubex.clash.alpha",
     )
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+    // Lazy: JVM unit tests load this object via shouldSkipManualProxy() without a
+    // prepared main Looper; constructing Handler eagerly crashes class init.
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val listeners = CopyOnWriteArrayList<(Status) -> Unit>()
 
     /**
