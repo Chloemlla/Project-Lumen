@@ -264,6 +264,7 @@ internal fun SettingsScreen(
     fun isPermissionTargetConfigured(target: PermissionSetupTarget): Boolean {
         return when (target) {
             PermissionSetupTarget.STATISTICS -> settings.statsEnabled
+            PermissionSetupTarget.USAGE_ACCESS -> !permissionRequirements.usageAccess
             PermissionSetupTarget.DIAGNOSTICS -> settings.diagnosticTelemetryUploadEnabled
             PermissionSetupTarget.NOTIFICATIONS -> settings.notificationEnabled && !notificationPermissionNeeded
             PermissionSetupTarget.EXACT_ALARM -> settings.notificationEnabled && !exactAlarmSettingsNeeded
@@ -287,6 +288,9 @@ internal fun SettingsScreen(
         when (target) {
             PermissionSetupTarget.STATISTICS -> {
                 viewModel.updateSettings { current -> current.copy(statsEnabled = true) }
+            }
+            PermissionSetupTarget.USAGE_ACCESS -> {
+                openUsageAccessSettings(context)
             }
             PermissionSetupTarget.DIAGNOSTICS -> {
                 viewModel.updateSettings { current ->
@@ -392,7 +396,8 @@ internal fun SettingsScreen(
                 viewModel.updateSettings { current -> current.copy(shizukuAdvancedModeEnabled = false) }
             }
             PermissionSetupTarget.EXACT_ALARM,
-            PermissionSetupTarget.FULL_SCREEN -> Unit
+            PermissionSetupTarget.FULL_SCREEN,
+            PermissionSetupTarget.USAGE_ACCESS -> Unit
         }
     }
     fun scrollToGrowthTarget(target: GrowthConfigTarget) {
@@ -535,6 +540,7 @@ internal fun SettingsScreen(
         cameraPermissionNeeded,
         writeSettingsPermissionNeeded,
         overlayPermissionNeeded,
+        permissionRequirements.usageAccess,
         shizukuState.ready,
     ) {
         val target = activePermissionSetupTarget ?: return@LaunchedEffect

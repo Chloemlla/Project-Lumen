@@ -19,6 +19,7 @@ import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.debug.DeveloperDebugOverlayService
 import com.projectlumen.app.core.debug.MemoryHealthMonitor
 import com.projectlumen.app.core.haptics.HapticPlaybackService
+import com.projectlumen.app.core.insights.AndroidDeviceInsightDataSource
 import com.projectlumen.app.core.devicecontrol.PrivilegedDeviceControlCoordinator
 import com.projectlumen.app.core.lifecycle.AppLifecycleCoordinator
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
@@ -35,6 +36,7 @@ import com.projectlumen.app.core.services.TimerForegroundService
 import com.projectlumen.app.core.services.TimerReconciliationWorker
 import com.projectlumen.app.core.light.LightMonitorService
 import com.projectlumen.app.core.proximity.ProximityDetectionWorker
+import com.projectlumen.app.core.repositories.DeviceInsightsRepository
 import com.projectlumen.app.core.repositories.RuntimeRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
@@ -84,6 +86,9 @@ class ProjectLumenApplication : Application() {
         )
     }
     val shizuku: ShizukuCapabilityManager by lazy { ShizukuCapabilityManager(this) }
+    val deviceInsights: DeviceInsightsRepository by lazy {
+        DeviceInsightsRepository(AndroidDeviceInsightDataSource(this))
+    }
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
     val deviceControl: PrivilegedDeviceControlCoordinator by lazy { PrivilegedDeviceControlCoordinator(this) }
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

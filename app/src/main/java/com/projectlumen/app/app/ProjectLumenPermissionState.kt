@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.projectlumen.app.core.insights.hasUsageStatsAccess
 
 internal data class PermissionRequirements(
     val notification: Boolean,
@@ -19,6 +20,7 @@ internal data class PermissionRequirements(
     val fullScreenIntent: Boolean,
     val overlay: Boolean,
     val writeSettings: Boolean,
+    val usageAccess: Boolean,
 )
 
 @Composable
@@ -50,5 +52,6 @@ private fun Context.permissionRequirements(): PermissionRequirements {
         fullScreenIntent = needsFullScreenIntentSettings(this),
         overlay = needsOverlayPermission(this),
         writeSettings = needsWriteSettingsPermission(this),
+        usageAccess = !hasUsageStatsAccess(),
     )
 }

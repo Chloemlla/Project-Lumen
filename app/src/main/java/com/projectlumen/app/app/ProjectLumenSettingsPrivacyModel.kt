@@ -15,6 +15,7 @@ import com.projectlumen.app.core.database.entities.AppSettingsEntity
 
 internal enum class PermissionSetupTarget {
     STATISTICS,
+    USAGE_ACCESS,
     DIAGNOSTICS,
     NOTIFICATIONS,
     EXACT_ALARM,
@@ -140,6 +141,7 @@ internal fun firstMissingPermissionTarget(
         settings.autoBrightnessEnabled && permissionRequirements.writeSettings && !usesShizukuNativeBrightness(settings) -> PermissionSetupTarget.BRIGHTNESS
         settings.globalOverlayEnabled && permissionRequirements.overlay -> PermissionSetupTarget.OVERLAY
         settings.shizukuAdvancedModeEnabled && !shizukuReady -> PermissionSetupTarget.SHIZUKU
+        permissionRequirements.usageAccess -> PermissionSetupTarget.USAGE_ACCESS
         else -> null
     }
 }
@@ -151,6 +153,7 @@ internal fun privacyReadinessScore(
 ): Int {
     val checks = listOf(
         settings.statsEnabled,
+        !permissionRequirements.usageAccess,
         !settings.notificationEnabled || !permissionRequirements.notification,
         !settings.notificationEnabled || !permissionRequirements.exactAlarm,
         !settings.notificationEnabled || !permissionRequirements.fullScreenIntent,
@@ -171,6 +174,7 @@ internal fun privacyActionNeededCount(
     shizukuReady: Boolean,
 ): Int {
     val pending = listOf(
+        permissionRequirements.usageAccess,
         settings.notificationEnabled && permissionRequirements.notification,
         settings.notificationEnabled && permissionRequirements.exactAlarm,
         settings.notificationEnabled && permissionRequirements.fullScreenIntent,

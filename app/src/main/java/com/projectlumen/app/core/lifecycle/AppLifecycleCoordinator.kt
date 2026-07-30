@@ -33,6 +33,7 @@ class AppLifecycleCoordinator(
     override fun onStart(owner: LifecycleOwner) {
         app.scheduleStoredCrashReportUpload()
         scope.launch {
+            app.deviceInsights.refresh()
             // Android 15 force-stop cancels pending intents; if we detect a force-stop start,
             // rebuild alarms/workers before normal foreground resume work.
             if (wasForceStoppedSinceLastStart()) {

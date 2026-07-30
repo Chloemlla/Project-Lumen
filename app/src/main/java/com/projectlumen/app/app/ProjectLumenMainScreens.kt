@@ -603,6 +603,7 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
     val pomodoro = uiState.pomodoroStats.firstOrNull()
     val statsEnabled = uiState.settings.statsEnabled
     val permissionRequirements = rememberPermissionRequirements()
+    val context = LocalContext.current
     val shizukuState by viewModel.shizukuState.collectAsStateWithLifecycle()
     var statsWindow by rememberSaveable { mutableIntStateOf(7) }
     val windowEyeStats = uiState.eyeStats.take(statsWindow)
@@ -612,6 +613,9 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
     } || uiState.pomodoroStats.any {
         it.completedTomatoCount > 0 || it.completedFocusSessions > 0 || it.totalBreakSeconds > 0L || it.totalFocusSeconds > 0L
     })
+    LaunchedEffect(permissionRequirements.usageAccess) {
+        viewModel.refreshDeviceInsights()
+    }
     LumenPage {
         PageIntro(
             icon = Icons.Outlined.BarChart,
@@ -619,6 +623,12 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
             message = stringResource(if (statsEnabled) R.string.statistics_subtitle else R.string.statistics_disabled),
         )
         EyeCareHealthReportCard(uiState, permissionRequirements, shizukuState.ready)
+        DeviceUsageAndPowerInsightsCard(
+            state = uiState.deviceInsights,
+            onRefresh = viewModel::refreshDeviceInsights,
+            onOpenUsageAccess = { openUsageAccessSettings(context) },
+            onOpenBatteryUsage = { openSystemBatteryUsageSettings(context) },
+        )
         TodayStatsCard(eye)
         LumenFlowRow {
             FilterChip(selected = statsWindow == 7, onClick = { statsWindow = 7 }, label = { Text(stringResource(R.string.stats_range_7_days)) })

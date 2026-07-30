@@ -112,6 +112,7 @@ open class MainActivity : ComponentActivity() {
                             apiClient = app.apiClient,
                             secureCredentials = app.secureCredentials,
                             eyeCarePreferences = app.eyeCarePreferences,
+                            deviceInsights = app.deviceInsights,
                             startTimerService = app::startTimerService,
                             stopTimerService = app::stopTimerService,
                             scheduleProximityMonitoring = app::scheduleProximityMonitoring,

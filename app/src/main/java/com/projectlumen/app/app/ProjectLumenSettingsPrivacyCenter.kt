@@ -115,6 +115,16 @@ internal fun SettingsPrivacyPermissionCenter(
                 onTargetCheckedChange = onTargetCheckedChange,
             )
             PrivacyPermissionRow(
+                icon = Icons.Outlined.BarChart,
+                titleRes = R.string.device_insights_usage_access_title,
+                detailRes = R.string.device_insights_usage_access_detail,
+                target = PermissionSetupTarget.USAGE_ACCESS,
+                ready = !permissionRequirements.usageAccess,
+                activeTarget = activeTarget,
+                onConfigureTarget = onConfigureTarget,
+                onTargetCheckedChange = onTargetCheckedChange,
+            )
+            PrivacyPermissionRow(
                 icon = Icons.Outlined.Info,
                 titleRes = R.string.enable_diagnostic_telemetry_upload,
                 detailRes = R.string.settings_privacy_diagnostics_detail,

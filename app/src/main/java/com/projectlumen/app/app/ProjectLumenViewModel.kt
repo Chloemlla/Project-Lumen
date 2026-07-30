@@ -18,6 +18,7 @@ import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.enums.PlanTier
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
+import com.projectlumen.app.core.repositories.DeviceInsightsRepository
 import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
@@ -43,6 +44,7 @@ class ProjectLumenViewModel(
     apiClient: ProjectLumenApiClient,
     private val secureCredentials: SecureCredentialStore,
     eyeCarePreferences: EyeCarePreferencesDataStore,
+    deviceInsights: DeviceInsightsRepository,
     startTimerService: () -> Unit,
     stopTimerService: () -> Unit,
     scheduleProximityMonitoring: () -> Unit,
@@ -59,7 +61,12 @@ class ProjectLumenViewModel(
     private val uploadTelemetrySnapshot: suspend () -> Unit,
     private val recordCrashReport: (Throwable) -> CrashReport?,
 ) : ViewModel() {
-    private val repositories = ProjectLumenRepositories(database, eyeCarePreferences, secureCredentials)
+    private val repositories = ProjectLumenRepositories(
+        database = database,
+        eyeCarePreferences = eyeCarePreferences,
+        secureCredentials = secureCredentials,
+        deviceInsights = deviceInsights,
+    )
     private val now = MutableStateFlow(System.currentTimeMillis())
     private var crashStateStore: ProjectLumenStateStore? = null
     private val installProfile = runCatching { secureCredentials.installProfile() }
@@ -319,6 +326,12 @@ class ProjectLumenViewModel(
     fun refreshShizukuNetworkApps() = appNetworkControlEntry.refreshApps()
     fun restrictAppNetwork(app: ShizukuNetworkApp) = appNetworkControlEntry.restrictApp(app)
     fun restoreAppNetwork(record: AppNetworkControlEntity) = appNetworkControlEntry.restoreApp(record)
+    fun refreshDeviceInsights() {
+        reportingScope.launch {
+            repositories.deviceInsights.refresh()
+        }
+    }
+
     fun uploadDiagnosticsNow() {
         reportingScope.launch {
             runCatching { uploadTelemetrySnapshot() }

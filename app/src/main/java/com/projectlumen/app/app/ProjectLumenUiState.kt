@@ -7,6 +7,7 @@ import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
 import com.projectlumen.app.core.database.entities.EntitlementEntity
 import com.projectlumen.app.core.database.entities.ReminderPlanEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.insights.DeviceInsightsState
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.chloemlla.lumen.crash.CrashReport
 
@@ -19,6 +20,7 @@ data class ProjectLumenUiState(
     val dailyGoal: DailyGoalEntity = DailyGoalEntity(),
     val entitlements: List<EntitlementEntity> = emptyList(),
     val reminderPlans: List<ReminderPlanEntity> = emptyList(),
+    val deviceInsights: DeviceInsightsState = DeviceInsightsState(),
     val nowMillis: Long = System.currentTimeMillis(),
     val isReady: Boolean = false,
     val crashReport: CrashReport? = null,

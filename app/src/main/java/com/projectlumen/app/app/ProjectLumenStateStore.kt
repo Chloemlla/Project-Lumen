@@ -76,11 +76,13 @@ internal class ProjectLumenStateStore(
             recordCrash(throwable)
             emit(emptyList())
         },
-    ) { state, dailyGoal, entitlements, reminderPlans ->
+        repositories.deviceInsights.observe(),
+    ) { state, dailyGoal, entitlements, reminderPlans, deviceInsights ->
         state.copy(
             dailyGoal = dailyGoal ?: DailyGoalEntity(),
             entitlements = entitlements,
             reminderPlans = reminderPlans,
+            deviceInsights = deviceInsights,
             isReady = state.isReady && dailyGoal != null,
         )
     }
