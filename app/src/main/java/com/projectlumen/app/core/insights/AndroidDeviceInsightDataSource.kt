@@ -126,13 +126,7 @@ internal class AndroidDeviceInsightDataSource(
                 continue
             }
             if (packageName == null || packageName == SYSTEM_PACKAGE) continue
-            val componentKey = buildString {
-                append(event.className.orEmpty())
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    append('#')
-                    append(event.instanceId)
-                }
-            }
+            val componentKey = event.className.orEmpty()
             when (event.eventType) {
                 UsageEvents.Event.MOVE_TO_FOREGROUND -> {
                     val active = activeComponents.getOrPut(packageName) { mutableSetOf() }
