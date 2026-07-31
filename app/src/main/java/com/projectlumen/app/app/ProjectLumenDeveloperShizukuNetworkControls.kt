@@ -241,10 +241,15 @@ private fun networkGuardStatusLabel(record: AppNetworkControlEntity): String {
     } else {
         stringResource(R.string.developer_shizuku_network_uid_policy_inactive)
     }
-    val delegatedGuard = when {
-        record.delegatedGuardApplied -> stringResource(R.string.developer_shizuku_network_delegated_guard_active)
-        record.delegatedGuardAttempted -> stringResource(R.string.developer_shizuku_network_delegated_guard_unsupported)
-        else -> stringResource(R.string.developer_shizuku_network_delegated_guard_not_attempted)
+    val delegatedGuard = when (record.delegatedNetworkGuardDisplayStatus) {
+        DelegatedNetworkGuardDisplayStatus.ACTIVE ->
+            stringResource(R.string.developer_shizuku_network_delegated_guard_active)
+        DelegatedNetworkGuardDisplayStatus.CLEARED ->
+            stringResource(R.string.developer_shizuku_network_delegated_guard_cleared)
+        DelegatedNetworkGuardDisplayStatus.UNSUPPORTED ->
+            stringResource(R.string.developer_shizuku_network_delegated_guard_unsupported)
+        DelegatedNetworkGuardDisplayStatus.NOT_ATTEMPTED ->
+            stringResource(R.string.developer_shizuku_network_delegated_guard_not_attempted)
     }
     return stringResource(R.string.developer_shizuku_network_guard_status, uidPolicy, delegatedGuard)
 }

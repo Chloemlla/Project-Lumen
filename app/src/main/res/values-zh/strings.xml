@@ -572,6 +572,7 @@
     <string name="developer_shizuku_network_uid_policy_active">UID 策略生效</string>
     <string name="developer_shizuku_network_uid_policy_inactive">UID 策略已清除</string>
     <string name="developer_shizuku_network_delegated_guard_active">委托联网加固生效</string>
+    <string name="developer_shizuku_network_delegated_guard_cleared">委托联网加固已清除</string>
     <string name="developer_shizuku_network_delegated_guard_unsupported">委托联网加固不受支持</string>
     <string name="developer_shizuku_network_delegated_guard_not_attempted">未尝试委托联网加固</string>
     <string name="developer_shizuku_network_guard_status">%1$s · %2$s</string>
