@@ -12,8 +12,26 @@ import java.io.IOException
  * under internal private paths (`filesDir` / `noBackupFilesDir` / `cacheDir`).
  * Legacy private copies are still readable/cleared for migration.
  */
-class CrashReportStore(context: Context) {
-    private val appContext = context.applicationContext
+class CrashReportStore private constructor(
+    private val externalTargetsProvider: () -> List<File>,
+    private val legacyPrivateTargetsProvider: () -> List<File>,
+) {
+    constructor(context: Context) : this(
+        externalTargetsProvider = context.applicationContext.let { appContext ->
+            { resolveExternalTargets(appContext) }
+        },
+        legacyPrivateTargetsProvider = context.applicationContext.let { appContext ->
+            { resolveLegacyPrivateTargets(appContext) }
+        },
+    )
+
+    internal constructor(
+        externalTargets: List<File>,
+        legacyPrivateTargets: List<File>,
+    ) : this(
+        externalTargetsProvider = { externalTargets },
+        legacyPrivateTargetsProvider = { legacyPrivateTargets },
+    )
 
     fun save(report: CrashReport) {
         AuthorIntegrity.verifyOrThrow("store-save")
@@ -65,29 +83,9 @@ class CrashReportStore(context: Context) {
 
     private fun writableTargets(): List<File> = externalTargets()
 
-    private fun externalTargets(): List<File> {
-        val dirs = listOfNotNull(
-            appContext.getExternalFilesDir(DIR_NAME),
-            appContext.getExternalFilesDir(null)?.resolve(DIR_NAME),
-            appContext.externalCacheDir?.resolve(DIR_NAME),
-        ).distinctBy { it.absolutePath }
+    private fun externalTargets(): List<File> = externalTargetsProvider()
 
-        return dirs.map { dir ->
-            if (!dir.exists()) {
-                dir.mkdirs()
-            }
-            File(dir, FILE_NAME)
-        }
-    }
-
-    private fun legacyPrivateTargets(): List<File> = listOf(
-        File(appContext.filesDir, FILE_NAME),
-        File(appContext.noBackupFilesDir, FILE_NAME),
-        File(appContext.cacheDir, FILE_NAME),
-        File(appContext.filesDir, "$DIR_NAME/$FILE_NAME"),
-        File(appContext.noBackupFilesDir, "$DIR_NAME/$FILE_NAME"),
-        File(appContext.cacheDir, "$DIR_NAME/$FILE_NAME"),
-    )
+    private fun legacyPrivateTargets(): List<File> = legacyPrivateTargetsProvider()
 
     private fun clearLegacyPrivateCopies() {
         legacyPrivateTargets().forEach { file ->
@@ -120,5 +118,29 @@ class CrashReportStore(context: Context) {
     private companion object {
         const val DIR_NAME = "lumen-crash"
         const val FILE_NAME = "crash_report.json"
+
+        fun resolveExternalTargets(appContext: Context): List<File> {
+            val dirs = listOfNotNull(
+                appContext.getExternalFilesDir(DIR_NAME),
+                appContext.getExternalFilesDir(null)?.resolve(DIR_NAME),
+                appContext.externalCacheDir?.resolve(DIR_NAME),
+            ).distinctBy { it.absolutePath }
+
+            return dirs.map { dir ->
+                if (!dir.exists()) {
+                    dir.mkdirs()
+                }
+                File(dir, FILE_NAME)
+            }
+        }
+
+        fun resolveLegacyPrivateTargets(appContext: Context): List<File> = listOf(
+            File(appContext.filesDir, FILE_NAME),
+            File(appContext.noBackupFilesDir, FILE_NAME),
+            File(appContext.cacheDir, FILE_NAME),
+            File(appContext.filesDir, "$DIR_NAME/$FILE_NAME"),
+            File(appContext.noBackupFilesDir, "$DIR_NAME/$FILE_NAME"),
+            File(appContext.cacheDir, "$DIR_NAME/$FILE_NAME"),
+        )
     }
 }
