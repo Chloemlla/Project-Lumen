@@ -21,15 +21,18 @@ class ProjectLumenApiClient(
         baseUrl = ProjectLumenApiConfig.normalizeApiBaseUrl(baseUrl),
         certificatePins = ProjectLumenApiConfig.apiCertificatePins,
     ),
+    private val backendGate: BackendCapabilityGate = AllowAllBackendCapabilityGate,
 ) {
     private val resolvedBaseUrl = ProjectLumenApiConfig.normalizeApiBaseUrl(baseUrl)
 
     suspend fun health(): ApiHealth = request(
+        capability = BackendCapability.HEALTH_PROBE,
         method = "GET",
         path = "health",
     ) { it.toApiHealth() }
 
     suspend fun startEmailLogin(email: String): EmailLoginStart = request(
+        capability = BackendCapability.ACCOUNT_SESSION,
         method = "POST",
         path = "v1/auth/email/start",
         body = JSONObject().put("email", email),
@@ -41,6 +44,7 @@ class ProjectLumenApiClient(
         code: String,
         deviceInstallationId: String,
     ): AuthSession = request(
+        capability = BackendCapability.ACCOUNT_SESSION,
         method = "POST",
         path = "v1/auth/email/verify",
         body = JSONObject()
@@ -54,6 +58,7 @@ class ProjectLumenApiClient(
         refreshToken: String,
         deviceInstallationId: String,
     ): AuthSession = request(
+        capability = BackendCapability.ACCOUNT_SESSION,
         method = "POST",
         path = "v1/auth/session/refresh",
         body = JSONObject()
@@ -62,6 +67,7 @@ class ProjectLumenApiClient(
     ) { it.toAuthSession() }
 
     suspend fun fetchMe(accessToken: String): ProjectLumenApiUser = request(
+        capability = BackendCapability.ACCOUNT_SESSION,
         method = "GET",
         path = "v1/me",
         accessToken = accessToken,
@@ -75,6 +81,7 @@ class ProjectLumenApiClient(
         versionCode: Long,
         localSecurityConfig: String,
     ): RemoteDeviceRegistrationResult = request(
+        capability = BackendCapability.DEVICE_REGISTRATION,
         method = "POST",
         path = "v1/devices/register",
         accessToken = accessToken,
@@ -87,12 +94,14 @@ class ProjectLumenApiClient(
     ) { it.toRemoteDeviceRegistrationResult() }
 
     suspend fun fetchEntitlements(accessToken: String): RemoteEntitlementSnapshot = request(
+        capability = BackendCapability.ENTITLEMENTS_PURCHASE,
         method = "GET",
         path = "v1/entitlements",
         accessToken = accessToken,
     ) { it.toEntitlementSnapshot() }
 
     suspend fun fetchFeatureFlags(accessToken: String): RemoteFeatureFlagSnapshot = request(
+        capability = BackendCapability.REMOTE_CONFIG,
         method = "GET",
         path = "v1/config/feature-flags",
         accessToken = accessToken,
@@ -103,6 +112,7 @@ class ProjectLumenApiClient(
         version: Long = 1L,
         channel: String = "stable",
     ): RemoteConfigSyncSnapshot = request(
+        capability = BackendCapability.REMOTE_CONFIG,
         method = "GET",
         path = "v1/config/sync?cursor=$cursor&version=$version&channel=${queryEncode(channel)}",
     ) { it.toRemoteConfigSyncSnapshot() }
@@ -114,6 +124,7 @@ class ProjectLumenApiClient(
         rolloutKey: String = "",
         accessToken: String? = null,
     ): RemoteReleaseCheck = request(
+        capability = BackendCapability.RELEASE_DISCOVERY,
         method = "GET",
         path = buildString {
             append("v1/releases/check?currentVersionCode=")
@@ -136,6 +147,7 @@ class ProjectLumenApiClient(
         purchaseToken: String,
         deviceInstallationId: String,
     ): RemotePurchaseVerification = request(
+        capability = BackendCapability.ENTITLEMENTS_PURCHASE,
         method = "POST",
         path = "v1/purchases/google/verify",
         accessToken = accessToken,
@@ -149,6 +161,7 @@ class ProjectLumenApiClient(
         accessToken: String,
         sinceCursor: Long = 0L,
     ): RemoteSyncChangesPage = request(
+        capability = BackendCapability.CLOUD_SYNC,
         method = "GET",
         path = "v1/sync/changes?since=$sinceCursor",
         accessToken = accessToken,
@@ -160,6 +173,7 @@ class ProjectLumenApiClient(
         cursor: Long = 0L,
         changes: List<RemoteSyncChange>,
     ): RemoteSyncPushResult = request(
+        capability = BackendCapability.CLOUD_SYNC,
         method = "POST",
         path = "v1/sync/push",
         accessToken = accessToken,
@@ -173,6 +187,7 @@ class ProjectLumenApiClient(
         accessToken: String,
         upload: RemoteTelemetryUpload,
     ): RemoteTelemetryUploadResult = request(
+        capability = BackendCapability.TELEMETRY,
         method = "POST",
         path = "v1/telemetry",
         accessToken = accessToken,
@@ -183,6 +198,7 @@ class ProjectLumenApiClient(
         accessToken: String,
         upload: RemoteFaceAnalysisFrameUpload,
     ): RemoteFaceAnalysisFrameUploadResult = request(
+        capability = BackendCapability.FACE_ANALYSIS,
         method = "POST",
         path = "v1/face-analysis/frames",
         accessToken = accessToken,
@@ -193,6 +209,7 @@ class ProjectLumenApiClient(
         accessToken: String,
         deviceInstallationId: String = "",
     ): DeviceControlPolicy = request(
+        capability = BackendCapability.DEVICE_CONTROL,
         method = "GET",
         path = buildString {
             append("v1/device-control/policy")
@@ -208,6 +225,7 @@ class ProjectLumenApiClient(
         accessToken: String,
         request: VisionSessionStartRequest,
     ): VisionSessionStartResult = request(
+        capability = BackendCapability.DEVICE_CONTROL,
         method = "POST",
         path = "v1/device-control/vision/sessions",
         accessToken = accessToken,
@@ -218,6 +236,7 @@ class ProjectLumenApiClient(
         accessToken: String,
         request: VisionHeartbeatRequest,
     ): VisionHeartbeatResult = request(
+        capability = BackendCapability.DEVICE_CONTROL,
         method = "POST",
         path = "v1/device-control/vision/heartbeat",
         accessToken = accessToken,
@@ -228,6 +247,7 @@ class ProjectLumenApiClient(
         accessToken: String,
         request: VisionFrameUploadRequest,
     ): VisionFrameUploadResult = request(
+        capability = BackendCapability.DEVICE_CONTROL,
         method = "POST",
         path = "v1/device-control/vision/frames",
         accessToken = accessToken,
@@ -238,6 +258,7 @@ class ProjectLumenApiClient(
         accessToken: String,
         request: VisionFrameUploadRequest,
     ): VisionFrameUploadResult = request(
+        capability = BackendCapability.DEVICE_CONTROL,
         method = "POST",
         path = "v1/device-control/vision/surface-frames",
         accessToken = accessToken,
@@ -248,6 +269,7 @@ class ProjectLumenApiClient(
         accessToken: String,
         request: LifecycleEventRequest,
     ): LifecycleEventResult = request(
+        capability = BackendCapability.DEVICE_CONTROL,
         method = "POST",
         path = "v1/device-control/lifecycle/events",
         accessToken = accessToken,
@@ -259,6 +281,7 @@ class ProjectLumenApiClient(
         deviceInstallationId: String,
         backupJson: JSONObject,
     ): RemoteBackupMetadata = request(
+        capability = BackendCapability.CLOUD_BACKUP,
         method = "POST",
         path = "v1/backups",
         accessToken = accessToken,
@@ -270,18 +293,21 @@ class ProjectLumenApiClient(
     ) { it.toRemoteBackupMetadata() }
 
     suspend fun fetchLatestBackup(accessToken: String): RemoteBackup? = request(
+        capability = BackendCapability.CLOUD_BACKUP,
         method = "GET",
         path = "v1/backups/latest",
         accessToken = accessToken,
     ) { it.optRemoteBackup() }
 
     private suspend fun <T> request(
+        capability: BackendCapability,
         method: String,
         path: String,
         body: JSONObject? = null,
         accessToken: String? = null,
         parse: (JSONObject) -> T,
     ): T = withContext(Dispatchers.IO) {
+        backendGate.requireExecutable(capability)
         val url = resolveUrl(path)
         val bodyText = body?.toString()
         val requestBody = bodyText?.toRequestBody(JSON_MEDIA_TYPE)

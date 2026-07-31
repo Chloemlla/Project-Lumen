@@ -42,6 +42,7 @@ internal fun privacyControlTiles(
     settings: AppSettingsEntity,
     permissionRequirements: PermissionRequirements,
     shizukuReady: Boolean,
+    backendFeaturesVisible: Boolean,
 ): List<PermissionControlTile> {
     return listOf(
         PermissionControlTile(
@@ -124,7 +125,9 @@ internal fun privacyControlTiles(
             checked = settings.shizukuAdvancedModeEnabled,
             ready = shizukuReady,
         ),
-    )
+    ).filterNot { tile ->
+        !backendFeaturesVisible && tile.target == PermissionSetupTarget.DIAGNOSTICS
+    }
 }
 
 internal fun firstMissingPermissionTarget(

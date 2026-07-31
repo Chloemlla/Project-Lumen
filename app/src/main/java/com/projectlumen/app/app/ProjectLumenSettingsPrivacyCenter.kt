@@ -50,6 +50,7 @@ internal fun SettingsPrivacyPermissionCenter(
     uiState: ProjectLumenUiState,
     permissionRequirements: PermissionRequirements,
     shizukuReady: Boolean,
+    backendFeaturesVisible: Boolean,
     activeTarget: PermissionSetupTarget?,
     onConfigureTarget: (PermissionSetupTarget) -> Unit,
     onTargetCheckedChange: (PermissionSetupTarget, Boolean) -> Unit,
@@ -100,7 +101,12 @@ internal fun SettingsPrivacyPermissionCenter(
                 fontWeight = FontWeight.SemiBold,
             )
             PermissionControlTileGrid(
-                tiles = privacyControlTiles(settings, permissionRequirements, shizukuReady),
+                tiles = privacyControlTiles(
+                    settings = settings,
+                    permissionRequirements = permissionRequirements,
+                    shizukuReady = shizukuReady,
+                    backendFeaturesVisible = backendFeaturesVisible,
+                ),
                 onTargetCheckedChange = onTargetCheckedChange,
             )
             PrivacyPermissionRow(
@@ -124,17 +130,19 @@ internal fun SettingsPrivacyPermissionCenter(
                 onConfigureTarget = onConfigureTarget,
                 onTargetCheckedChange = onTargetCheckedChange,
             )
-            PrivacyPermissionRow(
-                icon = Icons.Outlined.Info,
-                titleRes = R.string.enable_diagnostic_telemetry_upload,
-                detailRes = R.string.settings_privacy_diagnostics_detail,
-                target = PermissionSetupTarget.DIAGNOSTICS,
-                switchChecked = settings.diagnosticTelemetryUploadEnabled,
-                ready = true,
-                activeTarget = activeTarget,
-                onConfigureTarget = onConfigureTarget,
-                onTargetCheckedChange = onTargetCheckedChange,
-            )
+            if (backendFeaturesVisible) {
+                PrivacyPermissionRow(
+                    icon = Icons.Outlined.Info,
+                    titleRes = R.string.enable_diagnostic_telemetry_upload,
+                    detailRes = R.string.settings_privacy_diagnostics_detail,
+                    target = PermissionSetupTarget.DIAGNOSTICS,
+                    switchChecked = settings.diagnosticTelemetryUploadEnabled,
+                    ready = true,
+                    activeTarget = activeTarget,
+                    onConfigureTarget = onConfigureTarget,
+                    onTargetCheckedChange = onTargetCheckedChange,
+                )
+            }
             PrivacyPermissionRow(
                 icon = Icons.Outlined.NotificationsActive,
                 titleRes = R.string.eye_care_permission_notifications,

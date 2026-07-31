@@ -2,6 +2,8 @@ package com.projectlumen.app.app
 
 import android.os.Build
 import com.projectlumen.app.BuildConfig
+import com.projectlumen.app.core.api.BackendCapability
+import com.projectlumen.app.core.api.BackendConnectivityController
 import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.api.RemoteConfigPolicy
 import com.projectlumen.app.core.api.RemoteConfigTemplate
@@ -49,6 +51,7 @@ internal data class ProjectLumenRemoteUiState(
 internal class ProjectLumenRemoteFeatureEntry(
     private val scope: CoroutineScope,
     private val apiClient: ProjectLumenApiClient,
+    private val backendConnectivity: BackendConnectivityController,
     private val credentials: SecureCredentialStore,
     private val backup: DataBackupService,
     private val settingsRepository: SettingsRepository,
@@ -72,12 +75,10 @@ internal class ProjectLumenRemoteFeatureEntry(
         }
     }
 
-    fun checkHealth() = launchRemote("API health checked") {
-        val health = apiClient.health()
-        _state.value = _state.value.copy(lastOperation = "${health.service} ${health.status} ${health.version}".trim())
-    }
-
-    fun startEmailLogin(email: String) = launchRemote("Verification code requested") {
+    fun startEmailLogin(email: String) = launchRemote(
+        capability = BackendCapability.ACCOUNT_SESSION,
+        successMessage = "Verification code requested",
+    ) {
         val normalized = email.trim()
         require(normalized.isNotBlank()) { "Email is required." }
         val start = apiClient.startEmailLogin(normalized)
@@ -89,7 +90,10 @@ internal class ProjectLumenRemoteFeatureEntry(
         )
     }
 
-    fun verifyEmailLogin(code: String) = launchRemote("Signed in") {
+    fun verifyEmailLogin(code: String) = launchRemote(
+        capability = BackendCapability.ACCOUNT_SESSION,
+        successMessage = "Signed in",
+    ) {
         val current = _state.value
         require(current.pendingEmail.isNotBlank() && current.pendingRequestId.isNotBlank()) {
             "Request a verification code first."
@@ -111,7 +115,10 @@ internal class ProjectLumenRemoteFeatureEntry(
         refreshAccountWithAccessToken(session.accessToken)
     }
 
-    fun refreshAccount() = launchRemote("Account refreshed") {
+    fun refreshAccount() = launchRemote(
+        capability = BackendCapability.ACCOUNT_SESSION,
+        successMessage = "Account refreshed",
+    ) {
         refreshAccountWithAccessToken(requireAccessToken())
     }
 
@@ -146,7 +153,10 @@ internal class ProjectLumenRemoteFeatureEntry(
         )
     }
 
-    fun syncNow() = launchRemote("Sync completed") {
+    fun syncNow() = launchRemote(
+        capability = BackendCapability.CLOUD_SYNC,
+        successMessage = "Sync completed",
+    ) {
         requireCloudSyncEntitlement()
         val accessToken = requireAccessToken()
         val deviceId = credentials.deviceInstallationId()
@@ -172,7 +182,10 @@ internal class ProjectLumenRemoteFeatureEntry(
         )
     }
 
-    fun uploadCloudBackup() = launchRemote("Cloud backup uploaded") {
+    fun uploadCloudBackup() = launchRemote(
+        capability = BackendCapability.CLOUD_BACKUP,
+        successMessage = "Cloud backup uploaded",
+    ) {
         requireCloudSyncEntitlement()
         val metadata = apiClient.uploadBackup(
             accessToken = requireAccessToken(),
@@ -186,7 +199,10 @@ internal class ProjectLumenRemoteFeatureEntry(
         )
     }
 
-    fun restoreLatestCloudBackup() = launchRemote("Latest backup restored") {
+    fun restoreLatestCloudBackup() = launchRemote(
+        capability = BackendCapability.CLOUD_BACKUP,
+        successMessage = "Latest backup restored",
+    ) {
         requireCloudSyncEntitlement()
         val remoteBackup = apiClient.fetchLatestBackup(requireAccessToken())
             ?: error("No cloud backup is available.")
@@ -198,7 +214,10 @@ internal class ProjectLumenRemoteFeatureEntry(
         )
     }
 
-    fun verifyGooglePurchase(productId: String, purchaseToken: String) = launchRemote("Google purchase verified") {
+    fun verifyGooglePurchase(productId: String, purchaseToken: String) = launchRemote(
+        capability = BackendCapability.ENTITLEMENTS_PURCHASE,
+        successMessage = "Google purchase verified",
+    ) {
         val normalizedProductId = productId.trim()
         val normalizedPurchaseToken = purchaseToken.trim()
         require(normalizedProductId.isNotBlank()) { "Product ID is required." }
@@ -235,10 +254,17 @@ internal class ProjectLumenRemoteFeatureEntry(
         )
     }
 
-    private fun launchRemote(successMessage: String, block: suspend () -> Unit) {
+    private fun launchRemote(
+        capability: BackendCapability,
+        successMessage: String,
+        block: suspend () -> Unit,
+    ) {
         scope.launch {
             _state.value = _state.value.copy(busy = true, errorMessage = "")
-            runCatching { block() }
+            runCatching {
+                backendConnectivity.requireExecutable(capability)
+                block()
+            }
                 .onFailure { throwable ->
                     _state.value = _state.value.copy(
                         busy = false,

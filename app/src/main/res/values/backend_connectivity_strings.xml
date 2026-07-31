@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backend_connectivity_actual_status">Backend health</string>
+    <string name="backend_connectivity_effective_status">Effective backend access</string>
+    <string name="backend_connectivity_last_checked">Last health check</string>
+    <string name="backend_connectivity_last_reachable">Last reachable</string>
+    <string name="backend_connectivity_failures">Consecutive failures</string>
+    <string name="backend_connectivity_last_error">Stable error code</string>
+    <string name="backend_connectivity_none">None</string>
+    <string name="backend_connectivity_never">Never</string>
+    <string name="backend_connectivity_force_enable">Force-enable backend features</string>
+    <string name="backend_connectivity_force_enable_warning">Developer override only: this restores backend UI and request attempts without changing the measured health state. Requests can still fail, and the override persists until disabled.</string>
+    <string name="backend_connectivity_refresh">Refresh backend health</string>
+    <string name="backend_connectivity_status_unknown">Unknown</string>
+    <string name="backend_connectivity_status_checking">Checking</string>
+    <string name="backend_connectivity_status_reachable">Reachable</string>
+    <string name="backend_connectivity_status_unreachable">Unreachable</string>
+    <string name="backend_connectivity_effective_available">Available</string>
+    <string name="backend_connectivity_effective_blocked">Blocked; backend features are hidden</string>
+    <string name="backend_connectivity_effective_forced">Force-enabled by developer override</string>
+</resources>

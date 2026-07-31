@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="backend_connectivity_actual_status">后端健康状态</string>
+    <string name="backend_connectivity_effective_status">后端功能实际访问状态</string>
+    <string name="backend_connectivity_last_checked">最近健康检查</string>
+    <string name="backend_connectivity_last_reachable">最近可连接时间</string>
+    <string name="backend_connectivity_failures">连续失败次数</string>
+    <string name="backend_connectivity_last_error">稳定错误代码</string>
+    <string name="backend_connectivity_none">无</string>
+    <string name="backend_connectivity_never">从未</string>
+    <string name="backend_connectivity_force_enable">强制开启后端功能</string>
+    <string name="backend_connectivity_force_enable_warning">仅供开发调试：此开关只恢复后端相关界面和请求尝试，不会篡改实际健康状态。请求仍可能失败，且该覆盖会持久保存，直到手动关闭。</string>
+    <string name="backend_connectivity_refresh">重新检查后端健康</string>
+    <string name="backend_connectivity_status_unknown">未知</string>
+    <string name="backend_connectivity_status_checking">检查中</string>
+    <string name="backend_connectivity_status_reachable">可连接</string>
+    <string name="backend_connectivity_status_unreachable">无法连接</string>
+    <string name="backend_connectivity_effective_available">可用</string>
+    <string name="backend_connectivity_effective_blocked">已关闭并隐藏后端功能</string>
+    <string name="backend_connectivity_effective_forced">已由开发者覆盖强制开启</string>
+</resources>

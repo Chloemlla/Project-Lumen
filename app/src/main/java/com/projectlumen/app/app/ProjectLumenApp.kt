@@ -142,11 +142,18 @@ fun ProjectLumenApp(
         else -> configuredThemeMode
     }
     val baseContext = LocalContext.current
+    val application = baseContext.applicationContext as ProjectLumenApplication
     val localizedContext = remember(baseContext, uiState.settings.languageCode) {
         LocaleController.wrap(baseContext, uiState.settings.languageCode)
     }
     val coroutineScope = rememberCoroutineScope()
-    val updateChecker = remember(baseContext) { UpdateChecker(baseContext) }
+    val updateChecker = remember(application) {
+        UpdateChecker(
+            context = application,
+            apiClient = application.apiClient,
+            backendGate = application.backendConnectivity,
+        )
+    }
     val updateInstaller = remember { UpdateInstaller(baseContext) }
     val lifecycleOwner = LocalLifecycleOwner.current
     var pendingWebUrl by rememberSaveable { mutableStateOf<String?>(null) }

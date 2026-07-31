@@ -9,6 +9,9 @@ import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.core.api.AiPerformanceTelemetry
 import com.projectlumen.app.core.api.ApiTraceTelemetry
 import com.projectlumen.app.core.api.AudioFeedbackTelemetry
+import com.projectlumen.app.core.api.AllowAllBackendCapabilityGate
+import com.projectlumen.app.core.api.BackendCapability
+import com.projectlumen.app.core.api.BackendCapabilityGate
 import com.projectlumen.app.core.api.BlinkMetricsTelemetry
 import com.projectlumen.app.core.api.CalibrationAnchorTelemetry
 import com.projectlumen.app.core.api.CrashLogTelemetry
@@ -63,6 +66,7 @@ class EyeCareTelemetryReporter(
     private val context: Context,
     private val database: AppDatabase,
     private val apiClient: ProjectLumenApiClient,
+    private val backendGate: BackendCapabilityGate = AllowAllBackendCapabilityGate,
     private val shizuku: ShizukuCapabilityManager? = null,
     private val accessTokenProvider: suspend () -> String? = {
         ProjectLumenApiConfig.telemetryAccessToken.takeIf { it.isNotBlank() }
@@ -106,6 +110,7 @@ class EyeCareTelemetryReporter(
     suspend fun uploadFaceAnalysisFrame(
         upload: RemoteFaceAnalysisFrameUpload,
     ): RemoteFaceAnalysisFrameUploadResult? {
+        if (!backendGate.decision(BackendCapability.FACE_ANALYSIS).executable) return null
         return runCatching {
             val accessToken = accessTokenProvider()?.trim()?.takeIf { it.isNotBlank() } ?: return null
             apiClient.uploadFaceAnalysisFrame(accessToken, upload)
@@ -118,6 +123,7 @@ class EyeCareTelemetryReporter(
         force: Boolean = false,
         sourceApp: String = LumenOpenContracts.SOURCE_APP_PROJECT_LUMEN,
     ): RemoteTelemetryUploadResult? {
+        if (!backendGate.decision(BackendCapability.TELEMETRY).executable) return null
         val accessToken = accessTokenProvider()?.trim()?.takeIf { it.isNotBlank() } ?: return null
         val nowMillis = System.currentTimeMillis()
         if (!force && nowMillis - lastUploadAt.get() < MIN_UPLOAD_INTERVAL_MILLIS) return null
@@ -176,6 +182,7 @@ class EyeCareTelemetryReporter(
         force: Boolean = true,
         sourceApp: String = LumenOpenContracts.SOURCE_APP_PROJECT_LUMEN,
     ): RemoteTelemetryUploadResult? {
+        if (!backendGate.decision(BackendCapability.TELEMETRY).executable) return null
         val accessToken = accessTokenProvider()?.trim()?.takeIf { it.isNotBlank() } ?: return null
         val nowMillis = System.currentTimeMillis()
         if (!force && nowMillis - lastUploadAt.get() < MIN_UPLOAD_INTERVAL_MILLIS) return null

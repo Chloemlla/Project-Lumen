@@ -34,7 +34,6 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Sensors
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -91,6 +90,9 @@ internal fun DeveloperDebugScreen(
     val shizukuNetworkApps = viewModel.shizukuNetworkApps.collectAsStateWithLifecycle().value
     val appNetworkControlRecords = viewModel.appNetworkControlRecords.collectAsStateWithLifecycle(emptyList()).value
     val remoteState = viewModel.remoteState.collectAsStateWithLifecycle().value
+    val backendConnectivityState = viewModel.backendConnectivityState.collectAsStateWithLifecycle().value
+    val backendDecision = mainBackendUiDecision(backendConnectivityState, uiState.nowMillis)
+    val backendAccessEnabled = backendDecision.executable
     val apiTraces = viewModel.apiDiagnostics.collectAsStateWithLifecycle().value
     val memoryHealth = viewModel.memoryHealth.collectAsStateWithLifecycle().value
     val luxHistory = remember { mutableStateListOf<Float>() }
@@ -251,6 +253,12 @@ internal fun DeveloperDebugScreen(
 
         SettingsSection(R.string.developer_section_api_security, Icons.Outlined.Lock) {
             DeveloperMetricRow(R.string.developer_security_api_base, ProjectLumenApiConfig.baseUrl)
+            BackendConnectivityDeveloperControls(
+                state = backendConnectivityState,
+                decision = backendDecision,
+                onRefresh = viewModel::checkRemoteHealth,
+                onForceEnabledChange = viewModel::setBackendDeveloperForceEnabled,
+            )
             DeveloperMetricRow(R.string.developer_security_cleartext, stringResource(R.string.developer_security_cleartext_blocked))
             DeveloperMetricRow(
                 R.string.developer_security_api_pins,
@@ -283,6 +291,7 @@ internal fun DeveloperDebugScreen(
                 R.string.enable_diagnostic_face_analysis_upload,
                 Icons.Outlined.PhotoCamera,
                 settings.diagnosticFaceAnalysisUploadEnabled,
+                enabled = backendAccessEnabled,
                 labelMaxLines = Int.MAX_VALUE,
             ) { enabled ->
                 viewModel.updateSettings { current ->
@@ -296,7 +305,7 @@ internal fun DeveloperDebugScreen(
                 modifier = Modifier.fillMaxWidth(),
                 value = purchaseProductId,
                 onValueChange = { purchaseProductId = it },
-                enabled = !remoteState.busy,
+                enabled = backendAccessEnabled && !remoteState.busy,
                 singleLine = true,
                 label = { Text(stringResource(R.string.remote_cloud_product_id)) },
             )
@@ -304,14 +313,15 @@ internal fun DeveloperDebugScreen(
                 modifier = Modifier.fillMaxWidth(),
                 value = purchaseToken,
                 onValueChange = { purchaseToken = it },
-                enabled = !remoteState.busy,
+                enabled = backendAccessEnabled && !remoteState.busy,
                 singleLine = true,
                 label = { Text(stringResource(R.string.remote_cloud_purchase_token)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             )
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = remoteState.signedIn &&
+                enabled = backendAccessEnabled &&
+                    remoteState.signedIn &&
                     !remoteState.busy &&
                     normalizedPurchaseProductId.isNotBlank() &&
                     normalizedPurchaseToken.isNotBlank(),
@@ -327,16 +337,12 @@ internal fun DeveloperDebugScreen(
                 DeveloperMetricRow(R.string.developer_api_last_error, remoteState.errorMessage)
             }
             DeveloperMetricRow(R.string.developer_api_recent_count, apiTraces.size.toString())
-            LumenFlowRow {
-                Button(onClick = viewModel::checkRemoteHealth) {
-                    DeveloperButtonLabel(Icons.Outlined.Sync, R.string.developer_api_probe_health)
-                }
-                OutlinedButton(
-                    onClick = viewModel::clearApiDiagnostics,
-                    enabled = apiTraces.isNotEmpty(),
-                ) {
-                    DeveloperButtonLabel(Icons.Outlined.DeleteSweep, R.string.developer_api_clear_logs)
-                }
+            OutlinedButton(
+                onClick = viewModel::clearApiDiagnostics,
+                enabled = apiTraces.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                DeveloperButtonLabel(Icons.Outlined.DeleteSweep, R.string.developer_api_clear_logs)
             }
             if (apiTraces.isEmpty()) {
                 DeveloperNote(stringResource(R.string.developer_api_no_requests))

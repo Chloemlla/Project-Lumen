@@ -26,6 +26,7 @@ Before writing frontend code, confirm:
 - [ ] VitePress docs changes follow [`docs-site.md`](./docs-site.md); build/test commands stay in GitHub Actions.
 - [ ] Android Compose surface/top-bar chrome changes follow [`android-compose-surfaces.md`](./android-compose-surfaces.md).
 - [ ] Android first-run gates / per-build update notes follow [`android-first-run-and-update-notes.md`](./android-first-run-and-update-notes.md).
+- [ ] Android main-backend calls and backend-dependent UI follow [`android-backend-connectivity.md`](./android-backend-connectivity.md).
 
 ## Quality Check
 
@@ -54,6 +55,7 @@ Before marking work done (see [`quality-guidelines.md`](./quality-guidelines.md)
 | [Android Launcher Shortcuts](./android-launcher-shortcuts.md) | Android long-press app icon shortcut contracts | ✅ Filled |
 | [Android Compose Surfaces](./android-compose-surfaces.md) | Soft Material surfaces, preference rows, dock vs secondary top-bar hierarchy | ✅ Filled |
 | [Android First-Run and Update Notes](./android-first-run-and-update-notes.md) | OSS notice, immersive tutorial, per-build notes by commit+build time | ✅ Filled |
+| [Android Backend Connectivity](./android-backend-connectivity.md) | Main-backend health state, capability gate, UI/background suppression, and recovery exclusions | ✅ Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Forbidden/required patterns, 7 smells, tests | ✅ Filled (⏳ test setup to confirm) |
 | [VitePress Docs Site](./docs-site.md) | Docs package, Pages base path, workflow-only build | ✅ Filled |
 

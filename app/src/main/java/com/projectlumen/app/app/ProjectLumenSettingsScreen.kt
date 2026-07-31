@@ -229,6 +229,8 @@ internal fun SettingsScreen(
     val cloudSyncAllowed = planTier(settings) >= PlanTier.PLUS
     val backupImportPreview by viewModel.backupImportPreview.collectAsStateWithLifecycle()
     val remoteState by viewModel.remoteState.collectAsStateWithLifecycle()
+    val backendConnectivityState by viewModel.backendConnectivityState.collectAsStateWithLifecycle()
+    val backendFeaturesVisible = mainBackendUiDecision(backendConnectivityState, uiState.nowMillis).visible
     val shizukuState by viewModel.shizukuState.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     val settingsScrollState = LocalLumenPageScrollState.current
@@ -266,7 +268,7 @@ internal fun SettingsScreen(
         return when (target) {
             PermissionSetupTarget.STATISTICS -> settings.statsEnabled
             PermissionSetupTarget.USAGE_ACCESS -> !permissionRequirements.usageAccess
-            PermissionSetupTarget.DIAGNOSTICS -> settings.diagnosticTelemetryUploadEnabled
+            PermissionSetupTarget.DIAGNOSTICS -> !backendFeaturesVisible || settings.diagnosticTelemetryUploadEnabled
             PermissionSetupTarget.NOTIFICATIONS -> settings.notificationEnabled && !notificationPermissionNeeded
             PermissionSetupTarget.EXACT_ALARM -> settings.notificationEnabled && !exactAlarmSettingsNeeded
             PermissionSetupTarget.FULL_SCREEN -> settings.notificationEnabled && !fullScreenIntentSettingsNeeded
@@ -281,6 +283,7 @@ internal fun SettingsScreen(
         }
     }
     fun startPermissionSetup(target: PermissionSetupTarget) {
+        if (target == PermissionSetupTarget.DIAGNOSTICS && !backendFeaturesVisible) return
         if (isPermissionTargetConfigured(target)) {
             scrollToPermissionTarget(target, returnAfterCompletion = false)
             return
@@ -402,6 +405,7 @@ internal fun SettingsScreen(
         }
     }
     fun scrollToGrowthTarget(target: GrowthConfigTarget) {
+        if (target == GrowthConfigTarget.CLOUD && !backendFeaturesVisible) return
         val scrollState = settingsScrollState ?: return
         activeGrowthConfigTarget = target
         showGrowthConfiguredDialog = false
@@ -421,6 +425,17 @@ internal fun SettingsScreen(
             GrowthConfigTarget.CLOUD -> remoteState.signedIn
             GrowthConfigTarget.FAMILY -> isFamilyEyeCareModeActive(uiState)
             GrowthConfigTarget.GUIDANCE -> settings.statsEnabled && settings.reminderEnabled
+        }
+    }
+    LaunchedEffect(backendFeaturesVisible) {
+        if (!backendFeaturesVisible) {
+            if (activeGrowthConfigTarget == GrowthConfigTarget.CLOUD) {
+                activeGrowthConfigTarget = null
+                showGrowthConfiguredDialog = false
+            }
+            if (activePermissionSetupTarget == PermissionSetupTarget.DIAGNOSTICS) {
+                activePermissionSetupTarget = null
+            }
         }
     }
     val restSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -565,6 +580,7 @@ internal fun SettingsScreen(
             uiState = uiState,
             permissionRequirements = permissionRequirements,
             shizukuReady = shizukuState.ready,
+            backendFeaturesVisible = backendFeaturesVisible,
             activeTarget = activePermissionSetupTarget,
             onConfigureTarget = ::startPermissionSetup,
             onTargetCheckedChange = ::setPermissionTargetEnabled,
@@ -709,27 +725,30 @@ internal fun SettingsScreen(
                 }
             }
         }
-        SettingsScrollAnchor(
-            target = GrowthConfigTarget.CLOUD,
-            scrollState = settingsScrollState,
-            anchorPositions = growthAnchorPositions,
-        ) {
-        RemoteCloudAccountCard(
-            state = remoteState,
-            cloudSyncAllowed = cloudSyncAllowed,
-            onCheckHealth = viewModel::checkRemoteHealth,
-            onStartEmailLogin = viewModel::startRemoteEmailLogin,
-            onVerifyEmailLogin = viewModel::verifyRemoteEmailLogin,
-            onRefreshAccount = viewModel::refreshRemoteAccount,
-            onSyncNow = viewModel::syncRemoteNow,
-            onUploadBackup = viewModel::uploadCloudBackup,
-            onRestoreBackup = viewModel::restoreLatestCloudBackup,
-            onSignOut = viewModel::signOutRemote,
-        )
+        if (backendFeaturesVisible) {
+            SettingsScrollAnchor(
+                target = GrowthConfigTarget.CLOUD,
+                scrollState = settingsScrollState,
+                anchorPositions = growthAnchorPositions,
+            ) {
+                RemoteCloudAccountCard(
+                    state = remoteState,
+                    cloudSyncAllowed = cloudSyncAllowed,
+                    onCheckHealth = viewModel::checkRemoteHealth,
+                    onStartEmailLogin = viewModel::startRemoteEmailLogin,
+                    onVerifyEmailLogin = viewModel::verifyRemoteEmailLogin,
+                    onRefreshAccount = viewModel::refreshRemoteAccount,
+                    onSyncNow = viewModel::syncRemoteNow,
+                    onUploadBackup = viewModel::uploadCloudBackup,
+                    onRestoreBackup = viewModel::restoreLatestCloudBackup,
+                    onSignOut = viewModel::signOutRemote,
+                )
+            }
         }
         EyeCareGrowthCapabilityCard(
             uiState = uiState,
             remoteState = remoteState,
+            cloudCapabilityVisible = backendFeaturesVisible,
             onOpenTemplates = openTemplates,
             onConfigureReports = { scrollToGrowthTarget(GrowthConfigTarget.REPORTS) },
             onConfigureCloud = { scrollToGrowthTarget(GrowthConfigTarget.CLOUD) },
@@ -851,10 +870,11 @@ internal fun SettingsScreen(
         }
         }
         SettingsScrollAnchors(
-            targets = listOf(
-                PermissionSetupTarget.DIAGNOSTICS,
-                PermissionSetupTarget.SHIZUKU,
-            ),
+            targets = if (backendFeaturesVisible) {
+                listOf(PermissionSetupTarget.DIAGNOSTICS, PermissionSetupTarget.SHIZUKU)
+            } else {
+                listOf(PermissionSetupTarget.SHIZUKU)
+            },
             scrollState = settingsScrollState,
             anchorPositions = permissionAnchorPositions,
         ) {
@@ -862,8 +882,9 @@ internal fun SettingsScreen(
             settings = settings,
             state = shizukuState,
             viewModel = viewModel,
+            backendFeaturesVisible = backendFeaturesVisible,
             forceExpanded = activePermissionSetupTarget == PermissionSetupTarget.SHIZUKU ||
-                activePermissionSetupTarget == PermissionSetupTarget.DIAGNOSTICS,
+                (backendFeaturesVisible && activePermissionSetupTarget == PermissionSetupTarget.DIAGNOSTICS),
         )
         }
         SettingsScrollAnchor(
