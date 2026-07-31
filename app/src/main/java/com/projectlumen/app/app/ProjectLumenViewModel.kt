@@ -4,6 +4,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.projectlumen.app.core.api.BackendConnectivityController
 import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.api.ProjectLumenApiDiagnostics
 import com.chloemlla.lumen.crash.CrashBreadcrumbs
@@ -43,6 +44,7 @@ class ProjectLumenViewModel(
     export: ExportService,
     backup: DataBackupService,
     apiClient: ProjectLumenApiClient,
+    private val backendConnectivity: BackendConnectivityController,
     private val secureCredentials: SecureCredentialStore,
     buildUpdateNotesLoader: BuildUpdateNotesLoader,
     eyeCarePreferences: EyeCarePreferencesDataStore,
@@ -163,6 +165,7 @@ class ProjectLumenViewModel(
     private val remoteEntry = ProjectLumenRemoteFeatureEntry(
         scope = reportingScope,
         apiClient = apiClient,
+        backendConnectivity = backendConnectivity,
         credentials = secureCredentials,
         backup = backup,
         settingsRepository = repositories.settings,
@@ -178,6 +181,7 @@ class ProjectLumenViewModel(
     val buildUpdateNotesState = firstOpenGateEntry.buildUpdateNotesState
     val backupImportPreview = backupEntry.importPreview
     internal val remoteState = remoteEntry.state
+    val backendConnectivityState = backendConnectivity.state
     val shizukuState = shizuku.state
     val shizukuNetworkApps = appNetworkControlEntry.networkApps
     val appNetworkControlRecords = appNetworkControlEntry.records
@@ -414,7 +418,8 @@ class ProjectLumenViewModel(
     fun importBackup(uri: Uri) = backupEntry.importBackup(uri)
 
     fun recordManualProEntitlement(productId: String = "manual_pro") = entitlementEntry.recordManualProEntitlement(productId)
-    fun checkRemoteHealth() = remoteEntry.checkHealth()
+    fun checkRemoteHealth() = backendConnectivity.refreshAsync(force = true)
+    fun setBackendDeveloperForceEnabled(enabled: Boolean) = backendConnectivity.setDeveloperForceEnabled(enabled)
     fun clearApiDiagnostics() = ProjectLumenApiDiagnostics.clear()
     fun startRemoteEmailLogin(email: String) = remoteEntry.startEmailLogin(email)
     fun verifyRemoteEmailLogin(code: String) = remoteEntry.verifyEmailLogin(code)

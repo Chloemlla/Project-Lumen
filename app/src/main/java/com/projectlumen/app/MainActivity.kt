@@ -111,6 +111,7 @@ open class MainActivity : ComponentActivity() {
                             export = app.export,
                             backup = app.backup,
                             apiClient = app.apiClient,
+                            backendConnectivity = app.backendConnectivity,
                             secureCredentials = app.secureCredentials,
                             buildUpdateNotesLoader = BuildUpdateNotesLoader(app),
                             eyeCarePreferences = app.eyeCarePreferences,

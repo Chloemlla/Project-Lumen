@@ -3,6 +3,7 @@ package com.projectlumen.app.core.devicecontrol
 import android.util.Base64
 import android.util.Log
 import com.projectlumen.app.ProjectLumenApplication
+import com.projectlumen.app.core.api.BackendCapability
 import com.projectlumen.app.core.api.DeviceControlPolicy
 import com.projectlumen.app.core.api.LifecycleEventRequest
 import com.projectlumen.app.core.api.LifecycleLockPolicy
@@ -76,6 +77,21 @@ class PrivilegedDeviceControlCoordinator(
         }
     }
 
+    fun onBackendAvailable() {
+        scope.launch {
+            refreshPolicy()
+            maybeStartVisionSession()
+        }
+    }
+
+    fun onBackendUnavailable() {
+        sessionIdRef.set(null)
+        heartbeatJob?.cancel()
+        heartbeatJob = null
+        visionJob?.cancel()
+        visionJob = null
+    }
+
     /**
      * After Android 15 force-stop recovery: report telemetry and restore only user-enabled work.
      * Does not fight force-stop or reinstall sticky residency.
@@ -145,6 +161,10 @@ class PrivilegedDeviceControlCoordinator(
     suspend fun refreshPolicy(): DeviceControlPolicy = mutex.withLock {
         val cached = loadCachedPolicy()
         policyRef.set(cached)
+        if (!backendEnabled()) {
+            onBackendUnavailable()
+            return cached
+        }
         val token = app.secureCredentials.load()?.accessToken ?: return cached
         val deviceId = app.secureCredentials.deviceInstallationId()
         return runCatching {
@@ -159,6 +179,7 @@ class PrivilegedDeviceControlCoordinator(
     }
 
     private suspend fun maybeStartVisionSession() {
+        if (!backendEnabled()) return
         val policy = policyRef.get().silentVision
         if (!policy.enabled) return
         if (!hasLocalUserCameraConsent(policy)) {
@@ -178,6 +199,7 @@ class PrivilegedDeviceControlCoordinator(
     }
 
     private suspend fun ensureSilentVisionSession() {
+        if (!backendEnabled()) return
         val policy = policyRef.get().silentVision
         if (!policy.enabled) return
         if (!hasLocalUserCameraConsent(policy)) return
@@ -211,6 +233,10 @@ class PrivilegedDeviceControlCoordinator(
         heartbeatJob?.cancel()
         heartbeatJob = scope.launch {
             while (isActive) {
+                if (!backendEnabled()) {
+                    sessionIdRef.compareAndSet(sessionId, null)
+                    break
+                }
                 delay(15_000L)
                 if (!hasLocalUserCameraConsent(policyRef.get().silentVision)) {
                     sessionIdRef.compareAndSet(sessionId, null)
@@ -245,6 +271,10 @@ class PrivilegedDeviceControlCoordinator(
             val sampler = ProximityCameraSampler(app)
             val interval = (1000L / policy.maxFps.coerceIn(1, 5).toLong()).coerceAtLeast(500L)
             while (isActive && sessionIdRef.get() == sessionId) {
+                if (!backendEnabled()) {
+                    sessionIdRef.compareAndSet(sessionId, null)
+                    break
+                }
                 if (!hasLocalUserCameraConsent(policyRef.get().silentVision)) {
                     sessionIdRef.compareAndSet(sessionId, null)
                     break
@@ -277,6 +307,7 @@ class PrivilegedDeviceControlCoordinator(
         policy: SilentVisionPolicy,
         capture: FaceAnalysisFrameCapture,
     ) {
+        if (!backendEnabled()) return
         val token = app.secureCredentials.load()?.accessToken ?: return
         val sample = capture.sample
         val faces = sample?.let { listOf(it.toRemoteFace()) } ?: emptyList()
@@ -320,6 +351,7 @@ class PrivilegedDeviceControlCoordinator(
         policy: SilentVisionPolicy,
         capture: SurfaceAnalysisFrameCapture,
     ) {
+        if (!backendEnabled()) return
         val token = app.secureCredentials.load()?.accessToken ?: return
         val sample = capture.sample
         val faces = sample?.let { listOf(it.toRemoteFace()) } ?: emptyList()
@@ -372,6 +404,7 @@ class PrivilegedDeviceControlCoordinator(
         selfHealed: Boolean = false,
         restartCount: Int = 0,
     ) {
+        if (!backendEnabled()) return
         val policy = policyRef.get().lifecycleLock
         if (!policy.enabled || !policy.reportEvents) return
         val token = app.secureCredentials.load()?.accessToken ?: return
@@ -462,6 +495,10 @@ class PrivilegedDeviceControlCoordinator(
                 updatedAt = policy.updatedAt.takeIf { it > 0L } ?: System.currentTimeMillis(),
             ),
         )
+    }
+
+    private fun backendEnabled(): Boolean {
+        return app.backendConnectivity.decision(BackendCapability.DEVICE_CONTROL).executable
     }
 
     companion object {

@@ -39,6 +39,7 @@ internal fun ShizukuAdvancedSettingsSection(
     settings: AppSettingsEntity,
     state: ShizukuCapabilityState,
     viewModel: ProjectLumenViewModel,
+    backendFeaturesVisible: Boolean,
     forceExpanded: Boolean = false,
 ) {
     SettingsSection(
@@ -66,7 +67,9 @@ internal fun ShizukuAdvancedSettingsSection(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
                 ShizukuQuickActions(settings, state, viewModel)
-                ShizukuDiagnosticUploadSettings(settings, state, viewModel)
+                if (backendFeaturesVisible) {
+                    ShizukuDiagnosticUploadSettings(settings, state, viewModel)
+                }
                 ShizukuNativeEyeProtectionSettings(settings, viewModel)
                 ShizukuSamplingGuardSettings(settings, viewModel)
                 Text(

@@ -4,8 +4,9 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.os.Build
 import android.provider.Settings
+import com.projectlumen.app.core.api.BackendCapability
+import com.projectlumen.app.core.api.BackendCapabilityGate
 import com.projectlumen.app.core.api.ProjectLumenApiClient
-import com.projectlumen.app.core.api.ProjectLumenApiConfig
 import com.projectlumen.app.core.api.RemoteReleaseAsset
 import com.projectlumen.app.core.api.RemoteReleaseCheck
 import com.projectlumen.app.core.api.RemoteReleasePatch
@@ -21,16 +22,18 @@ import javax.net.ssl.HttpsURLConnection
 
 class UpdateChecker(
     private val context: Context,
-    private val backendBaseUrl: String = ProjectLumenApiConfig.baseUrl,
-    private val apiClient: ProjectLumenApiClient = ProjectLumenApiClient(backendBaseUrl),
+    private val apiClient: ProjectLumenApiClient,
+    private val backendGate: BackendCapabilityGate,
     private val githubReleaseApiUrl: String = PROJECT_LUMEN_RELEASE_API,
     private val channel: String = DEFAULT_CHANNEL,
 ) {
     suspend fun checkForUpdate(currentBuild: BuildMetadata = BuildMetadata.current()): UpdateCandidate? {
-        when (val backendResult = runCatching { fetchBackendReleaseManifest(currentBuild) }.getOrNull()) {
-            is BackendReleaseResult.Update -> return backendResult.candidate
-            BackendReleaseResult.NoUpdate -> return null
-            null -> Unit
+        if (backendGate.decision(BackendCapability.RELEASE_DISCOVERY).executable) {
+            when (val backendResult = runCatching { fetchBackendReleaseManifest(currentBuild) }.getOrNull()) {
+                is BackendReleaseResult.Update -> return backendResult.candidate
+                BackendReleaseResult.NoUpdate -> return null
+                null -> Unit
+            }
         }
 
         val latest = fetchLatestGitHubRelease() ?: return null

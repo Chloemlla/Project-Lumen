@@ -8,6 +8,10 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.projectlumen.app.core.api.BackendCapability
+import com.projectlumen.app.core.api.BackendCommunicationBlockedException
+import com.projectlumen.app.core.api.BackendConnectivityController
+import com.projectlumen.app.core.api.MmkvBackendConnectivityPersistence
 import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.chloemlla.lumen.crash.LumenCrash
 import com.chloemlla.lumen.crash.CrashBreadcrumbs
@@ -48,9 +52,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter {
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val database: AppDatabase by lazy { AppDatabase.create(this) }
     val eyeCarePreferences: EyeCarePreferencesDataStore by lazy { EyeCarePreferencesDataStore(this) }
     val notifications: NotificationService by lazy { NotificationService(this) }
@@ -60,7 +68,16 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     val backup: DataBackupService by lazy {
         DataBackupService(this, database, eyeCarePreferences) { secureCredentials.deviceInstallationId() }
     }
-    val apiClient: ProjectLumenApiClient by lazy { ProjectLumenApiClient() }
+    val backendConnectivity: BackendConnectivityController by lazy {
+        BackendConnectivityController(
+            scope = applicationScope,
+            persistence = MmkvBackendConnectivityPersistence(),
+            healthProbe = { apiClient.health() },
+        )
+    }
+    val apiClient: ProjectLumenApiClient by lazy {
+        ProjectLumenApiClient(backendGate = backendConnectivity)
+    }
     val crashReports: CrashReportStore
         get() {
             if (!LumenCrash.isInstalled()) {
@@ -79,6 +96,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
             context = this,
             database = database,
             apiClient = apiClient,
+            backendGate = backendConnectivity,
             shizuku = shizuku,
             accessTokenProvider = {
                 secureCredentials.load()?.accessToken
@@ -92,7 +110,6 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
     val deviceControl: PrivilegedDeviceControlCoordinator by lazy { PrivilegedDeviceControlCoordinator(this) }
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val crashReportUploadInFlight = AtomicBoolean(false)
     @Volatile
     private var crashReportUploadsReady = false
@@ -135,10 +152,12 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
                 }
             runCatching { notifications.ensureChannels() }
             runCatching { LumenToast.install(this) }
+            runCatching { backendConnectivity.start() }
             runCatching {
                 ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleCoordinator)
             }
             runCatching { deviceControl.start() }
+            observeBackendAvailability()
             crashReportUploadsReady = true
             scheduleStoredCrashReportUpload()
         }.onFailure { error ->
@@ -216,6 +235,14 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
      * LumenCrash is unavailable or integrity checks fail closed.
      */
     fun recordCrash(throwable: Throwable): CrashReport? {
+        if (throwable is BackendCommunicationBlockedException) {
+            runCatching {
+                CrashBreadcrumbs.record(
+                    "Backend request suppressed capability=${throwable.capability.name.lowercase()} reason=${throwable.reasonCode}",
+                )
+            }
+            return null
+        }
         return runCatching { LumenCrash.record(throwable) }
             .onFailure { Log.e(TAG, "Failed to record crash", it) }
             .getOrNull()
@@ -249,6 +276,22 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
             } finally {
                 crashReportUploadInFlight.set(false)
             }
+        }
+    }
+
+    private fun observeBackendAvailability() {
+        applicationScope.launch {
+            backendConnectivity.state
+                .map { backendConnectivity.decision(BackendCapability.TELEMETRY).executable }
+                .distinctUntilChanged()
+                .collect { enabled ->
+                    if (enabled) {
+                        scheduleStoredCrashReportUpload()
+                        deviceControl.onBackendAvailable()
+                    } else {
+                        deviceControl.onBackendUnavailable()
+                    }
+                }
         }
     }
 

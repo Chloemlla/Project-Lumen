@@ -397,6 +397,7 @@ internal fun EyeCareSetupAndPrivacyCard(
 internal fun EyeCareGrowthCapabilityCard(
     uiState: ProjectLumenUiState,
     remoteState: ProjectLumenRemoteUiState,
+    cloudCapabilityVisible: Boolean,
     onOpenTemplates: () -> Unit,
     onConfigureReports: () -> Unit,
     onConfigureCloud: () -> Unit,
@@ -414,24 +415,25 @@ internal fun EyeCareGrowthCapabilityCard(
     val cloudSyncReady = remoteState.signedIn && cloudSyncAllowed
     val familyModeReady = isFamilyEyeCareModeActive(uiState)
     val aiGuidanceReady = uiState.settings.statsEnabled && uiState.settings.reminderEnabled
-    val activeCapabilities = listOf(
-        proEnabled && hasPremiumTemplates,
-        advancedReportsReady,
-        cloudSyncReady,
-        familyModeReady,
-        aiGuidanceReady,
-    ).count { it }
+    val capabilitySummary = growthCapabilitySummary(
+        proTemplatesReady = proEnabled && hasPremiumTemplates,
+        advancedReportsReady = advancedReportsReady,
+        cloudSyncReady = cloudSyncReady,
+        familyModeReady = familyModeReady,
+        aiGuidanceReady = aiGuidanceReady,
+        cloudCapabilityVisible = cloudCapabilityVisible,
+    )
     SettingsSection(
         titleRes = R.string.eye_care_growth_capabilities,
         icon = Icons.Outlined.Sync,
         initiallyExpanded = false,
         headerAccessory = {
             Text(
-                text = "$activeCapabilities/5",
+                text = "${capabilitySummary.activeCount}/${capabilitySummary.totalCount}",
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(
-                        if (activeCapabilities > 0) {
+                        if (capabilitySummary.activeCount > 0) {
                             MaterialTheme.colorScheme.primaryContainer
                         } else {
                             MaterialTheme.colorScheme.surfaceVariant
@@ -440,7 +442,7 @@ internal fun EyeCareGrowthCapabilityCard(
                     .padding(horizontal = 10.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = if (activeCapabilities > 0) {
+                color = if (capabilitySummary.activeCount > 0) {
                     MaterialTheme.colorScheme.onPrimaryContainer
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
@@ -463,17 +465,19 @@ internal fun EyeCareGrowthCapabilityCard(
                 inactiveActionRes = R.string.eye_care_capability_enable,
                 onConfigure = onConfigureReports,
             )
-            CapabilityLine(
-                icon = Icons.Outlined.Sync,
-                titleRes = R.string.eye_care_growth_cloud_sync,
-                active = cloudSyncReady,
-                inactiveActionRes = if (remoteState.signedIn) {
-                    R.string.eye_care_capability_upgrade
-                } else {
-                    R.string.eye_care_capability_sign_in
-                },
-                onConfigure = onConfigureCloud,
-            )
+            if (cloudCapabilityVisible) {
+                CapabilityLine(
+                    icon = Icons.Outlined.Sync,
+                    titleRes = R.string.eye_care_growth_cloud_sync,
+                    active = cloudSyncReady,
+                    inactiveActionRes = if (remoteState.signedIn) {
+                        R.string.eye_care_capability_upgrade
+                    } else {
+                        R.string.eye_care_capability_sign_in
+                    },
+                    onConfigure = onConfigureCloud,
+                )
+            }
             CapabilityLine(
                 icon = Icons.Outlined.Lock,
                 titleRes = R.string.eye_care_growth_family_mode,
@@ -498,15 +502,17 @@ internal fun EyeCareGrowthCapabilityCard(
                         if (advancedReportsReady) R.string.eye_care_growth_advanced_reports else R.string.eye_care_capability_enable,
                     )
                 }
-                OutlinedButton(onClick = if (cloudSyncReady) onSyncCloud else onConfigureCloud) {
-                    ButtonLabel(
-                        Icons.Outlined.Sync,
-                        when {
-                            cloudSyncReady -> R.string.remote_cloud_sync_now
-                            remoteState.signedIn -> R.string.eye_care_capability_upgrade
-                            else -> R.string.eye_care_capability_sign_in
-                        },
-                    )
+                if (cloudCapabilityVisible) {
+                    OutlinedButton(onClick = if (cloudSyncReady) onSyncCloud else onConfigureCloud) {
+                        ButtonLabel(
+                            Icons.Outlined.Sync,
+                            when {
+                                cloudSyncReady -> R.string.remote_cloud_sync_now
+                                remoteState.signedIn -> R.string.eye_care_capability_upgrade
+                                else -> R.string.eye_care_capability_sign_in
+                            },
+                        )
+                    }
                 }
                 Button(onClick = onApplyFamilyMode) {
                     ButtonLabel(Icons.Outlined.Lock, R.string.eye_care_apply_family_profile)

@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Base64
 import com.projectlumen.app.ProjectLumenApplication
+import com.projectlumen.app.core.api.BackendCapability
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.api.RemoteCameraFramePayload
 import com.projectlumen.app.core.api.RemoteFaceAnalysisFace
@@ -255,6 +256,7 @@ class ProximityDetectionService : Service() {
         settings: AppSettingsEntity,
     ) {
         if (!settings.diagnosticTelemetryUploadEnabled || !settings.diagnosticFaceAnalysisUploadEnabled) return
+        if (!app.backendConnectivity.decision(BackendCapability.FACE_ANALYSIS).executable) return
         val capture = ProximityCameraSampler(this).captureFaceAnalysisFrame(maxDurationMillis = 2_000L) ?: return
         val deviceInstallationId = settings.deviceInstallationId.ifBlank { app.secureCredentials.deviceInstallationId() }
         if (deviceInstallationId.isBlank()) return

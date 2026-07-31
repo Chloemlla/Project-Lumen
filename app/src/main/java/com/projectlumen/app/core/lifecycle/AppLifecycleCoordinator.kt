@@ -6,6 +6,8 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.ProjectLumenApplication
+import com.projectlumen.app.core.api.BackendCapability
+import com.projectlumen.app.core.api.BackendCommunicationBlockedException
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
@@ -31,6 +33,7 @@ class AppLifecycleCoordinator(
     private val runtimeRepository = app.runtimeRepository()
 
     override fun onStart(owner: LifecycleOwner) {
+        app.backendConnectivity.onForeground()
         app.scheduleStoredCrashReportUpload()
         scope.launch {
             app.deviceInsights.refresh()
@@ -78,6 +81,7 @@ class AppLifecycleCoordinator(
     }
 
     override fun onStop(owner: LifecycleOwner) {
+        app.backendConnectivity.onBackground()
         scope.launch {
             val nowMillis = System.currentTimeMillis()
             val settings = settingsRepository.getOrDefault()
@@ -111,6 +115,7 @@ class AppLifecycleCoordinator(
     }
 
     private suspend fun registerDeviceAsset(settings: AppSettingsEntity) {
+        if (!app.backendConnectivity.decision(BackendCapability.DEVICE_REGISTRATION).executable) return
         val deviceInstallationId = app.secureCredentials
             .deviceInstallationId()
             .takeIf { it.isNotBlank() }
@@ -125,7 +130,9 @@ class AppLifecycleCoordinator(
                 versionCode = BuildConfig.VERSION_CODE.toLong(),
                 localSecurityConfig = localSecurityConfig(settings),
             )
-        }.onFailure(app::recordCrash)
+        }.onFailure { throwable ->
+            if (throwable !is BackendCommunicationBlockedException) app.recordCrash(throwable)
+        }
     }
 
     private suspend fun accessTokenForDeviceRegistration(deviceInstallationId: String): String? {
@@ -138,6 +145,7 @@ class AppLifecycleCoordinator(
         }
         if (session.refreshToken.isBlank()) return null
         if (session.refreshExpiresAt > 0L && session.refreshExpiresAt <= nowMillis) return null
+        if (!app.backendConnectivity.decision(BackendCapability.ACCOUNT_SESSION).executable) return null
 
         return runCatching {
             app.apiClient.refreshSession(
@@ -145,7 +153,7 @@ class AppLifecycleCoordinator(
                 deviceInstallationId = deviceInstallationId,
             ).also(app.secureCredentials::save).accessToken
         }.getOrElse { throwable ->
-            app.recordCrash(throwable)
+            if (throwable !is BackendCommunicationBlockedException) app.recordCrash(throwable)
             null
         }
     }
