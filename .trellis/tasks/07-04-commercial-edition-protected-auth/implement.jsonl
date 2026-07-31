@@ -1,1 +1,5 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend pre-development and route-test ownership checklist."}
+{"file": ".trellis/spec/backend/deployment-security.md", "reason": "Commercial Edition active Plus/Team entitlement and protected sync/backup route contract."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Stable forbidden reason-code and API error response guidance."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Focused behavior-test and source-quality requirements."}
+{"file": ".trellis/spec/guides/architecture-thinking-guide.md", "reason": "Guidance for selecting a small pure policy seam without adding infrastructure coupling."}

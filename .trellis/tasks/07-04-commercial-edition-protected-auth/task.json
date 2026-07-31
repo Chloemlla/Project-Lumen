@@ -21,6 +21,6 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "The original commercial-edition branch acceptance item is waived because the protected-auth implementation landed on main in commit b214f38. Follow-up verification is performed on codex/commercial-auth-tests; the obsolete branch is not recreated.",
   "meta": {}
 }
