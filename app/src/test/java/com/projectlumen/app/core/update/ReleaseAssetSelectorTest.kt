@@ -136,6 +136,22 @@ class ReleaseAssetSelectorTest {
         assertNull(selected)
     }
 
+    @Test
+    fun explicitArmv7FilenameIsNotReclassifiedAsUniversal() {
+        val selected = selectBestReleaseAsset(
+            assets = listOf(
+                ReleaseAsset(
+                    name = "Project-Lumen_android_1.0.1_armv7.apk",
+                    downloadUrl = "https://example.invalid/armv7.apk",
+                    sha256 = SHA256,
+                ),
+            ),
+            deviceAbis = listOf("arm64-v8a"),
+        )
+
+        assertNull(selected)
+    }
+
     private fun universalAsset(): ReleaseAsset = ReleaseAsset(
         name = "Project-Lumen_universal.apk",
         downloadUrl = "https://example.invalid/universal.apk",

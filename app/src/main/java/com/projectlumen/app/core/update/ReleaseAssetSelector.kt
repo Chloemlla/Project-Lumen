@@ -2,7 +2,7 @@ package com.projectlumen.app.core.update
 
 private val supportedReleaseAbis = setOf("arm64_v8a", "x86_64")
 private val explicitUnsupportedAbiPattern = Regex(
-    """(?:^|_)(?:armeabi(?:_v7a)?|x86(?!_64)|mips(?:64)?)(?:_|$)""",
+    """(?:^|_)(?:armeabi(?:_v7a)?|arm32|armv7|x86(?!_64)|mips(?:64)?)(?:_|$)""",
 )
 
 /**
