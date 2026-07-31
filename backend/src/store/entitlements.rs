@@ -47,8 +47,11 @@ impl AppStore {
             .try_collect()
             .await
             .map_err(database_error)?;
-        let active_tier = resolve_active_tier(&entitlements, now_millis());
-        Ok(tier_rank(&active_tier) >= tier_rank(required_tier))
+        Ok(entitlements_have_tier_at_least(
+            &entitlements,
+            required_tier,
+            now_millis(),
+        ))
     }
 
     pub async fn verify_google_purchase(
@@ -123,6 +126,15 @@ fn resolve_active_tier(entitlements: &[EntitlementRecord], now: i64) -> String {
         .to_owned()
 }
 
+fn entitlements_have_tier_at_least(
+    entitlements: &[EntitlementRecord],
+    required_tier: &str,
+    now: i64,
+) -> bool {
+    let active_tier = resolve_active_tier(entitlements, now);
+    tier_rank(&active_tier) >= tier_rank(required_tier)
+}
+
 fn tier_for_product(product_id: &str) -> String {
     let normalized = product_id.to_ascii_lowercase();
     if normalized.contains("team") {
@@ -146,5 +158,56 @@ fn tier_rank(tier: &str) -> u8 {
         "PLUS" => 2,
         "PRO" => 1,
         _ => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const NOW: i64 = 1_000_000;
+
+    #[test]
+    fn active_plus_and_team_entitlements_meet_the_commercial_cloud_requirement() {
+        for tier in ["PLUS", "TEAM"] {
+            let entitlements = [entitlement(tier, "active", NOW + 1)];
+
+            assert!(
+                entitlements_have_tier_at_least(&entitlements, "PLUS", NOW),
+                "{tier} should unlock protected sync and backup routes"
+            );
+        }
+    }
+
+    #[test]
+    fn free_pro_and_expired_plus_entitlements_do_not_meet_the_requirement() {
+        let cases = [
+            ("active FREE", entitlement("FREE", "active", NOW + 1)),
+            ("active PRO", entitlement("PRO", "active", NOW + 1)),
+            ("expired PLUS", entitlement("PLUS", "active", NOW)),
+        ];
+
+        for (case, entitlement) in cases {
+            assert!(
+                !entitlements_have_tier_at_least(&[entitlement], "PLUS", NOW),
+                "{case} should remain blocked from protected sync and backup routes"
+            );
+        }
+    }
+
+    fn entitlement(tier: &str, status: &str, expires_at: i64) -> EntitlementRecord {
+        EntitlementRecord {
+            id: format!("{tier}-{status}-{expires_at}"),
+            user_id: "test-user".to_owned(),
+            source: "test".to_owned(),
+            product_id: format!("test-{tier}"),
+            purchase_token: format!("token-{tier}"),
+            tier: tier.to_owned(),
+            status: status.to_owned(),
+            purchased_at: NOW - 1,
+            expires_at,
+            last_verified_at: NOW - 1,
+            raw_payload_json: "{}".to_owned(),
+        }
     }
 }
