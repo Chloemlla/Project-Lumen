@@ -33,4 +33,12 @@ runs:
           exit 1
         fi
 
+        set +e
         yes | "$SDKMANAGER" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+        SDKMANAGER_STATUS="${PIPESTATUS[1]}"
+        set -e
+
+        if [ "$SDKMANAGER_STATUS" -ne 0 ]; then
+          echo "sdkmanager failed with exit code $SDKMANAGER_STATUS." >&2
+          exit "$SDKMANAGER_STATUS"
+        fi

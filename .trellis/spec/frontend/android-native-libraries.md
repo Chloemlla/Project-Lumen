@@ -49,6 +49,7 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 - `gradle.properties` owns `projectLumenNdkVersion` and `projectLumenCmakeVersion`; do not hard-code those versions separately in workflows.
 - GitHub Actions must install the NDK/CMake versions from `gradle.properties` before any Android Gradle build that compiles native code.
 - GitHub Actions must use `.github/actions/setup-android-native-toolchain` for Android native toolchain setup so `sdkmanager` is available and all workflows share one install path.
+- The shared setup action must judge installation by `sdkmanager`'s own exit status. The expected `yes` input helper may receive `SIGPIPE` after `sdkmanager` closes stdin successfully and must not turn a successful install into a workflow failure under the composite shell's `pipefail` mode.
 - Native libraries must be packaged uncompressed with 16 KB ZIP data offsets.
 - Every `PT_LOAD` segment in every APK `.so` must have an alignment that is at least 16 KB and divisible by 16 KB.
 - Third-party AARs with native libraries are covered by the APK-level verification script because they are not relinked by the app's CMake build.
@@ -63,6 +64,8 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 | New native dependency is not 16 KB ready | Release workflow fails before publishing assets. |
 | Workflow installs a different NDK/CMake than Gradle requests | Fix workflow to read `gradle.properties`; do not add a second version constant. |
 | `sdkmanager` is not available after Android SDK setup | Native toolchain setup fails before any Gradle build with a clear `sdkmanager was not found` message. |
+| `sdkmanager` succeeds and closes the `yes` input pipe | Native toolchain setup succeeds even if `yes` exits with `SIGPIPE`. |
+| `sdkmanager` returns a non-zero status | Native toolchain setup reports and returns that exact status. |
 
 ### 5. Good/Base/Bad Cases
 
@@ -74,6 +77,7 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 
 - GitHub workflow: after `gradle assembleRelease`, run `scripts/verify_android_16kb_alignment.py` against all release APK outputs.
 - GitHub workflow: before any Android Gradle build that compiles native code, use `.github/actions/setup-android-native-toolchain` so SDK setup and NDK/CMake installation stay shared.
+- Manual review: the shared setup action captures `PIPESTATUS[1]` immediately after the `yes | sdkmanager` pipeline and fails only when that `sdkmanager` status is non-zero.
 - Manual review: when adding/updating native AAR dependencies, confirm the workflow passes the APK-level check rather than assuming Gradle/NDK relinks the dependency.
 
 ### 7. Wrong vs Correct
@@ -90,6 +94,23 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 ```yaml
 - name: Set up Android native toolchain
   uses: ./.github/actions/setup-android-native-toolchain
+```
+
+Inside the shared action, do not let the input helper's expected pipe closure mask the installer result:
+
+```bash
+# Wrong: composite actions run with pipefail, so a successful sdkmanager can
+# still fail the step when yes receives SIGPIPE.
+yes | "$SDKMANAGER" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+```
+
+```bash
+# Correct: temporarily suspend errexit, then propagate sdkmanager itself.
+set +e
+yes | "$SDKMANAGER" "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}"
+SDKMANAGER_STATUS="${PIPESTATUS[1]}"
+set -e
+test "$SDKMANAGER_STATUS" -eq 0 || exit "$SDKMANAGER_STATUS"
 ```
 
 ---
