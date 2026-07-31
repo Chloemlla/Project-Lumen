@@ -1,10 +1,35 @@
 package com.projectlumen.app.core.shizuku
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ShizukuNetworkRestrictionStateTest {
+    @Test
+    fun commandErrorsIdentifyTheFailedRestrictionChannel() {
+        assertEquals(
+            "UID policy: uid failed",
+            shizukuNetworkPolicyErrors(
+                uidPolicySucceeded = false,
+                uidPolicyError = "uid failed",
+                delegatedGuardAttempted = true,
+                delegatedGuardApplied = true,
+                delegatedGuardError = "",
+            ),
+        )
+        assertEquals(
+            "Delegated guard: guard failed",
+            shizukuNetworkPolicyErrors(
+                uidPolicySucceeded = true,
+                uidPolicyError = "",
+                delegatedGuardAttempted = true,
+                delegatedGuardApplied = false,
+                delegatedGuardError = "guard failed",
+            ),
+        )
+    }
+
     @Test
     fun restrictKeepsDelegatedGuardWhenUidPolicyFails() {
         val state = resolveShizukuNetworkRestrictionState(

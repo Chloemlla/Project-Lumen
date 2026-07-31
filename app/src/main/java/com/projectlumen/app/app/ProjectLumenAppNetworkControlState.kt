@@ -1,10 +1,29 @@
 package com.projectlumen.app.app
 
 import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
+import com.projectlumen.app.core.shizuku.SHIZUKU_DELEGATED_GUARD_ERROR_PREFIX
+import com.projectlumen.app.core.shizuku.SHIZUKU_UID_POLICY_ERROR_PREFIX
 import com.projectlumen.app.core.shizuku.ShizukuNetworkPolicyResult
+
+internal enum class DelegatedNetworkGuardDisplayStatus {
+    ACTIVE,
+    CLEARED,
+    UNSUPPORTED,
+    NOT_ATTEMPTED,
+}
 
 internal val AppNetworkControlEntity.hasActiveNetworkRestriction: Boolean
     get() = networkRestricted || delegatedGuardApplied
+
+internal val AppNetworkControlEntity.delegatedNetworkGuardDisplayStatus: DelegatedNetworkGuardDisplayStatus
+    get() = when {
+        delegatedGuardApplied -> DelegatedNetworkGuardDisplayStatus.ACTIVE
+        !delegatedGuardAttempted -> DelegatedNetworkGuardDisplayStatus.NOT_ATTEMPTED
+        lastError.isBlank() ||
+            (!lastError.contains(SHIZUKU_DELEGATED_GUARD_ERROR_PREFIX) &&
+                lastError.contains(SHIZUKU_UID_POLICY_ERROR_PREFIX)) -> DelegatedNetworkGuardDisplayStatus.CLEARED
+        else -> DelegatedNetworkGuardDisplayStatus.UNSUPPORTED
+    }
 
 private val ShizukuNetworkPolicyResult.hasActiveNetworkRestriction: Boolean
     get() = networkRestricted || delegatedGuardApplied

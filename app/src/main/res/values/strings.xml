@@ -573,6 +573,7 @@
     <string name="developer_shizuku_network_uid_policy_active">UID policy active</string>
     <string name="developer_shizuku_network_uid_policy_inactive">UID policy cleared</string>
     <string name="developer_shizuku_network_delegated_guard_active">delegated guard active</string>
+    <string name="developer_shizuku_network_delegated_guard_cleared">delegated guard cleared</string>
     <string name="developer_shizuku_network_delegated_guard_unsupported">delegated guard unsupported</string>
     <string name="developer_shizuku_network_delegated_guard_not_attempted">delegated guard not attempted</string>
     <string name="developer_shizuku_network_guard_status">%1$s · %2$s</string>

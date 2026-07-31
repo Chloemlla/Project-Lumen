@@ -774,18 +774,13 @@ class ShizukuCapabilityManager(
         val output = listOf(uidPolicyResult.output, delegatedGuardResult.output)
             .filter { it.isNotBlank() }
             .joinToString("\n")
-        val errors = buildList {
-            if (!uidPolicySucceeded) {
-                add(uidPolicyResult.error.ifBlank { "Android netpolicy command failed." })
-            }
-            if (delegatedGuardResult.attempted && !delegatedGuardResult.applied) {
-                add(
-                    delegatedGuardResult.error.ifBlank {
-                        "Delegated network guard is not supported on this device."
-                    },
-                )
-            }
-        }.joinToString("\n")
+        val errors = shizukuNetworkPolicyErrors(
+            uidPolicySucceeded = uidPolicySucceeded,
+            uidPolicyError = uidPolicyResult.error,
+            delegatedGuardAttempted = delegatedGuardResult.attempted,
+            delegatedGuardApplied = delegatedGuardResult.applied,
+            delegatedGuardError = delegatedGuardResult.error,
+        )
         val restrictionState = resolveShizukuNetworkRestrictionState(
             restrict = restrict,
             previousNetworkRestricted = previousNetworkRestricted,

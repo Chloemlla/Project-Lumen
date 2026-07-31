@@ -73,6 +73,39 @@ class ProjectLumenAppNetworkControlStateTest {
         assertEquals(nowMillis, restored.restoredAt)
     }
 
+    @Test
+    fun delegatedGuardDisplayShowsClearedAfterSuccessfulRestore() {
+        val record = activeRecord().copy(
+            networkRestricted = false,
+            uidPolicyApplied = false,
+            delegatedGuardApplied = false,
+            lastError = "",
+            restoredAt = 6_000L,
+        )
+
+        assertEquals(DelegatedNetworkGuardDisplayStatus.CLEARED, record.delegatedNetworkGuardDisplayStatus)
+    }
+
+    @Test
+    fun delegatedGuardDisplayShowsClearedWhenOnlyUidRestoreFails() {
+        val record = activeRecord().copy(
+            delegatedGuardApplied = false,
+            lastError = "UID policy: Android netpolicy command failed.",
+        )
+
+        assertEquals(DelegatedNetworkGuardDisplayStatus.CLEARED, record.delegatedNetworkGuardDisplayStatus)
+    }
+
+    @Test
+    fun delegatedGuardDisplayKeepsUnsupportedForGuardFailure() {
+        val record = activeRecord().copy(
+            delegatedGuardApplied = false,
+            lastError = "Delegated guard: operation is not supported",
+        )
+
+        assertEquals(DelegatedNetworkGuardDisplayStatus.UNSUPPORTED, record.delegatedNetworkGuardDisplayStatus)
+    }
+
     private fun activeRecord(): AppNetworkControlEntity {
         return AppNetworkControlEntity(
             packageName = PACKAGE_NAME,

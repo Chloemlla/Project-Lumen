@@ -52,6 +52,7 @@ val activeRestriction = networkRestricted || delegatedGuardApplied
 - A persisted record is actively restricting networking when `networkRestricted || delegatedGuardApplied`; counts, action eligibility, ordering, and status labels must use this combined state.
 - UID policy and delegated guard restore independently. A failed clear command preserves only the corresponding previously-active restriction; it must not recreate a restriction that was already inactive.
 - Delegated-only records remain restorable. If AppOps restore fails after UID policy is clear, the record remains active and the restore action remains retryable.
+- A successful AppOps `allow` restore is displayed as delegated guard cleared, including when UID policy removal fails separately; unsupported is reserved for an AppOps command failure.
 - Persist every Project Lumen initiated restrict/restore attempt with package name, UID, app type, command status, and last error/output.
 - Restore is idempotent: a system response such as `not blacklisted` or `not denylisted` is treated as restored.
 
@@ -69,6 +70,7 @@ val activeRestriction = networkRestricted || delegatedGuardApplied
 | Restrict applies AppOps but UID policy fails | Persist a delegated-only active restriction and keep restore enabled. |
 | Restore clears AppOps but UID policy clear fails | Persist `networkRestricted=true`, `delegatedGuardApplied=false`; do not retain the cleared guard. |
 | Restore clears UID policy but AppOps allow fails | Persist `networkRestricted=false`, `delegatedGuardApplied=true`; keep restore enabled for retry. |
+| AppOps allow succeeds | Show delegated guard cleared, not unsupported, regardless of the separate UID removal result. |
 | Delegated-only restore gets a UID clear failure | Preserve `networkRestricted=false`; a failed idempotent UID clear must not invent a UID restriction. |
 | User restores an app | Attempt netpolicy removal and AppOps allow if the delegated guard had been applied. |
 
