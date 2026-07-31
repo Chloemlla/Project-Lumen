@@ -21,10 +21,10 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
-import androidx.core.app.ServiceCompat
-import androidx.core.content.ContextCompat
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.constants.NotificationIds
+import com.projectlumen.app.core.services.ForegroundServiceController
+import com.projectlumen.app.core.services.ForegroundServiceStartEligibility
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -56,17 +56,21 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val app = application as ProjectLumenApplication
-        recordServiceStart(app, flags)
-        ServiceCompat.startForeground(
-            this,
-            NotificationIds.DEVELOPER_DEBUG_FOREGROUND,
-            app.notifications.buildDeveloperDebugForegroundNotification(),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        val promoted = ForegroundServiceController.promote(
+            service = this,
+            notificationId = NotificationIds.DEVELOPER_DEBUG_FOREGROUND,
+            notificationProvider = { app.notifications.buildDeveloperDebugForegroundNotification() },
+            foregroundServiceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             } else {
                 0
             },
         )
+        if (!promoted) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        recordServiceStart(app, flags)
         if (intent?.action == ACTION_SIMULATE_LOW_MEMORY) {
             simulateLowMemory(app)
         }
@@ -320,16 +324,11 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         private const val MEMORY_HEALTH_SAMPLE_INTERVAL_MILLIS = 5_000L
 
         fun start(context: Context) {
-            // Developer-only, but still subject to Android 12+ background FGS start limits if
-            // invoked from a delayed/background path. Refuse safely instead of crashing.
-            runCatching {
-                ContextCompat.startForegroundService(
-                    context,
-                    Intent(context, DeveloperDebugOverlayService::class.java),
-                )
-            }.onFailure { throwable ->
-                (context.applicationContext as? ProjectLumenApplication)?.recordCrash(throwable)
-            }
+            ForegroundServiceController.start(
+                context = context,
+                intent = Intent(context, DeveloperDebugOverlayService::class.java),
+                eligibilityCheck = ForegroundServiceStartEligibility::canStartFromForegroundProcess,
+            )
         }
 
         fun stop(context: Context) {
@@ -337,15 +336,12 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         }
 
         fun simulateLowMemory(context: Context) {
-            runCatching {
-                ContextCompat.startForegroundService(
-                    context,
-                    Intent(context, DeveloperDebugOverlayService::class.java)
-                        .setAction(ACTION_SIMULATE_LOW_MEMORY),
-                )
-            }.onFailure { throwable ->
-                (context.applicationContext as? ProjectLumenApplication)?.recordCrash(throwable)
-            }
+            ForegroundServiceController.start(
+                context = context,
+                intent = Intent(context, DeveloperDebugOverlayService::class.java)
+                    .setAction(ACTION_SIMULATE_LOW_MEMORY),
+                eligibilityCheck = ForegroundServiceStartEligibility::canStartFromForegroundProcess,
+            )
         }
     }
 }

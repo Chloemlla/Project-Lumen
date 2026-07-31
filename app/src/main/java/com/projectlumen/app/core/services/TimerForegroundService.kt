@@ -8,7 +8,6 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.PowerManager
 import android.os.SystemClock
-import androidx.core.app.ServiceCompat
 import androidx.lifecycle.LifecycleService
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.constants.NotificationIds
@@ -80,16 +79,20 @@ class TimerForegroundService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        ServiceCompat.startForeground(
-            this,
-            NotificationIds.FOREGROUND_TIMER,
-            notifications.buildOngoingStatusNotification(),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        val promoted = ForegroundServiceController.promote(
+            service = this,
+            notificationId = NotificationIds.FOREGROUND_TIMER,
+            notificationProvider = { notifications.buildOngoingStatusNotification() },
+            foregroundServiceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             } else {
                 0
             },
         )
+        if (!promoted) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         if (!loopStarted) {
             loopStarted = true
             scope.launch { runTimerLoop() }

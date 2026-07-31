@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.chloemlla.lumen.crash.LumenCrash
@@ -30,6 +29,8 @@ import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
+import com.projectlumen.app.core.services.ForegroundServiceController
+import com.projectlumen.app.core.services.ForegroundServiceFailureReporter
 import com.projectlumen.app.core.services.NotificationService
 import com.projectlumen.app.core.services.ShizukuResilienceWorker
 import com.projectlumen.app.core.services.TimerForegroundService
@@ -49,7 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
-class ProjectLumenApplication : Application() {
+class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter {
     val database: AppDatabase by lazy { AppDatabase.create(this) }
     val eyeCarePreferences: EyeCarePreferencesDataStore by lazy { EyeCarePreferencesDataStore(this) }
     val notifications: NotificationService by lazy { NotificationService(this) }
@@ -220,6 +221,10 @@ class ProjectLumenApplication : Application() {
             .getOrNull()
     }
 
+    override fun recordForegroundServiceFailure(throwable: Throwable) {
+        recordCrash(throwable)
+    }
+
     fun clearStartupCrashReport() {
         runCatching { LumenCrash.clearStartupCrashReport() }
     }
@@ -261,22 +266,10 @@ class ProjectLumenApplication : Application() {
         // Enqueue the reconciliation safety net first so it survives even when the
         // foreground-service start below is refused (background start on Android 12+).
         TimerReconciliationWorker.enqueue(this)
-        startForegroundServiceSafely(Intent(this, TimerForegroundService::class.java))
-    }
-
-    /**
-     * Starts a foreground service without letting a background-start refusal crash the caller.
-     *
-     * On Android 12+ (API 31) `startForegroundService` throws
-     * `ForegroundServiceStartNotAllowedException` (a subclass of `IllegalStateException`) when the
-     * app is in the background and no start exemption applies. WorkManager workers and boot/alarm
-     * receivers routinely hit this. Reminders still fire via AlarmManager exact alarms, so a refused
-     * start is recoverable — we record it and move on instead of tearing down the reconciliation
-     * chain.
-     */
-    private fun startForegroundServiceSafely(intent: Intent) {
-        runCatching { ContextCompat.startForegroundService(this, intent) }
-            .onFailure { recordCrash(it) }
+        ForegroundServiceController.start(
+            context = this,
+            intent = Intent(this, TimerForegroundService::class.java),
+        )
     }
 
     fun settingsRepository(): SettingsRepository {

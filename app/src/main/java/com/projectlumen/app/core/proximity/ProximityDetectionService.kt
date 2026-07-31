@@ -7,8 +7,6 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Base64
-import androidx.core.app.ServiceCompat
-import androidx.core.content.ContextCompat
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.api.RemoteCameraFramePayload
@@ -21,6 +19,7 @@ import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.debug.DeveloperDebugFrameStore
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
+import com.projectlumen.app.core.services.ForegroundServiceController
 import com.projectlumen.app.core.time.todayKey
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -106,23 +105,21 @@ class ProximityDetectionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startCameraForeground(app: ProjectLumenApplication, startId: Int): Boolean {
-        return runCatching {
-            ServiceCompat.startForeground(
-                this,
-                NotificationIds.PROXIMITY_FOREGROUND,
-                app.notifications.buildProximityForegroundNotification(),
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-                } else {
-                    0
-                },
-            )
-            true
-        }.getOrElse { throwable ->
-            app.recordCrash(throwable)
+        val promoted = ForegroundServiceController.promote(
+            service = this,
+            notificationId = NotificationIds.PROXIMITY_FOREGROUND,
+            notificationProvider = { app.notifications.buildProximityForegroundNotification() },
+            foregroundServiceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+            } else {
+                0
+            },
+            eligibilityCheck = { ProximityCameraForegroundEligibility.canStartCameraForegroundService(this) },
+        )
+        if (!promoted) {
             stopSelf(startId)
-            false
         }
+        return promoted
     }
 
     private suspend fun runDetection(app: ProjectLumenApplication, calibrate: Boolean) {
@@ -498,12 +495,13 @@ class ProximityDetectionService : Service() {
         fun start(context: Context, calibrate: Boolean) {
             val intent = Intent(context, ProximityDetectionService::class.java)
                 .putExtra(EXTRA_CALIBRATE, calibrate)
-            if (!ProximityCameraForegroundEligibility.canStartCameraForegroundService(context)) return
-            runCatching {
-                ContextCompat.startForegroundService(context, intent)
-            }.onFailure { throwable ->
-                (context.applicationContext as? ProjectLumenApplication)?.recordCrash(throwable)
-            }
+            ForegroundServiceController.start(
+                context = context,
+                intent = intent,
+                eligibilityCheck = {
+                    ProximityCameraForegroundEligibility.canStartCameraForegroundService(context)
+                },
+            )
         }
     }
 }

@@ -18,9 +18,11 @@ Project Lumen currently ships with `compileSdk/targetSdk = 37` (above Android 12
 Apps targeting Android 12 cannot freely start FGS while backgrounded; disallowed starts throw `ForegroundServiceStartNotAllowedException`.
 
 **Lumen response**
-- Timer path uses `startForegroundServiceSafely()` and always enqueues `TimerReconciliationWorker` first.
-- Light / proximity / forced-rest overlay starts wrap `ContextCompat.startForegroundService` in `runCatching` and record failures instead of crashing the caller chain.
-- Developer debug overlay starts now use the same refuse-safely pattern.
+- All five foreground services use a shared creation and promotion controller; no service calls the AndroidX foreground-service APIs directly.
+- Light, proximity-camera, and developer-debug starts check process visibility immediately before the framework call. Timer and forced-rest overlay may still attempt when an alarm or user interaction exemption can apply.
+- Android 12+ background-start refusals are treated as expected deferrals and only create a rate-limited breadcrumb. They are not stored or uploaded as crash reports.
+- Unexpected manifest, foreground-service type, permission, notification, and implementation failures remain crash-reported, and promotion failure stops the service with `START_NOT_STICKY`.
+- Timer reconciliation is always enqueued before a timer foreground-service attempt, so alarms and WorkManager continue the session when the platform defers service creation.
 - Alarm/boot recovery still re-schedules via AlarmManager + WorkManager when a background FGS start is refused.
 
 ### 2. PendingIntent mutability required
@@ -85,6 +87,8 @@ Motion sensors are capped around 200 Hz unless `HIGH_SAMPLING_RATE_SENSORS` is d
 ## Verification checklist
 
 - Background timer keep-alive: if FGS start is refused, WorkManager reconciliation and alarms still recover session state.
+- Background light restoration: defer until the process is foreground without opening the startup crash gate.
+- Every foreground service safely stops if foreground promotion fails; expected platform refusals never call `recordCrash`.
 - Notification taps / actions / alarms use immutable PendingIntents and open explicit components.
 - Install succeeds with all intent-filter components declaring `exported`.
 - Forced-rest overlay appears only with overlay permission and remains interactive (not pass-through).
@@ -94,3 +98,4 @@ Motion sensors are capped around 200 Hz unless `HIGH_SAMPLING_RATE_SENSORS` is d
 
 - 2026-07-16: Fetched doc 509 via workflow script, scanned repo, hardened developer-debug FGS starts, and added this Android 12 decision note.
 - 2026-07-16: Re-fetched doc 509 again; confirmed FGS refuse-safely, immutable PendingIntents, exported flags, overlay touch model, and sensor rate limits remain green.
+- 2026-07-31: Centralized foreground-service creation and promotion, filtered expected Android 12+ background refusals from crash telemetry, and added lifecycle eligibility regression tests.

@@ -11,12 +11,12 @@ import android.hardware.SensorManager
 import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
-import androidx.core.app.ServiceCompat
-import androidx.core.content.ContextCompat
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
+import com.projectlumen.app.core.services.ForegroundServiceController
+import com.projectlumen.app.core.services.ForegroundServiceStartEligibility
 import com.projectlumen.app.core.time.todayKey
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +35,7 @@ class LightMonitorService : Service(), SensorEventListener {
         },
     )
     private lateinit var sensorManager: SensorManager
+    private var sensorRegistered = false
     private var lastHandledAt: Long = 0L
 
     override fun onCreate() {
@@ -44,27 +45,50 @@ class LightMonitorService : Service(), SensorEventListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val app = application as ProjectLumenApplication
-        ServiceCompat.startForeground(
-            this,
-            NotificationIds.LOW_LIGHT_FOREGROUND,
-            app.notifications.buildLightMonitorForegroundNotification(),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        val promoted = ForegroundServiceController.promote(
+            service = this,
+            notificationId = NotificationIds.LOW_LIGHT_FOREGROUND,
+            notificationProvider = { app.notifications.buildLightMonitorForegroundNotification() },
+            foregroundServiceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             } else {
                 0
             },
         )
+        if (!promoted) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         val lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT)
         if (lightSensor == null) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-        sensorManager.registerListener(this, lightSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        if (!sensorRegistered) {
+            sensorRegistered = sensorManager.registerListener(
+                this,
+                lightSensor,
+                SensorManager.SENSOR_DELAY_NORMAL,
+            )
+        }
+        if (!sensorRegistered) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        scope.launch {
+            val settings = app.settingsRepository().get()
+            if (settings == null || (!settings.ambientLightMonitoringEnabled && !settings.autoBrightnessEnabled)) {
+                stopSelf(startId)
+            }
+        }
         return START_STICKY
     }
 
     override fun onDestroy() {
-        sensorManager.unregisterListener(this)
+        if (sensorRegistered) {
+            sensorManager.unregisterListener(this)
+            sensorRegistered = false
+        }
         scope.cancel()
         super.onDestroy()
     }
@@ -169,13 +193,11 @@ class LightMonitorService : Service(), SensorEventListener {
         private const val ULTRA_LOW_BRIGHTNESS_THRESHOLD_PERCENT = 10
 
         fun start(context: Context) {
-            // May be invoked from background workers/receivers; a background-start refusal on
-            // Android 12+ must not crash the caller and break its reconciliation chain.
-            runCatching {
-                ContextCompat.startForegroundService(context, Intent(context, LightMonitorService::class.java))
-            }.onFailure { throwable ->
-                (context.applicationContext as? ProjectLumenApplication)?.recordCrash(throwable)
-            }
+            ForegroundServiceController.start(
+                context = context,
+                intent = Intent(context, LightMonitorService::class.java),
+                eligibilityCheck = ForegroundServiceStartEligibility::canStartFromForegroundProcess,
+            )
         }
 
         fun stop(context: Context) {

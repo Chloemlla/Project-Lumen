@@ -41,6 +41,7 @@ On Android 15, force-stop cancels pending intents; later recovery may re-deliver
   - OEM quick-boot actions (`QUICKBOOT_POWERON`)
 - Receiver is `directBootAware` for locked-boot recovery.
 - Foreground resume path detects force-stop via `ApplicationStartInfo.wasForceStopped()` (API 35+) and rebuilds alarms/workers through `BootReceiver.restoreScheduledWork()`.
+- On Android 12+, background boot/recovery may only restore the light-monitoring intent: actual Light FGS creation is deferred until `ProcessLifecycleOwner` reaches `STARTED`, then the normal foreground-resume reconciliation starts it.
 
 ### 4. dataSync / mediaProcessing FGS 6-hour timeout
 These FGS types have a 6h/day timeout and require `onTimeout -> stopSelf`.
@@ -88,9 +89,10 @@ Stricter `String.format` / `Arrays.asList(...).toArray()` component-type rules.
 
 - Cold start under edge-to-edge: top bar / bottom nav remain padded via `safeDrawing`.
 - Force-stop app, then reopen: reminder alarms/workers re-register.
-- Reboot / package replace / locked boot: `BootReceiver` restores proximity/light/timer schedules.
+- Reboot / package replace / locked boot: `BootReceiver` restores proximity/light/timer intent; Android 12+ light monitoring starts on the next foreground-eligible resume without producing a crash report.
 - Dark-room face distance sampling still produces samples when camera permission is granted.
 
 ## Refresh log
 
 - 2026-07-16: Re-fetched doc 797 with 832 in one workflow pass; confirmed boot/force-stop recovery, edge-to-edge theme bars, low-light camera boost, and OpenJDK hazard absence.
+- 2026-07-31: Clarified that Android 12+ background recovery defers Light FGS creation until the process is foreground-eligible.

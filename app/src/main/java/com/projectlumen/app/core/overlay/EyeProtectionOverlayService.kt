@@ -18,11 +18,10 @@ import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.app.ServiceCompat
-import androidx.core.content.ContextCompat
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
+import com.projectlumen.app.core.services.ForegroundServiceController
 import kotlin.math.max
 
 class EyeProtectionOverlayService : Service() {
@@ -33,17 +32,21 @@ class EyeProtectionOverlayService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val app = application as ProjectLumenApplication
-        ServiceCompat.startForeground(
-            this,
-            NotificationIds.OVERLAY_FOREGROUND,
-            app.notifications.buildOverlayForegroundNotification(),
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        if (!Settings.canDrawOverlays(this)) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        val promoted = ForegroundServiceController.promote(
+            service = this,
+            notificationId = NotificationIds.OVERLAY_FOREGROUND,
+            notificationProvider = { app.notifications.buildOverlayForegroundNotification() },
+            foregroundServiceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             } else {
                 0
             },
         )
-        if (!Settings.canDrawOverlays(this)) {
+        if (!promoted) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
@@ -176,11 +179,7 @@ class EyeProtectionOverlayService : Service() {
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_MESSAGE, message)
                 .putExtra(EXTRA_DURATION_SECONDS, durationSeconds)
-            // A background-start refusal on Android 12+ must not crash the alarm/timer caller.
-            runCatching { ContextCompat.startForegroundService(context, intent) }
-                .onFailure { throwable ->
-                    (context.applicationContext as? ProjectLumenApplication)?.recordCrash(throwable)
-                }
+            ForegroundServiceController.start(context, intent)
         }
     }
 }
