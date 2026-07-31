@@ -127,6 +127,7 @@ fun ProjectLumenApp(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val ossNoticeState by viewModel.ossNoticeState.collectAsStateWithLifecycle()
     val onboardingState by viewModel.onboardingState.collectAsStateWithLifecycle()
+    val buildUpdateNotesState by viewModel.buildUpdateNotesState.collectAsStateWithLifecycle()
     val configuredThemeMode = runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }
         .getOrDefault(AppThemeMode.SYSTEM)
     val templateAppearanceEnabled = !uiState.settings.useDynamicColors
@@ -312,17 +313,14 @@ fun ProjectLumenApp(
                 )
                 return@ProjectLumenTheme
             }
-            if (ossNoticeState.visible && !ossNoticeState.reopenMode) {
-                ProjectLumenOpenSourceNoticeScreen(
-                    onContinue = viewModel::completeOssNotice,
+            if (
+                ProjectLumenAutomaticFirstOpenGateHost(
+                    viewModel = viewModel,
+                    ossNoticeState = ossNoticeState,
+                    onboardingState = onboardingState,
+                    buildUpdateNotesState = buildUpdateNotesState,
                 )
-                return@ProjectLumenTheme
-            }
-            if (onboardingState.visible) {
-                ProjectLumenOnboardingScreen(
-                    state = onboardingState,
-                    onComplete = viewModel::completeOnboarding,
-                )
+            ) {
                 return@ProjectLumenTheme
             }
             Box(modifier = Modifier.fillMaxSize()) {
@@ -499,12 +497,11 @@ fun ProjectLumenApp(
                     }
                 }
             }
-            if (ossNoticeState.visible && ossNoticeState.reopenMode) {
-                ProjectLumenOpenSourceNoticeScreen(
-                    onContinue = viewModel::completeOssNotice,
-                    onDismiss = viewModel::dismissOssNotice,
-                )
-            }
+            ProjectLumenReopenedFirstOpenGateOverlay(
+                viewModel = viewModel,
+                ossNoticeState = ossNoticeState,
+                buildUpdateNotesState = buildUpdateNotesState,
+            )
             } // end host Box (main UI + reopen overlay)
 
             if (updateDialogState !is UpdateDialogState.Hidden) {
