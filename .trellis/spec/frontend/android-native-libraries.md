@@ -54,6 +54,9 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 - Every `PT_LOAD` segment in every APK `.so` must have an alignment that is at least 16 KB and divisible by 16 KB.
 - Third-party AARs with native libraries are covered by the APK-level verification script because they are not relinked by the app's CMake build.
 - Release APKs currently package only `arm64-v8a` and `x86_64`; the shipped 32-bit ML Kit/libc++ artifacts have 4 KB segments and are excluded until verifiable 16 KB-ready replacements exist. The verifier must continue checking every packaged `.so`.
+- Native release mode is a compile-time CMake definition: Gradle passes `LUMEN_NATIVE_RELEASE_BUILD=1` to the release build type and `0` to debug; aggregate `assemble`/`build`/`bundle` task detection is used only to fail fast when a release-capable task lacks the signing secret. The native source defaults to `1` when built outside Gradle (fail closed).
+- JNI `debug_allowed` is only a caller hint. `effective_debug_allowed` must combine it with the compile-time mode, so hooks or reflection cannot disable release identity, certificate, or volatile-environment checks.
+- Update discovery shares one pure ABI selector. Only `arm64-v8a` and `x86_64` devices may receive a verified APK; 32-bit/unknown devices and backend requests without a compatible asset return no update. A generic aggregate APK is universal only when it has no ABI metadata and no explicit unsupported ABI token.
 
 ### 4. Validation & Error Matrix
 
@@ -64,6 +67,9 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 | Any ELF `PT_LOAD` alignment is below 16 KB or not divisible by 16 KB | 16 KB alignment verification fails. |
 | New native dependency is not 16 KB ready | Release workflow fails before publishing assets. |
 | A release ABI includes the known 4 KB-only 32-bit native artifacts | Do not publish it; keep the ABI filter at `arm64-v8a`/`x86_64` or upgrade the dependency with evidence. |
+| JNI passes `debug_allowed=true` to a release native library | Compile-time `LUMEN_NATIVE_RELEASE_BUILD=1` forces effective debug mode off; signing remains fail-closed until identity and volatile checks pass. |
+| Native CMake is invoked without `LUMEN_NATIVE_RELEASE_BUILD` | The native default is release mode (`1`); debug mode must be an explicit Gradle `0` definition. |
+| A 32-bit-only or unknown-ABI device checks for an update | The Android selector and backend return no compatible APK/update; they do not fall back to the first or universal asset. |
 | Workflow installs a different NDK/CMake than Gradle requests | Fix workflow to read `gradle.properties`; do not add a second version constant. |
 | `sdkmanager` is not available after Android SDK setup | Native toolchain setup fails before any Gradle build with a clear `sdkmanager was not found` message. |
 | `sdkmanager` succeeds and closes the `yes` input pipe | Native toolchain setup succeeds even if `yes` exits with `SIGPIPE`. |
@@ -81,6 +87,8 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 - GitHub workflow: before any Android Gradle build that compiles native code, use `.github/actions/setup-android-native-toolchain` so SDK setup and NDK/CMake installation stay shared.
 - Manual review: the shared setup action captures `PIPESTATUS[1]` immediately after the `yes | sdkmanager` pipeline and fails only when that `sdkmanager` status is non-zero.
 - Manual review: when adding/updating native AAR dependencies, confirm the workflow passes the APK-level check rather than assuming Gradle/NDK relinks the dependency.
+- Host C++ tests: compile the native policy once with `LUMEN_NATIVE_RELEASE_BUILD=0` and once with `1`, asserting that only the former accepts a runtime debug request.
+- Android architecture tests: assert aggregate task detection, explicit CMake `0/1` wiring, fail-closed native defaults, and the shared 64-bit update selector.
 
 ### 7. Wrong vs Correct
 

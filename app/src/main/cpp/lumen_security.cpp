@@ -2,6 +2,7 @@
 
 #include "lumen_security_crypto.h"
 #include "lumen_security_identity.h"
+#include "lumen_security_mode.h"
 #include "lumen_security_reasons.h"
 #include "lumen_security_runtime.h"
 
@@ -46,7 +47,7 @@ std::string jstring_to_string(JNIEnv *env, jstring value, bool *success) {
 std::uint32_t evaluate_environment(
     const std::string &actual_package,
     const std::string &actual_certificate,
-    bool debug_allowed
+    bool debug_mode
 ) {
     using namespace lumen::security;
     std::uint32_t reasons = 0;
@@ -65,7 +66,7 @@ std::uint32_t evaluate_environment(
         normalize_certificate_sha256(LUMEN_RELEASE_CERT_SHA256);
     const NormalizedFingerprint normalized_actual_certificate =
         normalize_certificate_sha256(actual_certificate);
-    if (!debug_allowed || expected_certificate.state != FingerprintState::kMissing) {
+    if (!debug_mode || expected_certificate.state != FingerprintState::kMissing) {
         if (expected_certificate.state == FingerprintState::kMissing ||
             normalized_actual_certificate.state == FingerprintState::kMissing) {
             reasons |= kCertificateMissing;
@@ -79,7 +80,7 @@ std::uint32_t evaluate_environment(
         }
     }
 
-    if (!debug_allowed) reasons |= collect_volatile_reasons();
+    if (!debug_mode) reasons |= collect_volatile_reasons();
     return reasons;
 }
 
@@ -127,13 +128,16 @@ Java_com_projectlumen_app_core_security_NativeSecurityBridge_evaluateEnvironment
             jstring_to_string(env, package_name, &package_success);
         const std::string actual_certificate =
             jstring_to_string(env, signing_cert_sha256, &certificate_success);
+        const bool is_debug_allowed = lumen::security::effective_debug_allowed(
+            debug_allowed == JNI_TRUE
+        );
         std::uint32_t reasons = evaluate_environment(
             actual_package,
             actual_certificate,
-            debug_allowed == JNI_TRUE
+            is_debug_allowed
         );
         if (!package_success || !certificate_success) reasons |= kInternalFailure;
-        if (debug_allowed == JNI_FALSE) {
+        if (!is_debug_allowed) {
             if (reasons != 0) {
                 release_identity_verified.store(false, std::memory_order_release);
             } else if (establish_release_identity == JNI_TRUE) {
@@ -168,7 +172,9 @@ Java_com_projectlumen_app_core_security_NativeSecurityBridge_signCanonicalPayloa
     std::vector<std::uint8_t> secret;
     std::vector<std::uint8_t> payload;
     try {
-        const bool is_debug_allowed = debug_allowed == JNI_TRUE;
+        const bool is_debug_allowed = lumen::security::effective_debug_allowed(
+            debug_allowed == JNI_TRUE
+        );
         if (!is_debug_allowed &&
             !release_identity_verified.load(std::memory_order_acquire)) {
             reasons |= kReleaseIdentityNotVerified;

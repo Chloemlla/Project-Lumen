@@ -12,12 +12,26 @@ val projectLumenKeyAlias = providers.gradleProperty("PROJECT_LUMEN_KEY_ALIAS").o
 val projectLumenKeyPassword = providers.gradleProperty("PROJECT_LUMEN_KEY_PASSWORD").orNull
 val projectLumenApplicationId = "com.chloemlla.projectlumen"
 val projectLumenDebugRequestSigningSecret = "project-lumen-local-request-signing-key"
-val projectLumenReleaseNativeSecurityRequired = gradle.startParameter.taskNames.any { taskName ->
-    val normalized = taskName.lowercase()
-    normalized.contains("baselineprofile") ||
-        (normalized.contains("release") &&
-            (!normalized.startsWith(":") || normalized.startsWith(":app:")))
+fun projectLumenTaskRequiresReleaseNativeSecurity(taskName: String): Boolean {
+    val normalized = taskName.trim().lowercase()
+    if (normalized.isEmpty()) return false
+
+    // The app's unqualified aggregate tasks can assemble/bundle release outputs through
+    // variant-aware dependencies. A path-qualified task is in scope only for :app: so
+    // release tasks from library modules do not accidentally impose the app secret gate.
+    val appTask = !normalized.startsWith(":") || normalized.startsWith(":app:")
+    if (!appTask) return false
+
+    val leaf = normalized.substringAfterLast(':')
+    if (leaf in setOf("assemble", "build", "bundle")) return true
+    if (leaf.contains("baselineprofile")) return true
+    return leaf.contains("release")
 }
+val projectLumenReleaseNativeSecurityRequired = gradle.startParameter.taskNames.any { taskName ->
+    projectLumenTaskRequiresReleaseNativeSecurity(taskName)
+}
+val projectLumenNativeDebugBuild = "0"
+val projectLumenNativeReleaseBuild = "1"
 val projectLumenConfiguredRequestSigningSecret = providers.environmentVariable(
     "PROJECT_LUMEN_REQUEST_SIGNING_SECRET",
 ).orNull ?: providers.gradleProperty("PROJECT_LUMEN_REQUEST_SIGNING_SECRET").orNull
@@ -204,6 +218,7 @@ android {
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
                     "-DLUMEN_REQUEST_SIGNING_SECRET_HEX=$projectLumenRequestSigningSecretHex",
+                    "-DLUMEN_NATIVE_RELEASE_BUILD=$projectLumenNativeDebugBuild",
                     "-DLUMEN_RELEASE_CERT_SHA256=${projectLumenBuildConfigString(projectLumenReleaseCertSha256)}",
                     "-DLUMEN_EXPECTED_PACKAGE=${projectLumenBuildConfigString(projectLumenApplicationId)}",
                 )
@@ -223,6 +238,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            externalNativeBuild {
+                cmake {
+                    arguments += listOf("-DLUMEN_NATIVE_RELEASE_BUILD=$projectLumenNativeDebugBuild")
+                }
+            }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -233,6 +255,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            externalNativeBuild {
+                cmake {
+                    arguments += listOf("-DLUMEN_NATIVE_RELEASE_BUILD=$projectLumenNativeReleaseBuild")
+                }
+            }
         }
     }
 

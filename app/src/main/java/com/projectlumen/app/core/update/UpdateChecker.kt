@@ -27,6 +27,8 @@ class UpdateChecker(
     private val channel: String = DEFAULT_CHANNEL,
 ) {
     suspend fun checkForUpdate(currentBuild: BuildMetadata = BuildMetadata.current()): UpdateCandidate? {
+        if (!isSupportedReleaseDevice(Build.SUPPORTED_ABIS.toList())) return null
+
         when (val backendResult = runCatching { fetchBackendReleaseManifest(currentBuild) }.getOrNull()) {
             is BackendReleaseResult.Update -> return backendResult.candidate
             BackendReleaseResult.NoUpdate -> return null
@@ -54,9 +56,11 @@ class UpdateChecker(
     }
 
     private suspend fun fetchBackendReleaseManifest(currentBuild: BuildMetadata): BackendReleaseResult {
+        val requestedAbi = firstSupportedReleaseAbi(Build.SUPPORTED_ABIS.toList())
+            ?: return BackendReleaseResult.NoUpdate
         val remoteRelease = apiClient.checkRemoteRelease(
             currentVersionCode = currentBuild.versionCode.toLong(),
-            abi = Build.SUPPORTED_ABIS.firstOrNull()?.takeIf { it.isNotBlank() } ?: "universal",
+            abi = requestedAbi,
             channel = channel.ifBlank { DEFAULT_CHANNEL },
             rolloutKey = deviceRolloutKey(),
         )
@@ -345,32 +349,7 @@ class UpdateChecker(
     }
 
     private fun selectBestAsset(assets: List<ReleaseAsset>): ReleaseAsset? {
-        val apkAssets = assets.filter {
-            it.name.endsWith(".apk", ignoreCase = true) && !it.sha256.isNullOrBlank()
-        }
-        if (apkAssets.isEmpty()) return null
-
-        val preferredAbis = Build.SUPPORTED_ABIS.map { normalizeAbiToken(it) }
-        val scored = apkAssets.mapNotNull { asset ->
-            val normalizedName = normalizeName(asset.name)
-            val normalizedAssetAbi = asset.abi?.let(::normalizeAbiToken).orEmpty()
-            val abiScore = preferredAbis.indexOfFirst { abi ->
-                abi.isNotBlank() && (normalizedAssetAbi == abi || normalizedName.contains(abi))
-            }
-            val fallbackScore = when {
-                normalizedAssetAbi == "universal" -> 10_000
-                normalizedAssetAbi == "all" -> 10_001
-                normalizedName.contains("universal") -> 10_000
-                normalizedName.contains("all") -> 10_001
-                else -> 20_000
-            }
-            if (abiScore >= 0) {
-                asset to abiScore
-            } else {
-                asset to fallbackScore
-            }
-        }
-        return scored.minWithOrNull(compareBy<Pair<ReleaseAsset, Int>> { it.second }.thenBy { it.first.name.length })?.first
+        return selectBestReleaseAsset(assets, Build.SUPPORTED_ABIS.toList())
     }
 
     private fun normalizeName(value: String): String {
@@ -378,12 +357,6 @@ class UpdateChecker(
             .replace('-', '_')
             .replace('.', '_')
             .replace(' ', '_')
-    }
-
-    private fun normalizeAbiToken(value: String): String {
-        return value.lowercase()
-            .replace('-', '_')
-            .replace('.', '_')
     }
 
     private fun parseInstant(value: String): Long? {

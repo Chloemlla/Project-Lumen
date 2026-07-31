@@ -180,6 +180,7 @@ import com.projectlumen.app.core.services.BackupImportSummary
 import com.projectlumen.app.core.update.BuildMetadata
 import com.projectlumen.app.core.update.ReleaseAsset
 import com.projectlumen.app.core.update.ReleaseInfo
+import com.projectlumen.app.core.update.selectBestReleaseAsset
 import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
@@ -375,12 +376,11 @@ internal fun rememberBuildVersionLabel(): String {
     return "${metadata.versionName} (${metadata.shortHash})"
 }
 
-internal fun chooseFallbackAsset(assets: List<ReleaseAsset>): ReleaseAsset? {
-    val verifiedApks = assets.filter { asset ->
-        asset.name.endsWith(".apk", ignoreCase = true) && !asset.sha256.isNullOrBlank()
-    }
-    return verifiedApks.firstOrNull { it.name.contains("universal", ignoreCase = true) }
-        ?: verifiedApks.firstOrNull { it.name.contains("all", ignoreCase = true) }
+internal fun chooseFallbackAsset(
+    assets: List<ReleaseAsset>,
+    deviceAbis: List<String> = Build.SUPPORTED_ABIS.toList(),
+): ReleaseAsset? {
+    return selectBestReleaseAsset(assets, deviceAbis)
 }
 
 internal fun openAppNotificationSettings(context: Context) {

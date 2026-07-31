@@ -1,5 +1,6 @@
 #include "lumen_security_crypto.h"
 #include "lumen_security_identity.h"
+#include "lumen_security_mode.h"
 #include "lumen_security_sockets.h"
 
 #include <cstdint>
@@ -124,6 +125,21 @@ void limits_unix_socket_matches_to_owned_descriptors() {
     );
 }
 
+void debug_mode_is_explicitly_compiled_for_host_tests() {
+    require(
+        !lumen::security::kNativeReleaseBuild,
+        "Host debug fixture must explicitly compile native release mode off"
+    );
+    require(
+        lumen::security::effective_debug_allowed(true),
+        "Debug native fixture rejected its explicit debug mode"
+    );
+    require(
+        !lumen::security::effective_debug_allowed(false),
+        "A false runtime debug request was accepted"
+    );
+}
+
 }  // namespace
 
 int main() {
@@ -133,5 +149,6 @@ int main() {
     decodes_the_utf8_hex_fixture();
     normalizes_certificate_fingerprints();
     limits_unix_socket_matches_to_owned_descriptors();
+    debug_mode_is_explicitly_compiled_for_host_tests();
     return 0;
 }

@@ -171,6 +171,9 @@ async fn check_release(
         .filter(|release| release.version_code > current_version_code)
         .filter(|release| channel_matches(&release.channel, &normalized_channel))
         .filter(|release| rollout_allows(release, query.rollout_key.as_deref()))
+        .filter(|release| {
+            select_release_asset(&release.assets, &requested_abi).is_some()
+        })
         .max_by_key(|release| release.version_code);
     let Some(release) = candidate else {
         return Ok(Json(json!({
@@ -341,15 +344,62 @@ fn select_release_asset<'a>(
     requested_abi: &str,
 ) -> Option<&'a AdminReleaseAssetItem> {
     let normalized_abi = normalize_abi(requested_abi);
+    if normalized_abi.is_empty()
+        || matches!(normalized_abi.as_str(), "universal" | "all")
+    {
+        return assets.iter().find(|asset| is_universal_asset(asset));
+    }
+    if !matches!(normalized_abi.as_str(), "arm64_v8a" | "x86_64") {
+        return None;
+    }
     assets
         .iter()
         .find(|asset| normalize_abi(&asset.abi) == normalized_abi)
         .or_else(|| {
-            assets
-                .iter()
-                .find(|asset| matches!(normalize_abi(&asset.abi).as_str(), "universal" | "all"))
+            assets.iter().find(|asset| {
+                normalize_abi(&asset.abi).is_empty()
+                    && normalize_asset_name(&asset.name).contains(&normalized_abi)
+            })
         })
-        .or_else(|| assets.first())
+        .or_else(|| assets.iter().find(|asset| is_universal_asset(asset)))
+}
+
+fn is_universal_asset(asset: &AdminReleaseAssetItem) -> bool {
+    let declared_abi = normalize_abi(&asset.abi);
+    if matches!(declared_abi.as_str(), "universal" | "all") {
+        return true;
+    }
+    if !declared_abi.is_empty() {
+        return false;
+    }
+
+    let normalized_name = normalize_asset_name(&asset.name);
+    if normalized_name.contains("universal")
+        || normalized_name.contains("_all_")
+        || normalized_name.starts_with("all_")
+        || normalized_name.ends_with("_all")
+    {
+        return true;
+    }
+    if normalized_name.contains("arm64") || normalized_name.contains("x86_64") {
+        return false;
+    }
+    !has_explicit_unsupported_abi_token(&normalized_name)
+}
+
+fn normalize_asset_name(value: &str) -> String {
+    value
+        .trim()
+        .to_ascii_lowercase()
+        .replace('-', "_")
+        .replace('.', "_")
+        .replace(' ', "_")
+}
+
+fn has_explicit_unsupported_abi_token(normalized_name: &str) -> bool {
+    normalized_name.split('_').any(|token| {
+        matches!(token, "armeabi" | "arm32" | "armv7" | "x86" | "mips" | "mips64")
+    })
 }
 
 fn release_asset_json(asset: &AdminReleaseAssetItem) -> Value {
@@ -428,7 +478,12 @@ fn normalize_channel(value: &str) -> String {
 }
 
 fn normalize_abi(value: &str) -> String {
-    value.trim().to_ascii_lowercase().replace('-', "_")
+    value
+        .trim()
+        .to_ascii_lowercase()
+        .replace('-', "_")
+        .replace('.', "_")
+        .replace(' ', "_")
 }
 
 fn now_millis() -> i64 {
@@ -454,3 +509,95 @@ impl EmptyFallback for String {
 
 const DEFAULT_CHANNEL: &str = "stable";
 const CONFIG_STATIC_CURSOR: i64 = 3;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn asset(abi: &str, name: &str) -> AdminReleaseAssetItem {
+        AdminReleaseAssetItem {
+            abi: abi.to_owned(),
+            name: name.to_owned(),
+            url: format!(
+                "https://github.com/Chloemlla/Project-Lumen/releases/download/test/{name}"
+            ),
+            sha256: "a".repeat(64),
+            size_bytes: 1,
+            content_type: "application/vnd.android.package-archive".to_owned(),
+        }
+    }
+
+    #[test]
+    fn rejects_32_bit_and_unknown_abis_without_falling_back() {
+        let assets = vec![
+            asset("universal", "Project-Lumen_universal.apk"),
+            asset("arm64-v8a", "Project-Lumen_arm64-v8a.apk"),
+        ];
+
+        assert!(select_release_asset(&assets, "armeabi-v7a").is_none());
+        assert!(select_release_asset(&assets, "x86").is_none());
+        assert!(select_release_asset(&assets, "mips64").is_none());
+    }
+
+    #[test]
+    fn chooses_supported_specific_asset_before_universal() {
+        let assets = vec![
+            asset("universal", "Project-Lumen_universal.apk"),
+            asset("arm64-v8a", "Project-Lumen_arm64-v8a.apk"),
+        ];
+
+        assert_eq!(
+            select_release_asset(&assets, "arm64-v8a").map(|value| value.abi.as_str()),
+            Some("arm64-v8a"),
+        );
+    }
+
+    #[test]
+    fn supported_abi_can_use_universal_when_specific_is_missing() {
+        let assets = vec![asset("universal", "Project-Lumen_universal.apk")];
+
+        assert_eq!(
+            select_release_asset(&assets, "x86_64").map(|value| value.abi.as_str()),
+            Some("universal"),
+        );
+    }
+
+    #[test]
+    fn universal_request_requires_a_universal_asset() {
+        let assets = vec![asset("arm64-v8a", "Project-Lumen_arm64-v8a.apk")];
+
+        assert!(select_release_asset(&assets, "universal").is_none());
+    }
+
+    #[test]
+    fn blank_abi_aggregate_filename_is_universal() {
+        let assets = vec![asset("", "Project-Lumen_android_1.0.1-a1b2c3d4.apk")];
+
+        assert_eq!(
+            select_release_asset(&assets, "arm64-v8a").map(|value| value.name.as_str()),
+            Some("Project-Lumen_android_1.0.1-a1b2c3d4.apk"),
+        );
+    }
+
+    #[test]
+    fn blank_abi_32_bit_filename_is_not_universal() {
+        let assets = vec![asset(
+            "",
+            "Project-Lumen_android_1.0.1_armeabi-v7a.apk",
+        )];
+
+        assert!(select_release_asset(&assets, "arm64-v8a").is_none());
+    }
+
+    #[test]
+    fn blank_abi_x86_filename_is_not_universal_but_x8664_is_supported() {
+        let x86_assets = vec![asset("", "Project-Lumen_android_1.0.1_x86.apk")];
+        assert!(select_release_asset(&x86_assets, "x86_64").is_none());
+
+        let x8664_assets = vec![asset("", "Project-Lumen_android_1.0.1_x86_64.apk")];
+        assert_eq!(
+            select_release_asset(&x8664_assets, "x86_64").map(|value| value.name.as_str()),
+            Some("Project-Lumen_android_1.0.1_x86_64.apk"),
+        );
+    }
+}

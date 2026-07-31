@@ -27,6 +27,8 @@
 - The local `project-lumen-local-request-signing-key` fallback exists only in Kotlin debug signing. Native CMake defaults to an empty secret and release/native builds must never silently compile the local fallback.
 - GitHub release and release-baseline builds must reject missing, blank, leading/trailing-whitespace, or exact local-fallback `PROJECT_LUMEN_REQUEST_SIGNING_SECRET` values before Gradle runs.
 - Gradle must apply the same release validation and UTF-8 hex-encode the exact accepted value without trimming it, so Android and backend bytes cannot diverge.
+- Gradle's secret gate must cover app aggregate `assemble`, `build`, and `bundle` tasks (plus `:app:` equivalents) as well as release/baseline-profile leaves, while leaving explicit debug-only tasks such as `assembleDebug` out of the release check. Build-type-specific CMake wiring passes numeric `LUMEN_NATIVE_RELEASE_BUILD=1` for release and `0` for debug; the native default is `1` when the definition is absent.
+- The JNI `debug_allowed` parameter cannot authorize a release build. Native code computes effective debug mode from the compile-time definition and the caller hint, then keeps release identity, certificate, and volatile Hook/anti-debug checks mandatory.
 - Backend request signing verification must default to disabled, including production deployments.
 - Backend deployment workflows must not hard-code `LUMEN_REQUIRE_REQUEST_SIGNING=true`; they must read an explicit operator-provided environment/repository variable and default it to `false` when absent.
 - Backend deployment workflows must pass the GitHub Actions secret `PROJECT_LUMEN_REQUEST_SIGNING_SECRET` into the running container as `LUMEN_REQUEST_SIGNING_SECRET` so request signing can be enabled without rebuilding.
@@ -52,6 +54,7 @@
 - Missing/blank Android release secret -> workflow and Gradle configuration fail before compilation.
 - Android release secret has leading/trailing whitespace -> workflow and Gradle configuration fail rather than trimming only the client value.
 - Android release secret equals `project-lumen-local-request-signing-key` -> workflow and Gradle configuration fail.
+- JNI `debug_allowed=true` in a release APK -> compile-time native mode ignores the hint; signing fails closed until a verified release identity and fresh environment verdict exist.
 - Android/backend signing secret mismatch -> HTTP 403 on otherwise valid signed requests.
 - Reused nonce within the accepted timestamp window -> HTTP 403.
 - Missing or too-short `X-Lumen-Integrity` while Play Integrity is required for that path -> HTTP 403.
@@ -81,6 +84,7 @@
 - GitHub workflow review: backend deployment env passes `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK: ${{ vars.LUMEN_ALLOW_PUBLIC_RELEASE_CHECK }}` so production can explicitly close the public release-check bypass.
 - Android packaging review: `app/build.gradle.kts` includes `-DANDROID_STL=c++_shared` and a `jniLibs.pickFirsts` entry for `**/libc++_shared.so`.
 - Workflow/architecture test: build and release workflows use `.github/actions/validate-release-request-signing-secret`, and Gradle rejects whitespace/local fallback without calling `.trim()` before native hex encoding.
+- Android architecture/host tests: aggregate release task detection, numeric CMake mode wiring, fail-closed native defaults, and both compile-time modes are covered; runtime JNI booleans cannot weaken release checks.
 - Backend route/security tests: with `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=true`, release check succeeds without request-signing headers for both configured API prefix and legacy `/v1` path.
 - Backend route/security tests: with `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=false`, unsigned release check returns HTTP 403 when request signing is required.
 - Backend route/security tests: a request signed with the configured secret succeeds, and the same request signed with a different secret returns HTTP 403.

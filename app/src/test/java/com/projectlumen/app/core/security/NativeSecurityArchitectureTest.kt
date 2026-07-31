@@ -109,6 +109,8 @@ class NativeSecurityArchitectureTest {
         val repositoryRoot = findRepositoryRoot()
         val gradleBuild = File(repositoryRoot, "app/build.gradle.kts").readText()
         val nativeEntry = File(repositoryRoot, "app/src/main/cpp/lumen_security.cpp").readText()
+        val nativeMode = File(repositoryRoot, "app/src/main/cpp/lumen_security_mode.h").readText()
+        val cmake = File(repositoryRoot, "app/src/main/cpp/CMakeLists.txt").readText()
         val secretValidationAction = File(
             repositoryRoot,
             ".github/actions/validate-release-request-signing-secret/action.yml",
@@ -117,11 +119,23 @@ class NativeSecurityArchitectureTest {
         val releaseWorkflow = File(repositoryRoot, ".github/workflows/release.yml").readText()
 
         assertTrue(gradleBuild.contains("projectLumenConfiguredRequestSigningSecret.orEmpty()"))
+        assertTrue(gradleBuild.contains("projectLumenTaskRequiresReleaseNativeSecurity"))
+        assertTrue(gradleBuild.contains("leaf in setOf(\"assemble\", \"build\", \"bundle\")"))
         assertTrue(gradleBuild.contains("normalized.startsWith(\":app:\")"))
+        assertTrue(gradleBuild.contains("projectLumenNativeReleaseBuild"))
+        assertTrue(gradleBuild.contains("projectLumenNativeDebugBuild = \"0\""))
+        assertTrue(gradleBuild.contains("-DLUMEN_NATIVE_RELEASE_BUILD=\$projectLumenNativeReleaseBuild"))
+        assertTrue(gradleBuild.contains("-DLUMEN_NATIVE_RELEASE_BUILD=\$projectLumenNativeDebugBuild"))
         assertTrue(gradleBuild.contains("must not contain leading or trailing whitespace"))
         assertTrue(gradleBuild.contains("Release builds cannot use the local request-signing"))
         assertFalse(gradleBuild.contains("projectLumenRequestSigningSecret.trim()"))
         assertTrue(nativeEntry.contains("#define LUMEN_REQUEST_SIGNING_SECRET_HEX \"\""))
+        assertTrue(nativeMode.contains("#define LUMEN_NATIVE_RELEASE_BUILD 1"))
+        assertTrue(nativeMode.contains("effective_debug_allowed"))
+        assertTrue(nativeMode.contains("!kNativeReleaseBuild"))
+        assertTrue(nativeEntry.contains("effective_debug_allowed"))
+        assertTrue(cmake.contains("LUMEN_NATIVE_RELEASE_BUILD=\${LUMEN_NATIVE_RELEASE_BUILD}"))
+        assertTrue(cmake.contains("set(LUMEN_NATIVE_RELEASE_BUILD 1)"))
         assertTrue(secretValidationAction.contains("TRIMMED_REQUEST_SIGNING_SECRET"))
         assertTrue(secretValidationAction.contains("project-lumen-local-request-signing-key"))
         assertTrue(buildWorkflow.contains("validate-release-request-signing-secret"))
@@ -133,14 +147,56 @@ class NativeSecurityArchitectureTest {
     }
 
     @Test
+    fun aggregateReleaseGateKeepsDebugOnlyTasksOut() {
+        val repositoryRoot = findRepositoryRoot()
+        val gradleBuild = File(repositoryRoot, "app/build.gradle.kts").readText()
+
+        assertTrue(gradleBuild.contains("if (leaf in setOf(\"assemble\", \"build\", \"bundle\")) return true"))
+        assertTrue(gradleBuild.contains("return leaf.contains(\"release\")"))
+        assertTrue(gradleBuild.contains("normalized.startsWith(\":app:\")"))
+        assertTrue(gradleBuild.contains("taskName.trim().lowercase()"))
+        assertFalse(gradleBuild.contains("leaf.contains(\"debug\")"))
+        assertTrue(gradleBuild.contains("debug {"))
+        assertTrue(gradleBuild.contains("release {"))
+    }
+
+    @Test
+    fun updateCheckerRejectsDevicesWithoutAReleaseAbi() {
+        val repositoryRoot = findRepositoryRoot()
+        val checker = File(
+            repositoryRoot,
+            "app/src/main/java/com/projectlumen/app/core/update/UpdateChecker.kt",
+        ).readText()
+        val selector = File(
+            repositoryRoot,
+            "app/src/main/java/com/projectlumen/app/core/update/ReleaseAssetSelector.kt",
+        ).readText()
+
+        assertTrue(checker.contains("if (!isSupportedReleaseDevice(Build.SUPPORTED_ABIS.toList())) return null"))
+        assertTrue(checker.contains("firstSupportedReleaseAbi(Build.SUPPORTED_ABIS.toList())"))
+        assertTrue(selector.contains("arm64_v8a"))
+        assertTrue(selector.contains("x86_64"))
+        assertTrue(selector.contains("if (preferredAbis.isEmpty()) return null"))
+        assertTrue(selector.contains("hasExplicitUnsupportedAbiToken"))
+        assertTrue(selector.contains("explicitUnsupportedAbiPattern"))
+    }
+
+    @Test
     fun releasePackagingStaysOnVerifiedSixteenKilobyteAbis() {
         val repositoryRoot = findRepositoryRoot()
         val gradleBuild = File(repositoryRoot, "app/build.gradle.kts").readText()
         val buildWorkflow = File(repositoryRoot, ".github/workflows/build.yml").readText()
         val releaseWorkflow = File(repositoryRoot, ".github/workflows/release.yml").readText()
+        val selector = File(
+            repositoryRoot,
+            "app/src/main/java/com/projectlumen/app/core/update/ReleaseAssetSelector.kt",
+        ).readText()
 
         assertTrue(gradleBuild.contains("abiFilters += listOf(\"arm64-v8a\", \"x86_64\")"))
         assertTrue(gradleBuild.contains("include(\"arm64-v8a\", \"x86_64\")"))
+        assertTrue(buildWorkflow.contains("for variant in arm64-v8a x86_64"))
+        assertTrue(releaseWorkflow.contains("for variant in arm64-v8a x86_64"))
+        assertTrue(selector.contains("setOf(\"arm64_v8a\", \"x86_64\")"))
         assertFalse(gradleBuild.contains("include(\"armeabi-v7a\""))
         assertFalse(buildWorkflow.contains("for variant in armeabi-v7a"))
         assertFalse(releaseWorkflow.contains("for variant in armeabi-v7a"))

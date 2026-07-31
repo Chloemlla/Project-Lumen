@@ -12,7 +12,8 @@ Project Lumen 的更新策略是“GitHub Releases 作为发布源 + 应用启�
 - 让客户端只信任 HTTPS GitHub Release API 和 HTTPS 下载地址。
 - 用语义版本优先判断更新，用发布时间作为兜底判断。
 - 只下载带 SHA-256 校验值的 APK 资源。
-- 优先匹配当前设备 ABI 的 APK，找不到时使用通用包或跳转 Release 页面。
+- 优先匹配当前设备 ABI 的 APK；当前 release 产物只支持 `arm64-v8a` 和 `x86_64`，不支持的 32 位设备不选择任何 APK。
+- 64 位设备找不到专用包时才使用 64 位 universal/aggregate 包或跳转 Release 页面。
 - 不在应用内静默安装，下载完成后交给 Android 系统安装器和未知来源安装授权流程。
 - 自动检查只在应用 ready 后触发一次，手动检查不受自动检查开关影响。
 
@@ -81,7 +82,9 @@ release workflow 构建 release APK 后，将产物复制到 `release-assets`：
 其中：
 
 - `VERSION="${PROJECT_LUMEN_VERSION_NAME}-${PROJECT_LUMEN_SHORT_HASH}"`
-- `variant` 取值：`armeabi-v7a`、`arm64-v8a`、`x86`、`x86_64`
+- `variant` 取值：`arm64-v8a`、`x86_64`
+
+release APK 只打包上述两个经过 16 KB 对齐验证的 64 位 ABI。通用 APK 可以不在文件名中写 ABI（例如 `Project-Lumen_android_1.0.1.apk`），客户端把这种没有 ABI 元数据且没有明确不支持 ABI token 的聚合包视为 universal；带有 `armeabi-v7a`、`x86` 等 32 位 token 的资源不会被当作通用包。
 
 示例：
 
@@ -290,28 +293,26 @@ Release body 示例：
 
 ## 7. APK asset 选择策略
 
-`UpdateChecker.selectBestAsset()` 只考虑：
+`selectBestReleaseAsset(assets, deviceAbis)` 是纯选择函数，`UpdateChecker` 和更新弹窗共用它。它只考虑：
 
 - 文件名以 `.apk` 结尾。
 - `sha256` 非空。
+- `deviceAbis` 至少包含归一化后的 `arm64_v8a` 或 `x86_64`；32 位或未知 ABI 直接返回空。
 
 选择步骤：
 
-1. 读取 `Build.SUPPORTED_ABIS`。
-2. 将 ABI token 归一化为小写，并将 `-`、`.` 替换为 `_`。
-3. 将 asset 文件名归一化为小写，并将 `-`、`.`、空格替换为 `_`。
-4. 如果 asset 文件名包含某个设备 ABI token，则按该 ABI 在 `SUPPORTED_ABIS` 中的顺序评分。
-5. 如果没有 ABI 命中，但文件名包含 `universal`，评分为 `10000`。
-6. 如果文件名包含 `all`，评分为 `10001`。
-7. 其他 APK 评分为 `20000`。
-8. 选择评分最低者；评分相同时选择文件名更短者。
+1. 将设备 ABI token 归一化为小写，并将 `-`、`.` 替换为 `_`。
+2. 将 asset 文件名归一化为小写，并将 `-`、`.`、空格替换为 `_`。
+3. 按 `Build.SUPPORTED_ABIS` 顺序优先选择声明或文件名匹配的 `arm64_v8a` / `x86_64` 专用包；设备 ABI 列表中若先出现 32 位 token，会跳过它并继续寻找首个支持的 64 位 token。
+4. 没有专用包时选择声明为 `universal`/`all`、文件名含对应 token，或没有 ABI 元数据且没有明确不支持 ABI token 的 aggregate 包。
+5. 没有兼容资源时返回空；不会再按列表首项猜测，也不会让 32 位设备拿到 universal APK。
 
-当前 workflow 生成通用包文件名没有包含 `universal` 或 `all`，但它仍会作为 `20000` 分兜底。若存在 ABI 专用包，ABI 包会优先于通用包。
+`UpdateChecker.checkForUpdate()` 在访问后端和 GitHub 之前执行同一 64 位 ABI gate。后端 `/releases/check` 对显式 `armeabi-v7a`、`x86` 或未知非 universal ABI 返回 `updateAvailable=false`；当选中的 release 没有兼容 asset 时也返回无更新，而不是空下载 URL。
 
 更新弹窗中还会调用 UI 层兜底选择：
 
 - `candidate.matchedAsset`
-- 若为空，再调用 `chooseFallbackAsset(release.assets)`
+- 若为空，再用同一个 `selectBestReleaseAsset(release.assets, Build.SUPPORTED_ABIS)` 选择
 - 若仍为空，则打开 Release 页面
 
 ## 8. APK 下载与校验
