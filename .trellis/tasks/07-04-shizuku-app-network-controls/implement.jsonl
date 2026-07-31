@@ -1,1 +1,5 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file":".trellis/spec/frontend/index.md","reason":"Routes Android developer UI changes to the Shizuku network-control contract."}
+{"file":".trellis/spec/frontend/android-shizuku-network-controls.md","reason":"Defines command, persistence, partial-result, restore, and device-support behavior."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Requires a shared active-restriction predicate instead of duplicated boolean checks."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Covers Shizuku result to Room record to Compose action-state reconciliation."}
+{"file":".trellis/tasks/07-04-shizuku-app-network-controls/research/android-netpolicy-shizuku.md","reason":"Documents netpolicy and AppOps support boundaries across Android ROMs."}
