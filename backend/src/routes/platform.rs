@@ -171,9 +171,7 @@ async fn check_release(
         .filter(|release| release.version_code > current_version_code)
         .filter(|release| channel_matches(&release.channel, &normalized_channel))
         .filter(|release| rollout_allows(release, query.rollout_key.as_deref()))
-        .filter(|release| {
-            select_release_asset(&release.assets, &requested_abi).is_some()
-        })
+        .filter(|release| select_release_asset(&release.assets, &requested_abi).is_some())
         .max_by_key(|release| release.version_code);
     let Some(release) = candidate else {
         return Ok(Json(json!({
@@ -344,9 +342,7 @@ fn select_release_asset<'a>(
     requested_abi: &str,
 ) -> Option<&'a AdminReleaseAssetItem> {
     let normalized_abi = normalize_abi(requested_abi);
-    if normalized_abi.is_empty()
-        || matches!(normalized_abi.as_str(), "universal" | "all")
-    {
+    if normalized_abi.is_empty() || matches!(normalized_abi.as_str(), "universal" | "all") {
         return assets.iter().find(|asset| is_universal_asset(asset));
     }
     if !matches!(normalized_abi.as_str(), "arm64_v8a" | "x86_64") {
@@ -398,7 +394,10 @@ fn normalize_asset_name(value: &str) -> String {
 
 fn has_explicit_unsupported_abi_token(normalized_name: &str) -> bool {
     normalized_name.split('_').any(|token| {
-        matches!(token, "armeabi" | "arm32" | "armv7" | "x86" | "mips" | "mips64")
+        matches!(
+            token,
+            "armeabi" | "arm32" | "armv7" | "x86" | "mips" | "mips64"
+        )
     })
 }
 
@@ -581,10 +580,7 @@ mod tests {
 
     #[test]
     fn blank_abi_32_bit_filename_is_not_universal() {
-        let assets = vec![asset(
-            "",
-            "Project-Lumen_android_1.0.1_armeabi-v7a.apk",
-        )];
+        let assets = vec![asset("", "Project-Lumen_android_1.0.1_armeabi-v7a.apk")];
 
         assert!(select_release_asset(&assets, "arm64-v8a").is_none());
     }
