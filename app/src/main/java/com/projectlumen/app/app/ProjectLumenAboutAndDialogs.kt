@@ -89,6 +89,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PhotoCamera
@@ -346,6 +347,11 @@ internal fun AboutLinksCard(viewModel: ProjectLumenViewModel) {
                 Icon(Icons.Outlined.Gavel, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.oss_notice_reopen))
+            }
+            OutlinedButton(onClick = viewModel::reopenBuildUpdateNotes) {
+                Icon(Icons.Outlined.NewReleases, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.build_update_notes_reopen))
             }
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL, viewModel)
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL, viewModel)

@@ -820,6 +820,17 @@
     <string name="oss_notice_credits_body">Project Lumen stands on these open-source projects and libraries. Tap an item to open its homepage when available.</string>
     <string name="oss_notice_continue">Continue</string>
     <string name="oss_notice_reopen">Open-source notice &amp; credits</string>
+    <string name="build_update_notes_title">What\'s new in this build</string>
+    <string name="build_update_notes_intro">This page describes the exact Project Lumen build installed on your device. Commit notes are shown as authored.</string>
+    <string name="build_update_notes_version_label">Version</string>
+    <string name="build_update_notes_version_value">%1$s (code %2$d)</string>
+    <string name="build_update_notes_commit_label">Commit</string>
+    <string name="build_update_notes_build_time_label">Build time</string>
+    <string name="build_update_notes_highlights_title">Highlights</string>
+    <string name="build_update_notes_details_title">Build details</string>
+    <string name="build_update_notes_no_details">No detailed notes were packaged for this build. The build identity above remains authoritative.</string>
+    <string name="build_update_notes_continue">Continue</string>
+    <string name="build_update_notes_reopen">What\'s new in this build</string>
     <string name="credit_lumen_crash_desc">In-app crash collection and adaptive crash UI used by Project Lumen</string>
     <string name="credit_compose_desc">Modern declarative UI toolkit and Material 3 components</string>
     <string name="credit_androidx_desc">Core Android Jetpack libraries for runtime, lifecycle, navigation, and background work</string>

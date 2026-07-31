@@ -52,6 +52,17 @@ jobs:
           echo "PROJECT_LUMEN_COMMIT_HASH=$COMMIT_HASH" >> "$GITHUB_ENV"
           echo "PROJECT_LUMEN_SHORT_HASH=$SHORT_HASH" >> "$GITHUB_ENV"
 
+      - name: Generate packaged build update notes
+        run: |
+          python3 scripts/generate_build_update_notes.py \
+            --output app/src/main/assets/build-update-notes.json \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --version-name "$PROJECT_LUMEN_VERSION_NAME" \
+            --version-code "$PROJECT_LUMEN_VERSION_CODE" \
+            --build-time-utc-millis "$PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS" \
+            --commit-hash "$PROJECT_LUMEN_COMMIT_HASH" \
+            --short-hash "$PROJECT_LUMEN_SHORT_HASH"
+
       - name: Write signing config
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}

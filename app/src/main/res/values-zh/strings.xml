@@ -819,6 +819,17 @@
     <string name="oss_notice_credits_body">Project Lumen 基于以下开源项目与库构建。若有主页，点击条目可打开。</string>
     <string name="oss_notice_continue">继续</string>
     <string name="oss_notice_reopen">开源说明与鸣谢</string>
+    <string name="build_update_notes_title">本次更新说明</string>
+    <string name="build_update_notes_intro">此页面说明设备上当前安装的 Project Lumen 精确构建。提交说明会保留作者原文。</string>
+    <string name="build_update_notes_version_label">版本</string>
+    <string name="build_update_notes_version_value">%1$s（构建号 %2$d）</string>
+    <string name="build_update_notes_commit_label">提交</string>
+    <string name="build_update_notes_build_time_label">构建时间</string>
+    <string name="build_update_notes_highlights_title">更新要点</string>
+    <string name="build_update_notes_details_title">构建详情</string>
+    <string name="build_update_notes_no_details">此构建未打包详细说明，请以以上构建标识为准。</string>
+    <string name="build_update_notes_continue">继续</string>
+    <string name="build_update_notes_reopen">本次更新说明</string>
     <string name="credit_lumen_crash_desc">Project Lumen 使用的应用内崩溃采集与自适应崩溃界面</string>
     <string name="credit_compose_desc">现代声明式 UI 工具包与 Material 3 组件</string>
     <string name="credit_androidx_desc">覆盖运行时、生命周期、导航与后台任务的 Android Jetpack 核心库</string>

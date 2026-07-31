@@ -17,6 +17,8 @@ data class DeviceInstallProfile(
     val packageFirstInstallAt: Long,
     val onboardingCompletedAt: Long,
     val ossNoticeCompletedAt: Long,
+    val lastAcknowledgedCommitHash: String,
+    val lastAcknowledgedBuildTimeUtcMillis: Long,
 )
 
 data class StoredAuthSession(
@@ -126,6 +128,11 @@ class SecureCredentialStore(context: Context) {
                 packageFirstInstallAt = packageFirstInstallAt(),
                 onboardingCompletedAt = encryptedMmkv.decodeLong(KEY_ONBOARDING_COMPLETED_AT, 0L),
                 ossNoticeCompletedAt = encryptedMmkv.decodeLong(KEY_OSS_NOTICE_COMPLETED_AT, 0L),
+                lastAcknowledgedCommitHash = encryptedMmkv.decodeString(KEY_BUILD_UPDATE_NOTES_ACK_COMMIT).orEmpty(),
+                lastAcknowledgedBuildTimeUtcMillis = encryptedMmkv.decodeLong(
+                    KEY_BUILD_UPDATE_NOTES_ACK_BUILD_TIME,
+                    0L,
+                ),
             )
         }.getOrElse { error ->
             Log.e(TAG, "installProfile failed; using ephemeral defaults", error)
@@ -135,6 +142,8 @@ class SecureCredentialStore(context: Context) {
                 packageFirstInstallAt = packageFirstInstallAt(),
                 onboardingCompletedAt = 0L,
                 ossNoticeCompletedAt = 0L,
+                lastAcknowledgedCommitHash = "",
+                lastAcknowledgedBuildTimeUtcMillis = 0L,
             )
         }
     }
@@ -147,6 +156,17 @@ class SecureCredentialStore(context: Context) {
     fun markOssNoticeCompleted(nowMillis: Long = System.currentTimeMillis()) {
         migrateLegacyCredentialsIfNeeded()
         encryptedMmkv.encode(KEY_OSS_NOTICE_COMPLETED_AT, nowMillis.coerceAtLeast(1L))
+    }
+
+    fun markBuildUpdateNotesAcknowledged(
+        commitHash: String,
+        buildTimeUtcMillis: Long,
+    ) {
+        require(commitHash.isNotBlank()) { "Build acknowledgment requires a commit hash" }
+        require(buildTimeUtcMillis > 0L) { "Build acknowledgment requires a positive build time" }
+        migrateLegacyCredentialsIfNeeded()
+        encryptedMmkv.encode(KEY_BUILD_UPDATE_NOTES_ACK_COMMIT, commitHash)
+        encryptedMmkv.encode(KEY_BUILD_UPDATE_NOTES_ACK_BUILD_TIME, buildTimeUtcMillis)
     }
 
     fun deviceInstallationId(): String {
@@ -288,6 +308,8 @@ class SecureCredentialStore(context: Context) {
         private const val KEY_FIRST_SEEN_AT = "first_seen_at"
         private const val KEY_ONBOARDING_COMPLETED_AT = "onboarding_completed_at"
         private const val KEY_OSS_NOTICE_COMPLETED_AT = "oss_notice_completed_at"
+        private const val KEY_BUILD_UPDATE_NOTES_ACK_COMMIT = "build_update_notes_ack_commit"
+        private const val KEY_BUILD_UPDATE_NOTES_ACK_BUILD_TIME = "build_update_notes_ack_build_time"
         private const val KEY_MMKV_CRYPT_KEY = "mmkv_crypt_key"
         private const val KEY_MMKV_MIGRATION_COMPLETE = "mmkv_migration_complete"
         private const val DEVICE_FINGERPRINT_LENGTH = 64

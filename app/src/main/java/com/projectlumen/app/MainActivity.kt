@@ -21,6 +21,7 @@ import com.chloemlla.lumen.crash.CrashBreadcrumbs
 import com.chloemlla.lumen.crash.LumenCrash
 import com.chloemlla.lumen.crash.ui.LumenCrashGate
 import com.projectlumen.app.core.enums.AppThemeMode
+import com.projectlumen.app.core.update.BuildUpdateNotesLoader
 import com.projectlumen.app.openapi.LumenOpenIntents
 import com.projectlumen.app.openapi.LumenOpenLaunchRequest
 import com.projectlumen.app.openapi.LumenOpenLaunchTarget
@@ -111,6 +112,7 @@ open class MainActivity : ComponentActivity() {
                             backup = app.backup,
                             apiClient = app.apiClient,
                             secureCredentials = app.secureCredentials,
+                            buildUpdateNotesLoader = BuildUpdateNotesLoader(app),
                             eyeCarePreferences = app.eyeCarePreferences,
                             deviceInsights = app.deviceInsights,
                             startTimerService = app::startTimerService,
