@@ -391,12 +391,18 @@ jobs:
           )
           PY
           curl -fsS \
+            --connect-timeout 10 \
+            --max-time 60 \
+            --retry 4 \
+            --retry-all-errors \
+            --retry-delay 5 \
             -H "Authorization: Bearer ${PROJECT_LUMEN_ADMIN_TOKEN}" \
             -H "Content-Type: application/json" \
             --data-binary @release-assets/backend-release-action.json \
             "$ADMIN_ACTIONS_URL"
 
       - name: Run state machine unit tests
+        if: ${{ !cancelled() }}
         env:
           PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
           PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
@@ -406,6 +412,7 @@ jobs:
         run: gradle testDebugUnitTest --no-daemon --warning-mode all
 
       - name: Run Android lint
+        if: ${{ !cancelled() }}
         env:
           PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
           PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
