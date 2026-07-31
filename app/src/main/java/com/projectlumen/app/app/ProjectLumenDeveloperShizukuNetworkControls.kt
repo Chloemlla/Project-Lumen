@@ -199,7 +199,7 @@ private fun DeveloperNetworkControlRecordCard(
 }
 
 @Composable
-private fun developerShizukuStatusLabel(state: ShizukuCapabilityState): String {
+internal fun developerShizukuStatusLabel(state: ShizukuCapabilityState): String {
     return when {
         state.ready -> stringResource(R.string.shizuku_status_ready)
         !state.binderAvailable -> stringResource(R.string.shizuku_status_no_service)
