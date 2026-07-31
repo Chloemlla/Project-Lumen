@@ -207,7 +207,8 @@ class ShizukuCapabilityManager(
             uid = app.uid,
             appType = app.appType,
             restrict = true,
-            delegatedGuardExpected = true,
+            previousNetworkRestricted = false,
+            previousDelegatedGuardApplied = false,
         )
     }
 
@@ -215,14 +216,16 @@ class ShizukuCapabilityManager(
         packageName: String,
         uid: Int,
         appType: String,
-        restoreDelegatedGuard: Boolean,
+        previousNetworkRestricted: Boolean,
+        previousDelegatedGuardApplied: Boolean,
     ): ShizukuNetworkPolicyResult = withContext(Dispatchers.IO) {
         applyAppNetworkPolicy(
             packageName = packageName,
             uid = uid,
             appType = appType,
             restrict = false,
-            delegatedGuardExpected = restoreDelegatedGuard,
+            previousNetworkRestricted = previousNetworkRestricted,
+            previousDelegatedGuardApplied = previousDelegatedGuardApplied,
         )
     }
 
@@ -723,7 +726,8 @@ class ShizukuCapabilityManager(
         uid: Int,
         appType: String,
         restrict: Boolean,
-        delegatedGuardExpected: Boolean,
+        previousNetworkRestricted: Boolean,
+        previousDelegatedGuardApplied: Boolean,
     ): ShizukuNetworkPolicyResult {
         val currentState = queryState()
         _state.value = currentState
@@ -733,10 +737,10 @@ class ShizukuCapabilityManager(
                 packageName = normalizedPackageName,
                 uid = uid,
                 appType = appType,
-                networkRestricted = !restrict,
-                uidPolicyApplied = !restrict,
-                delegatedGuardAttempted = delegatedGuardExpected,
-                delegatedGuardApplied = false,
+                networkRestricted = previousNetworkRestricted,
+                uidPolicyApplied = previousNetworkRestricted,
+                delegatedGuardAttempted = false,
+                delegatedGuardApplied = previousDelegatedGuardApplied,
                 output = "",
                 error = "Shizuku authorization is required for app network controls.",
             )
@@ -746,10 +750,10 @@ class ShizukuCapabilityManager(
                 packageName = normalizedPackageName,
                 uid = uid,
                 appType = appType,
-                networkRestricted = !restrict,
-                uidPolicyApplied = !restrict,
-                delegatedGuardAttempted = delegatedGuardExpected,
-                delegatedGuardApplied = false,
+                networkRestricted = previousNetworkRestricted,
+                uidPolicyApplied = previousNetworkRestricted,
+                delegatedGuardAttempted = false,
+                delegatedGuardApplied = previousDelegatedGuardApplied,
                 output = "",
                 error = "A valid package name and UID are required.",
             )
@@ -760,7 +764,8 @@ class ShizukuCapabilityManager(
             "cmd netpolicy remove restrict-background-blacklist $uid"
         }
         val uidPolicyResult = executeShellCommand(policyCommand)
-        val delegatedGuardResult = if (delegatedGuardExpected) {
+        val shouldAttemptDelegatedGuard = restrict || previousDelegatedGuardApplied
+        val delegatedGuardResult = if (shouldAttemptDelegatedGuard) {
             setDelegatedNetworkGuard(normalizedPackageName, restrict)
         } else {
             DelegatedNetworkGuardResult(attempted = false, applied = false, output = "", error = "")
@@ -781,21 +786,22 @@ class ShizukuCapabilityManager(
                 )
             }
         }.joinToString("\n")
-        val networkRestricted = if (restrict) uidPolicySucceeded else !uidPolicySucceeded
-        val uidPolicyApplied = if (restrict) uidPolicySucceeded else !uidPolicySucceeded
+        val restrictionState = resolveShizukuNetworkRestrictionState(
+            restrict = restrict,
+            previousNetworkRestricted = previousNetworkRestricted,
+            previousDelegatedGuardApplied = previousDelegatedGuardApplied,
+            uidPolicyCommandSucceeded = uidPolicySucceeded,
+            delegatedGuardCommandSucceeded = delegatedGuardResult.applied,
+        )
         _state.value = queryState(errors)
         return networkPolicyResult(
             packageName = normalizedPackageName,
             uid = uid,
             appType = appType,
-            networkRestricted = networkRestricted,
-            uidPolicyApplied = uidPolicyApplied,
+            networkRestricted = restrictionState.networkRestricted,
+            uidPolicyApplied = restrictionState.networkRestricted,
             delegatedGuardAttempted = delegatedGuardResult.attempted,
-            delegatedGuardApplied = if (restrict) {
-                delegatedGuardResult.applied
-            } else {
-                delegatedGuardExpected && !delegatedGuardResult.applied
-            },
+            delegatedGuardApplied = restrictionState.delegatedGuardApplied,
             output = output,
             error = errors,
         )
@@ -928,13 +934,6 @@ class ShizukuCapabilityManager(
         val success: Boolean
             get() = exitCode == 0
     }
-
-    private data class DelegatedNetworkGuardResult(
-        val attempted: Boolean,
-        val applied: Boolean,
-        val output: String,
-        val error: String,
-    )
 
     private fun classifyForegroundContext(packageName: String, activityName: String): String {
         val combined = "$packageName $activityName".lowercase()

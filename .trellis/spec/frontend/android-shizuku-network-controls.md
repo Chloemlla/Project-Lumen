@@ -38,6 +38,8 @@ data class AppNetworkControlEntity(
     val restoredAt: Long,
     val updatedAt: Long,
 )
+
+val activeRestriction = networkRestricted || delegatedGuardApplied
 ```
 
 ### 3. Contracts
@@ -47,6 +49,9 @@ data class AppNetworkControlEntity(
 - The app must not expose a free-form shell command field for this feature.
 - UID network restriction uses `cmd netpolicy add restrict-background-blacklist <uid>` and restore uses `remove restrict-background-blacklist <uid>`.
 - AppOps INTERNET is a best-effort delegated-network guard only; unsupported AppOps commands must be persisted as unsupported, not hidden.
+- A persisted record is actively restricting networking when `networkRestricted || delegatedGuardApplied`; counts, action eligibility, ordering, and status labels must use this combined state.
+- UID policy and delegated guard restore independently. A failed clear command preserves only the corresponding previously-active restriction; it must not recreate a restriction that was already inactive.
+- Delegated-only records remain restorable. If AppOps restore fails after UID policy is clear, the record remains active and the restore action remains retryable.
 - Persist every Project Lumen initiated restrict/restore attempt with package name, UID, app type, command status, and last error/output.
 - Restore is idempotent: a system response such as `not blacklisted` or `not denylisted` is treated as restored.
 
@@ -61,20 +66,28 @@ data class AppNetworkControlEntity(
 | `cmd netpolicy add` exits non-zero | Record `networkRestricted=false`, `uidPolicyApplied=false`, and the error. |
 | `cmd netpolicy remove` exits with `not blacklisted` | Treat as restored and set `networkRestricted=false`. |
 | AppOps INTERNET command unsupported | Keep UID policy result, set `delegatedGuardAttempted=true`, `delegatedGuardApplied=false`, and show the unsupported status. |
+| Restrict applies AppOps but UID policy fails | Persist a delegated-only active restriction and keep restore enabled. |
+| Restore clears AppOps but UID policy clear fails | Persist `networkRestricted=true`, `delegatedGuardApplied=false`; do not retain the cleared guard. |
+| Restore clears UID policy but AppOps allow fails | Persist `networkRestricted=false`, `delegatedGuardApplied=true`; keep restore enabled for retry. |
+| Delegated-only restore gets a UID clear failure | Preserve `networkRestricted=false`; a failed idempotent UID clear must not invent a UID restriction. |
 | User restores an app | Attempt netpolicy removal and AppOps allow if the delegated guard had been applied. |
 
 ### 5. Good/Base/Bad Cases
 
 - Good: developer page clearly separates UID policy status from delegated-network guard status.
+- Good: either active channel keeps the record counted, sorted with active records, and restorable.
 - Good: Room state records failures so users can see why a package was not restricted.
 - Base: devices without AppOps INTERNET support still use UID policy when netpolicy succeeds.
+- Base: one restore channel succeeds and the other fails; the successful channel is cleared while the failed channel remains retryable.
 - Bad: claiming this feature fully blocks system-service delegated traffic when only UID netpolicy succeeded.
+- Bad: marking a record restored because UID policy cleared while the delegated guard is still active.
 - Bad: using root-only iptables/nftables commands from Shizuku user service.
 - Bad: hard-coding package names for system services to disable globally.
 
 ### 6. Tests Required
 
 - GitHub workflow: Android build must compile Room v18 migration, DAO, repository, Shizuku models, and developer UI.
+- Pure JVM tests: cover delegated-only restriction plus both restore partial-result directions; assert active state and `restoredAt` use the combined restriction state.
 - Manual Shizuku device test: authorize Shizuku, refresh app list, restrict one user app, verify record appears, restore it, verify record status updates.
 - Manual unsupported-device test: verify AppOps INTERNET unsupported results remain visible while UID policy status is still accurate.
 - Manual safety review: verify Project Lumen's own package is not offered in the controllable app list.
@@ -95,4 +108,24 @@ if (ANDROID_PACKAGE_NAME_REGEX.matches(packageName) && uid > 0) {
     val result = executeShellCommand("cmd netpolicy add restrict-background-blacklist $uid")
     record.networkRestricted = result.success
 }
+```
+
+#### Wrong: restore reconciliation
+
+```kotlin
+record.delegatedGuardApplied = if (result.networkRestricted) {
+    record.delegatedGuardApplied
+} else {
+    result.delegatedGuardApplied
+}
+record.restoredAt = if (result.networkRestricted) 0L else nowMillis
+```
+
+#### Correct: restore reconciliation
+
+```kotlin
+record.networkRestricted = result.networkRestricted
+record.delegatedGuardApplied = result.delegatedGuardApplied
+val activeRestriction = result.networkRestricted || result.delegatedGuardApplied
+record.restoredAt = if (activeRestriction) 0L else nowMillis
 ```

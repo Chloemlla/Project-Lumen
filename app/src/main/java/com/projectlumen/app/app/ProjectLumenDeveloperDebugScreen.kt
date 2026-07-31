@@ -70,14 +70,11 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.api.CertificatePinPolicy
 import com.projectlumen.app.core.api.ProjectLumenApiConfig
 import com.projectlumen.app.core.api.ProjectLumenApiTrace
-import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
 import com.chloemlla.lumen.crash.CrashAppInfo
 import com.chloemlla.lumen.crash.CrashReport
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.debug.MemoryHealthSnapshot
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
-import com.projectlumen.app.core.shizuku.ShizukuNetworkApp
-import com.projectlumen.app.core.shizuku.ShizukuNetworkAppTypes
 import kotlin.math.roundToInt
 
 @Composable
@@ -389,174 +386,6 @@ internal fun DeveloperDebugScreen(
 }
 
 @Composable
-private fun ShizukuNetworkControlsSection(
-    shizukuState: ShizukuCapabilityState,
-    networkApps: List<ShizukuNetworkApp>,
-    records: List<AppNetworkControlEntity>,
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onRefresh: () -> Unit,
-    onAuthorize: () -> Unit,
-    onRestrict: (ShizukuNetworkApp) -> Unit,
-    onRestore: (AppNetworkControlEntity) -> Unit,
-) {
-    val normalizedQuery = query.trim()
-    val recordsByPackage = records.associateBy { it.packageName }
-    val restrictedRecords = records.filter { it.networkRestricted }
-    val filteredApps = networkApps
-        .filter { app ->
-            normalizedQuery.isBlank() ||
-                app.packageName.contains(normalizedQuery, ignoreCase = true) ||
-                app.uid.toString().contains(normalizedQuery)
-        }
-        .take(MAX_NETWORK_APP_CARDS)
-    SettingsSection(R.string.developer_section_shizuku_network_controls, Icons.Outlined.Lock) {
-        DeveloperNote(stringResource(R.string.developer_shizuku_network_boundary))
-        DeveloperMetricRow(R.string.shizuku_status, developerShizukuStatusLabel(shizukuState))
-        DeveloperMetricRow(
-            R.string.developer_shizuku_network_apps_count,
-            stringResource(
-                R.string.developer_shizuku_network_apps_count_value,
-                networkApps.size,
-                restrictedRecords.size,
-            ),
-        )
-        LumenFlowRow {
-            OutlinedButton(onClick = onRefresh, enabled = shizukuState.ready) {
-                DeveloperButtonLabel(Icons.Outlined.Sync, R.string.developer_shizuku_network_refresh_apps)
-            }
-            if (!shizukuState.ready) {
-                OutlinedButton(onClick = onAuthorize, enabled = shizukuState.binderAvailable) {
-                    DeveloperButtonLabel(Icons.Outlined.Lock, R.string.shizuku_authorize)
-                }
-            }
-        }
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = query,
-            onValueChange = onQueryChange,
-            singleLine = true,
-            label = { Text(stringResource(R.string.developer_shizuku_network_search_label)) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-        )
-        if (records.isEmpty()) {
-            DeveloperNote(stringResource(R.string.developer_shizuku_network_no_records))
-        } else {
-            records.take(MAX_NETWORK_RECORD_CARDS).forEach { record ->
-                DeveloperNetworkControlRecordCard(record = record, onRestore = { onRestore(record) })
-            }
-        }
-        if (filteredApps.isEmpty()) {
-            DeveloperNote(stringResource(R.string.developer_shizuku_network_no_apps))
-        } else {
-            filteredApps.forEach { app ->
-                DeveloperNetworkAppCard(
-                    app = app,
-                    record = recordsByPackage[app.packageName],
-                    onRestrict = { onRestrict(app) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeveloperNetworkAppCard(
-    app: ShizukuNetworkApp,
-    record: AppNetworkControlEntity?,
-    onRestrict: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = app.packageName,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.SemiBold,
-            softWrap = true,
-        )
-        Text(
-            text = stringResource(
-                R.string.developer_shizuku_network_app_detail,
-                app.uid,
-                networkAppTypeLabel(app.appType),
-                networkAppStatusLabel(app, record),
-            ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            softWrap = true,
-        )
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            enabled = record?.networkRestricted != true,
-            onClick = onRestrict,
-        ) {
-            DeveloperButtonLabel(Icons.Outlined.Lock, R.string.developer_shizuku_network_restrict)
-        }
-    }
-}
-
-@Composable
-private fun DeveloperNetworkControlRecordCard(
-    record: AppNetworkControlEntity,
-    onRestore: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = record.packageName,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.SemiBold,
-            softWrap = true,
-        )
-        Text(
-            text = stringResource(
-                R.string.developer_shizuku_network_record_detail,
-                record.uid,
-                networkAppTypeLabel(record.appType),
-                networkRecordStatusLabel(record),
-            ),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            softWrap = true,
-        )
-        Text(
-            text = networkGuardStatusLabel(record),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            softWrap = true,
-        )
-        if (record.lastError.isNotBlank()) {
-            ApiTraceLine(R.string.developer_shizuku_network_last_error, record.lastError)
-        }
-        OutlinedButton(
-            modifier = Modifier.fillMaxWidth(),
-            enabled = record.networkRestricted,
-            onClick = onRestore,
-        ) {
-            DeveloperButtonLabel(Icons.Outlined.Sync, R.string.developer_shizuku_network_restore)
-        }
-    }
-}
-
-@Composable
 private fun DeveloperApiTraceCard(trace: ProjectLumenApiTrace) {
     val statusColor = if (trace.successful) {
         MaterialTheme.colorScheme.primary
@@ -610,7 +439,7 @@ private fun DeveloperApiTraceCard(trace: ProjectLumenApiTrace) {
 }
 
 @Composable
-private fun ApiTraceLine(@StringRes labelRes: Int, value: String) {
+internal fun ApiTraceLine(@StringRes labelRes: Int, value: String) {
     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = stringResource(labelRes),
@@ -649,7 +478,7 @@ private fun traceStatusLabel(trace: ProjectLumenApiTrace): String {
 }
 
 @Composable
-private fun DeveloperMetricRow(@StringRes labelRes: Int, value: String) {
+internal fun DeveloperMetricRow(@StringRes labelRes: Int, value: String) {
     DeveloperMetricRow(label = stringResource(labelRes), value = value)
 }
 
@@ -686,7 +515,7 @@ private fun DeveloperMetricRow(label: String, value: String) {
 }
 
 @Composable
-private fun DeveloperNote(message: String) {
+internal fun DeveloperNote(message: String) {
     Text(
         text = message,
         modifier = Modifier
@@ -702,7 +531,7 @@ private fun DeveloperNote(message: String) {
 }
 
 @Composable
-private fun DeveloperButtonLabel(icon: ImageVector, @StringRes labelRes: Int) {
+internal fun DeveloperButtonLabel(icon: ImageVector, @StringRes labelRes: Int) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
@@ -872,16 +701,6 @@ private fun timestampLabel(value: Long): String {
 }
 
 @Composable
-private fun developerShizukuStatusLabel(state: ShizukuCapabilityState): String {
-    return when {
-        state.ready -> stringResource(R.string.shizuku_status_ready)
-        !state.binderAvailable -> stringResource(R.string.shizuku_status_no_service)
-        !state.permissionGranted -> stringResource(R.string.shizuku_status_permission_needed)
-        else -> stringResource(R.string.shizuku_status_unavailable)
-    }
-}
-
-@Composable
 private fun developerShizukuContextLabel(state: ShizukuCapabilityState): String {
     if (state.foregroundPackage.isBlank()) return "-"
     return if (state.foregroundShouldDeferSampling) {
@@ -951,48 +770,5 @@ private fun createDeveloperCrashPreview(context: Context): CrashReport {
     )
 }
 
-@Composable
-private fun networkAppTypeLabel(appType: String): String {
-    return when (appType) {
-        ShizukuNetworkAppTypes.SYSTEM -> stringResource(R.string.developer_shizuku_network_system_app)
-        else -> stringResource(R.string.developer_shizuku_network_user_app)
-    }
-}
-
-@Composable
-private fun networkAppStatusLabel(app: ShizukuNetworkApp, record: AppNetworkControlEntity?): String {
-    return when {
-        record?.networkRestricted == true -> stringResource(R.string.developer_shizuku_network_restricted)
-        app.restrictedByUidPolicy -> stringResource(R.string.developer_shizuku_network_uid_policy_active)
-        else -> stringResource(R.string.developer_shizuku_network_available)
-    }
-}
-
-@Composable
-private fun networkRecordStatusLabel(record: AppNetworkControlEntity): String {
-    return when {
-        record.networkRestricted -> stringResource(R.string.developer_shizuku_network_restricted)
-        record.lastError.isNotBlank() -> stringResource(R.string.developer_shizuku_network_failed)
-        else -> stringResource(R.string.developer_shizuku_network_restored)
-    }
-}
-
-@Composable
-private fun networkGuardStatusLabel(record: AppNetworkControlEntity): String {
-    val uidPolicy = if (record.uidPolicyApplied) {
-        stringResource(R.string.developer_shizuku_network_uid_policy_active)
-    } else {
-        stringResource(R.string.developer_shizuku_network_uid_policy_inactive)
-    }
-    val delegatedGuard = when {
-        record.delegatedGuardApplied -> stringResource(R.string.developer_shizuku_network_delegated_guard_active)
-        record.delegatedGuardAttempted -> stringResource(R.string.developer_shizuku_network_delegated_guard_unsupported)
-        else -> stringResource(R.string.developer_shizuku_network_delegated_guard_not_attempted)
-    }
-    return stringResource(R.string.developer_shizuku_network_guard_status, uidPolicy, delegatedGuard)
-}
-
 private const val DEBUG_WRAP_COLUMN = 36
 private const val MAX_API_TRACE_CARDS = 8
-private const val MAX_NETWORK_APP_CARDS = 12
-private const val MAX_NETWORK_RECORD_CARDS = 12
