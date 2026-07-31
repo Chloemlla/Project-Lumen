@@ -33,8 +33,14 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-cleanup: on-success
 
-      # - name: Set up Android native toolchain
-      #   uses: ./.github/actions/setup-android-native-toolchain
+      - name: Set up Android native toolchain
+        uses: ./.github/actions/setup-android-native-toolchain
+
+      - name: Run native security helper tests
+        run: |
+          cmake -S app/src/test/cpp -B build/native-security-tests -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/native-security-tests --config Release
+          ctest --test-dir build/native-security-tests --output-on-failure
 
       - name: Read app version
         run: |
@@ -69,6 +75,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          CONFIGURED_RELEASE_CERT_SHA256: ${{ secrets.PROJECT_LUMEN_RELEASE_CERT_SHA256 }}
         run: |
           set -euo pipefail
 
@@ -120,6 +127,11 @@ jobs:
           cat /tmp/keystore-alias.txt
 
           CERT_SHA256="$(keytool -exportcert -alias "$KEY_ALIAS" -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" 2>/dev/null | openssl dgst -sha256 -hex | awk '{print toupper($2)}')"
+          CONFIGURED_CERT_SHA256="$(printf '%s' "${CONFIGURED_RELEASE_CERT_SHA256:-}" | tr -d '[:space:]:-' | tr '[:lower:]' '[:upper:]')"
+          if [ -n "$CONFIGURED_CERT_SHA256" ] && [ "$CONFIGURED_CERT_SHA256" != "$CERT_SHA256" ]; then
+            echo "::error::PROJECT_LUMEN_RELEASE_CERT_SHA256 does not match the actual release keystore certificate."
+            exit 1
+          fi
           CERT_SHA256_COLON="$(printf '%s' "$CERT_SHA256" | sed 's/../&:/g; s/:$//')"
           echo "Release cert SHA-256: $CERT_SHA256"
           echo "Release cert SHA-256 (colon): $CERT_SHA256_COLON"
@@ -148,6 +160,7 @@ jobs:
           PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
           PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
           PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
+          PROJECT_LUMEN_REQUEST_SIGNING_SECRET: ${{ secrets.PROJECT_LUMEN_REQUEST_SIGNING_SECRET }}
         run: |
           # Always use release signing. Never fall back to debug signing.
           if [ -f gradle.properties ]; then
@@ -159,6 +172,10 @@ jobs:
              ! grep -q '^PROJECT_LUMEN_KEY_ALIAS=' gradle.properties || \
              ! grep -q '^PROJECT_LUMEN_KEY_PASSWORD=' gradle.properties; then
             echo "::error::Release signing properties missing before baseline profile generation."
+            exit 1
+          fi
+          if [ -z "${PROJECT_LUMEN_REQUEST_SIGNING_SECRET:-}" ]; then
+            echo "::error::PROJECT_LUMEN_REQUEST_SIGNING_SECRET is required for release baseline generation."
             exit 1
           fi
           gradle :app:generateBaselineProfile --no-daemon --warning-mode all
@@ -178,7 +195,6 @@ jobs:
           PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS: ${{ secrets.PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS }}
           PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN: ${{ secrets.PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN }}
           PROJECT_LUMEN_REQUEST_SIGNING_SECRET: ${{ secrets.PROJECT_LUMEN_REQUEST_SIGNING_SECRET }}
-          PROJECT_LUMEN_RELEASE_CERT_SHA256: ${{ secrets.PROJECT_LUMEN_RELEASE_CERT_SHA256 || env.PROJECT_LUMEN_RELEASE_CERT_SHA256 }}
           PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256: ${{ secrets.PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256 }}
         run: |
           set -euo pipefail
@@ -192,10 +208,19 @@ jobs:
             echo "::error::Release signing properties missing before assembleRelease."
             exit 1
           fi
+          if [ -z "${PROJECT_LUMEN_REQUEST_SIGNING_SECRET:-}" ]; then
+            echo "::error::PROJECT_LUMEN_REQUEST_SIGNING_SECRET is required for release APKs."
+            exit 1
+          fi
           echo "=== Signing properties before assembleRelease (passwords redacted) ==="
           grep -E '^PROJECT_LUMEN_(STORE_FILE|KEY_ALIAS)=' gradle.properties || true
           grep -E '^PROJECT_LUMEN_(STORE_PASSWORD|KEY_PASSWORD)=' gradle.properties | sed 's/=.*/=<redacted>/' || true
           gradle :app:assembleRelease --no-daemon --warning-mode all
+
+      - name: Verify 16 KB native library alignment
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*.apk
 
       - name: Inspect APK signing
         run: |

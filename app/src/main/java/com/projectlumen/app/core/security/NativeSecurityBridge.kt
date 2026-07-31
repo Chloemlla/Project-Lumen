@@ -1,5 +1,10 @@
 package com.projectlumen.app.core.security
 
+internal data class NativeSigningResult(
+    val signatureHex: String?,
+    val verdict: NativeSecurityVerdict,
+)
+
 internal object NativeSecurityBridge {
     private val libraryLoadFailure = runCatching {
         System.loadLibrary("lumen_security")
@@ -7,31 +12,51 @@ internal object NativeSecurityBridge {
 
     val isAvailable: Boolean get() = libraryLoadFailure == null
 
-    fun requestSigningSecretOrNull(): String? {
-        if (!isAvailable) return null
-        return runCatching { requestSigningSecret() }.getOrNull()
-    }
-
-    fun isNativeEnvironmentAllowedOrNull(
+    fun evaluateEnvironmentOrNull(
         packageName: String,
         signingCertSha256: String,
         debugAllowed: Boolean,
-    ): Boolean? {
+    ): NativeSecurityVerdict? {
         if (!isAvailable) return null
         return runCatching {
-            isNativeEnvironmentAllowed(
-                packageName = packageName,
-                signingCertSha256 = signingCertSha256,
-                debugAllowed = debugAllowed,
+            NativeSecurityVerdict(
+                mask = evaluateEnvironment(
+                    packageName = packageName,
+                    signingCertSha256 = signingCertSha256,
+                    debugAllowed = debugAllowed,
+                ),
             )
         }.getOrNull()
     }
 
-    external fun requestSigningSecret(): String
+    fun signCanonicalPayloadOrNull(
+        canonicalPayloadUtf8: ByteArray,
+        debugAllowed: Boolean,
+    ): NativeSigningResult? {
+        if (!isAvailable) return null
+        return runCatching {
+            val reasonMask = IntArray(1)
+            val signature = signCanonicalPayload(
+                canonicalPayloadUtf8 = canonicalPayloadUtf8,
+                debugAllowed = debugAllowed,
+                reasonMaskOut = reasonMask,
+            )
+            NativeSigningResult(
+                signatureHex = signature,
+                verdict = NativeSecurityVerdict(reasonMask.single()),
+            )
+        }.getOrNull()
+    }
 
-    external fun isNativeEnvironmentAllowed(
+    private external fun evaluateEnvironment(
         packageName: String,
         signingCertSha256: String,
         debugAllowed: Boolean,
-    ): Boolean
+    ): Int
+
+    private external fun signCanonicalPayload(
+        canonicalPayloadUtf8: ByteArray,
+        debugAllowed: Boolean,
+        reasonMaskOut: IntArray,
+    ): String?
 }

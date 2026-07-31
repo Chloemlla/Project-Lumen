@@ -104,40 +104,60 @@ python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*
 ### 2. Signatures
 
 ```kotlin
-NativeSecurityBridge.isNativeEnvironmentAllowedOrNull(
+NativeSecurityBridge.evaluateEnvironmentOrNull(
     packageName = appContext.packageName,
     signingCertSha256 = signingCertificateSha256(appContext),
     debugAllowed = false,
 )
+
+NativeSecurityBridge.signCanonicalPayloadOrNull(
+    canonicalPayloadUtf8 = canonicalPayload.toByteArray(Charsets.UTF_8),
+    debugAllowed = BuildConfig.DEBUG,
+)
 ```
 
 ```cpp
-Java_com_projectlumen_app_core_security_NativeSecurityBridge_isNativeEnvironmentAllowed(
+Java_com_projectlumen_app_core_security_NativeSecurityBridge_evaluateEnvironment(
     JNIEnv *env,
     jobject,
     jstring package_name,
     jstring signing_cert_sha256,
     jboolean debug_allowed
 )
+
+Java_com_projectlumen_app_core_security_NativeSecurityBridge_signCanonicalPayload(
+    JNIEnv *env,
+    jobject,
+    jbyteArray canonical_payload_utf8,
+    jboolean debug_allowed,
+    jintArray reason_mask_out
+)
 ```
 
 ### 3. Contracts
 
 - Keep the JNI method signature stable unless Kotlin call sites are updated in the same change.
-- Native checks must verify expected package and release certificate before trusting the environment.
+- Native checks must verify expected package, `/proc/self/cmdline` process name, and normalized release certificate before trusting the environment.
+- Stable native reason bits cover package mismatch, process mismatch, certificate missing/mismatch, tracer, suspicious environment, hook artifacts, unverified release identity, invalid signing secret, and internal failure. Kotlin must preserve unknown bits in diagnostics.
 - When `debug_allowed == JNI_FALSE`, native checks must reject a non-zero `TracerPid`, suspicious debug/injection environment variables, known hook library mappings, suspicious task names, suspicious file-descriptor targets, and known Frida/Xposed/Substrate socket artifacts.
+- `/proc`, task, fd, environment, and symlink inspection must use explicit byte/entry caps. Read or parse failures become the internal-failure reason in release checks rather than silently allowing signing.
 - Debuggable local builds are bypassed by `AppIntegrityGuard`; do not make native checks block ordinary debug development paths unless the caller explicitly opts in.
-- Release request signing must fail closed when `NativeSecurityBridge.requestSigningSecretOrNull()` is unavailable; only debug builds may use the documented local fallback signing secret.
+- The request-signing secret and HMAC-SHA256 operation stay native. JNI returns only a lowercase signature and structured reason mask; it must never return the raw secret.
+- A clean release evaluation establishes process-local verified identity. Every release signature requires that identity and repeats volatile debugger/environment/hook checks immediately before signing.
+- Release request signing must fail closed when the bridge is unavailable, the reason mask is non-zero, or the signature is malformed. Only debug builds may use the documented local fallback signing secret.
+- Native detection remains side-effect free: no `ptrace`, abort, process kill, or destructive anti-analysis behavior.
 - TODO1 remote device registration must include native bridge availability, native environment verdict, request-signing policy, and App Integrity state in `localSecurityConfig`.
 
 ### 4. Validation & Error Matrix
 
 | Condition | Expected behavior |
 |---|---|
-| Package name does not match `LUMEN_EXPECTED_PACKAGE` | Native bridge returns `JNI_FALSE`. |
-| Release certificate is configured and does not match | Native bridge returns `JNI_FALSE`. |
-| `TracerPid` is non-zero with debug disallowed | Native bridge returns `JNI_FALSE`. |
-| Frida/Xposed/Substrate/Riru/Zygisk artifacts appear in maps, cmdline, task comm, fd symlinks, or Unix socket metadata | Native bridge returns `JNI_FALSE`. |
+| Package or process name does not match `LUMEN_EXPECTED_PACKAGE` | Verdict contains the stable package/process mismatch bit and release identity is not established. |
+| Release certificate is missing, malformed, or mismatched | Verdict contains the certificate missing/mismatch bit and release identity is not established. |
+| `TracerPid` is non-zero with debug disallowed | Verdict contains `tracer_detected`; release signing returns no signature. |
+| Frida/Xposed/Substrate/Riru/Zygisk artifacts appear in maps, cmdline, task comm, fd symlinks, or Unix socket metadata | Verdict contains `hook_artifact_detected`; release signing returns no signature. |
+| A bounded native scan cannot complete safely | Verdict contains `internal_failure`; release signing returns no signature. |
+| Release signing is requested before a clean native evaluation | Signing returns no signature with `release_identity_not_verified`. |
 | Debug build calls `AppIntegrityGuard.enforce` | Guard returns before native enforcement. |
 | Release API request cannot load `lumen_security` | Request signing throws before sending a fallback-signed request. |
 | Remote device registration succeeds | `localSecurityConfig` reports native bridge/protection state for backend/admin inspection. |
@@ -153,8 +173,10 @@ Java_com_projectlumen_app_core_security_NativeSecurityBridge_isNativeEnvironment
 ### 6. Tests Required
 
 - GitHub workflow: Android build must still compile `lumen_security`.
+- GitHub workflow: pure host C++ tests must cover RFC 4231 HMAC and the shared Project Lumen canonical request vector.
+- Android unit tests: reason-bit mapping, unknown-bit diagnostics, canonical payload construction, and removal of the raw-secret JNI path.
 - Manual review: check that new needles are lower-case and searched through the case-normalized helper.
-- Manual review: check that release-only enforcement remains gated by `BuildConfig.DEBUG` and `APP_INTEGRITY_ENFORCEMENT_ENABLED`.
+- Manual review: check debug builds bypass enforcement, release builds always evaluate native identity for signing, and `APP_INTEGRITY_ENFORCEMENT_ENABLED` still owns startup exception/report policy.
 - Manual review: check release request signing has no non-native fallback path.
 
 ### 7. Wrong vs Correct
@@ -168,5 +190,6 @@ if (detected) abort();
 #### Correct
 
 ```cpp
-if (debug_allowed == JNI_FALSE && has_hooking_artifacts()) return JNI_FALSE;
+if (debug_allowed == JNI_FALSE) reasons |= collect_volatile_reasons();
+return reasons;
 ```

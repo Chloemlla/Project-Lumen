@@ -19,11 +19,13 @@
 - Android client signs the canonical request payload and sends the same three headers on API requests.
 - Public release check API: `GET /api/v1/releases/check` and legacy `GET /v1/releases/check`.
 - Android native signing bridge is built by CMake with `ANDROID_STL=c++_shared` and requires `libc++_shared.so` in the APK.
+- Gradle encodes the Android signing secret as UTF-8 hex for the internal CMake definition `LUMEN_REQUEST_SIGNING_SECRET_HEX`; the public build input remains `PROJECT_LUMEN_REQUEST_SIGNING_SECRET`.
 
 ### 3. Contracts
 
 - `LUMEN_REQUEST_SIGNING_SECRET` and `PROJECT_LUMEN_REQUEST_SIGNING_SECRET` must carry the same secret value for the same production API environment.
 - The local default `project-lumen-local-request-signing-key` is allowed only for local development or deliberately matched non-production testing.
+- GitHub release and release-baseline builds must require a non-empty `PROJECT_LUMEN_REQUEST_SIGNING_SECRET`; they must not publish or profile a release artifact with the local fallback.
 - Backend request signing verification must default to disabled, including production deployments.
 - Backend deployment workflows must not hard-code `LUMEN_REQUIRE_REQUEST_SIGNING=true`; they must read an explicit operator-provided environment/repository variable and default it to `false` when absent.
 - Backend deployment workflows must pass the GitHub Actions secret `PROJECT_LUMEN_REQUEST_SIGNING_SECRET` into the running container as `LUMEN_REQUEST_SIGNING_SECRET` so request signing can be enabled without rebuilding.
@@ -32,6 +34,9 @@
 - All other protected `/v1` routes must continue to fail closed when `LUMEN_REQUIRE_REQUEST_SIGNING=true`.
 - All protected `/v1` routes must bypass request-signature verification when `LUMEN_REQUIRE_REQUEST_SIGNING` is unset, empty, or false.
 - Android release builds that use the native signing bridge must pass `-DANDROID_STL=c++_shared` and package/pick `**/libc++_shared.so` so `System.loadLibrary("lumen_security")` can resolve the C++ runtime.
+- Android must preserve the canonical payload fields, lexicographic ordering, newline separators without a trailing newline, and lowercase HMAC-SHA256 hex output. Moving HMAC into native code must not change this protocol.
+- The raw production signing secret must never cross JNI into Kotlin/Java. Release signing requires a verified native identity plus a fresh volatile security verdict for each signature.
+- Release workflows must derive the expected certificate fingerprint from the actual signing keystore. A separately configured fingerprint may assert parity but must not override the actual certificate used to sign the APK.
 - If `LUMEN_REQUIRE_REQUEST_SIGNING=true`, unsigned requests or signatures generated with a different secret must fail closed.
 - `LUMEN_REQUIRE_PLAY_INTEGRITY` is independent from request signing; enabling it requires clients to be able to attach `X-Lumen-Integrity`.
 
@@ -46,7 +51,7 @@
 - Android/backend signing secret mismatch -> HTTP 403 on otherwise valid signed requests.
 - Reused nonce within the accepted timestamp window -> HTTP 403.
 - Missing or too-short `X-Lumen-Integrity` while Play Integrity is required for that path -> HTTP 403.
-- Missing `libc++_shared.so` in an APK that needs the shared STL -> native signing bridge fails to load; request signing may fall back to the wrong key source and production API requests return HTTP 403.
+- Missing `libc++_shared.so` in an APK that needs the shared STL -> native signing bridge fails to load; release request signing fails before the request is sent.
 
 ### 5. Good/Base/Bad Cases
 
@@ -60,7 +65,7 @@
 - Bad: The update-discovery endpoint sits only behind request signing, so a released APK with a bad compiled secret cannot learn about the fixed release.
 - Bad: Android release is built with `PROJECT_LUMEN_REQUEST_SIGNING_SECRET`, but backend deployment omits `LUMEN_REQUEST_SIGNING_SECRET`; login starts fail with HTTP 403 even when diagnostics report `signed=true`.
 - Bad: Backend deployment hard-codes `LUMEN_REQUIRE_REQUEST_SIGNING=true`, enabling client request-signature verification without an explicit environment decision.
-- Bad: `lumen_security` uses C++ standard library code, but the APK omits `libc++_shared.so`; the client can report `signed=true` while signing with the fallback key after the native bridge fails.
+- Bad: `lumen_security` uses C++ standard library code, but the APK omits `libc++_shared.so`; all protected release requests fail locally because native signing cannot load.
 
 ### 6. Tests Required
 
@@ -72,6 +77,8 @@
 - Backend route/security tests: with `LUMEN_ALLOW_PUBLIC_RELEASE_CHECK=false`, unsigned release check returns HTTP 403 when request signing is required.
 - Backend route/security tests: a request signed with the configured secret succeeds, and the same request signed with a different secret returns HTTP 403.
 - Android signing tests: canonical payload construction remains aligned with backend canonicalization for method, path, query, body hash, timestamp, and nonce.
+- Native signing tests: RFC 4231 vectors and the same Android/backend canonical request fixture produce the expected lowercase signature.
+- Architecture test: no managed `requestSigningSecret` method or raw-secret JNI export remains.
 
 ### 7. Wrong vs Correct
 
@@ -91,7 +98,7 @@ let v1 = Router::new()
 ```kotlin
 externalNativeBuild {
     cmake {
-        arguments += listOf("-DLUMEN_REQUEST_SIGNING_SECRET=...")
+        arguments += listOf("-DLUMEN_REQUEST_SIGNING_SECRET_HEX=...")
     }
 }
 ```
@@ -115,7 +122,7 @@ externalNativeBuild {
     cmake {
         arguments += listOf(
             "-DANDROID_STL=c++_shared",
-            "-DLUMEN_REQUEST_SIGNING_SECRET=...",
+            "-DLUMEN_REQUEST_SIGNING_SECRET_HEX=...",
         )
     }
 }

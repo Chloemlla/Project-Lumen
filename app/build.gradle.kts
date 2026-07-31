@@ -36,6 +36,12 @@ fun projectLumenBuildConfigString(value: String): String {
         .replace("\"", "\\\"")
 }
 
+fun projectLumenUtf8Hex(value: String): String {
+    return value.toByteArray(Charsets.UTF_8).joinToString(separator = "") { byte ->
+        "%02x".format(byte.toInt() and 0xff)
+    }
+}
+
 fun projectLumenBooleanFlag(value: String?): Boolean {
     return value?.trim()?.lowercase() in setOf("1", "true", "yes", "on")
 }
@@ -117,6 +123,9 @@ android {
             .orNull
             ?.takeIf { it.isNotBlank() }
         ?: "project-lumen-local-request-signing-key"
+    val projectLumenRequestSigningSecretHex = projectLumenUtf8Hex(
+        projectLumenRequestSigningSecret.trim(),
+    )
     val projectLumenReleaseCertSha256 = providers.environmentVariable("PROJECT_LUMEN_RELEASE_CERT_SHA256")
         .orNull
         ?.takeIf { it.isNotBlank() }
@@ -171,7 +180,7 @@ android {
             cmake {
                 arguments += listOf(
                     "-DANDROID_STL=c++_shared",
-                    "-DLUMEN_REQUEST_SIGNING_SECRET=${projectLumenBuildConfigString(projectLumenRequestSigningSecret)}",
+                    "-DLUMEN_REQUEST_SIGNING_SECRET_HEX=$projectLumenRequestSigningSecretHex",
                     "-DLUMEN_RELEASE_CERT_SHA256=${projectLumenBuildConfigString(projectLumenReleaseCertSha256)}",
                     "-DLUMEN_EXPECTED_PACKAGE=${projectLumenBuildConfigString(projectLumenApplicationId)}",
                 )

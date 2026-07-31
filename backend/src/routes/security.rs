@@ -226,4 +226,49 @@ mod tests {
             "/apiary/v1/releases/check"
         ));
     }
+
+    #[test]
+    fn canonical_payload_matches_android_contract_vector() {
+        let canonical = canonical_payload(
+            "post",
+            "/api/v1/sync/push",
+            "channel=stable&cursor=7",
+            br#"{"a":1}"#,
+            "1720000000",
+            "00112233445566778899aabbccddeeff",
+        );
+
+        assert_eq!(
+            canonical,
+            concat!(
+                "bodySha256=015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862\n",
+                "method=POST\n",
+                "nonce=00112233445566778899aabbccddeeff\n",
+                "path=/api/v1/sync/push\n",
+                "query=channel=stable&cursor=7\n",
+                "timestamp=1720000000"
+            )
+        );
+    }
+
+    #[test]
+    fn signature_validation_matches_native_hmac_vector() {
+        let canonical = concat!(
+            "bodySha256=015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862\n",
+            "method=POST\n",
+            "nonce=00112233445566778899aabbccddeeff\n",
+            "path=/api/v1/sync/push\n",
+            "query=channel=stable&cursor=7\n",
+            "timestamp=1720000000"
+        );
+        let signature = "f9dee2240fc31dd902899ed4cba47fc6afbc8793660fd89c9af54a2155370cf2";
+
+        assert!(validate_signature(
+            "project-lumen-local-request-signing-key",
+            canonical,
+            signature,
+        )
+        .is_ok());
+        assert!(validate_signature("different-key", canonical, signature).is_err());
+    }
 }
