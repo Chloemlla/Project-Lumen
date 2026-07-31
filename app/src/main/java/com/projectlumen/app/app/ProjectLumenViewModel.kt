@@ -27,12 +27,13 @@ import com.projectlumen.app.core.security.DeviceInstallProfile
 import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.shizuku.ShizukuNetworkApp
+import com.projectlumen.app.core.update.BuildMetadata
+import com.projectlumen.app.core.update.BuildUpdateNotesLoader
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class ProjectLumenViewModel(
@@ -43,6 +44,7 @@ class ProjectLumenViewModel(
     backup: DataBackupService,
     apiClient: ProjectLumenApiClient,
     private val secureCredentials: SecureCredentialStore,
+    buildUpdateNotesLoader: BuildUpdateNotesLoader,
     eyeCarePreferences: EyeCarePreferencesDataStore,
     deviceInsights: DeviceInsightsRepository,
     startTimerService: () -> Unit,
@@ -79,11 +81,20 @@ class ProjectLumenViewModel(
                 packageFirstInstallAt = 0L,
                 onboardingCompletedAt = 0L,
                 ossNoticeCompletedAt = 0L,
+                lastAcknowledgedCommitHash = "",
+                lastAcknowledgedBuildTimeUtcMillis = 0L,
             )
         }
     private val deviceFingerprint = runCatching { secureCredentials.deviceInstallationId() }
         .onFailure { Log.e(TAG, "deviceInstallationId failed in ViewModel", it) }
         .getOrDefault("unknown-device")
+    private val firstOpenGateEntry = ProjectLumenFirstOpenGateEntry(
+        secureCredentials = secureCredentials,
+        buildUpdateNotesLoader = buildUpdateNotesLoader,
+        currentBuild = BuildMetadata.current(),
+        initialInstallProfile = installProfile,
+        deviceFingerprint = deviceFingerprint,
+    )
     private val crashReportingHandler = CoroutineExceptionHandler { _, throwable ->
         crashStateStore?.recordCrash(throwable) ?: recordCrashReport(throwable)
     }
@@ -161,22 +172,10 @@ class ProjectLumenViewModel(
         nativeProtectionSummary = nativeProtectionSummary,
     )
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
-    private val _ossNoticeState = MutableStateFlow(
-        ProjectLumenOssNoticeState(
-            // Avoid a first-frame flash of the main UI for incomplete first-run notices.
-            // Existing users who already finished product onboarding are settled in refresh.
-            visible = installProfile.ossNoticeCompletedAt <= 0L &&
-                installProfile.onboardingCompletedAt <= 0L,
-            reopenMode = false,
-        ),
-    )
-    private val _onboardingState = MutableStateFlow(
-        ProjectLumenOnboardingState(deviceFingerprint = deviceFingerprint),
-    )
-
     val webPageRequests = _webPageRequests.asSharedFlow()
-    val ossNoticeState = _ossNoticeState.asStateFlow()
-    val onboardingState = _onboardingState.asStateFlow()
+    val ossNoticeState = firstOpenGateEntry.ossNoticeState
+    val onboardingState = firstOpenGateEntry.onboardingState
+    val buildUpdateNotesState = firstOpenGateEntry.buildUpdateNotesState
     val backupImportPreview = backupEntry.importPreview
     internal val remoteState = remoteEntry.state
     val shizukuState = shizuku.state
@@ -346,41 +345,36 @@ class ProjectLumenViewModel(
     }
 
     fun completeOssNotice() {
-        val reopenMode = _ossNoticeState.value.reopenMode
-        if (!reopenMode) {
-            secureCredentials.markOssNoticeCompleted()
-        }
-        _ossNoticeState.value = ProjectLumenOssNoticeState(visible = false, reopenMode = false)
-        if (reopenMode) return
-        val onboardingStillPending = runCatching {
-            secureCredentials.installProfile().onboardingCompletedAt <= 0L
-        }.getOrDefault(true)
-        if (onboardingStillPending) {
-            _onboardingState.value = _onboardingState.value.copy(
-                visible = true,
-                deviceFingerprint = deviceFingerprint,
-            )
-        }
+        firstOpenGateEntry.completeOssNotice()
     }
 
     fun dismissOssNotice() {
-        // Used by system back while reopening from About. Do not re-arm first-run.
-        if (!_ossNoticeState.value.visible) return
-        _ossNoticeState.value = ProjectLumenOssNoticeState(visible = false, reopenMode = false)
+        firstOpenGateEntry.dismissOssNotice()
     }
 
     fun reopenOssNotice() {
-        _ossNoticeState.value = ProjectLumenOssNoticeState(visible = true, reopenMode = true)
+        firstOpenGateEntry.reopenOssNotice()
     }
 
     fun completeOnboarding(applyRecommendedSetup: Boolean) {
-        secureCredentials.markOnboardingCompleted()
-        _onboardingState.value = _onboardingState.value.copy(visible = false)
+        firstOpenGateEntry.completeOnboarding()
         if (!applyRecommendedSetup) return
         updateSettings { current ->
             recommendedEyeCareSettings(current).copy(pomodoroEnabled = true)
         }
         updateDailyGoal(::recommendedEyeCareDailyGoal)
+    }
+
+    fun completeBuildUpdateNotes() {
+        firstOpenGateEntry.completeBuildUpdateNotes()
+    }
+
+    fun dismissBuildUpdateNotes() {
+        firstOpenGateEntry.dismissBuildUpdateNotes()
+    }
+
+    fun reopenBuildUpdateNotes() {
+        firstOpenGateEntry.reopenBuildUpdateNotes()
     }
 
     fun selectTemplate(templateId: Long) {
@@ -458,41 +452,7 @@ class ProjectLumenViewModel(
     }
 
     private fun refreshOnboardingState(hadExistingLocalUse: Boolean) {
-        val nowMillis = System.currentTimeMillis()
-        val firstInstallAt = installProfile.packageFirstInstallAt
-        val freshPackageInstall = firstInstallAt <= 0L ||
-            nowMillis - firstInstallAt <= FRESH_INSTALL_WINDOW_MILLIS
-        val newInstallDetected = !installProfile.hadDeviceCredentialBeforeLaunch &&
-            (freshPackageInstall || installProfile.firstSeenAt >= nowMillis - FIRST_SEEN_GRACE_MILLIS)
-
-        // Gate solely on the OSS completion flag so killing the process mid-notice still
-        // re-shows the page. Existing users who already finished product onboarding before
-        // this feature are silently settled instead of being forced through the notice.
-        val ossAlreadyCompleted = installProfile.ossNoticeCompletedAt > 0L
-        val existingUserBeforeOssFeature = !ossAlreadyCompleted &&
-            installProfile.onboardingCompletedAt > 0L
-        if (existingUserBeforeOssFeature) {
-            runCatching { secureCredentials.markOssNoticeCompleted() }
-        }
-        val shouldShowOssNotice = !ossAlreadyCompleted && !existingUserBeforeOssFeature
-
-        val shouldShow = installProfile.onboardingCompletedAt <= 0L &&
-            !installProfile.hadDeviceCredentialBeforeLaunch &&
-            !hadExistingLocalUse &&
-            !shouldShowOssNotice
-        // Preserve an in-progress About reopen; only auto-drive first-run visibility here.
-        val currentOss = _ossNoticeState.value
-        if (!currentOss.reopenMode) {
-            _ossNoticeState.value = ProjectLumenOssNoticeState(
-                visible = shouldShowOssNotice,
-                reopenMode = false,
-            )
-        }
-        _onboardingState.value = ProjectLumenOnboardingState(
-            visible = shouldShow,
-            deviceFingerprint = deviceFingerprint,
-            newInstallDetected = newInstallDetected,
-        )
+        firstOpenGateEntry.refresh(hadExistingLocalUse)
     }
 
     private inline fun reportIfThrows(block: () -> Unit) {
@@ -506,7 +466,5 @@ class ProjectLumenViewModel(
 
     private companion object {
         private const val TAG = "ProjectLumenViewModel"
-        private const val FRESH_INSTALL_WINDOW_MILLIS = 3L * 24L * 60L * 60L * 1_000L
-        private const val FIRST_SEEN_GRACE_MILLIS = 5L * 60L * 1_000L
     }
 }
