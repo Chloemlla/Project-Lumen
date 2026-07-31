@@ -26,7 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -105,8 +105,7 @@ internal fun ProjectLumenBuildUpdateNotesScreen(
 
 @Composable
 private fun BuildUpdateNotesIdentityCard(notes: BuildUpdateNotes) {
-    val context = LocalContext.current
-    val locale = context.resources.configuration.locales[0]
+    val locale = LocalConfiguration.current.locales[0]
     val buildTime = remember(notes.buildTimeUtcMillis, locale.toLanguageTag()) {
         runCatching {
             Instant.ofEpochMilli(notes.buildTimeUtcMillis)
