@@ -1,3 +1,0 @@
-{"file": ".trellis/spec/backend/deployment-security.md", "reason": "Verify active Plus/Team allow and Free/Pro/expired entitlement denial coverage."}
-{"file": ".trellis/spec/backend/error-handling.md", "reason": "Verify 403 responses retain the stable commercial_plus_required reason code."}
-{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Source-only quality review and CI-owned Rust verification checklist."}

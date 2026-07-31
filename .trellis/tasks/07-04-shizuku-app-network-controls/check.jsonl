@@ -1,5 +1,0 @@
-{"file":".trellis/spec/frontend/index.md","reason":"Provides the Android frontend quality routing checklist."}
-{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Checks component size, duplication, type safety, and regression coverage."}
-{"file":".trellis/spec/frontend/android-shizuku-network-controls.md","reason":"Verifies reversible partial-result behavior and explicit unsupported states."}
-{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Checks that active-state logic has one implementation contract."}
-{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Checks the command-result, persistence, and UI round trip."}
