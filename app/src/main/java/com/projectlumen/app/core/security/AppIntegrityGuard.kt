@@ -8,6 +8,14 @@ import android.util.Log
 import com.projectlumen.app.BuildConfig
 import java.security.MessageDigest
 
+internal fun managedIntegrityFailureReasons(
+    javaDebugDetected: Boolean,
+    runtimeHookDetected: Boolean,
+): List<String> = buildList {
+    if (javaDebugDetected) add("java_debugger")
+    if (runtimeHookDetected) add("java_runtime_hook")
+}
+
 object AppIntegrityGuard {
     private const val TAG = "AppIntegrityGuard"
 
@@ -15,11 +23,35 @@ object AppIntegrityGuard {
         if (BuildConfig.DEBUG) return
 
         val appContext = context.applicationContext
-        val javaDebugDetected = Debug.isDebuggerConnected() || Debug.waitingForDebugger()
+        // Clear any identity established by an earlier diagnostic or enforcement call before
+        // evaluating managed signals. A Java-side rejection must never leave native signing
+        // authorized for the rest of the process.
+        NativeSecurityBridge.invalidateVerifiedIdentity()
+        val managedFailureReasons = managedIntegrityFailureReasons(
+            javaDebugDetected = Debug.isDebuggerConnected() || Debug.waitingForDebugger(),
+            runtimeHookDetected = hasRuntimeHookingClasses(),
+        )
+        if (!BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED || managedFailureReasons.isNotEmpty()) {
+            val diagnosticReasons = managedFailureReasons.ifEmpty { listOf("certificate_not_configured") }
+            if (!BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED) {
+                Log.e(
+                    TAG,
+                    "App integrity enforcement is not configured; release signing remains blocked: " +
+                        diagnosticReasons.joinToString(),
+                )
+                return
+            }
+            Log.e(TAG, "Integrity check failed: ${managedFailureReasons.joinToString()}")
+            throw SecurityException(
+                "Project Lumen integrity check failed: ${managedFailureReasons.joinToString()}.",
+            )
+        }
+
         val nativeVerdict = NativeSecurityBridge.evaluateEnvironmentOrNull(
             packageName = appContext.packageName,
             signingCertSha256 = signingCertificateSha256(appContext),
             debugAllowed = false,
+            establishReleaseIdentity = true,
         )
         if (nativeVerdict == null) {
             // Native bridge unavailable (missing ABI / load failure). Log and soft-fail so
@@ -29,19 +61,7 @@ object AppIntegrityGuard {
             return
         }
 
-        val failureReasons = buildList {
-            if (javaDebugDetected) add("java_debugger")
-            addAll(nativeVerdict.diagnosticCodes().map { reason -> "native_$reason" })
-            if (hasRuntimeHookingClasses()) add("java_runtime_hook")
-        }
-        if (!BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED) {
-            Log.e(
-                TAG,
-                "App integrity enforcement is not configured; release signing remains blocked: " +
-                    failureReasons.joinToString().ifBlank { "certificate_not_configured" },
-            )
-            return
-        }
+        val failureReasons = nativeVerdict.diagnosticCodes().map { reason -> "native_$reason" }
         if (failureReasons.isNotEmpty()) {
             // Soft-fail: still report via caller runCatching, but never hard-kill the process
             // when the failure is environment-related (managed emulators, debug hooks).
@@ -54,10 +74,21 @@ object AppIntegrityGuard {
 
     fun nativeProtectionSummary(context: Context): String {
         val appContext = context.applicationContext
+        val managedFailureReasons = managedIntegrityFailureReasons(
+            javaDebugDetected = !BuildConfig.DEBUG &&
+                (Debug.isDebuggerConnected() || Debug.waitingForDebugger()),
+            runtimeHookDetected = !BuildConfig.DEBUG && hasRuntimeHookingClasses(),
+        )
+        if (!BuildConfig.DEBUG &&
+            (!BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED || managedFailureReasons.isNotEmpty())
+        ) {
+            NativeSecurityBridge.invalidateVerifiedIdentity()
+        }
         val nativeVerdict = NativeSecurityBridge.evaluateEnvironmentOrNull(
             packageName = appContext.packageName,
             signingCertSha256 = signingCertificateSha256(appContext),
             debugAllowed = BuildConfig.DEBUG,
+            establishReleaseIdentity = false,
         )
         return buildList {
             add("nativeBridge=${if (NativeSecurityBridge.isAvailable) "available" else "unavailable"}")
@@ -69,6 +100,10 @@ object AppIntegrityGuard {
                 },
             )
             add("nativeReasons=${nativeVerdict?.diagnosticSummary() ?: "native_load_failure"}")
+            add(
+                "managedReasons=" +
+                    managedFailureReasons.joinToString(",").ifBlank { "none" },
+            )
             add(
                 "requestSigning=" + if (BuildConfig.DEBUG) {
                     "native_or_debug_fallback"

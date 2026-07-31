@@ -1,5 +1,6 @@
 #include "lumen_security_crypto.h"
 #include "lumen_security_identity.h"
+#include "lumen_security_sockets.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -61,18 +62,18 @@ void verifies_project_lumen_canonical_vector() {
     );
 }
 
-void decodes_the_compiled_secret_representation() {
+void decodes_the_utf8_hex_fixture() {
     std::vector<std::uint8_t> decoded;
     require(
         lumen::security::decode_hex(
             "70726f6a6563742d6c756d656e2d6c6f63616c2d726571756573742d7369676e696e672d6b6579",
             &decoded
         ),
-        "Signing secret hex could not be decoded"
+        "UTF-8 hex fixture could not be decoded"
     );
     require(
         decoded == bytes("project-lumen-local-request-signing-key"),
-        "Signing secret hex decoded to different bytes"
+        "UTF-8 hex fixture decoded to different bytes"
     );
     lumen::security::secure_clear(&decoded);
 }
@@ -102,13 +103,35 @@ void normalizes_certificate_fingerprints() {
     );
 }
 
+void limits_unix_socket_matches_to_owned_descriptors() {
+    require(
+        lumen::security::socket_inode_from_fd_target("socket:[4242]") == "4242",
+        "Socket fd target inode was not parsed"
+    );
+    require(
+        lumen::security::socket_inode_from_fd_target("/tmp/frida.sock").empty(),
+        "Non-socket fd target was misclassified"
+    );
+    const std::string suspicious_line =
+        "0000000000000000: 00000002 00000000 00010000 0001 01 4242 @frida-server";
+    require(
+        lumen::security::unix_socket_line_is_owned(suspicious_line, {"4242"}),
+        "Owned suspicious socket line was not recognized"
+    );
+    require(
+        !lumen::security::unix_socket_line_is_owned(suspicious_line, {"9999"}),
+        "A different process socket inode was treated as owned"
+    );
+}
+
 }  // namespace
 
 int main() {
     verifies_rfc_4231_hmac_vector();
     verifies_rfc_4231_long_key_vector();
     verifies_project_lumen_canonical_vector();
-    decodes_the_compiled_secret_representation();
+    decodes_the_utf8_hex_fixture();
     normalizes_certificate_fingerprints();
+    limits_unix_socket_matches_to_owned_descriptors();
     return 0;
 }

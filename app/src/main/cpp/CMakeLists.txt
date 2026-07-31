@@ -9,6 +9,7 @@ add_library(
     lumen_security_crypto.cpp
     lumen_security_identity.cpp
     lumen_security_runtime.cpp
+    lumen_security_sockets.cpp
 )
 
 target_compile_features(lumen_security PRIVATE cxx_std_17)

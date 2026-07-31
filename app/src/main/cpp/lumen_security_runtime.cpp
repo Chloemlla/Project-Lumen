@@ -1,7 +1,9 @@
 #include "lumen_security_runtime.h"
 
 #include "lumen_security_reasons.h"
+#include "lumen_security_sockets.h"
 
+#include <algorithm>
 #include <array>
 #include <cerrno>
 #include <cctype>
@@ -10,6 +12,7 @@
 #include <limits.h>
 #include <string>
 #include <unistd.h>
+#include <vector>
 
 extern "C" char **environ;
 
@@ -149,7 +152,10 @@ DetectionState scan_task_names(const std::array<const char *, Count> &needles) {
 }
 
 template <std::size_t Count>
-DetectionState scan_file_descriptors(const std::array<const char *, Count> &needles) {
+DetectionState scan_file_descriptors(
+    const std::array<const char *, Count> &needles,
+    std::vector<std::string> *owned_socket_inodes
+) {
     constexpr std::size_t max_descriptors = 1024;
     DIR *directory = opendir("/proc/self/fd");
     if (directory == nullptr) return DetectionState::kError;
@@ -169,6 +175,15 @@ DetectionState scan_file_descriptors(const std::array<const char *, Count> &need
         }
         const std::string path = std::string("/proc/self/fd/") + entry->d_name;
         const std::string target = read_symlink_target(path);
+        const std::string socket_inode = socket_inode_from_fd_target(target);
+        if (!socket_inode.empty() && owned_socket_inodes != nullptr &&
+            std::find(
+                owned_socket_inodes->begin(),
+                owned_socket_inodes->end(),
+                socket_inode
+            ) == owned_socket_inodes->end()) {
+            owned_socket_inodes->push_back(socket_inode);
+        }
         if (!target.empty() && contains_any(target, needles)) {
             result = DetectionState::kDetected;
             break;
@@ -207,12 +222,23 @@ DetectionState detect_hook_artifacts() {
         "zygisk",
     };
 
+    std::vector<std::string> owned_socket_inodes;
+    const DetectionState descriptor_state =
+        scan_file_descriptors(transport_artifacts, &owned_socket_inodes);
+    const std::vector<std::string_view> transport_needles(
+        transport_artifacts.begin(),
+        transport_artifacts.end()
+    );
+    const DetectionState owned_socket_state =
+        scan_owned_unix_socket_artifacts(owned_socket_inodes, transport_needles)
+            ? DetectionState::kDetected
+            : DetectionState::kClean;
     const std::array<DetectionState, 5> states = {
         scan_text_file("/proc/self/maps", mapped_artifacts, 4U * 1024U * 1024U),
         scan_text_file("/proc/self/cmdline", mapped_artifacts, 4096U),
-        scan_text_file("/proc/net/unix", transport_artifacts, 1024U * 1024U),
         scan_task_names(task_artifacts),
-        scan_file_descriptors(transport_artifacts),
+        descriptor_state,
+        owned_socket_state,
     };
     bool has_error = false;
     for (const DetectionState state : states) {

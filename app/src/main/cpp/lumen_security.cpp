@@ -12,8 +12,7 @@
 #include <vector>
 
 #ifndef LUMEN_REQUEST_SIGNING_SECRET_HEX
-#define LUMEN_REQUEST_SIGNING_SECRET_HEX \
-    "70726f6a6563742d6c756d656e2d6c6f63616c2d726571756573742d7369676e696e672d6b6579"
+#define LUMEN_REQUEST_SIGNING_SECRET_HEX ""
 #endif
 
 #ifndef LUMEN_RELEASE_CERT_SHA256
@@ -81,10 +80,6 @@ std::uint32_t evaluate_environment(
     }
 
     if (!debug_allowed) reasons |= collect_volatile_reasons();
-    release_identity_verified.store(
-        !debug_allowed && reasons == 0,
-        std::memory_order_release
-    );
     return reasons;
 }
 
@@ -121,7 +116,8 @@ Java_com_projectlumen_app_core_security_NativeSecurityBridge_evaluateEnvironment
     jobject /* unused */,
     jstring package_name,
     jstring signing_cert_sha256,
-    jboolean debug_allowed
+    jboolean debug_allowed,
+    jboolean establish_release_identity
 ) {
     using namespace lumen::security;
     try {
@@ -137,14 +133,26 @@ Java_com_projectlumen_app_core_security_NativeSecurityBridge_evaluateEnvironment
             debug_allowed == JNI_TRUE
         );
         if (!package_success || !certificate_success) reasons |= kInternalFailure;
-        if (debug_allowed == JNI_FALSE && reasons != 0) {
-            release_identity_verified.store(false, std::memory_order_release);
+        if (debug_allowed == JNI_FALSE) {
+            if (reasons != 0) {
+                release_identity_verified.store(false, std::memory_order_release);
+            } else if (establish_release_identity == JNI_TRUE) {
+                release_identity_verified.store(true, std::memory_order_release);
+            }
         }
         return static_cast<jint>(reasons);
     } catch (...) {
         release_identity_verified.store(false, std::memory_order_release);
         return static_cast<jint>(kInternalFailure);
     }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_projectlumen_app_core_security_NativeSecurityBridge_invalidateReleaseIdentity(
+    JNIEnv * /* env */,
+    jobject /* unused */
+) {
+    release_identity_verified.store(false, std::memory_order_release);
 }
 
 extern "C" JNIEXPORT jstring JNICALL

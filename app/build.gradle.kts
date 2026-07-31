@@ -11,6 +11,35 @@ val projectLumenStorePassword = providers.gradleProperty("PROJECT_LUMEN_STORE_PA
 val projectLumenKeyAlias = providers.gradleProperty("PROJECT_LUMEN_KEY_ALIAS").orNull
 val projectLumenKeyPassword = providers.gradleProperty("PROJECT_LUMEN_KEY_PASSWORD").orNull
 val projectLumenApplicationId = "com.chloemlla.projectlumen"
+val projectLumenDebugRequestSigningSecret = "project-lumen-local-request-signing-key"
+val projectLumenReleaseNativeSecurityRequired = gradle.startParameter.taskNames.any { taskName ->
+    val normalized = taskName.lowercase()
+    normalized.contains("baselineprofile") ||
+        (normalized.contains("release") &&
+            (!normalized.startsWith(":") || normalized.startsWith(":app:")))
+}
+val projectLumenConfiguredRequestSigningSecret = providers.environmentVariable(
+    "PROJECT_LUMEN_REQUEST_SIGNING_SECRET",
+).orNull ?: providers.gradleProperty("PROJECT_LUMEN_REQUEST_SIGNING_SECRET").orNull
+val projectLumenRequestSigningSecret = projectLumenConfiguredRequestSigningSecret.orEmpty()
+require(
+    projectLumenConfiguredRequestSigningSecret == null ||
+        projectLumenConfiguredRequestSigningSecret == projectLumenConfiguredRequestSigningSecret.trim(),
+) {
+    "PROJECT_LUMEN_REQUEST_SIGNING_SECRET must not contain leading or trailing whitespace."
+}
+require(
+    !projectLumenReleaseNativeSecurityRequired ||
+        projectLumenConfiguredRequestSigningSecret?.isNotBlank() == true,
+) {
+    "PROJECT_LUMEN_REQUEST_SIGNING_SECRET is required and must not be blank for release builds."
+}
+require(
+    !projectLumenReleaseNativeSecurityRequired ||
+        projectLumenConfiguredRequestSigningSecret != projectLumenDebugRequestSigningSecret,
+) {
+    "Release builds cannot use the local request-signing fallback secret."
+}
 val projectLumenReleaseSigningConfigured = listOf(
     projectLumenStoreFile,
     projectLumenStorePassword,
@@ -116,15 +145,8 @@ android {
             .orNull
             ?: providers.gradleProperty("PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINNING_ENABLED").orNull,
     )
-    val projectLumenRequestSigningSecret = providers.environmentVariable("PROJECT_LUMEN_REQUEST_SIGNING_SECRET")
-        .orNull
-        ?.takeIf { it.isNotBlank() }
-        ?: providers.gradleProperty("PROJECT_LUMEN_REQUEST_SIGNING_SECRET")
-            .orNull
-            ?.takeIf { it.isNotBlank() }
-        ?: "project-lumen-local-request-signing-key"
     val projectLumenRequestSigningSecretHex = projectLumenUtf8Hex(
-        projectLumenRequestSigningSecret.trim(),
+        projectLumenRequestSigningSecret,
     )
     val projectLumenReleaseCertSha256 = providers.environmentVariable("PROJECT_LUMEN_RELEASE_CERT_SHA256")
         .orNull
@@ -169,9 +191,10 @@ android {
         versionCode = projectLumenVersionCode
         versionName = projectLumenVersionName
 
-        // Keep x86_64 for managed-device baseline profile generation on CI emulators.
+        // Ship only 16 KB-ready 64-bit ABIs. The current ML Kit / libc++ native artifacts
+        // for armeabi-v7a and x86 contain 4 KB PT_LOAD segments and cannot pass the APK gate.
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -227,7 +250,7 @@ android {
         abi {
             isEnable = !isBaselineProfileTask
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            include("arm64-v8a", "x86_64")
             isUniversalApk = true
         }
     }

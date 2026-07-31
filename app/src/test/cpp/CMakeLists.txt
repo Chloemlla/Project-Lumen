@@ -9,6 +9,7 @@ add_executable(
     lumen_security_native_tests.cpp
     ../../main/cpp/lumen_security_crypto.cpp
     ../../main/cpp/lumen_security_identity.cpp
+    ../../main/cpp/lumen_security_sockets.cpp
 )
 
 target_compile_features(lumen_security_native_tests PRIVATE cxx_std_17)

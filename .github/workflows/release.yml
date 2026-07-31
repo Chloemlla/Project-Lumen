@@ -17,6 +17,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Validate release request signing secret
+        uses: ./.github/actions/validate-release-request-signing-secret
+        env:
+          PROJECT_LUMEN_REQUEST_SIGNING_SECRET: ${{ secrets.PROJECT_LUMEN_REQUEST_SIGNING_SECRET }}
+
       - name: Set up Java 21
         uses: actions/setup-java@v5
         with:
@@ -214,7 +219,7 @@ jobs:
 
           cp "$AGGREGATED_APK" "release-assets/Project-Lumen_android_${VERSION}.apk"
 
-          for variant in armeabi-v7a arm64-v8a x86 x86_64; do
+          for variant in arm64-v8a x86_64; do
             VARIANT_APK="$(find "$APK_DIR" -maxdepth 1 -type f -name "app-${variant}-release.apk" | head -n 1)"
             if [ -n "$VARIANT_APK" ]; then
               cp "$VARIANT_APK" "release-assets/Project-Lumen_android_${VERSION}_${variant}.apk"
@@ -246,7 +251,7 @@ jobs:
                   checksums[pathlib.Path(parts[-1]).name] = parts[0].lower()
 
           def abi_for(name):
-              for abi in ("armeabi-v7a", "arm64-v8a", "x86", "x86_64"):
+              for abi in ("arm64-v8a", "x86_64"):
                   if name.endswith(f"_{abi}.apk"):
                       return abi
               return "universal"

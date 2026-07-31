@@ -31,6 +31,7 @@ class NativeSecurityArchitectureTest {
             "lumen_security_crypto.cpp",
             "lumen_security_identity.cpp",
             "lumen_security_runtime.cpp",
+            "lumen_security_sockets.cpp",
         ).forEach { source -> assertTrue("CMake is missing $source", cmake.contains(source)) }
     }
 
@@ -53,6 +54,96 @@ class NativeSecurityArchitectureTest {
                 kotlinReasons.contains(kotlinDeclaration),
             )
         }
+    }
+
+    @Test
+    fun managedRejectionsPrecedeNativeIdentityEstablishment() {
+        val repositoryRoot = findRepositoryRoot()
+        val guard = File(
+            repositoryRoot,
+            "app/src/main/java/com/projectlumen/app/core/security/AppIntegrityGuard.kt",
+        ).readText()
+        val bridge = File(
+            repositoryRoot,
+            "app/src/main/java/com/projectlumen/app/core/security/NativeSecurityBridge.kt",
+        ).readText()
+        val enforce = guard.substringBefore("fun nativeProtectionSummary")
+
+        assertTrue(enforce.indexOf("managedIntegrityFailureReasons") >= 0)
+        assertTrue(enforce.indexOf("NativeSecurityBridge.invalidateVerifiedIdentity()") >= 0)
+        assertTrue(
+            "Managed checks must happen before native evaluation",
+            enforce.indexOf("managedFailureReasons") <
+                enforce.indexOf("NativeSecurityBridge.evaluateEnvironmentOrNull"),
+        )
+        assertTrue(enforce.contains("establishReleaseIdentity = true"))
+        assertTrue(
+            "Diagnostics must not establish release identity",
+            guard.substringAfter("fun nativeProtectionSummary")
+                .contains("establishReleaseIdentity = false"),
+        )
+        assertTrue(bridge.contains("managedReleaseIdentityVerified = false"))
+        assertTrue(bridge.contains("RELEASE_IDENTITY_NOT_VERIFIED.bit"))
+    }
+
+    @Test
+    fun unixSocketScanIsBoundToSelfFdInodes() {
+        val repositoryRoot = findRepositoryRoot()
+        val runtime = File(
+            repositoryRoot,
+            "app/src/main/cpp/lumen_security_runtime.cpp",
+        ).readText()
+        val sockets = File(
+            repositoryRoot,
+            "app/src/main/cpp/lumen_security_sockets.cpp",
+        ).readText()
+
+        assertFalse(runtime.contains("scan_text_file(\"/proc/net/unix\""))
+        assertTrue(runtime.contains("socket_inode_from_fd_target"))
+        assertTrue(sockets.contains("unix_socket_line_is_owned"))
+        assertTrue(sockets.contains("/proc/net/unix"))
+    }
+
+    @Test
+    fun releaseSigningSecretCannotUseWhitespaceOrDevelopmentFallbacks() {
+        val repositoryRoot = findRepositoryRoot()
+        val gradleBuild = File(repositoryRoot, "app/build.gradle.kts").readText()
+        val nativeEntry = File(repositoryRoot, "app/src/main/cpp/lumen_security.cpp").readText()
+        val secretValidationAction = File(
+            repositoryRoot,
+            ".github/actions/validate-release-request-signing-secret/action.yml",
+        ).readText()
+        val buildWorkflow = File(repositoryRoot, ".github/workflows/build.yml").readText()
+        val releaseWorkflow = File(repositoryRoot, ".github/workflows/release.yml").readText()
+
+        assertTrue(gradleBuild.contains("projectLumenConfiguredRequestSigningSecret.orEmpty()"))
+        assertTrue(gradleBuild.contains("normalized.startsWith(\":app:\")"))
+        assertTrue(gradleBuild.contains("must not contain leading or trailing whitespace"))
+        assertTrue(gradleBuild.contains("Release builds cannot use the local request-signing"))
+        assertFalse(gradleBuild.contains("projectLumenRequestSigningSecret.trim()"))
+        assertTrue(nativeEntry.contains("#define LUMEN_REQUEST_SIGNING_SECRET_HEX \"\""))
+        assertTrue(secretValidationAction.contains("TRIMMED_REQUEST_SIGNING_SECRET"))
+        assertTrue(secretValidationAction.contains("project-lumen-local-request-signing-key"))
+        assertTrue(buildWorkflow.contains("validate-release-request-signing-secret"))
+        assertTrue(releaseWorkflow.contains("validate-release-request-signing-secret"))
+        assertTrue(
+            buildWorkflow.indexOf("validate-release-request-signing-secret") <
+                buildWorkflow.indexOf("Set up Java 21"),
+        )
+    }
+
+    @Test
+    fun releasePackagingStaysOnVerifiedSixteenKilobyteAbis() {
+        val repositoryRoot = findRepositoryRoot()
+        val gradleBuild = File(repositoryRoot, "app/build.gradle.kts").readText()
+        val buildWorkflow = File(repositoryRoot, ".github/workflows/build.yml").readText()
+        val releaseWorkflow = File(repositoryRoot, ".github/workflows/release.yml").readText()
+
+        assertTrue(gradleBuild.contains("abiFilters += listOf(\"arm64-v8a\", \"x86_64\")"))
+        assertTrue(gradleBuild.contains("include(\"arm64-v8a\", \"x86_64\")"))
+        assertFalse(gradleBuild.contains("include(\"armeabi-v7a\""))
+        assertFalse(buildWorkflow.contains("for variant in armeabi-v7a"))
+        assertFalse(releaseWorkflow.contains("for variant in armeabi-v7a"))
     }
 
     private fun findRepositoryRoot(): File {

@@ -1,0 +1,29 @@
+name: Validate release request signing secret
+description: Reject missing, whitespace-mutated, or development-only release signing secrets.
+
+runs:
+  using: composite
+  steps:
+    - name: Validate request signing secret
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        REQUEST_SIGNING_SECRET="${PROJECT_LUMEN_REQUEST_SIGNING_SECRET:-}"
+        TRIMMED_REQUEST_SIGNING_SECRET="$(
+          printf '%s' "$REQUEST_SIGNING_SECRET" |
+            sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+        )"
+
+        if [ -z "$REQUEST_SIGNING_SECRET" ]; then
+          echo "::error::PROJECT_LUMEN_REQUEST_SIGNING_SECRET is required for release builds."
+          exit 1
+        fi
+        if [ "$REQUEST_SIGNING_SECRET" != "$TRIMMED_REQUEST_SIGNING_SECRET" ]; then
+          echo "::error::PROJECT_LUMEN_REQUEST_SIGNING_SECRET must not contain leading or trailing whitespace."
+          exit 1
+        fi
+        if [ "$REQUEST_SIGNING_SECRET" = "project-lumen-local-request-signing-key" ]; then
+          echo "::error::Release builds cannot use the local request-signing fallback secret."
+          exit 1
+        fi
