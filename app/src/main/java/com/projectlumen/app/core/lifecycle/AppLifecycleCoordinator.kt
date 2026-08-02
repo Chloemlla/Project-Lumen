@@ -2,6 +2,7 @@ package com.projectlumen.app.core.lifecycle
 
 import android.app.ActivityManager
 import android.os.Build
+import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.projectlumen.app.BuildConfig
@@ -60,22 +61,27 @@ class AppLifecycleCoordinator(
             runtimeRepository.upsert(persistedRuntime)
             app.notifications.syncRuntimeAlarms(settings, persistedRuntime)
             if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) {
-                app.scheduleProximityMonitoring()
+                runCatching { app.scheduleProximityMonitoring() }
+                    .onFailure { Log.w(TAG, "scheduleProximityMonitoring failed", it) }
             }
             if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) {
-                app.startLightMonitoring()
+                runCatching { app.startLightMonitoring() }
+                    .onFailure { Log.w(TAG, "startLightMonitoring failed", it) }
             }
             if (settings.shizukuAdvancedModeEnabled && settings.shizukuNativeEyeProtectionEnabled) {
-                app.shizuku.applyNativeEyeProtection(settings, smooth = false)
+                runCatching { app.shizuku.applyNativeEyeProtection(settings, smooth = false) }
+                    .onFailure { Log.w(TAG, "applyNativeEyeProtection failed", it) }
             }
             if (
                 settings.shizukuAdvancedModeEnabled &&
                 (settings.shizukuServiceRecoveryEnabled || settings.shizukuNativeEyeProtectionEnabled)
             ) {
-                app.startShizukuResilience()
+                runCatching { app.startShizukuResilience() }
+                    .onFailure { Log.w(TAG, "startShizukuResilience failed", it) }
             }
             if (foregroundRuntime.activeEngine != ActiveEngine.IDLE.name && settings.keepAliveEnabled) {
-                app.startTimerService()
+                runCatching { app.startTimerService() }
+                    .onFailure { Log.w(TAG, "startTimerService failed", it) }
             }
         }
     }
@@ -250,6 +256,7 @@ class AppLifecycleCoordinator(
     }
 
     private companion object {
+        private const val TAG = "AppLifecycle"
         private const val TOKEN_REFRESH_MARGIN_MILLIS = 60_000L
     }
 }
