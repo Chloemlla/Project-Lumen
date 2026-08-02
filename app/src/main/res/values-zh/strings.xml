@@ -517,6 +517,13 @@
     <string name="developer_section_raw_sensors">传感器原始数据</string>
     <string name="developer_section_crash">崩溃页面调试</string>
     <string name="developer_section_mode">开发者模式</string>
+    <string name="developer_crooot_root_status">Root 状态</string>
+    <string name="developer_crooot_suspicious_indicators">可疑指标</string>
+    <string name="developer_crooot_hardware_integrity">硬件完整性</string>
+    <string name="developer_crooot_selinux">SELinux</string>
+    <string name="developer_crooot_tee_attestation">TEE 证明</string>
+    <string name="developer_crooot_show_report">显示详细 CRooot 报告</string>
+    <string name="developer_crooot_hide_report">隐藏详细 CRooot 报告</string>
     <string name="developer_overlay_enabled">实时悬浮调试小窗</string>
     <string name="developer_preview_enabled">低分辨率抽样预览</string>
     <string name="developer_ai_inference">AI 推理耗时</string>

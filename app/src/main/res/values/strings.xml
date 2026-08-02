@@ -518,6 +518,13 @@
     <string name="developer_section_raw_sensors">Raw sensor data</string>
     <string name="developer_section_crash">Crash page debug</string>
     <string name="developer_section_mode">Developer mode</string>
+    <string name="developer_crooot_root_status">Root status</string>
+    <string name="developer_crooot_suspicious_indicators">Suspicious indicators</string>
+    <string name="developer_crooot_hardware_integrity">Hardware integrity</string>
+    <string name="developer_crooot_selinux">SELinux</string>
+    <string name="developer_crooot_tee_attestation">TEE attestation</string>
+    <string name="developer_crooot_show_report">Show detailed CRooot report</string>
+    <string name="developer_crooot_hide_report">Hide detailed CRooot report</string>
     <string name="developer_overlay_enabled">Realtime floating debug window</string>
     <string name="developer_preview_enabled">Low-res sample preview</string>
     <string name="developer_ai_inference">AI inference</string>
