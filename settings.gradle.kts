@@ -19,6 +19,21 @@ dependencyResolutionManagement {
                 password = "developer!@#"
             }
         }
+        maven(url = "https://jitpack.io") {
+            content { includeGroup("com.github.Tencent.soter") }
+        }
+        maven {
+            url = uri("https://maven.pkg.github.com/Chloemlla/CRooot")
+            content { includeGroup("com.chloemlla.crooot") }
+            credentials {
+                username = providers.gradleProperty("gpr.user")
+                    .orElse(providers.environmentVariable("GITHUB_ACTOR"))
+                    .orNull
+                password = providers.gradleProperty("gpr.key")
+                    .orElse(providers.environmentVariable("GITHUB_TOKEN"))
+                    .orNull
+            }
+        }
     }
 }
 

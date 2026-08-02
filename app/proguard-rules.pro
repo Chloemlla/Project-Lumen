@@ -90,3 +90,18 @@
 -keepclassmembers class com.chloemlla.lumen.crash.** { *; }
 -dontwarn com.chloemlla.lumen.crash.**
 -keepnames class com.chloemlla.lumen.crash.**
+
+# CRooot SDK — keep all detector classes for JNI and reflection-based probes.
+-keep class com.chloemlla.crooot.** { *; }
+-keep class com.eltavine.duckdetector.** { *; }
+-keep class com.juanma0511.rootdetector.** { *; }
+-dontwarn com.eltavine.duckdetector.**
+-dontwarn com.juanma0511.rootdetector.**
+
+# Keep JNI native methods from both detector engines.
+-keepclasseswithmembernames class com.juanma0511.rootdetector.detector.NativeChecks {
+    native <methods>;
+}
+-keepclasseswithmembernames class com.eltavine.duckdetector.** {
+    native <methods>;
+}

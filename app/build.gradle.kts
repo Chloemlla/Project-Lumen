@@ -298,6 +298,7 @@ ksp {
 
 dependencies {
     implementation(project(":lumen-crash"))
+    implementation("com.chloemlla.crooot:crooot-sdk:0.1.0")
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)

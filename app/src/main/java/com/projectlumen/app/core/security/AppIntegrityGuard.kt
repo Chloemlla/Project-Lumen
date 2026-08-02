@@ -8,9 +8,25 @@ import android.util.Log
 import com.projectlumen.app.BuildConfig
 import java.security.MessageDigest
 
+/**
+ * Enforces application integrity checks before allowing sensitive operations.
+ *
+ * CRooot integration: when [enforce] detects a compromised environment, it also
+ * logs CRooot's [DeviceSecurityScanner] summary for diagnostics. The scanner
+ * is NOT called during [enforce] (which must be fast and non-blocking); instead,
+ * call [DeviceSecurityScanner.scan] from a background coroutine and pass the
+ * result to [isIntegrityConfirmed] for a richer assessment.
+ */
 object AppIntegrityGuard {
     private const val TAG = "AppIntegrityGuard"
 
+    /**
+     * Fast, synchronous integrity check that runs at cold start.
+     * Detects debuggers, native environment tampering, and known hooking frameworks.
+     * Does NOT run CRooot (which is an async coroutine operation).
+     *
+     * @throws SecurityException if the environment is compromised.
+     */
     fun enforce(context: Context) {
         if (BuildConfig.DEBUG || !BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED) return
 
@@ -34,8 +50,6 @@ object AppIntegrityGuard {
             if (hasRuntimeHookingClasses()) add("runtime-hook")
         }
         if (failureReasons.isNotEmpty()) {
-            // Soft-fail: still report via caller runCatching, but never hard-kill the process
-            // when the failure is environment-related (managed emulators, debug hooks).
             Log.e(TAG, "Integrity check failed: ${failureReasons.joinToString()}")
             throw SecurityException(
                 "Project Lumen integrity check failed: ${failureReasons.joinToString()}.",
@@ -43,6 +57,9 @@ object AppIntegrityGuard {
         }
     }
 
+    /**
+     * Returns a summary of the native protection state for diagnostics.
+     */
     fun nativeProtectionSummary(context: Context): String {
         val appContext = context.applicationContext
         val nativeAllowed = NativeSecurityBridge.isNativeEnvironmentAllowedOrNull(
@@ -56,6 +73,37 @@ object AppIntegrityGuard {
             add("requestSigning=${if (BuildConfig.DEBUG) "native_or_debug_fallback" else "native_required"}")
             add("appIntegrity=${if (BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED) "enabled" else "disabled"}")
         }.joinToString(separator = ";")
+    }
+
+    /**
+     * Evaluates a CRooot [DeviceSecurityScanner.SecurityAssessment] against
+     * Lumen's integrity policy.
+     *
+     * Use this in background security checks (e.g., before sensitive API calls,
+     * during entitlement verification).
+     *
+     * @return `true` if the device passes Lumen's integrity policy.
+     */
+    fun isIntegrityConfirmed(assessment: DeviceSecurityScanner.SecurityAssessment): Boolean {
+        if (!assessment.completed) {
+            // Scan didn't complete — conservative: treat as unconfirmed.
+            Log.w(TAG, "Integrity not confirmed: scan did not complete. ${assessment.summary}")
+            return false
+        }
+        if (assessment.rooted) {
+            Log.w(TAG, "Integrity not confirmed: device is rooted.")
+            return false
+        }
+        if (assessment.hardwareIntegrityOk == false) {
+            Log.w(TAG, "Integrity not confirmed: hardware/TEE integrity compromised.")
+            return false
+        }
+        // Suspicious indicators are logged but not automatically rejected —
+        // they may be false positives on custom ROMs or developer devices.
+        if (assessment.suspicious) {
+            Log.w(TAG, "Integrity warning: suspicious indicators present. ${assessment.summary}")
+        }
+        return true
     }
 
     @Suppress("DEPRECATION")
