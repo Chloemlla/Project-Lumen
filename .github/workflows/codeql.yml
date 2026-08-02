@@ -58,6 +58,12 @@ jobs:
           distribution: zulu
           java-version: "21"
 
+      - name: Accept Android SDK licenses
+        if: matrix.language == 'java-kotlin'
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          yes | sdkmanager --install "ndk;30.0.15729638" >/dev/null 2>&1 || true
+
       - name: Set up Gradle
         if: matrix.language == 'java-kotlin'
         uses: gradle/actions/setup-gradle@v4
