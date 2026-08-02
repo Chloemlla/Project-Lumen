@@ -40,6 +40,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Checkout CRooot SDK (sibling for composite build)
+        uses: actions/checkout@v5
+        with:
+          repository: Chloemlla/CRooot
+          path: ../CRooot
+
       - name: Set up Java 21
         if: matrix.language == 'java-kotlin'
         uses: actions/setup-java@v5
