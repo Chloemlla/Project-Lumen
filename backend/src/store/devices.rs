@@ -22,6 +22,7 @@ impl AppStore {
         let model = normalize_optional(request.model, MAX_DEVICE_MODEL_LENGTH);
         let local_security_config =
             normalize_optional(request.local_security_config, MAX_SECURITY_CONFIG_LENGTH);
+        let security_evidence = sanitize_security_evidence(request.security_evidence);
         let version_code = request.version_code.max(0);
         let registered_at = now_millis();
 
@@ -37,6 +38,7 @@ impl AppStore {
                         "deviceAssetVersionCode": version_code,
                         "deviceAssetLastSeenAt": registered_at,
                         "deviceAssetSecurityConfig": local_security_config,
+                        "deviceSecurityEvidence": security_evidence,
                     },
                 },
                 None,
@@ -79,6 +81,29 @@ fn normalize_device_fingerprint(value: String) -> Option<String> {
     } else {
         None
     }
+}
+
+fn sanitize_security_evidence(value: Option<serde_json::Value>) -> serde_json::Value {
+    let Some(serde_json::Value::Object(object)) = value else {
+        return serde_json::json!({ "status": "unknown", "verified": false });
+    };
+    let status = object
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        .filter(|status| matches!(*status, "clean" | "dangerous"))
+        .unwrap_or("unknown");
+    serde_json::json!({
+        "status": status,
+        "verified": false,
+        "completed": object.get("completed").and_then(serde_json::Value::as_bool).unwrap_or(false),
+        "rooted": object.get("rooted").and_then(serde_json::Value::as_bool).unwrap_or(false),
+        "suspicious": object.get("suspicious").and_then(serde_json::Value::as_bool).unwrap_or(false),
+        "hardwareIntegrityOk": object.get("hardwareIntegrityOk").and_then(serde_json::Value::as_bool),
+        "selinuxEnforcing": object.get("selinuxEnforcing").and_then(serde_json::Value::as_bool),
+        "teeAttestationOk": object.get("teeAttestationOk").and_then(serde_json::Value::as_bool),
+        "observedAt": object.get("observedAt").and_then(serde_json::Value::as_i64).unwrap_or_default(),
+        "scannerVersion": object.get("scannerVersion").and_then(serde_json::Value::as_str).unwrap_or("unknown"),
+    })
 }
 
 const MAX_DEVICE_INSTALLATION_ID_LENGTH: usize = 128;

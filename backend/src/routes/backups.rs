@@ -1,5 +1,5 @@
 use crate::{
-    auth_context::require_plus_entitlement,
+    auth_context::{require_device_security, require_plus_entitlement},
     error::ApiError,
     models::{BackupMetadata, BackupUploadRequest, LatestBackupResponse},
     state::AppState,
@@ -23,6 +23,7 @@ async fn upload_backup(
     Json(payload): Json<BackupUploadRequest>,
 ) -> Result<Json<BackupMetadata>, ApiError> {
     let user = require_plus_entitlement(&headers, &state).await?;
+    require_device_security(&user, &payload.device_installation_id).await?;
     Ok(Json(state.store.save_backup(&user.id, payload).await?))
 }
 
@@ -31,6 +32,7 @@ async fn latest_backup(
     headers: HeaderMap,
 ) -> Result<Json<LatestBackupResponse>, ApiError> {
     let user = require_plus_entitlement(&headers, &state).await?;
+    require_device_security(&user, &user.device_installation_id).await?;
     Ok(Json(LatestBackupResponse {
         backup: state.store.latest_backup(&user.id).await?,
     }))

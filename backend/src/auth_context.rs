@@ -8,6 +8,47 @@ pub async fn require_user(headers: &HeaderMap, state: &AppState) -> Result<UserR
     state.store.user_for_token(token).await
 }
 
+pub async fn require_device_security(
+    user: &UserRecord,
+    requested_device_id: &str,
+) -> Result<(), ApiError> {
+    if requested_device_id.trim().is_empty() || requested_device_id.trim() != user.device_installation_id {
+        return Err(ApiError::forbidden_reason(
+            "device_security_required",
+            "A recent verified device security status is required for this operation.",
+        ));
+    }
+    let Some(serde_json::Value::Object(evidence)) = user.device_security_evidence.as_ref() else {
+        return Err(ApiError::forbidden_reason(
+            "device_security_required",
+            "A recent verified device security status is required for this operation.",
+        ));
+    };
+    let observed_at = evidence.get("observedAt").and_then(serde_json::Value::as_i64).unwrap_or_default();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or_default();
+    let clean = evidence.get("status").and_then(serde_json::Value::as_str) == Some("clean")
+        && evidence.get("completed").and_then(serde_json::Value::as_bool) == Some(true)
+        && evidence.get("rooted").and_then(serde_json::Value::as_bool) == Some(false)
+        && evidence.get("suspicious").and_then(serde_json::Value::as_bool) == Some(false)
+        && evidence.get("hardwareIntegrityOk").and_then(serde_json::Value::as_bool) != Some(false)
+        && evidence.get("selinuxEnforcing").and_then(serde_json::Value::as_bool) != Some(false)
+        && evidence.get("teeAttestationOk").and_then(serde_json::Value::as_bool) != Some(false)
+        && observed_at > 0
+        && now.saturating_sub(observed_at) <= DEVICE_SECURITY_MAX_AGE_MILLIS;
+    if !clean {
+        return Err(ApiError::forbidden_reason(
+            "device_security_required",
+            "A recent verified device security status is required for this operation.",
+        ));
+    }
+    Ok(())
+}
+
+const DEVICE_SECURITY_MAX_AGE_MILLIS: i64 = 15 * 60 * 1_000;
+
 pub async fn require_plus_entitlement(
     headers: &HeaderMap,
     state: &AppState,

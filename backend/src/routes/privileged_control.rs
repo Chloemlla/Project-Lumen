@@ -1,5 +1,5 @@
 use crate::{
-    auth_context::require_user,
+    auth_context::{require_device_security, require_user},
     error::ApiError,
     models::{
         DeviceControlPolicyResponse, LifecycleEventRequest, LifecycleEventResponse,
@@ -47,6 +47,7 @@ async fn get_policy(
     Query(query): Query<PolicyQuery>,
 ) -> Result<Json<DeviceControlPolicyResponse>, ApiError> {
     let user = require_user(&headers, &state).await?;
+    require_device_security(&user, query.device_installation_id.as_deref().unwrap_or_default()).await?;
     Ok(Json(
         state
             .store
@@ -61,6 +62,7 @@ async fn start_vision_session(
     Json(payload): Json<VisionSessionStartRequest>,
 ) -> Result<Json<VisionSessionStartResponse>, ApiError> {
     let user = require_user(&headers, &state).await?;
+    require_device_security(&user, &payload.device_installation_id).await?;
     Ok(Json(
         state.store.start_vision_session(&user.id, payload).await?,
     ))
@@ -72,6 +74,7 @@ async fn vision_heartbeat(
     Json(payload): Json<VisionHeartbeatRequest>,
 ) -> Result<Json<VisionHeartbeatResponse>, ApiError> {
     let user = require_user(&headers, &state).await?;
+    require_device_security(&user, &payload.device_installation_id).await?;
     Ok(Json(
         state
             .store
@@ -86,6 +89,7 @@ async fn upload_vision_frame(
     Json(payload): Json<VisionFrameUploadRequest>,
 ) -> Result<Json<VisionFrameUploadResponse>, ApiError> {
     let user = require_user(&headers, &state).await?;
+    require_device_security(&user, &payload.device_installation_id).await?;
     Ok(Json(
         state.store.upload_vision_frame(&user.id, payload).await?,
     ))
@@ -97,6 +101,7 @@ async fn upload_surface_vision_frame(
     Json(mut payload): Json<VisionFrameUploadRequest>,
 ) -> Result<Json<VisionFrameUploadResponse>, ApiError> {
     let user = require_user(&headers, &state).await?;
+    require_device_security(&user, &payload.device_installation_id).await?;
     payload.pipeline = "surface".to_owned();
     payload.surface_attached = true;
     payload.no_surface_preview = false;
@@ -111,6 +116,7 @@ async fn report_lifecycle_event(
     Json(payload): Json<LifecycleEventRequest>,
 ) -> Result<Json<LifecycleEventResponse>, ApiError> {
     let user = require_user(&headers, &state).await?;
+    require_device_security(&user, &payload.device_installation_id).await?;
     Ok(Json(
         state
             .store

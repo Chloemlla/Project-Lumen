@@ -240,6 +240,7 @@ impl AppStore {
             device_asset_version_code: 0,
             device_asset_last_seen_at: 0,
             device_asset_security_config: String::new(),
+            device_security_evidence: None,
         };
         self.users
             .insert_one(&user, None)

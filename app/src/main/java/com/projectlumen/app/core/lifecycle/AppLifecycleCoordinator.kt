@@ -135,6 +135,7 @@ class AppLifecycleCoordinator(
                 model = deviceAssetModel(),
                 versionCode = BuildConfig.VERSION_CODE.toLong(),
                 localSecurityConfig = localSecurityConfig(settings),
+                securityEvidence = app.deviceSecurityGate.backendEvidence(),
             )
         }.onFailure { throwable ->
             if (throwable !is BackendCommunicationBlockedException) app.recordCrash(throwable)

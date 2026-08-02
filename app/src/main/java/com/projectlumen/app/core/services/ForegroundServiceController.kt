@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.chloemlla.lumen.crash.CrashBreadcrumbs
+import com.projectlumen.app.ProjectLumenApplication
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -44,6 +45,11 @@ internal object ForegroundServiceController {
         eligibilityCheck: (() -> Boolean)? = null,
     ): Boolean {
         val serviceName = intent.component?.className ?: intent.action.orEmpty().ifBlank { "unknown" }
+        val securityGate = (context.applicationContext as? ProjectLumenApplication)?.deviceSecurityGate
+        if (securityGate != null && !securityGate.isServiceAllowed()) {
+            recordExpectedRefusal(serviceName, operation = "start", reason = "device_security_blocked")
+            return false
+        }
         val eligible = evaluateEligibility(
             context = context,
             serviceName = serviceName,
@@ -97,6 +103,11 @@ internal object ForegroundServiceController {
         eligibilityCheck: (() -> Boolean)? = null,
     ): Boolean {
         val serviceName = service.javaClass.name
+        val securityGate = (service.applicationContext as? ProjectLumenApplication)?.deviceSecurityGate
+        if (securityGate != null && !securityGate.isServiceAllowed()) {
+            recordExpectedRefusal(serviceName, operation = "promote", reason = "device_security_blocked")
+            return false
+        }
         val eligible = evaluateEligibility(
             context = service,
             serviceName = serviceName,

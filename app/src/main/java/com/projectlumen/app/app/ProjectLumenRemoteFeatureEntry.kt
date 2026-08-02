@@ -59,6 +59,7 @@ internal class ProjectLumenRemoteFeatureEntry(
     private val featureFlagRepository: FeatureFlagRepository,
     private val tipTemplateRepository: TipTemplateRepository,
     private val nativeProtectionSummary: () -> String,
+    private val securityEvidence: () -> JSONObject? = { null },
 ) {
     private val _state = MutableStateFlow(ProjectLumenRemoteUiState())
     val state: StateFlow<ProjectLumenRemoteUiState> = _state.asStateFlow()
@@ -132,6 +133,7 @@ internal class ProjectLumenRemoteFeatureEntry(
             model = "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
             versionCode = BuildConfig.VERSION_CODE.toLong(),
             localSecurityConfig = localSecurityConfig(),
+            securityEvidence = securityEvidence(),
         )
         val entitlements = apiClient.fetchEntitlements(accessToken)
         val featureFlags = apiClient.fetchFeatureFlags(accessToken)

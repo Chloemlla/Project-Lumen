@@ -20,6 +20,8 @@ pub struct UserRecord {
     pub device_asset_last_seen_at: i64,
     #[serde(default)]
     pub device_asset_security_config: String,
+    #[serde(default)]
+    pub device_security_evidence: Option<Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

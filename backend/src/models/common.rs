@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +33,8 @@ pub struct DeviceRegistrationRequest {
     pub model: String,
     pub version_code: i64,
     pub local_security_config: String,
+    #[serde(default)]
+    pub security_evidence: Option<Value>,
 }
 
 #[derive(Serialize)]

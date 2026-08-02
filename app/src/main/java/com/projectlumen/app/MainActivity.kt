@@ -130,6 +130,7 @@ open class MainActivity : ComponentActivity() {
                             shizuku = app.shizuku,
                             simulateDeveloperLowMemory = app::simulateDeveloperLowMemory,
                             nativeProtectionSummary = app::nativeProtectionSummary,
+                            securityEvidence = { app.deviceSecurityGate.backendEvidence() },
                             uploadTelemetrySnapshot = { app.telemetry.uploadCurrentSnapshot(force = true) },
                             recordCrashReport = app::recordCrash,
                         ) as T

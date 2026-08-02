@@ -1,5 +1,5 @@
 use crate::{
-    auth_context::require_user,
+    auth_context::{require_device_security, require_user},
     error::ApiError,
     models::{FaceAnalysisFrameUploadRequest, FaceAnalysisFrameUploadResponse},
     state::AppState,
@@ -17,6 +17,7 @@ async fn upload_frame(
 ) -> Result<Json<FaceAnalysisFrameUploadResponse>, ApiError> {
     validate_frame_upload(&payload)?;
     let user = require_user(&headers, &state).await?;
+    require_device_security(&user, &payload.device_installation_id).await?;
     Ok(Json(
         state
             .store

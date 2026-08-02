@@ -9,6 +9,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import com.projectlumen.app.core.security.DeviceSecurityGate
 import com.projectlumen.app.core.security.ProjectLumenRequestSigner
 import org.json.JSONArray
 import org.json.JSONObject
@@ -22,6 +23,7 @@ class ProjectLumenApiClient(
         certificatePins = ProjectLumenApiConfig.apiCertificatePins,
     ),
     private val backendGate: BackendCapabilityGate = AllowAllBackendCapabilityGate,
+    private val deviceSecurityGate: DeviceSecurityGate? = null,
 ) {
     private val resolvedBaseUrl = ProjectLumenApiConfig.normalizeApiBaseUrl(baseUrl)
 
@@ -80,6 +82,7 @@ class ProjectLumenApiClient(
         model: String,
         versionCode: Long,
         localSecurityConfig: String,
+        securityEvidence: JSONObject? = null,
     ): RemoteDeviceRegistrationResult = request(
         capability = BackendCapability.DEVICE_REGISTRATION,
         method = "POST",
@@ -90,7 +93,8 @@ class ProjectLumenApiClient(
             .put("deviceFingerprint", deviceFingerprint)
             .put("model", model)
             .put("versionCode", versionCode)
-            .put("localSecurityConfig", localSecurityConfig),
+            .put("localSecurityConfig", localSecurityConfig)
+            .also { json -> securityEvidence?.let { json.put("securityEvidence", it) } },
     ) { it.toRemoteDeviceRegistrationResult() }
 
     suspend fun fetchEntitlements(accessToken: String): RemoteEntitlementSnapshot = request(
@@ -308,6 +312,7 @@ class ProjectLumenApiClient(
         parse: (JSONObject) -> T,
     ): T = withContext(Dispatchers.IO) {
         backendGate.requireExecutable(capability)
+        deviceSecurityGate?.requireBackendAllowed(capability)
         val url = resolveUrl(path)
         val bodyText = body?.toString()
         val requestBody = bodyText?.toRequestBody(JSON_MEDIA_TYPE)

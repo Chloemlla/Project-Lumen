@@ -29,6 +29,7 @@ import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.network.ClashPartnerCompat
 import com.projectlumen.app.core.mmkv.ProjectLumenMmkv
 import com.projectlumen.app.core.security.AppIntegrityGuard
+import com.projectlumen.app.core.security.DeviceSecurityGate
 import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.services.AudioService
 import com.projectlumen.app.core.services.DataBackupService
@@ -76,7 +77,10 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
         )
     }
     val apiClient: ProjectLumenApiClient by lazy {
-        ProjectLumenApiClient(backendGate = backendConnectivity)
+        ProjectLumenApiClient(
+            backendGate = backendConnectivity,
+            deviceSecurityGate = deviceSecurityGate,
+        )
     }
     val crashReports: CrashReportStore
         get() {
@@ -90,6 +94,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
             }
         }
     val secureCredentials: SecureCredentialStore by lazy { SecureCredentialStore(this) }
+    val deviceSecurityGate: DeviceSecurityGate by lazy { DeviceSecurityGate(this) }
     val openApiController: LumenOpenRuntimeController by lazy { LumenOpenRuntimeController(this) }
     val telemetry: EyeCareTelemetryReporter by lazy {
         EyeCareTelemetryReporter(
@@ -151,6 +156,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
                     Log.e(TAG, "App integrity enforcement failed", throwable)
                     recordCrash(throwable)
                 }
+            deviceSecurityGate.startStartupScan(applicationScope)
             runCatching { notifications.ensureChannels() }
             runCatching { LumenToast.install(this) }
             runCatching { backendConnectivity.start() }
@@ -307,6 +313,10 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     fun startTimerService() {
+        if (!deviceSecurityGate.isServiceAllowed()) {
+            Log.w(TAG, "Timer service refused by device security gate")
+            return
+        }
         // Enqueue the reconciliation safety net first so it survives even when the
         // foreground-service start below is refused (background start on Android 12+).
         TimerReconciliationWorker.enqueue(this)
@@ -338,6 +348,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     fun scheduleProximityMonitoring() {
+        if (!deviceSecurityGate.isServiceAllowed()) return
         ProximityDetectionWorker.enqueueNext(this)
     }
 
@@ -350,6 +361,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     fun startLightMonitoring() {
+        if (!deviceSecurityGate.isServiceAllowed()) return
         LightMonitorService.start(this)
     }
 
@@ -358,6 +370,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     fun startDeveloperDebugService() {
+        if (!deviceSecurityGate.isServiceAllowed()) return
         DeveloperDebugOverlayService.start(this)
     }
 
@@ -370,6 +383,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     fun startShizukuResilience() {
+        if (!deviceSecurityGate.isServiceAllowed()) return
         ShizukuResilienceWorker.enqueue(this)
     }
 
