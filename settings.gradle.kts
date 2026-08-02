@@ -6,6 +6,22 @@ pluginManagement {
     }
 }
 
+// CRooot SDK: prefer a local composite build when the repository is checked out as a sibling.
+// CI builds must check out CRooot alongside Project-Lumen:
+//   git clone https://github.com/Chloemlla/CRooot.git ../CRooot
+// Local development: clone CRooot as a sibling directory, or place an AAR in app/libs/.
+val croootDir = rootProject.projectDir.parentFile?.resolve("CRooot")
+val hasCroootSibling = croootDir?.exists() == true
+
+if (hasCroootSibling) {
+    includeBuild(croootDir!!.path) {
+        dependencySubstitution {
+            substitute(module("com.chloemlla.crooot:crooot-sdk"))
+                .using(project(":sdk"))
+        }
+    }
+}
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
@@ -22,16 +38,18 @@ dependencyResolutionManagement {
         maven(url = "https://jitpack.io") {
             content { includeGroup("com.github.Tencent.soter") }
         }
-        maven {
-            url = uri("https://maven.pkg.github.com/Chloemlla/CRooot")
-            content { includeGroup("com.chloemlla.crooot") }
-            credentials {
-                username = providers.gradleProperty("gpr.user")
-                    .orElse(providers.environmentVariable("GITHUB_ACTOR"))
-                    .orNull
-                password = providers.gradleProperty("gpr.key")
-                    .orElse(providers.environmentVariable("GITHUB_TOKEN"))
-                    .orNull
+        if (!hasCroootSibling) {
+            maven {
+                url = uri("https://maven.pkg.github.com/Chloemlla/CRooot")
+                content { includeGroup("com.chloemlla.crooot") }
+                credentials {
+                    username = providers.gradleProperty("gpr.user")
+                        .orElse(providers.environmentVariable("GITHUB_ACTOR"))
+                        .orNull
+                    password = providers.gradleProperty("gpr.key")
+                        .orElse(providers.environmentVariable("GITHUB_TOKEN"))
+                        .orNull
+                }
             }
         }
     }
