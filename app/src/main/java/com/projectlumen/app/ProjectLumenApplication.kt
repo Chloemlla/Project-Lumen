@@ -126,6 +126,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
 
     override fun onCreate() {
         super.onCreate()
+        appContext = this
         ClashPartnerCompat.start(this)
         // Keep paste-upload HttpURLConnection off stacked system proxies while
         // Clash VPN process binding is active (module-safe hook, no hard dep).
@@ -378,5 +379,10 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
 
     private companion object {
         private const val TAG = "ProjectLumenApp"
+        @Volatile
+        private var appContext: Context? = null
+
+        /** Returns the application context, or null if the Application has not been created yet. */
+        fun applicationContext(): Context? = appContext
     }
 }

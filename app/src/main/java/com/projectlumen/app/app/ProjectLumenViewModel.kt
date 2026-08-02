@@ -25,6 +25,7 @@ import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
 import com.projectlumen.app.core.security.DeviceInstallProfile
+import com.projectlumen.app.core.security.DeviceSecurityScanner
 import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.shizuku.ShizukuNetworkApp
@@ -188,6 +189,29 @@ class ProjectLumenViewModel(
     val apiDiagnostics = ProjectLumenApiDiagnostics.traces
     val memoryHealth = MemoryHealthMonitor.snapshot
     val uiState = stateStore.uiState
+
+    private val _securityScanState = MutableStateFlow<DeviceSecurityScanState>(DeviceSecurityScanState.Idle)
+    val securityScanState = _securityScanState.asStateFlow()
+
+    fun startDeviceSecurityScan() {
+        val context = ProjectLumenApplication.applicationContext() ?: return
+        if (_securityScanState.value is DeviceSecurityScanState.Running) return
+        _securityScanState.value = DeviceSecurityScanState.Running
+        reportingScope.launch {
+            try {
+                val scanner = DeviceSecurityScanner(context)
+                val assessment = scanner.fullScan()
+                _securityScanState.value = DeviceSecurityScanState.Complete(assessment)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                _securityScanState.value = DeviceSecurityScanState.Idle
+                throw e
+            } catch (e: Throwable) {
+                _securityScanState.value = DeviceSecurityScanState.Failed(
+                    e.message ?: e::class.java.simpleName,
+                )
+            }
+        }
+    }
 
     init {
         runCatching { CrashBreadcrumbs.record("ProjectLumenViewModel.init") }

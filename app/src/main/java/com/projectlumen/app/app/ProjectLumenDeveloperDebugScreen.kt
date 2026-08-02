@@ -95,6 +95,7 @@ internal fun DeveloperDebugScreen(
     val backendAccessEnabled = backendDecision.executable
     val apiTraces = viewModel.apiDiagnostics.collectAsStateWithLifecycle().value
     val memoryHealth = viewModel.memoryHealth.collectAsStateWithLifecycle().value
+    val securityScanState = viewModel.securityScanState.collectAsStateWithLifecycle().value
     val luxHistory = remember { mutableStateListOf<Float>() }
     var networkAppQuery by rememberSaveable { mutableStateOf("") }
     var purchaseProductId by rememberSaveable { mutableStateOf("project_lumen_pro") }
@@ -351,6 +352,13 @@ internal fun DeveloperDebugScreen(
                     DeveloperApiTraceCard(trace)
                 }
             }
+        }
+
+        SettingsSection("Device Security Scan", Icons.Outlined.Security) {
+            DeviceSecurityScanCard(
+                scanState = securityScanState,
+                onStartScan = viewModel::startDeviceSecurityScan,
+            )
         }
 
         SettingsSection(R.string.developer_section_raw_sensors, Icons.Outlined.Sensors) {
