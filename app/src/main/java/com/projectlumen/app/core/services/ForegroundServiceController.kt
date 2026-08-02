@@ -23,8 +23,21 @@ fun interface ForegroundServiceFailureReporter {
  * Android 12+ background-start refusals are an expected scheduling outcome. They must not be
  * persisted as crashes, while manifest, permission, notification, and service implementation
  * failures still need crash telemetry.
+ *
+ * Android 16 (SDK 36) introduced stricter [mAllowStartForeground] gating: the flag is reset on
+ * process start and takes a short window before it becomes true. The [start] method handles this
+ * by catching [ForegroundServiceStartNotAllowedException] and retrying once after a short delay.
  */
 internal object ForegroundServiceController {
+    /**
+     * Attempts to start a foreground service.
+     *
+     * On Android 16+, if the start fails with [ForegroundServiceStartNotAllowedException]
+     * (mAllowStartForeground is false), the method retries once after [RETRY_DELAY_MILLIS].
+     * This handles the cold-start window where the platform has not yet set the flag.
+     *
+     * @return true if the service was started successfully, false otherwise.
+     */
     fun start(
         context: Context,
         intent: Intent,
@@ -46,13 +59,33 @@ internal object ForegroundServiceController {
             ContextCompat.startForegroundService(context, intent)
             true
         } catch (exception: Exception) {
-            handleFailure(
-                context = context,
-                serviceName = serviceName,
-                operation = "start",
-                throwable = exception,
-                becameIneligible = becameIneligible(eligibilityCheck),
-            )
+            // Android 16: mAllowStartForeground may be false during cold start.
+            // Retry once after a short delay to give the platform time to set the flag.
+            if (isForegroundServiceStartNotAllowed(exception)) {
+                Log.i(TAG, "Foreground service start refused (mAllowStartForeground false); " +
+                    "retrying ${serviceName} in ${RETRY_DELAY_MILLIS}ms")
+                SystemClock.sleep(RETRY_DELAY_MILLIS)
+                try {
+                    ContextCompat.startForegroundService(context, intent)
+                    return true
+                } catch (retryException: Exception) {
+                    handleFailure(
+                        context = context,
+                        serviceName = serviceName,
+                        operation = "start",
+                        throwable = retryException,
+                        becameIneligible = becameIneligible(eligibilityCheck),
+                    )
+                }
+            } else {
+                handleFailure(
+                    context = context,
+                    serviceName = serviceName,
+                    operation = "start",
+                    throwable = exception,
+                    becameIneligible = becameIneligible(eligibilityCheck),
+                )
+            }
         }
     }
 
@@ -131,6 +164,20 @@ internal object ForegroundServiceController {
                     throwableMessage = it.message,
                 )
             }
+    }
+
+    /**
+     * Checks if the throwable is a [ForegroundServiceStartNotAllowedException], either directly
+     * or as a cause. Works across all Android versions where the exception class name differs.
+     */
+    private fun isForegroundServiceStartNotAllowed(throwable: Throwable): Boolean {
+        return generateSequence(throwable) { it.cause }.any {
+            isExpectedBackgroundStartRefusal(
+                sdkInt = Build.VERSION.SDK_INT,
+                throwableClassName = it.javaClass.name,
+                throwableMessage = it.message,
+            )
+        }
     }
 
     private fun handleFailure(
@@ -217,4 +264,5 @@ internal object ForegroundServiceController {
     private const val EXPECTED_REFUSAL_LOG_WINDOW_MILLIS = 30_000L
     private const val FOREGROUND_SERVICE_START_NOT_ALLOWED_EXCEPTION =
         "android.app.ForegroundServiceStartNotAllowedException"
+    private const val RETRY_DELAY_MILLIS = 2_000L
 }
