@@ -39,9 +39,19 @@ jobs:
 
       - name: Accept Android SDK licenses
         run: |
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          # Also accept NDK-specific licenses
-          yes | sdkmanager --install "ndk;30.0.15729638" >/dev/null 2>&1 || true
+          SDK_MANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -f "$SDK_MANAGER" ]; then
+            SDK_MANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
+          fi
+          if [ -f "$SDK_MANAGER" ]; then
+            echo "Accepting Android SDK licenses via $SDK_MANAGER"
+            yes | "$SDK_MANAGER" --licenses 2>&1 || true
+            "$SDK_MANAGER" --install "ndk;30.0.15729638" 2>&1 || true
+          else
+            echo "sdkmanager not found at $ANDROID_HOME; trying PATH"
+            yes | sdkmanager --licenses 2>&1 || true
+            sdkmanager --install "ndk;30.0.15729638" 2>&1 || true
+          fi
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
