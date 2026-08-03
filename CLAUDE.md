@@ -49,6 +49,12 @@ gradle lintDebug --no-daemon --warning-mode all          # Android lint
 # README shorthand for a full check: gradle test lint assembleDebug --no-daemon
 ```
 
+Gradle Kotlin DSL convention for `lumen-crash`, `lumen-crash-core`, and
+`lumen-crash-sample`: keep `kotlin { compilerOptions { ... } }` at the top
+level, while Android-only settings such as `buildFeatures`, `packaging`, and
+`publishing` remain inside `android {}`. This is required by the Kotlin 2.4.x
+plugin and is validated by the GitHub workflow's Gradle script compilation.
+
 Rust backend (`build.yml`, runs from repo root):
 ```bash
 cargo fmt   --manifest-path backend/Cargo.toml --all -- --check

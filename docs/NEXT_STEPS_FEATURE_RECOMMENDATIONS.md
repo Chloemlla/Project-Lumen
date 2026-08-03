@@ -41,6 +41,7 @@ CRooot SDK 的依赖边界：
 - 本地 `CRooot` sibling composite build 不是默认路径。需要联调 SDK 源码时，显式使用 `-PprojectLumenUseLocalCrooot=true`。
 - 这样可以避免 CRooot 的 AGP 9.3.1 与 Project-Lumen 的 AGP 8.13.2 在同一次 Gradle 构建中产生版本冲突。
 - `lumen-crash-core` 仍保持 `minSdk 26`，独立接入时不继承主应用对 CRooot 的 API 29 要求。
+- `lumen-crash`、`lumen-crash-core` 和 `lumen-crash-sample` 使用 Kotlin 2.4 的顶层 `kotlin { compilerOptions { ... } }` 配置；Android 专属的 `buildFeatures`、`packaging` 和 `publishing` 保持在 `android {}` 内，避免旧版 `kotlinOptions` 弃用和扩展名冲突。
 
 ## 2. 已添加功能归档
 
