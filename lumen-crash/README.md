@@ -108,6 +108,7 @@ Notes:
 ## Features
 
 - Uncaught exception capture with previous-handler chaining
+- Main-looper freeze watchdog plus opt-in startup-hang watchdog with bounded thread dumps
 - Multi-path atomic persistence under app-specific **external** storage (`getExternalFilesDir` / `externalCacheDir`)
 - Breadcrumbs ring buffer (max 40 events, sanitized)
 - Adaptive Material3 crash report screen (`WindowSizeClass`)
@@ -132,6 +133,9 @@ lumen-crash/
       LumenCrash.kt                 # public install / record / load / clear API
       LumenCrashConfig.kt           # host config + CrashAppInfo
       CrashReport.kt                # report model, JSON, clipboard export
+      CrashReportKind.kt             # crash / freeze / startup-hang report types
+      CrashThreadDump.kt             # bounded cross-thread diagnostic snapshot
+      LumenCrashWatchdog.kt          # background ANR and startup watchdog
       CrashReportStore.kt           # multi-path atomic persistence
       CrashBreadcrumbs.kt           # in-memory ring buffer
       CrashAuthorAttribution.kt     # non-overridable author constants
@@ -708,6 +712,41 @@ class MyApp : Application() {
     }
 }
 ```
+
+### ANR, freeze, and startup-hang watchdogs
+
+The core artifact also runs a lightweight watchdog outside the main looper. When the main
+thread stops processing heartbeats for `anrWatchdogTimeoutMillis`, it persists a bounded dump of
+all thread stacks as a `CrashReportKind.FREEZE` report. The legacy `onCrashSaved` callback receives
+watchdog reports too, so existing host upload scheduling continues to work.
+
+```kotlin
+LumenCrash.install(this) {
+    anrWatchdogEnabled = true
+    anrWatchdogTimeoutMillis = 5_000L
+    anrWatchdogCheckIntervalMillis = 1_000L
+    onAnrDetected = { report ->
+        // optional immediate diagnostic scheduling
+    }
+}
+```
+
+Hosts that can remain before the first rendered frame must opt into the startup watchdog. Call
+`markStartupComplete()` only after the first usable frame; calling it from `Application.onCreate()`
+would defeat startup-hang detection. Startup reports use `CrashReportKind.STARTUP_HANG`.
+
+```kotlin
+LumenCrash.install(this) {
+    startupHangWatchdogEnabled = true
+    startupHangTimeoutMillis = 15_000L
+}
+
+// In a Compose host, call from a LaunchedEffect after withFrameNanos { }.
+LumenCrash.markStartupComplete()
+```
+
+`CrashReport` adds `kind` and `durationMillis`. Reports written by older SDK versions omit these
+fields and are loaded as `CrashReportKind.CRASH` with a zero duration.
 
 Gate startup UI on a pending report:
 

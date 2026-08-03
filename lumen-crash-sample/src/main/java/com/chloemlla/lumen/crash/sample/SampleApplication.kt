@@ -11,6 +11,8 @@ class SampleApplication : Application() {
         LumenCrash.installSafely(this) {
             reportTitle = "Sample crash report"
             reportMessage = "This sample recovered from a forced crash."
+            startupHangWatchdogEnabled = true
+            startupHangTimeoutMillis = 15_000L
         }
     }
 
@@ -20,6 +22,8 @@ class SampleApplication : Application() {
             LumenCrash.installSafely(this) {
                 reportTitle = "Sample crash report"
                 reportMessage = "This sample recovered from a forced crash."
+                startupHangWatchdogEnabled = true
+                startupHangTimeoutMillis = 15_000L
             }
         }
     }

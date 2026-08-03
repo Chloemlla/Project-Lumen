@@ -108,6 +108,7 @@ setContent {
 ## 功能特性
 
 - 未捕获异常采集，并与既有 `UncaughtExceptionHandler` 链式衔接
+- 主 Looper 冻结看门狗，以及可选的启动挂起看门狗与受限全线程堆栈
 - 多路径原子持久化到应用专属**外部**存储（`getExternalFilesDir` / `externalCacheDir`）
 - 面包屑环形缓冲（最多 40 条，自动脱敏）
 - 自适应 Material3 崩溃报告页（`WindowSizeClass`）
@@ -132,6 +133,9 @@ lumen-crash/
       LumenCrash.kt                 # 公开 install / record / load / clear API
       LumenCrashConfig.kt           # 宿主配置 + CrashAppInfo
       CrashReport.kt                # 报告模型、JSON、剪贴板导出
+      CrashReportKind.kt             # crash / freeze / startup-hang 报告类型
+      CrashThreadDump.kt             # 受限全线程诊断快照
+      LumenCrashWatchdog.kt          # 后台 ANR 与启动看门狗
       CrashReportStore.kt           # 多路径原子持久化
       CrashBreadcrumbs.kt           # 内存环形缓冲
       CrashAuthorAttribution.kt     # 不可覆盖的作者常量
@@ -706,6 +710,41 @@ class MyApp : Application() {
     }
 }
 ```
+
+### ANR、冻结与启动挂起看门狗
+
+core 制品还会在主 Looper 之外运行轻量看门狗。主线程在
+`anrWatchdogTimeoutMillis` 内没有处理心跳时，SDK 会持久化受大小限制的全线程堆栈，生成
+`CrashReportKind.FREEZE` 报告。旧的 `onCrashSaved` 回调也会收到 watchdog 报告，因此现有宿主
+上报调度无需改写。
+
+```kotlin
+LumenCrash.install(this) {
+    anrWatchdogEnabled = true
+    anrWatchdogTimeoutMillis = 5_000L
+    anrWatchdogCheckIntervalMillis = 1_000L
+    onAnrDetected = { report ->
+        // 可选：立即调度诊断上报
+    }
+}
+```
+
+如果宿主可能在首帧渲染前长时间等待，应显式启用启动看门狗。只在首个可用帧之后调用
+`markStartupComplete()`；不要在 `Application.onCreate()` 中调用，否则会失去启动挂起检测能力。
+启动挂起报告类型为 `CrashReportKind.STARTUP_HANG`。
+
+```kotlin
+LumenCrash.install(this) {
+    startupHangWatchdogEnabled = true
+    startupHangTimeoutMillis = 15_000L
+}
+
+// Compose 宿主可在 withFrameNanos { } 之后的 LaunchedEffect 中调用。
+LumenCrash.markStartupComplete()
+```
+
+`CrashReport` 新增 `kind` 和 `durationMillis`。旧 SDK 写入的报告没有这些字段，读取时会按
+`CrashReportKind.CRASH`、持续时间 0 兼容处理。
 
 启动时按待处理报告门禁 UI：
 

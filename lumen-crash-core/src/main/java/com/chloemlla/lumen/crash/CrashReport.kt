@@ -28,13 +28,19 @@ data class CrashReport(
     val authorName: String = CrashAuthorAttribution.AUTHOR_NAME,
     val authorUrl: String = CrashAuthorAttribution.AUTHOR_URL,
     val authorFingerprint: String = CrashAuthorAttribution.FINGERPRINT_HEX,
+    val kind: CrashReportKind = CrashReportKind.CRASH,
+    val durationMillis: Long = 0L,
 ) {
     fun toClipboardText(): String {
         AuthorIntegrity.verifyOrThrow("export-clipboard")
         val author = AuthorIntegrity.verifiedAuthorBlock()
         return buildString {
             appendLine("Report ID: $reportId")
+            appendLine("Report type: ${kind.wireValue}")
             appendLine("Crash time: $crashedAtText")
+            if (durationMillis > 0L) {
+                appendLine("Unresponsive duration: ${durationMillis} ms")
+            }
             appendLine("Exception type: $exceptionType")
             appendLine("Root cause: $rootCause")
             appendLine("Thread: $threadName")
@@ -66,7 +72,7 @@ data class CrashReport(
             return CrashReport(
                 reportId = reportId(nowMillis, exceptionType, rootCause, stackTrace),
                 crashedAtMillis = nowMillis,
-                crashedAtText = Instant.ofEpochMilli(nowMillis).atZone(ZoneId.systemDefault()).format(crashTimeFormatter),
+                crashedAtText = formatTime(nowMillis),
                 exceptionType = exceptionType,
                 rootCause = rootCause,
                 threadName = Thread.currentThread().name,
@@ -88,13 +94,15 @@ data class CrashReport(
             AuthorIntegrity.verifyOrThrow("from-throwable-fallback")
             val author = AuthorIntegrity.verifiedAuthorBlock()
             val nowMillis = System.currentTimeMillis()
-            val stackTrace = throwable.stackTraceToString()
+            val stackTrace = sanitize(throwable.stackTraceToString())
             val exceptionType = throwable::class.java.name
-            val rootCause = throwable.message?.takeIf { it.isNotBlank() } ?: throwable::class.java.name
+            val rootCause = sanitize(
+                throwable.message?.takeIf { it.isNotBlank() } ?: throwable::class.java.name,
+            )
             return CrashReport(
                 reportId = reportId(nowMillis, exceptionType, rootCause, stackTrace),
                 crashedAtMillis = nowMillis,
-                crashedAtText = nowMillis.toString(),
+                crashedAtText = formatTime(nowMillis),
                 exceptionType = exceptionType,
                 rootCause = rootCause,
                 threadName = Thread.currentThread().name,
@@ -106,6 +114,51 @@ data class CrashReport(
                 authorName = author.authorName,
                 authorUrl = author.authorUrl,
                 authorFingerprint = author.authorFingerprint,
+            )
+        }
+
+        fun fromWatchdog(
+            kind: CrashReportKind,
+            durationMillis: Long,
+            mainThread: Thread,
+            threadDump: String,
+            appInfo: CrashAppInfo,
+        ): CrashReport {
+            require(kind != CrashReportKind.CRASH) { "Watchdog reports must not use CRASH kind." }
+            AuthorIntegrity.verifyOrThrow("from-watchdog")
+            val author = AuthorIntegrity.verifiedAuthorBlock()
+            val nowMillis = System.currentTimeMillis()
+            val duration = durationMillis.coerceAtLeast(0L)
+            val exceptionType = when (kind) {
+                CrashReportKind.ANR -> "android.app.ApplicationNotResponding"
+                CrashReportKind.STARTUP_HANG -> "com.chloemlla.lumen.crash.StartupHang"
+                CrashReportKind.FREEZE -> "com.chloemlla.lumen.crash.MainThreadFreeze"
+                CrashReportKind.CRASH -> error("Unreachable crash watchdog kind")
+            }
+            val rootCause = when (kind) {
+                CrashReportKind.ANR, CrashReportKind.FREEZE ->
+                    "Main thread did not process a heartbeat for $duration ms"
+                CrashReportKind.STARTUP_HANG ->
+                    "Application did not report its first rendered frame within $duration ms"
+                CrashReportKind.CRASH -> error("Unreachable crash watchdog kind")
+            }
+            val stackTrace = sanitize(threadDump).ifBlank { "<thread dump unavailable>" }
+            return CrashReport(
+                reportId = reportId(nowMillis, exceptionType, rootCause, stackTrace, kind),
+                crashedAtMillis = nowMillis,
+                crashedAtText = formatTime(nowMillis),
+                exceptionType = exceptionType,
+                rootCause = rootCause,
+                threadName = mainThread.name.ifBlank { "main" },
+                processName = processName(),
+                systemInfo = buildSystemInfo(appInfo),
+                stackTrace = stackTrace,
+                recentEvents = CrashBreadcrumbs.snapshot(),
+                authorName = author.authorName,
+                authorUrl = author.authorUrl,
+                authorFingerprint = author.authorFingerprint,
+                kind = kind,
+                durationMillis = duration,
             )
         }
 
@@ -143,12 +196,21 @@ data class CrashReport(
             exceptionType: String,
             rootCause: String,
             stackTrace: String,
+            kind: CrashReportKind = CrashReportKind.CRASH,
         ): String {
-            val seed = "$crashedAtMillis|$exceptionType|$rootCause|${stackTrace.lineSequence().firstOrNull().orEmpty()}"
+            val kindPrefix = if (kind == CrashReportKind.CRASH) "" else "${kind.wireValue}|"
+            val seed = "$crashedAtMillis|$kindPrefix$exceptionType|$rootCause|" +
+                stackTrace.lineSequence().firstOrNull().orEmpty()
             return MessageDigest.getInstance("SHA-256")
                 .digest(seed.toByteArray(Charsets.UTF_8))
                 .joinToString(separator = "") { "%02x".format(it) }
                 .take(12)
+        }
+
+        private fun formatTime(millis: Long): String {
+            return Instant.ofEpochMilli(millis)
+                .atZone(ZoneId.systemDefault())
+                .format(crashTimeFormatter)
         }
 
         private fun Throwable.rootCause(): Throwable {
@@ -202,6 +264,8 @@ fun crashReportFromJson(json: JSONObject): CrashReport {
         authorName = author.authorName,
         authorUrl = author.authorUrl,
         authorFingerprint = author.authorFingerprint,
+        kind = CrashReportKind.fromWireValue(json.optString("kind").takeIf { it.isNotBlank() }),
+        durationMillis = json.optLong("durationMillis", 0L).coerceAtLeast(0L),
     )
 }
 
@@ -221,6 +285,8 @@ fun CrashReport.toJson(): JSONObject {
         put("recentEvents", JSONArray().apply {
             recentEvents.forEach { event -> put(event) }
         })
+        put("kind", kind.wireValue)
+        put("durationMillis", durationMillis.coerceAtLeast(0L))
         put("authorName", author.authorName)
         put("authorUrl", author.authorUrl)
         put("authorFingerprint", author.authorFingerprint)

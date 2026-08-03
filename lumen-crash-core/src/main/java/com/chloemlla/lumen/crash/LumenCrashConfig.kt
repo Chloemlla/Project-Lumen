@@ -28,8 +28,23 @@ data class LumenCrashConfig(
     val pasteUploadEnabled: Boolean = true,
     /** HTTPS base URL for LogPaste-compatible upload. Trailing slashes are ignored. */
     val pasteUploadBaseUrl: String = CrashReportPasteUploader.DEFAULT_BASE_URL,
+    /** Legacy callback invoked for both crash and watchdog reports after persistence. */
     val onCrashSaved: ((CrashReport) -> Unit)? = null,
     val killProcessWhenNoPreviousHandler: Boolean = true,
+    /** Detects a main looper that stops processing heartbeat callbacks. */
+    val anrWatchdogEnabled: Boolean = true,
+    /** How long the main looper may be silent before a freeze report is persisted. */
+    val anrWatchdogTimeoutMillis: Long = 5_000L,
+    /** How often the watchdog checks the heartbeat and startup deadline. */
+    val anrWatchdogCheckIntervalMillis: Long = 1_000L,
+    /** Detects hosts that never report their first rendered frame. */
+    val startupHangWatchdogEnabled: Boolean = false,
+    /** Maximum time from [LumenCrash.install] to [LumenCrash.markStartupComplete]. */
+    val startupHangTimeoutMillis: Long = 15_000L,
+    /** Receives every report after at least one persistence target accepted it. */
+    val onReportSaved: ((CrashReport) -> Unit)? = null,
+    /** Receives synthetic startup-hang and main-thread freeze reports. */
+    val onAnrDetected: ((CrashReport) -> Unit)? = null,
 )
 
 data class CrashAppInfo(

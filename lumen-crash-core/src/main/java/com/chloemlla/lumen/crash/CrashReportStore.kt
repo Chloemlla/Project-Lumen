@@ -6,7 +6,7 @@ import java.io.File
 import java.io.IOException
 
 /**
- * Persists the latest crash report outside app-private internal storage.
+ * Persists the latest crash or watchdog report outside app-private internal storage.
  *
  * Primary locations are app-specific external directories so the report is not kept only
  * under internal private paths (`filesDir` / `noBackupFilesDir` / `cacheDir`).
@@ -16,6 +16,8 @@ class CrashReportStore private constructor(
     private val externalTargetsProvider: () -> List<File>,
     private val legacyPrivateTargetsProvider: () -> List<File>,
 ) {
+    private val lock = Any()
+
     constructor(context: Context) : this(
         externalTargetsProvider = context.applicationContext.let { appContext ->
             { resolveExternalTargets(appContext) }
@@ -34,6 +36,29 @@ class CrashReportStore private constructor(
     )
 
     fun save(report: CrashReport) {
+        synchronized(lock) {
+            saveLocked(report)
+        }
+    }
+
+    fun load(): CrashReport? {
+        return synchronized(lock) { loadLocked() }
+    }
+
+    fun clear() {
+        synchronized(lock) {
+            (externalTargets() + legacyPrivateTargets()).forEach { file ->
+                if (file.exists()) {
+                    file.delete()
+                }
+                file.parentFile
+                    ?.takeIf { it.name == DIR_NAME && it.isDirectory && it.list().isNullOrEmpty() }
+                    ?.delete()
+            }
+        }
+    }
+
+    private fun saveLocked(report: CrashReport) {
         AuthorIntegrity.verifyOrThrow("store-save")
         val payload = report.toJson().toString()
         val targets = writableTargets()
@@ -57,28 +82,17 @@ class CrashReportStore private constructor(
         clearLegacyPrivateCopies()
     }
 
-    fun load(): CrashReport? {
+    private fun loadLocked(): CrashReport? {
         // Prefer external locations first, then migrate any legacy private copy.
         externalTargets().forEach { file ->
             readReport(file)?.let { return it }
         }
         legacyPrivateTargets().forEach { file ->
             val report = readReport(file) ?: return@forEach
-            runCatching { save(report) }
+            runCatching { saveLocked(report) }
             return report
         }
         return null
-    }
-
-    fun clear() {
-        (externalTargets() + legacyPrivateTargets()).forEach { file ->
-            if (file.exists()) {
-                file.delete()
-            }
-            file.parentFile
-                ?.takeIf { it.name == DIR_NAME && it.isDirectory && it.list().isNullOrEmpty() }
-                ?.delete()
-        }
     }
 
     private fun writableTargets(): List<File> = externalTargets()
@@ -103,15 +117,19 @@ class CrashReportStore private constructor(
     }
 
     private fun File.writeAtomically(payload: String) {
-        parentFile?.mkdirs()
-        val tempFile = File(parentFile, "$name.tmp")
-        tempFile.writeText(payload, Charsets.UTF_8)
-        if (exists() && !delete()) {
-            throw IOException("Unable to replace existing crash report at $absolutePath.")
-        }
-        if (!tempFile.renameTo(this)) {
+        val parent = parentFile ?: throw IOException("Crash report has no parent directory.")
+        parent.mkdirs()
+        val tempFile = File.createTempFile("$name.", ".tmp", parent)
+        try {
+            tempFile.writeText(payload, Charsets.UTF_8)
+            if (exists() && !delete()) {
+                throw IOException("Unable to replace existing crash report at $absolutePath.")
+            }
+            if (!tempFile.renameTo(this)) {
+                writeText(payload, Charsets.UTF_8)
+            }
+        } finally {
             tempFile.delete()
-            writeText(payload, Charsets.UTF_8)
         }
     }
 

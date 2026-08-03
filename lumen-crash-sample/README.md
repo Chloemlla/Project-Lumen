@@ -3,8 +3,9 @@
 Minimal host for the short integration path:
 
 1. `LumenCrash.installSafely(this) { ... }` in `SampleApplication`
-2. `LumenCrashGate { ... }` in `MainActivity`
-3. Force an uncaught crash, relaunch, then use the crash UI
+2. Enable the startup watchdog and call `LumenCrash.markStartupComplete()` after the first frame
+3. `LumenCrashGate { ... }` in `MainActivity`
+4. Force an uncaught crash, relaunch, then use the crash UI
 
 Build in CI / workflow only:
 

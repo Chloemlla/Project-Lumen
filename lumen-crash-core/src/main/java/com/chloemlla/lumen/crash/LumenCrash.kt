@@ -12,6 +12,8 @@ object LumenCrash {
     private val installedConfig = AtomicReference<LumenCrashConfig?>(null)
     private val storeRef = AtomicReference<CrashReportStore?>(null)
     private val handlerRef = AtomicReference<Thread.UncaughtExceptionHandler?>(null)
+    private val watchdogRef = AtomicReference<LumenCrashWatchdog?>(null)
+    private val installLock = Any()
 
     @Volatile
     var startupCrashReport: CrashReport? = null
@@ -19,10 +21,15 @@ object LumenCrash {
 
     fun install(application: Application, config: LumenCrashConfig) {
         AuthorIntegrity.verifyOrThrow("install")
-        installedConfig.set(config)
-        storeRef.set(CrashReportStore(application.applicationContext))
-        installUncaughtExceptionHandler(application)
-        CrashBreadcrumbs.record("LumenCrash installed")
+        synchronized(installLock) {
+            installedConfig.set(config)
+            storeRef.set(CrashReportStore(application.applicationContext))
+            installUncaughtExceptionHandler(application)
+            restartWatchdog(config)
+            CrashBreadcrumbs.record(
+                "LumenCrash installed watchdog=${config.anrWatchdogEnabled || config.startupHangWatchdogEnabled}",
+            )
+        }
     }
 
     /**
@@ -87,10 +94,22 @@ object LumenCrash {
         CrashBreadcrumbs.record("Crash captured: ${throwable::class.java.name}")
         val report = runCatching { CrashReport.fromThrowable(throwable, appInfo) }
             .getOrElse { CrashReport.fromThrowableFallback(throwable, it, appInfo) }
-        startupCrashReport = report
-        runCatching { store().save(report) }
-            .onSuccess { config.onCrashSaved?.invoke(report) }
+        saveReport(report, config)
         return report
+    }
+
+    /**
+     * Marks the first usable host frame as rendered and stops the optional startup timer.
+     * Hosts that enable [LumenCrashConfig.startupHangWatchdogEnabled] should call this from
+     * their first-frame callback, not from an early Application lifecycle method.
+     */
+    fun markStartupComplete() {
+        watchdogRef.get()?.markStartupComplete()
+    }
+
+    /** Stops background detection. The uncaught exception handler remains installed. */
+    fun stopWatchdog() {
+        watchdogRef.getAndSet(null)?.stop()
     }
 
     fun loadPendingReport(): CrashReport? {
@@ -129,9 +148,12 @@ object LumenCrash {
             )
             val report = runCatching { CrashReport.fromThrowable(throwable, appInfo) }
                 .getOrElse { CrashReport.fromThrowableFallback(throwable, it, appInfo) }
-            startupCrashReport = report
-            runCatching { CrashReportStore(application.applicationContext).save(report) }
-            runCatching { config?.onCrashSaved?.invoke(report) }
+            if (config != null) {
+                saveReport(report, config)
+            } else {
+                startupCrashReport = report
+                runCatching { CrashReportStore(application.applicationContext).save(report) }
+            }
             val chained = previousHandler
             if (chained != null && chained !== handlerRef.get()) {
                 chained.uncaughtException(thread, throwable)
@@ -143,6 +165,52 @@ object LumenCrash {
         handlerRef.set(handler)
         Thread.setDefaultUncaughtExceptionHandler(handler)
         CrashBreadcrumbs.record("Crash reporter installed")
+    }
+
+    private fun restartWatchdog(config: LumenCrashConfig) {
+        watchdogRef.getAndSet(null)?.stop()
+        if (!config.anrWatchdogEnabled && !config.startupHangWatchdogEnabled) return
+
+        val watchdog = LumenCrashWatchdog(config) { kind, durationMillis, threadDump ->
+            recordWatchdogReport(kind, durationMillis, threadDump)
+        }
+        watchdogRef.set(watchdog)
+        watchdog.start()
+    }
+
+    private fun recordWatchdogReport(
+        kind: CrashReportKind,
+        durationMillis: Long,
+        threadDump: String,
+    ) {
+        val config = installedConfig.get() ?: return
+        val report = runCatching {
+            CrashReport.fromWatchdog(
+                kind = kind,
+                durationMillis = durationMillis,
+                mainThread = android.os.Looper.getMainLooper().thread,
+                threadDump = threadDump,
+                appInfo = config.toAppInfo(),
+            )
+        }.getOrNull() ?: return
+        saveReport(report, config)
+    }
+
+    private fun saveReport(
+        report: CrashReport,
+        config: LumenCrashConfig,
+    ) {
+        startupCrashReport = report
+        runCatching { store().save(report) }
+            .onSuccess {
+                // Keep the legacy callback useful for hosts that already enqueue every
+                // persisted diagnostic report through onCrashSaved.
+                runCatching { config.onCrashSaved?.invoke(report) }
+                runCatching { config.onReportSaved?.invoke(report) }
+                if (report.kind != CrashReportKind.CRASH) {
+                    runCatching { config.onAnrDetected?.invoke(report) }
+                }
+            }
     }
 
     private fun LumenCrashConfig.toAppInfo(): CrashAppInfo = CrashAppInfo(

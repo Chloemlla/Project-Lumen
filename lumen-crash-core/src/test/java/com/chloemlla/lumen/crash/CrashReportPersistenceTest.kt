@@ -24,6 +24,8 @@ class CrashReportPersistenceTest {
             remove("threadName")
             remove("processName")
             remove("recentEvents")
+            remove("kind")
+            remove("durationMillis")
             put("authorName", "tampered")
             put("authorUrl", "https://example.invalid")
             put("authorFingerprint", "tampered")
@@ -35,6 +37,8 @@ class CrashReportPersistenceTest {
         assertEquals("unknown", restored.threadName)
         assertEquals("unknown", restored.processName)
         assertTrue(restored.recentEvents.isEmpty())
+        assertEquals(CrashReportKind.CRASH, restored.kind)
+        assertEquals(0L, restored.durationMillis)
         assertEquals(CrashAuthorAttribution.AUTHOR_NAME, restored.authorName)
         assertEquals(CrashAuthorAttribution.AUTHOR_URL, restored.authorUrl)
         assertEquals(CrashAuthorAttribution.FINGERPRINT_HEX, restored.authorFingerprint)
@@ -109,6 +113,8 @@ class CrashReportPersistenceTest {
             systemInfo = "Android: 16 (SDK 36)\nABI: arm64-v8a",
             stackTrace = "android.app.ForegroundServiceStartNotAllowedException\n\tat example.Frame.call(Frame.kt:1)",
             recentEvents = listOf("Application.onCreate", "MMKV initialized", "包含中文"),
+            kind = CrashReportKind.ANR,
+            durationMillis = 6_500L,
         )
     }
 }

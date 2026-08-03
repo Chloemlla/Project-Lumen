@@ -26,6 +26,13 @@ class LumenCrashConfigBuilder internal constructor(
     var pasteUploadBaseUrl: String = CrashReportPasteUploader.DEFAULT_BASE_URL
     var onCrashSaved: ((CrashReport) -> Unit)? = null
     var killProcessWhenNoPreviousHandler: Boolean = true
+    var anrWatchdogEnabled: Boolean = true
+    var anrWatchdogTimeoutMillis: Long = 5_000L
+    var anrWatchdogCheckIntervalMillis: Long = 1_000L
+    var startupHangWatchdogEnabled: Boolean = false
+    var startupHangTimeoutMillis: Long = 15_000L
+    var onReportSaved: ((CrashReport) -> Unit)? = null
+    var onAnrDetected: ((CrashReport) -> Unit)? = null
 
     fun build(): LumenCrashConfig {
         val packageInfo = runCatching {
@@ -62,6 +69,13 @@ class LumenCrashConfigBuilder internal constructor(
             pasteUploadBaseUrl = pasteUploadBaseUrl,
             onCrashSaved = onCrashSaved,
             killProcessWhenNoPreviousHandler = killProcessWhenNoPreviousHandler,
+            anrWatchdogEnabled = anrWatchdogEnabled,
+            anrWatchdogTimeoutMillis = anrWatchdogTimeoutMillis,
+            anrWatchdogCheckIntervalMillis = anrWatchdogCheckIntervalMillis,
+            startupHangWatchdogEnabled = startupHangWatchdogEnabled,
+            startupHangTimeoutMillis = startupHangTimeoutMillis,
+            onReportSaved = onReportSaved,
+            onAnrDetected = onAnrDetected,
         )
     }
 
