@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.devtools.ksp")
+    id("org.jetbrains.kotlin.kapt")
     id("androidx.baselineprofile")
 }
 
@@ -292,9 +292,11 @@ kotlin {
     }
 }
 
-ksp {
-    arg("room.incremental", "true")
-    arg("room.schemaLocation", "$projectDir/schemas")
+kapt {
+    arguments {
+        arg("room.incremental", "true")
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
 }
 
 dependencies {
@@ -336,7 +338,7 @@ dependencies {
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.mlkit:face-mesh-detection:16.0.0-beta3")
-    ksp("androidx.room:room-compiler:2.8.4")
+    kapt("androidx.room:room-compiler:2.8.4")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
