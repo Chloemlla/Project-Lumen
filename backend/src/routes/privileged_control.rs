@@ -47,7 +47,11 @@ async fn get_policy(
     Query(query): Query<PolicyQuery>,
 ) -> Result<Json<DeviceControlPolicyResponse>, ApiError> {
     let user = require_user(&headers, &state).await?;
-    require_device_security(&user, query.device_installation_id.as_deref().unwrap_or_default()).await?;
+    require_device_security(
+        &user,
+        query.device_installation_id.as_deref().unwrap_or_default(),
+    )
+    .await?;
     Ok(Json(
         state
             .store

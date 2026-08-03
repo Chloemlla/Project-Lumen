@@ -16,7 +16,14 @@ async fn verify_google_purchase(
     Json(payload): Json<GooglePurchaseVerifyRequest>,
 ) -> Result<Json<PurchaseVerifyResponse>, ApiError> {
     let user = require_user(&headers, &state).await?;
-    require_device_security(&user, payload.device_installation_id.as_deref().unwrap_or_default()).await?;
+    require_device_security(
+        &user,
+        payload
+            .device_installation_id
+            .as_deref()
+            .unwrap_or_default(),
+    )
+    .await?;
     let response = state
         .store
         .verify_google_purchase(&user.id, payload, state.config.accept_unverified_purchases)
