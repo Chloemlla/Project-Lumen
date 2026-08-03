@@ -6,7 +6,7 @@ Related: [Android 16 / Vivo notes](./ANDROID_16_VIVO_ADAPTATION.md)
 
 Fetched package: `docs/vivo-adaptation/1010-android-17/` (script: `scripts/fetch_vivo_adaptation_doc.py`)
 
-Project Lumen currently ships with `compileSdk/targetSdk = 37` and `minSdk = 26`. This note tracks high-priority items from the Vivo Android 17 guide after the 2026-07-16 refresh.
+Project Lumen currently ships with `compileSdk/targetSdk = 37` and `minSdk = 29`. This note tracks high-priority items from the Vivo Android 17 guide after the 2026-07-16 refresh.
 
 ## High priority for this app
 
@@ -43,7 +43,7 @@ Orientation / resize locks may be ignored on large screens; opt-out properties a
 `usesCleartextTraffic` is on a deprecation path; prefer `networkSecurityConfig`.
 
 **Lumen decision**
-- `minSdk = 26` (>= 24), so Manifest no longer declares `usesCleartextTraffic`.
+- `minSdk = 29` (>= 24), so Manifest no longer declares `usesCleartextTraffic`.
 - Domain policy lives only in `res/xml/network_security_config.xml`.
 - Base config and production hosts force `cleartextTrafficPermitted="false"`.
 - Production hosts remain HTTPS-only (`eye.chloemlla.com`, `tts.chloemlla.com`).

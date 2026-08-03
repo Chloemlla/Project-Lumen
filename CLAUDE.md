@@ -74,7 +74,7 @@ npm run dev        # local Vite dev server
 - **Shizuku** (`core/shizuku`, `dev.rikka.shizuku`) provides elevated shell operations (e.g. per-app network control) without root.
 - **Native security layer** (`app/src/main/cpp/lumen_security.cpp`, built by CMake/NDK). Compiles the request-signing secret, release cert SHA-256, and expected package name into a `.so` for integrity/attestation checks; built for 16 KB page alignment. Note: the CI step that sets up the Android native toolchain is currently commented out in `build.yml` — the `externalNativeBuild` config in `app/build.gradle.kts` still references it.
 - **Open API for third-party apps.** `ILumenOpenApi.aidl` + `LumenOpenService` (bound service) plus exported `openapi/*Activity` classes expose eye-fatigue level, screen time, and focus/rest control. These are gated by custom permissions `com.project.lumen.permission.ACCESS_LUMEN_CORE` (dangerous) and `TRIGGER_LUMEN_CONTROL` (signature).
-- SDK: `minSdk 26`, `compileSdk`/`targetSdk 37`, Java 21 toolchain. ABI splits (`armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`) + universal APK. The bundled JetBrains Mono subset font is validated to stay < 20 KB at `preBuild`.
+- SDK: app `minSdk 29` (CRooot Android 10 floor), `compileSdk`/`targetSdk 37`, Java 21 toolchain. `lumen-crash-core` remains independently usable from API 26. ABI splits (`armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`) + universal APK. The bundled JetBrains Mono subset font is validated to stay < 20 KB at `preBuild`.
 
 ## Backend architecture (`backend/`)
 

@@ -22,10 +22,9 @@ impl AppStore {
         let model = normalize_optional(request.model, MAX_DEVICE_MODEL_LENGTH);
         let local_security_config =
             normalize_optional(request.local_security_config, MAX_SECURITY_CONFIG_LENGTH);
-        let security_evidence = mongodb::bson::to_bson(&sanitize_security_evidence(
-            request.security_evidence,
-        ))
-        .map_err(|_| ApiError::Internal)?;
+        let security_evidence =
+            mongodb::bson::to_bson(&sanitize_security_evidence(request.security_evidence))
+                .map_err(|_| ApiError::Internal)?;
         let version_code = request.version_code.max(0);
         let registered_at = now_millis();
 

@@ -155,7 +155,8 @@ android {
         buildConfigField("String", "OPEN_API_TRUSTED_SIGNATURE_SHA256", "\"${projectLumenBuildConfigString(projectLumenOpenApiTrustedSignatureSha256)}\"")
 
         applicationId = projectLumenApplicationId
-        minSdk = 26
+        // CRooot 0.1.0 uses API 29 App Zygote and declares Android 10 as its floor.
+        minSdk = 29
         targetSdk = 37
         versionCode = projectLumenVersionCode
         versionName = projectLumenVersionName

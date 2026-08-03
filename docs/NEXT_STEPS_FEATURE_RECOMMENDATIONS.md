@@ -16,7 +16,7 @@ Project Lumen 当前已经不是单纯的本地倒计时工具，而是一个以
 - Jetpack Compose Material 3 UI。
 - Room 数据库，当前 `AppDatabase` 版本为 `13`，`exportSchema = true`。
 - Java 21 / Kotlin 2.1.20 / Android Gradle Plugin 8.13.2。
-- `compileSdk = 37`、`targetSdk = 37`、`minSdk = 26`。
+- `compileSdk = 37`、`targetSdk = 37`、`minSdk = 29`（CRooot SDK 的 Android 10 / API 29 下限）。
 - 当前应用版本来源为 `app/application.version`，现值 `1.0.1`。
 - 通过 `BuildConfig.API_BASE_URL` 默认连接 `https://eye.chloemlla.com/api`。
 
@@ -40,6 +40,7 @@ CRooot SDK 的依赖边界：
 - CI 和默认构建从 GitHub Packages 解析 `com.chloemlla.crooot:crooot-sdk:0.1.0`，workflow 通过 `packages: read` 授权读取。
 - 本地 `CRooot` sibling composite build 不是默认路径。需要联调 SDK 源码时，显式使用 `-PprojectLumenUseLocalCrooot=true`。
 - 这样可以避免 CRooot 的 AGP 9.3.1 与 Project-Lumen 的 AGP 8.13.2 在同一次 Gradle 构建中产生版本冲突。
+- `lumen-crash-core` 仍保持 `minSdk 26`，独立接入时不继承主应用对 CRooot 的 API 29 要求。
 
 ## 2. 已添加功能归档
 
