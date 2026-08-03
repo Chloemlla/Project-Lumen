@@ -6,12 +6,15 @@ pluginManagement {
     }
 }
 
-// CRooot SDK: prefer a local composite build when the repository is checked out as a sibling.
-// CI builds must check out CRooot alongside Project-Lumen:
-//   git clone https://github.com/Chloemlla/CRooot.git ../CRooot
-// Local development: clone CRooot as a sibling directory, or place an AAR in app/libs/.
+// CRooot SDK is consumed from GitHub Packages by default. A local composite build is
+// opt-in because CRooot and Project-Lumen may use different Android Gradle Plugin versions.
+// Enable it locally with: ./gradlew -PprojectLumenUseLocalCrooot=true <task>
 val croootDir = rootProject.projectDir.parentFile?.resolve("CRooot")
-val hasCroootSibling = croootDir?.exists() == true
+val useLocalCrooot = providers.gradleProperty("projectLumenUseLocalCrooot")
+    .map(String::toBoolean)
+    .orElse(false)
+    .get()
+val hasCroootSibling = useLocalCrooot && croootDir?.isDirectory == true
 
 if (hasCroootSibling) {
     includeBuild(croootDir!!.path) {
