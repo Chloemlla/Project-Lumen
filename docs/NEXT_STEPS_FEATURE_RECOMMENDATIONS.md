@@ -15,7 +15,7 @@ Project Lumen 当前已经不是单纯的本地倒计时工具，而是一个以
 - 原生 Kotlin Android 应用。
 - Jetpack Compose Material 3 UI。
 - Room 数据库，当前 `AppDatabase` 版本为 `13`，`exportSchema = true`。
-- Java 21 / Kotlin 2.1.20 / Android Gradle Plugin 8.13.2。
+- Java 21 / Kotlin 2.4.10 / Android Gradle Plugin 8.13.2。
 - `compileSdk = 37`、`targetSdk = 37`、`minSdk = 29`（CRooot SDK 的 Android 10 / API 29 下限）。
 - 当前应用版本来源为 `app/application.version`，现值 `1.0.1`。
 - 通过 `BuildConfig.API_BASE_URL` 默认连接 `https://eye.chloemlla.com/api`。
