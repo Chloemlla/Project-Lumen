@@ -180,7 +180,7 @@ jobs:
             echo "::error::Release signing properties missing before baseline profile generation."
             exit 1
           fi
-          gradle :app:generateBaselineProfile --no-daemon --warning-mode all
+          gradle :app:generateBaselineProfile --no-daemon --warning-mode all --stacktrace
 
       - name: Build release APK
         env:
@@ -428,7 +428,7 @@ jobs:
           PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
           PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
           PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
-        run: gradle testDebugUnitTest --no-daemon --warning-mode all
+        run: gradle testDebugUnitTest --no-daemon --warning-mode all --stacktrace
 
       - name: Run Android lint
         if: ${{ !cancelled() }}
@@ -438,7 +438,7 @@ jobs:
           PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
           PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
           PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
-        run: gradle :app:lintDebug --no-daemon --warning-mode all
+        run: gradle :app:lintDebug --no-daemon --warning-mode all --stacktrace
 
       - name: Upload verification reports
         if: always()

@@ -44,8 +44,8 @@ Supporting: `design/lumen-ui-tokens.json` (UI tokens, mounted into the app as as
 Android (`build.yml`, `release.yml`) — CI uses system `gradle` 9.5.1 on Java 21 (Zulu); there is no `gradlew` wrapper:
 ```bash
 gradle assembleRelease --no-daemon --warning-mode all   # release APK (ABI splits + universal)
-gradle testDebugUnitTest --no-daemon --warning-mode all  # JVM unit tests
-gradle lintDebug --no-daemon --warning-mode all          # Android lint
+gradle testDebugUnitTest --no-daemon --warning-mode all --stacktrace  # JVM unit tests
+gradle lintDebug --no-daemon --warning-mode all --stacktrace          # Android lint
 # README shorthand for a full check: gradle test lint assembleDebug --no-daemon
 ```
 
