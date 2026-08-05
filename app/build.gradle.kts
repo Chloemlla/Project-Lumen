@@ -327,8 +327,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
-    implementation("androidx.room:room-ktx:2.8.5")
-    implementation("androidx.room:room-runtime:2.8.5")
+    implementation("androidx.room:room-ktx:2.8.4")
+    implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
     // Vendor HE haptic stubs are compile-only. Packaging them as implementation can ship
     // android.os.* stub classes that break cold start on stock AOSP / baseline emulators.
@@ -338,7 +338,10 @@ dependencies {
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.mlkit:face-mesh-detection:16.0.0-beta3")
-    kapt("androidx.room:room-compiler:2.8.5")
+    kapt("androidx.room:room-compiler:2.8.4") {
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-metadata-jvm")
+    }
+    kapt("org.jetbrains.kotlin:kotlin-metadata-jvm:2.0.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
