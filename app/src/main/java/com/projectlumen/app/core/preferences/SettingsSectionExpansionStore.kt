@@ -1,6 +1,7 @@
 package com.projectlumen.app.core.preferences
 
 import android.content.Context
+import androidx.annotation.StringRes
 
 /**
  * Persists Settings page section expand/collapse choices so users can continue where they left off
