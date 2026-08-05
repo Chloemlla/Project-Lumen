@@ -1,6 +1,6 @@
 # Project Lumen
 
-Project Lumen is an Android-first eye-care and focus project. Its native client combines configurable break reminders and Pomodoro sessions with local statistics, sensor-assisted protections, privacy controls, and optional connected services. This repository also contains the companion API, reusable crash-reporting SDK, documentation site, product animation, and release automation.
+Project Lumen is an Android-first eye-care and focus project. Its native client combines configurable break reminders and Pomodoro sessions with local statistics, sensor-assisted protections, privacy controls, and optional connected services. This repository also contains the reusable crash-reporting SDK, documentation site, product animation, and release automation.
 
 ## Android client
 
@@ -21,19 +21,18 @@ The app currently has a minimum SDK of 26, targets SDK 37, and uses a Java/Kotli
 | Path | Purpose |
 | --- | --- |
 | [`app/`](app/) | Native Android application: Compose surfaces, runtime engines, services, local repositories, security, updates, and the external app API. |
-| [`backend/`](backend/) | Rust/Axum API for sessions, devices, entitlements, sync, backup, telemetry, releases, and administration; includes a React/Vite admin dashboard. |
 | [`lumen-crash-core/`](lumen-crash-core/), [`lumen-crash/`](lumen-crash/), [`lumen-crash-sample/`](lumen-crash-sample/) | Reusable Android crash capture, persistence, adaptive Compose report UI, and integration sample. |
 | [`baselineprofile/`](baselineprofile/) | Managed-device Baseline Profile generator for the Android app. |
 | [`docs/`](docs/) | VitePress product, engineering, adaptation, and research documentation. |
 | [`remotion/android-product-animation/`](remotion/android-product-animation/) | React/Remotion source for the Android product animation. |
 
-Within the Android client, Compose product surfaces live under `app/.../app`, runtime/data/security integrations under `app/.../core`, and the permission-protected external interface under `app/.../openapi`. The backend keeps its Axum routes, models, state/configuration, and persistence code separated under `backend/src`.
+Within the Android client, Compose product surfaces live under `app/.../app`, runtime/data/security integrations under `app/.../core`, and the permission-protected external interface under `app/.../openapi`.
 
 ## Build and verification
 
 Repository policy requires all actual builds and tests to run in GitHub Actions. Do **not** run Gradle, Cargo, npm build, lint, render, or test commands on the local workstation.
 
-- [`build.yml`](.github/workflows/build.yml) builds the Android release artifacts and Baseline Profile, runs Android unit tests and lint, builds the admin dashboard, and checks/tests the Rust backend.
+- [`build.yml`](.github/workflows/build.yml) builds the Android release artifacts and Baseline Profile, and runs Android unit tests and lint.
 - [`release.yml`](.github/workflows/release.yml) verifies and publishes tagged Android APK releases with checksums and a release manifest.
 - [`lumen-crash-sdk-release.yml`](.github/workflows/lumen-crash-sdk-release.yml) verifies and publishes the Lumen Crash AARs.
 - [`vitepress-docs.yml`](.github/workflows/vitepress-docs.yml) builds and publishes the documentation site.

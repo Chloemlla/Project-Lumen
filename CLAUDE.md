@@ -29,15 +29,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository layout
 
-Three deployable components live in one repo:
+Two deployable components live in one repo:
 
 | Path | Component | Stack |
 |---|---|---|
 | `app/` | Android client | Kotlin, Jetpack Compose Material 3, Room, Java 21 |
-| `backend/` | API service | Rust (axum + tokio + MongoDB) |
-| `backend/admin/` | Admin dashboard | React 19 + TypeScript + Vite, served by the Rust binary at `/admin` |
 
-Supporting: `design/lumen-ui-tokens.json` (UI tokens, mounted into the app as assets), `tools/lumen-ui-tuner/` (standalone Vite tool for tuning those tokens), `docs/` (planning/research, mostly Chinese), `Dockerfile` (multi-stage: Rust backend + Node admin → Debian runtime).
+Supporting: `design/lumen-ui-tokens.json` (UI tokens, mounted into the app as assets), `tools/lumen-ui-tuner/` (standalone Vite tool for tuning those tokens), `docs/` (planning/research, mostly Chinese).
 
 ## Commands (these run in CI — see workflows in `.github/workflows/`)
 
@@ -47,26 +45,6 @@ gradle assembleRelease --no-daemon --warning-mode all   # release APK (ABI split
 gradle testDebugUnitTest --no-daemon --warning-mode all --stacktrace  # JVM unit tests
 gradle lintDebug --no-daemon --warning-mode all --stacktrace          # Android lint
 # README shorthand for a full check: gradle test lint assembleDebug --no-daemon
-```
-
-Gradle Kotlin DSL convention for `lumen-crash`, `lumen-crash-core`, and
-`lumen-crash-sample`: keep `kotlin { compilerOptions { ... } }` at the top
-level, while Android-only settings such as `buildFeatures`, `packaging`, and
-`publishing` remain inside `android {}`. This is required by the Kotlin 2.4.x
-plugin and is validated by the GitHub workflow's Gradle script compilation.
-
-Rust backend (`build.yml`, runs from repo root):
-```bash
-cargo fmt   --manifest-path backend/Cargo.toml --all -- --check
-cargo test  --manifest-path backend/Cargo.toml --all-targets
-cargo build --manifest-path backend/Cargo.toml --release
-```
-
-Admin dashboard (`backend/admin/`):
-```bash
-npm install
-npm run build      # tsc -b && vite build → dist/ (the Rust service serves this)
-npm run dev        # local Vite dev server
 ```
 
 ## Android architecture (`app/`, package `com.projectlumen.app`)
@@ -81,17 +59,6 @@ npm run dev        # local Vite dev server
 - **Native security layer** (`app/src/main/cpp/lumen_security.cpp`, built by CMake/NDK). Compiles the request-signing secret, release cert SHA-256, and expected package name into a `.so` for integrity/attestation checks; built for 16 KB page alignment. Note: the CI step that sets up the Android native toolchain is currently commented out in `build.yml` — the `externalNativeBuild` config in `app/build.gradle.kts` still references it.
 - **Open API for third-party apps.** `ILumenOpenApi.aidl` + `LumenOpenService` (bound service) plus exported `openapi/*Activity` classes expose eye-fatigue level, screen time, and focus/rest control. These are gated by custom permissions `com.project.lumen.permission.ACCESS_LUMEN_CORE` (dangerous) and `TRIGGER_LUMEN_CONTROL` (signature).
 - SDK: app `minSdk 29` (CRooot Android 10 floor), `compileSdk`/`targetSdk 37`, Java 21 toolchain. `lumen-crash-core` remains independently usable from API 26. ABI splits (`armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`) + universal APK. The bundled JetBrains Mono subset font is validated to stay < 20 KB at `preBuild`.
-
-## Backend architecture (`backend/`)
-
-- **axum** router assembled in `src/api.rs`. Routes (`src/routes/*.rs`) are nested under a configurable prefix (default `/api`): a `/v1` group (also mirrored at root for legacy clients) behind optional `security::enforce_api_security` request-signature verification (`LUMEN_REQUIRE_REQUEST_SIGNING=true`) and `audit::audit_request`, plus `/admin` and public `platform` routes. The same binary serves the admin SPA from `/admin` and `/assets`.
-- **Layering:** `routes/` (HTTP) → `store/` (MongoDB collections) → `models/` (serde types). `state.rs` holds `AppState` (Mongo client + config); `config.rs` reads all `LUMEN_*` env vars; `server.rs` wires CORS/tracing and binds the listener.
-- **Purchases fail closed** (`LUMEN_ACCEPT_UNVERIFIED_PURCHASES=false`) until real Play verification is wired in. Email login codes are sent via Happy-TTS **outemail** (`outemail.rs`); when no API key is set, `/api/v1/auth/email/start` returns a dev code.
-- See `backend/README.md` for the full env var list, endpoint catalog, and the 20 admin-dashboard modules / MongoDB collections.
-
-## Cross-component contract
-
-When backend request signing is explicitly enabled with `LUMEN_REQUIRE_REQUEST_SIGNING=true`, the Android build's `PROJECT_LUMEN_REQUEST_SIGNING_SECRET` **must equal** the backend's `LUMEN_REQUEST_SIGNING_SECRET`, or signed client requests get HTTP 403. Backend request-signature verification is disabled by default, including production deployments.
 
 ## Build-time configuration (Android)
 

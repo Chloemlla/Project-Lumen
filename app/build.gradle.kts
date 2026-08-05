@@ -71,7 +71,7 @@ android {
         ?: providers.gradleProperty("PROJECT_LUMEN_API_BASE_URL")
             .orNull
             ?.takeIf { it.isNotBlank() }
-        ?: "https://eye.chloemlla.com/api"
+        ?: "https://tts.chloemlla.com/api/lumen"
     val projectLumenTranslationApiBaseUrl = providers.environmentVariable("PROJECT_LUMEN_TRANSLATION_API_BASE_URL")
         .orNull
         ?.takeIf { it.isNotBlank() }

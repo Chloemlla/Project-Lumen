@@ -300,7 +300,7 @@ jobs:
           generate_release_notes: true
           files: release-assets/*
 
-      - name: Sync release manifest to backend
+      - name: Sync release manifest to admin API
         if: success() && startsWith(github.ref, 'refs/tags/')
         env:
           PROJECT_LUMEN_API_BASE_URL: ${{ secrets.PROJECT_LUMEN_API_BASE_URL }}
@@ -308,20 +308,18 @@ jobs:
           PROJECT_LUMEN_ADMIN_TOKEN: ${{ secrets.PROJECT_LUMEN_ADMIN_TOKEN }}
         run: |
           if [ -z "$PROJECT_LUMEN_ADMIN_TOKEN" ]; then
-            echo "Backend release sync skipped; PROJECT_LUMEN_ADMIN_TOKEN is not configured."
+            echo "Release sync skipped; PROJECT_LUMEN_ADMIN_TOKEN is not configured."
             exit 0
           fi
           if [ -z "$PROJECT_LUMEN_API_BASE_URL" ] && [ -z "$PROJECT_LUMEN_ADMIN_ACTIONS_URL" ]; then
-            echo "Backend release sync skipped; PROJECT_LUMEN_API_BASE_URL or PROJECT_LUMEN_ADMIN_ACTIONS_URL is not configured."
+            echo "Release sync skipped; PROJECT_LUMEN_API_BASE_URL or PROJECT_LUMEN_ADMIN_ACTIONS_URL is not configured."
             exit 0
           fi
           ADMIN_ACTIONS_URL="${PROJECT_LUMEN_ADMIN_ACTIONS_URL%/}"
           if [ -z "$ADMIN_ACTIONS_URL" ]; then
             API_BASE="${PROJECT_LUMEN_API_BASE_URL%/}"
-            case "$API_BASE" in
-              */api) ADMIN_ACTIONS_URL="${API_BASE}/admin/actions" ;;
-              *) ADMIN_ACTIONS_URL="${API_BASE}/api/admin/actions" ;;
-            esac
+            # The API base ends with /api/lumen, so admin actions are at ${API_BASE}/admin/actions
+            ADMIN_ACTIONS_URL="${API_BASE}/admin/actions"
           fi
           python3 - <<'PY'
           import json
@@ -330,7 +328,7 @@ jobs:
           manifest_path = pathlib.Path("release-assets/release-manifest.json")
           manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
           payload = {"action": "force-update", "payload": manifest}
-          pathlib.Path("release-assets/backend-release-action.json").write_text(
+          pathlib.Path("release-assets/admin-release-action.json").write_text(
               json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
               encoding="utf-8",
           )
@@ -338,5 +336,5 @@ jobs:
           curl -fsS \
             -H "Authorization: Bearer ${PROJECT_LUMEN_ADMIN_TOKEN}" \
             -H "Content-Type: application/json" \
-            --data-binary @release-assets/backend-release-action.json \
+            --data-binary @release-assets/admin-release-action.json \
             "$ADMIN_ACTIONS_URL"
