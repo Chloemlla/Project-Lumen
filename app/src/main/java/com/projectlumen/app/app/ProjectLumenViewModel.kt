@@ -176,9 +176,8 @@ class ProjectLumenViewModel(
         tipTemplateRepository = repositories.tipTemplates,
         nativeProtectionSummary = nativeProtectionSummary,
         securityEvidence = {
-            ProjectLumenApplication.applicationContext()?.let { context ->
-                (context as? ProjectLumenApplication)?.deviceSecurityGate?.backendEvidence()
-            }
+            val ctx = ProjectLumenApplication.applicationContext()
+            (ctx as? ProjectLumenApplication)?.deviceSecurityGate?.backendEvidence()
         },
     )
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
