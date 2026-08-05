@@ -341,7 +341,7 @@ dependencies {
     kapt("androidx.room:room-compiler:2.8.4") {
         exclude(group = "org.jetbrains.kotlin", module = "kotlin-metadata-jvm")
     }
-    kapt("org.jetbrains.kotlin:kotlin-metadata-jvm:2.0.0")
+    kapt("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.10")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
