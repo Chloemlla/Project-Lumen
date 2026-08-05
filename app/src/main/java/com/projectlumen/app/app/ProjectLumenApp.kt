@@ -112,7 +112,6 @@ internal enum class Destination(
     SETTINGS("settings", R.string.nav_settings, Icons.Outlined.Settings),
     TRANSLATION("translation", R.string.nav_translation, Icons.Outlined.Translate, false),
     TEMPLATES("templates", R.string.nav_templates, Icons.Outlined.Style, false),
-    PRODUCT_DEMO("product-demo", R.string.nav_product_demo, Icons.Outlined.PlayArrow, false),
     ABOUT("about", R.string.nav_about, Icons.Outlined.Info, false),
     DEVELOPER("developer", R.string.nav_developer, Icons.Outlined.Code, false),
     WEB("web", R.string.about_external_link_prompt_title, Icons.AutoMirrored.Outlined.OpenInNew, false),
@@ -482,14 +481,12 @@ fun ProjectLumenApp(
                                 checkingUpdate = updateDialogState is UpdateDialogState.Checking,
                                 onManualUpdateCheck = { triggerUpdateCheck(manual = true) },
                                 openTemplates = { navController.navigate(Destination.TEMPLATES.route) },
-                                openProductDemo = { navController.navigate(Destination.PRODUCT_DEMO.route) },
                                 openAbout = { navController.navigate(Destination.ABOUT.route) },
                                 openDeveloperOptions = { navController.navigate(Destination.DEVELOPER.route) },
                             )
                         }
                         composable(Destination.TRANSLATION.route) { TranslationScreen() }
                         composable(Destination.TEMPLATES.route) { TemplatesScreen(uiState, viewModel) }
-                        composable(Destination.PRODUCT_DEMO.route) { ProductDemoScreen() }
                         composable(Destination.ABOUT.route) { AboutScreen(viewModel) }
                         composable(Destination.DEVELOPER.route) {
                             DeveloperDebugScreen(

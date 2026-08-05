@@ -37,6 +37,8 @@ class UpdateChecker(
         }
 
         val latest = fetchLatestGitHubRelease() ?: return null
+        if (isSdkRelease(latest.tagName)) return null
+
         val localVersion = parseVersionDescriptor("${currentBuild.versionName}-${currentBuild.shortHash}")
             ?: parseVersionDescriptor(currentBuild.versionName)
             ?: return null
@@ -389,6 +391,12 @@ class UpdateChecker(
             .replace('.', '_')
     }
 
+    private fun isSdkRelease(tagName: String): Boolean {
+        return SDK_RELEASE_PREFIXES.any { prefix ->
+            tagName.lowercase().startsWith(prefix)
+        }
+    }
+
     private fun parseInstant(value: String): Long? {
         if (value.isBlank()) return null
         return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
@@ -420,6 +428,7 @@ class UpdateChecker(
         private const val USER_AGENT = "Project-Lumen"
         private const val DEFAULT_CHANNEL = "stable"
         private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases/latest"
+        private val SDK_RELEASE_PREFIXES = listOf("lumen-crash", "sdk-", "lumen-sdk")
         private val SHORT_HASH_IN_PARENS_REGEX = Regex("""\(([0-9a-fA-F]{7,40})\)$""")
         private val SHORT_HASH_SUFFIX_REGEX = Regex("""(?:-|_)([0-9a-fA-F]{7,40})$""")
         private val SHA256_REGEX = Regex("""\b[0-9a-fA-F]{64}\b""")
