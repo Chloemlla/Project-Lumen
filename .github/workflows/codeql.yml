@@ -36,8 +36,6 @@ jobs:
         include:
           - language: java-kotlin
             build-mode: manual
-          - language: rust
-            build-mode: none
           - language: actions
             build-mode: default
 

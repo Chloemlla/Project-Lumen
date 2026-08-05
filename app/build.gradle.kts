@@ -299,6 +299,14 @@ kapt {
     }
 }
 
+// Force kotlin-metadata-jvm to a version that supports Kotlin 2.4.x metadata format.
+// Room 2.8.4 bundles an older version that only supports metadata up to 2.3.0.
+configurations.kapt {
+    resolutionStrategy {
+        force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.0.0")
+    }
+}
+
 dependencies {
     implementation(project(":lumen-crash"))
     implementation("com.chloemlla.crooot:crooot-sdk:0.1.0")
