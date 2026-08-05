@@ -299,14 +299,6 @@ kapt {
     }
 }
 
-// Force kotlin-metadata-jvm to a version that supports Kotlin 2.4.x metadata format.
-// Room 2.8.4 bundles an older version that only supports metadata up to 2.3.0.
-configurations.kapt {
-    resolutionStrategy {
-        force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.0.0")
-    }
-}
-
 dependencies {
     implementation(project(":lumen-crash"))
     implementation("com.chloemlla.crooot:crooot-sdk:0.1.0")
@@ -335,8 +327,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
-    implementation("androidx.room:room-ktx:2.8.4")
-    implementation("androidx.room:room-runtime:2.8.4")
+    implementation("androidx.room:room-ktx:2.8.5")
+    implementation("androidx.room:room-runtime:2.8.5")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
     // Vendor HE haptic stubs are compile-only. Packaging them as implementation can ship
     // android.os.* stub classes that break cold start on stock AOSP / baseline emulators.
@@ -346,7 +338,7 @@ dependencies {
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.mlkit:face-mesh-detection:16.0.0-beta3")
-    kapt("androidx.room:room-compiler:2.8.4")
+    kapt("androidx.room:room-compiler:2.8.5")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
