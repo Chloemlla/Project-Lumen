@@ -391,7 +391,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
         ShizukuResilienceWorker.cancel(this)
     }
 
-    private companion object {
+    companion object {
         private const val TAG = "ProjectLumenApp"
         @Volatile
         private var appContext: Context? = null

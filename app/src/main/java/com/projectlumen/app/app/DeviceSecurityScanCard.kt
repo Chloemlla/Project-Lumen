@@ -38,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.projectlumen.app.R
 import com.projectlumen.app.core.security.CroootReportFormatter
 import com.projectlumen.app.core.security.DeviceSecurityScanner
 
