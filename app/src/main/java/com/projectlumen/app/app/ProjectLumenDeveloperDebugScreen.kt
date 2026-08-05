@@ -354,7 +354,7 @@ internal fun DeveloperDebugScreen(
             }
         }
 
-        SettingsSection("Device Security Scan", Icons.Outlined.Security) {
+        SettingsSection(R.string.developer_section_device_security_scan, Icons.Outlined.Security) {
             DeviceSecurityScanCard(
                 scanState = securityScanState,
                 onStartScan = viewModel::startDeviceSecurityScan,

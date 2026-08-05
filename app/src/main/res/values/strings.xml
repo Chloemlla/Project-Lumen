@@ -517,6 +517,7 @@
     <string name="developer_section_raw_sensors">Raw sensor data</string>
     <string name="developer_section_crash">Crash page debug</string>
     <string name="developer_section_mode">Developer mode</string>
+    <string name="developer_section_device_security_scan">Device Security Scan</string>
     <string name="developer_crooot_root_status">Root status</string>
     <string name="developer_crooot_suspicious_indicators">Suspicious indicators</string>
     <string name="developer_crooot_hardware_integrity">Hardware integrity</string>

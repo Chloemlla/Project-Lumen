@@ -71,7 +71,7 @@ internal fun DeviceSecurityScanCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SectionHeader(Icons.Outlined.Security, "Device Security Scan")
+                InlineHeader(Icons.Outlined.Security, "Device Security Scan")
                 if (scanState is DeviceSecurityScanState.Running) {
                     CircularProgressIndicator(modifier = Modifier.padding(start = 8.dp))
                 }

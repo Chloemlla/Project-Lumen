@@ -289,6 +289,7 @@ kotlin {
     jvmToolchain(21)
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+        freeCompilerArgs.add("-Xskip-metadata-version-check")
     }
 }
 
@@ -338,10 +339,7 @@ dependencies {
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.mlkit:face-mesh-detection:16.0.0-beta3")
-    kapt("androidx.room:room-compiler:2.8.4") {
-        exclude(group = "org.jetbrains.kotlin", module = "kotlin-metadata-jvm")
-    }
-    kapt("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.10")
+    kapt("androidx.room:room-compiler:2.8.4")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
