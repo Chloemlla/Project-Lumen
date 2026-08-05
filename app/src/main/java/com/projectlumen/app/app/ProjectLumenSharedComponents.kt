@@ -493,14 +493,18 @@ internal fun SettingsSection(
                 headerAccessory?.invoke()
                 if (!forceExpanded) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowUp,
+                        imageVector = Icons.Outlined.KeyboardArrowDown,
                         contentDescription = null,
-                        modifier = Modifier.rotation(arrowRotation).size(20.dp),
+                        modifier = Modifier.graphicsLayer { rotationZ = arrowRotation },
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            AnimatedVisibility(visible = expanded) {
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(tween(160)) + slideInVertically(tween(160)) { -it / 8 },
+                exit = fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 8 },
+            ) {
                 Column(
                     modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
                     content = content,
@@ -508,7 +512,12 @@ internal fun SettingsSection(
             }
         }
     }
-    summary?.let { SummaryCard(summary = it) }
+    summary?.let { summaryContent ->
+        Column(
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+            content = summaryContent,
+        )
+    }
 }
 
 @Composable
