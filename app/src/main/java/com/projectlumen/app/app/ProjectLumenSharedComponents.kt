@@ -340,6 +340,36 @@ internal fun InlineHeader(icon: ImageVector, text: String) {
 }
 
 @Composable
+internal fun SectionHeader(icon: ImageVector, title: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Text(
+            title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
 internal fun SectionHeader(icon: ImageVector, @StringRes titleRes: Int) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -396,6 +426,90 @@ internal val LocalSettingsSectionGroup = staticCompositionLocalOf<SettingsSectio
 @Composable
 internal fun rememberSettingsSectionGroupController(): SettingsSectionGroupController =
     remember { SettingsSectionGroupController() }
+
+@Composable
+internal fun SettingsSection(
+    title: String,
+    icon: ImageVector,
+    initiallyExpanded: Boolean = true,
+    forceExpanded: Boolean = false,
+    headerAccessory: (@Composable () -> Unit)? = null,
+    summary: (@Composable ColumnScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val context = LocalContext.current
+    val restoredExpanded = remember(title, initiallyExpanded) {
+        SettingsSectionExpansionStore.isExpanded(context, title, initiallyExpanded)
+    }
+    var expanded by rememberSaveable(title) { mutableStateOf(restoredExpanded) }
+    LaunchedEffect(title, expanded) {
+        SettingsSectionExpansionStore.setExpanded(context, title, expanded)
+    }
+    LaunchedEffect(forceExpanded) {
+        if (forceExpanded) expanded = true
+    }
+    val groupController = LocalSettingsSectionGroup.current
+    if (groupController != null) {
+        LaunchedEffect(groupController.expandToken) {
+            if (groupController.expandToken > 0) expanded = true
+        }
+        LaunchedEffect(groupController.collapseToken) {
+            if (groupController.collapseToken > 0 && !forceExpanded) expanded = false
+        }
+    }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(180),
+        label = "settingsSection",
+    )
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        onClick = { expanded = !expanded },
+        enabled = !forceExpanded,
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (!forceExpanded) Modifier.clickable { expanded = !expanded } else Modifier)
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+                Text(
+                    title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                headerAccessory?.invoke()
+                if (!forceExpanded) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowUp,
+                        contentDescription = null,
+                        modifier = Modifier.rotation(arrowRotation).size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column(
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                    content = content,
+                )
+            }
+        }
+    }
+    summary?.let { SummaryCard(summary = it) }
+}
 
 @Composable
 internal fun SettingsSection(

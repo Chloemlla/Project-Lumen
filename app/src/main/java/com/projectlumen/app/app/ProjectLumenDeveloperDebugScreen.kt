@@ -95,7 +95,7 @@ internal fun DeveloperDebugScreen(
     val backendAccessEnabled = backendDecision.executable
     val apiTraces = viewModel.apiDiagnostics.collectAsStateWithLifecycle().value
     val memoryHealth = viewModel.memoryHealth.collectAsStateWithLifecycle().value
-    val securityScanState = viewModel.securityScanState.collectAsStateWithLifecycle().value
+    val securityScanState = viewModel.securityScanState.collectAsStateWithLifecycle<DeviceSecurityScanState>().value
     val luxHistory = remember { mutableStateListOf<Float>() }
     var networkAppQuery by rememberSaveable { mutableStateOf("") }
     var purchaseProductId by rememberSaveable { mutableStateOf("project_lumen_pro") }
