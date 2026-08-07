@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="legal_permissions_title">应用权限</string>
+    <string name="legal_permissions_intro">以下为 Project Lumen 可能使用的权限及其用途说明。大多数权限仅在您启用相关功能时才会被请求。</string>
+    <string name="legal_permission_camera_name">android.permission.CAMERA</string>
+    <string name="legal_permission_camera_desc">在设备本地进行屏幕距离检测以及眨眼与干眼监测。画面帧仅在本地处理，不会被保存或上传。</string>
+    <string name="legal_permission_notifications_name">android.permission.POST_NOTIFICATIONS</string>
+    <string name="legal_permission_notifications_desc">提醒您休息、显示番茄钟状态并弹出提醒。</string>
+    <string name="legal_permission_exact_alarm_name">android.permission.SCHEDULE_EXACT_ALARM</string>
+    <string name="legal_permission_exact_alarm_desc">在精确的预定时间触发休息与番茄钟提醒。</string>
+    <string name="legal_permission_full_screen_intent_name">android.permission.USE_FULL_SCREEN_INTENT</string>
+    <string name="legal_permission_full_screen_intent_desc">在需要休息时以全屏形式显示休息提醒。</string>
+    <string name="legal_permission_overlay_name">android.permission.SYSTEM_ALERT_WINDOW</string>
+    <string name="legal_permission_overlay_desc">在严格护眼模式开启时，在其他应用上方绘制用眼休息悬浮层。</string>
+    <string name="legal_permission_write_settings_name">android.permission.WRITE_SETTINGS</string>
+    <string name="legal_permission_write_settings_desc">为自动亮度护眼功能调整屏幕亮度。</string>
+    <string name="legal_permission_usage_access_name">android.permission.PACKAGE_USAGE_STATS</string>
+    <string name="legal_permission_usage_access_desc">可选权限；用于读取您正在使用的应用，以便休息建议能够结合具体应用给出。</string>
+    <string name="legal_permission_boot_name">android.permission.RECEIVE_BOOT_COMPLETED</string>
+    <string name="legal_permission_boot_desc">在设备重启后恢复您已安排的提醒。</string>
+    <string name="legal_permission_foreground_service_name">android.permission.FOREGROUND_SERVICE</string>
+    <string name="legal_permission_foreground_service_desc">在使用期间让计时器、摄像头与光线监测在后台稳定运行。</string>
+    <string name="legal_permission_internet_name">android.permission.INTERNET</string>
+    <string name="legal_permission_internet_desc">用于检查更新；仅在您开启时上传可选诊断信息或同步云端账号。</string>
+    <string name="legal_permission_network_state_name">android.permission.ACCESS_NETWORK_STATE</string>
+    <string name="legal_permission_network_state_desc">检测网络可用性，用于更新检查与云端同步。</string>
+    <string name="legal_permission_battery_name">android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</string>
+    <string name="legal_permission_battery_desc">通过请求豁免激进的电量优化，确保提醒计时器稳定可靠。</string>
+    <string name="legal_permission_biometric_name">android.permission.USE_BIOMETRIC</string>
+    <string name="legal_permission_biometric_desc">可选权限；使用设备锁或生物识别保护敏感设置。</string>
+    <string name="legal_permission_install_packages_name">android.permission.REQUEST_INSTALL_PACKAGES</string>
+    <string name="legal_permission_install_packages_desc">安装您从官方发布页下载的更新 APK。</string>
+    <string name="legal_permission_vibrate_name">android.permission.VIBRATE</string>
+    <string name="legal_permission_vibrate_desc">在休息提醒触发时振动。</string>
+    <string name="legal_permission_query_all_packages_name">android.permission.QUERY_ALL_PACKAGES</string>
+    <string name="legal_permission_query_all_packages_desc">可选权限；列出已安装的应用，以便通过 Shizuku 实现按应用进行网络控制。</string>
+    <string name="legal_permission_open_api_access_name">com.project.lumen.permission.ACCESS_LUMEN_CORE</string>
+    <string name="legal_permission_open_api_access_desc">允许您授权的第三方应用通过开放 API 读取 Project Lumen 状态并控制专注会话。</string>
+    <string name="legal_permission_open_api_trigger_name">com.project.lumen.permission.TRIGGER_LUMEN_CONTROL</string>
+    <string name="legal_permission_open_api_trigger_desc">允许同签名的应用触发休息保护控制。</string>
+</resources>
