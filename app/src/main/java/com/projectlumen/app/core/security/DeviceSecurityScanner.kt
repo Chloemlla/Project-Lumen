@@ -96,8 +96,6 @@ class DeviceSecurityScanner(private val context: Context) {
         options: CRoootScanOptions = CRoootScanOptions(
             includeHardware = true,
             includeDuckFeatures = true,
-            // Soter safety: set to false if the app uses Tencent Soter.
-            includeTee = true,
         ),
     ): SecurityAssessment = scanMutex.withLock {
         withContext(Dispatchers.Default) {
@@ -119,7 +117,7 @@ class DeviceSecurityScanner(private val context: Context) {
     }
 
     /**
-     * Runs a quick scan (KKND root only, no TEE, no hardware).
+     * Runs a quick scan (KKND root only, no Duck features, no hardware).
      * Suitable for cold-start or background checks.
      */
     suspend fun quickScan(): SecurityAssessment = scan(
@@ -137,19 +135,6 @@ class DeviceSecurityScanner(private val context: Context) {
         CRoootScanOptions(
             includeHardware = true,
             includeDuckFeatures = true,
-            includeTee = true,
-        ),
-    )
-
-    /**
-     * Runs a scan without TEE (for Soter-using hosts).
-     * All 15 non-TEE Duck reports remain active.
-     */
-    suspend fun scanWithoutTee(): SecurityAssessment = scan(
-        CRoootScanOptions(
-            includeHardware = true,
-            includeDuckFeatures = true,
-            includeTee = false,
         ),
     )
 
@@ -159,8 +144,8 @@ class DeviceSecurityScanner(private val context: Context) {
 
         return SecurityAssessment(
             completed = true,
-            rooted = result.isRooted,
-            suspicious = result.isSuspicious,
+            rooted = result.kkndRoot.isRooted,
+            suspicious = result.kkndRoot.isSuspicious,
             hardwareIntegrityOk = result.kkndHardware?.overallOk,
             selinuxEnforcing = selinux?.mode?.let { mode ->
                 mode == SelinuxMode.ENFORCING && selinux.paradoxDetected != true
@@ -172,7 +157,7 @@ class DeviceSecurityScanner(private val context: Context) {
                 }
                 else -> false
             },
-            summary = result.summary(),
+            summary = CroootReportFormatter.format(result),
             rawResult = result,
             errorMessage = null,
         )

@@ -267,7 +267,7 @@ private fun SecurityLine(
 }
 
 /** State for the [DeviceSecurityScanCard]. */
-internal sealed interface DeviceSecurityScanState {
+sealed interface DeviceSecurityScanState {
     data object Idle : DeviceSecurityScanState
     data object Running : DeviceSecurityScanState
     data class Complete(val assessment: DeviceSecurityScanner.SecurityAssessment) : DeviceSecurityScanState
