@@ -45,6 +45,34 @@ Repository policy requires all actual builds and tests to run in GitHub Actions.
 
 Trigger the relevant workflow through a push, pull request, tag, or `workflow_dispatch`, then inspect its logs, reports, and uploaded artifacts. Installable Android artifacts are published through [GitHub Releases](https://github.com/Chloemlla/Project-Lumen/releases).
 
+## Configuration and secret management
+
+Build-time configuration and CI credentials are provisioned as GitHub Actions secrets (repository **Settings → Secrets and variables → Actions**). The workflows read them via `secrets.*` in [`build.yml`](.github/workflows/build.yml) and [`release.yml`](.github/workflows/release.yml). Version and build-identity keys are derived by CI and do **not** need to be stored.
+
+| Secret | Consumed in | Purpose |
+| --- | --- | --- |
+| `KEYSTORE_BASE64` | `build.yml`, `release.yml` | Base64 of the Android signing `.jks` keystore |
+| `KEYSTORE_PASSWORD` | `build.yml`, `release.yml` | Keystore password |
+| `KEY_ALIAS` | `build.yml`, `release.yml` | Signing key alias |
+| `KEY_PASSWORD` | `build.yml`, `release.yml` | Signing private-key password |
+| `PROJECT_LUMEN_API_BASE_URL` | `build.yml`, `release.yml` | Client API base URL |
+| `PROJECT_LUMEN_API_CERTIFICATE_PINNING_ENABLED` | `build.yml`, `release.yml` | Enable API certificate pinning |
+| `PROJECT_LUMEN_API_CERTIFICATE_PINS` | `build.yml`, `release.yml` | API certificate pins |
+| `PROJECT_LUMEN_TRANSLATION_API_BASE_URL` | `build.yml`, `release.yml` | Translation service base URL |
+| `PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINNING_ENABLED` | `build.yml`, `release.yml` | Enable translation certificate pinning |
+| `PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS` | `build.yml`, `release.yml` | Translation certificate pins |
+| `PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN` | `build.yml`, `release.yml` | Telemetry access token |
+| `PROJECT_LUMEN_REQUEST_SIGNING_SECRET` | `build.yml`, `release.yml` | HMAC request-signing secret compiled into the native security layer |
+| `PROJECT_LUMEN_RELEASE_CERT_SHA256` | `build.yml`, `release.yml` | Release certificate SHA-256 for integrity checks |
+| `PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256` | `build.yml`, `release.yml` | Trusted third-party signature for the exported Open API |
+| `PROJECT_LUMEN_ADMIN_ACTIONS_URL` | `build.yml`, `release.yml` | Release-manifest sync admin action URL |
+| `PROJECT_LUMEN_ADMIN_TOKEN` | `build.yml`, `release.yml` | Release-manifest sync bearer token |
+| `USER_PAT` | `lumen-ui-tuner.yml`, `dependabot-maintenance.yml` | PAT for the UI-tuner deploy and Dependabot PR operations |
+
+The 13 non-signing secrets above can also be stored in the **Project Lumen** section of the [Happy-TTS](https://github.com/Chloemlla/Happy-TTS) env-manager (admin → Env Manager) and pushed to this repo's Actions secrets in one click ("同步全部到 GitHub"). The four keystore signing secrets are intentionally managed out-of-band and not stored there. CI-derived keys that require no configuration: `PROJECT_LUMEN_VERSION_NAME`, `PROJECT_LUMEN_VERSION_CODE`, `PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS`, `PROJECT_LUMEN_COMMIT_HASH`, `PROJECT_LUMEN_SHORT_HASH`.
+
+Keep all secret values out of source and documentation; rotate them through the GitHub UI or the Happy-TTS env-manager.
+
 ## Security and privacy
 
 - **Core settings, runtime state, goals, templates, and statistics** are stored on-device with Room/MMKV-backed repositories. Account credentials are handled through encrypted credential storage.
