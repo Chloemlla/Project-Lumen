@@ -40,7 +40,8 @@ class BackendCommunicationArchitectureTest {
 
         assertEquals(listOf("ProjectLumenApplication.kt"), productionConstructions)
         val application = source("ProjectLumenApplication.kt").readText()
-        assertTrue(application.contains("ProjectLumenApiClient(backendGate = backendConnectivity)"))
+        assertTrue(application.contains("ProjectLumenApiClient("))
+        assertTrue(application.contains("backendGate = backendConnectivity"))
         assertTrue(application.contains("healthProbe = { apiClient.health() }"))
 
         val updateChecker = source("core/update/UpdateChecker.kt").readText()

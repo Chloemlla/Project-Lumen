@@ -105,3 +105,9 @@
 -keepclasseswithmembernames class com.eltavine.duckdetector.** {
     native <methods>;
 }
+
+# Tencent Soter references android.hardware.fingerprint.FingerprintManager, which was
+# removed from the SDK in API 28+. The calls are guarded at runtime, so the missing
+# class is safe to ignore during R8 minification.
+-dontwarn android.hardware.fingerprint.FingerprintManager
+-dontwarn com.tencent.soter.**

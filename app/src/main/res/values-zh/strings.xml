@@ -516,6 +516,7 @@
     <string name="developer_section_raw_sensors">传感器原始数据</string>
     <string name="developer_section_crash">崩溃页面调试</string>
     <string name="developer_section_mode">开发者模式</string>
+    <string name="developer_section_device_security_scan">设备安全扫描</string>
     <string name="developer_crooot_root_status">Root 状态</string>
     <string name="developer_crooot_suspicious_indicators">可疑指标</string>
     <string name="developer_crooot_hardware_integrity">硬件完整性</string>
