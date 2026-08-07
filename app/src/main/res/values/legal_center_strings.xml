@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="legal_center_title">App Declarations</string>
+    <string name="legal_center_intro">Agreements, privacy information, and permission overview for Project Lumen in one place.</string>
+    <string name="legal_center_section_legal">Legal Information</string>
+    <string name="legal_center_user_agreement">User Agreement</string>
+    <string name="legal_center_privacy_policy">Privacy Policy</string>
+    <string name="legal_center_membership_agreement">Membership Service Agreement</string>
+    <string name="legal_center_personal_info_collection">Personal Information Collection List</string>
+    <string name="legal_center_section_consent">Consent Management</string>
+    <string name="legal_center_withdraw_consent">Withdraw Consent</string>
+    <string name="legal_center_withdraw_privacy_consent">Withdraw Privacy Policy Consent</string>
+    <string name="legal_center_section_other">Other</string>
+    <string name="legal_center_oss_notice">Open Source License Declaration</string>
+    <string name="legal_center_app_permissions">App Permissions</string>
+    <string name="legal_withdraw_consent_dialog_title">Withdraw consent</string>
+    <string name="legal_withdraw_consent_dialog_message">Confirming will turn off local usage statistics and stop all optional diagnostic uploads (crash reports, face-analysis samples, and installed-app inventory). Eye-break reminders and Pomodoro focus sessions remain fully usable.</string>
+    <string name="legal_withdraw_privacy_dialog_title">Withdraw privacy policy consent</string>
+    <string name="legal_withdraw_privacy_dialog_message">Confirming stops the same data processing as the general consent withdrawal and additionally resets your privacy policy agreement. Project Lumen will ask you to review and re-agree to the policy on the next launch.</string>
+    <string name="legal_withdraw_confirm">Withdraw</string>
+    <string name="legal_withdraw_cancel">Not now</string>
+    <string name="legal_withdraw_consent_success">Consent withdrawn. Statistics and diagnostic uploads are now off.</string>
+    <string name="legal_withdraw_privacy_success">Privacy policy consent withdrawn. The policy will be shown again on next launch.</string>
+</resources>

@@ -207,7 +207,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun AboutScreen(viewModel: ProjectLumenViewModel) {
+internal fun AboutScreen(
+    viewModel: ProjectLumenViewModel,
+    openLegal: () -> Unit,
+) {
     val versionLabel = rememberBuildVersionLabel()
     val context = LocalContext.current
     var versionTapCount by rememberSaveable { mutableIntStateOf(0) }
@@ -257,7 +260,7 @@ internal fun AboutScreen(viewModel: ProjectLumenViewModel) {
                 versionLabel = versionLabel,
                 onVersionClick = { handleDeveloperTap() },
             )
-            AboutLinksCard(viewModel)
+            AboutLinksCard(viewModel, openLegal)
         }
         AboutFooter(
             modifier = Modifier
@@ -339,9 +342,18 @@ internal fun AboutHeroCard(versionLabel: String, onVersionClick: () -> Unit) {
 }
 
 @Composable
-internal fun AboutLinksCard(viewModel: ProjectLumenViewModel) {
+internal fun AboutLinksCard(
+    viewModel: ProjectLumenViewModel,
+    openLegal: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = lumenCardColors(), elevation = lumenCardElevation(), border = lumenCardBorder()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeader(Icons.Outlined.Gavel, R.string.legal_center_title)
+            OutlinedButton(onClick = openLegal) {
+                Icon(Icons.Outlined.Gavel, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.legal_center_title))
+            }
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
             OutlinedButton(onClick = viewModel::reopenOssNotice) {
                 Icon(Icons.Outlined.Gavel, contentDescription = null)

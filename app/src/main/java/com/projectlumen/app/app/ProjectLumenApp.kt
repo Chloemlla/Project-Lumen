@@ -25,15 +25,21 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.ListAlt
 import androidx.compose.material.icons.outlined.LocalCafe
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Translate
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -114,6 +120,12 @@ internal enum class Destination(
     TEMPLATES("templates", R.string.nav_templates, Icons.Outlined.Style, false),
     ABOUT("about", R.string.nav_about, Icons.Outlined.Info, false),
     DEVELOPER("developer", R.string.nav_developer, Icons.Outlined.Code, false),
+    LEGAL("legal", R.string.legal_center_title, Icons.Outlined.Gavel, false),
+    LEGAL_TERMS("legal_terms", R.string.legal_terms_title, Icons.Outlined.Description, false),
+    LEGAL_PRIVACY("legal_privacy", R.string.legal_privacy_title, Icons.Outlined.PrivacyTip, false),
+    LEGAL_MEMBERSHIP("legal_membership", R.string.legal_membership_title, Icons.Outlined.WorkspacePremium, false),
+    LEGAL_PERSONAL("legal_personal", R.string.legal_personal_title, Icons.Outlined.ListAlt, false),
+    LEGAL_PERMISSIONS("legal_permissions", R.string.legal_permissions_title, Icons.Outlined.Lock, false),
     WEB("web", R.string.about_external_link_prompt_title, Icons.AutoMirrored.Outlined.OpenInNew, false),
 }
 
@@ -487,7 +499,52 @@ fun ProjectLumenApp(
                         }
                         composable(Destination.TRANSLATION.route) { TranslationScreen() }
                         composable(Destination.TEMPLATES.route) { TemplatesScreen(uiState, viewModel) }
-                        composable(Destination.ABOUT.route) { AboutScreen(viewModel) }
+                        composable(Destination.ABOUT.route) {
+                            AboutScreen(
+                                viewModel = viewModel,
+                                openLegal = { navController.navigate(Destination.LEGAL.route) },
+                            )
+                        }
+                        composable(Destination.LEGAL.route) {
+                            LegalHubScreen(
+                                viewModel = viewModel,
+                                onOpenDoc = { key ->
+                                    val route = when (key) {
+                                        LegalDocKey.TERMS -> Destination.LEGAL_TERMS.route
+                                        LegalDocKey.PRIVACY -> Destination.LEGAL_PRIVACY.route
+                                        LegalDocKey.MEMBERSHIP -> Destination.LEGAL_MEMBERSHIP.route
+                                        LegalDocKey.PERSONAL -> Destination.LEGAL_PERSONAL.route
+                                        LegalDocKey.PERMISSIONS -> Destination.LEGAL_PERMISSIONS.route
+                                    }
+                                    navController.navigate(route)
+                                },
+                            )
+                        }
+                        composable(Destination.LEGAL_TERMS.route) {
+                            LegalDocumentScreen(
+                                titleRes = R.string.legal_terms_title,
+                                bodyRes = R.string.legal_terms_body,
+                            )
+                        }
+                        composable(Destination.LEGAL_PRIVACY.route) {
+                            LegalDocumentScreen(
+                                titleRes = R.string.legal_privacy_title,
+                                bodyRes = R.string.legal_privacy_body,
+                            )
+                        }
+                        composable(Destination.LEGAL_MEMBERSHIP.route) {
+                            LegalDocumentScreen(
+                                titleRes = R.string.legal_membership_title,
+                                bodyRes = R.string.legal_membership_body,
+                            )
+                        }
+                        composable(Destination.LEGAL_PERSONAL.route) {
+                            LegalDocumentScreen(
+                                titleRes = R.string.legal_personal_title,
+                                bodyRes = R.string.legal_personal_body,
+                            )
+                        }
+                        composable(Destination.LEGAL_PERMISSIONS.route) { AppPermissionsScreen() }
                         composable(Destination.DEVELOPER.route) {
                             DeveloperDebugScreen(
                                 uiState = uiState,

@@ -412,6 +412,25 @@ class ProjectLumenViewModel(
         firstOpenGateEntry.reopenBuildUpdateNotes()
     }
 
+    fun withdrawDataConsent() {
+        CrashBreadcrumbs.record("Action withdrawDataConsent")
+        updateSettings { current ->
+            current.copy(
+                statsEnabled = false,
+                diagnosticTelemetryUploadEnabled = false,
+                diagnosticCrashReportUploadEnabled = false,
+                diagnosticFaceAnalysisUploadEnabled = false,
+                shizukuAppInventoryUploadEnabled = false,
+            )
+        }
+    }
+
+    fun withdrawPrivacyPolicyConsent() {
+        CrashBreadcrumbs.record("Action withdrawPrivacyPolicyConsent")
+        withdrawDataConsent()
+        firstOpenGateEntry.withdrawPrivacyConsent()
+    }
+
     fun selectTemplate(templateId: Long) {
         CrashBreadcrumbs.record("Action selectTemplate id=$templateId")
         val state = stateStore.uiState.value

@@ -158,6 +158,11 @@ class SecureCredentialStore(context: Context) {
         encryptedMmkv.encode(KEY_OSS_NOTICE_COMPLETED_AT, nowMillis.coerceAtLeast(1L))
     }
 
+    fun resetOnboardingCompletion() {
+        migrateLegacyCredentialsIfNeeded()
+        encryptedMmkv.encode(KEY_ONBOARDING_COMPLETED_AT, 0L)
+    }
+
     fun markBuildUpdateNotesAcknowledged(
         commitHash: String,
         buildTimeUtcMillis: Long,

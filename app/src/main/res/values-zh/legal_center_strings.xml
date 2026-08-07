@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="legal_center_title">应用声明</string>
+    <string name="legal_center_intro">应用声明：协议、隐私与权限信息汇总。</string>
+    <string name="legal_center_section_legal">法律信息</string>
+    <string name="legal_center_user_agreement">用户协议</string>
+    <string name="legal_center_privacy_policy">隐私政策</string>
+    <string name="legal_center_membership_agreement">会员服务协议</string>
+    <string name="legal_center_personal_info_collection">个人信息收集清单</string>
+    <string name="legal_center_section_consent">同意管理</string>
+    <string name="legal_center_withdraw_consent">撤回同意</string>
+    <string name="legal_center_withdraw_privacy_consent">撤回隐私政策同意</string>
+    <string name="legal_center_section_other">其他</string>
+    <string name="legal_center_oss_notice">开源许可声明</string>
+    <string name="legal_center_app_permissions">应用权限</string>
+    <string name="legal_withdraw_consent_dialog_title">撤回同意</string>
+    <string name="legal_withdraw_consent_dialog_message">确认后将关闭本地使用统计，并停止所有可选的诊断上传（崩溃报告、人脸分析样本、已安装应用清单）。护眼休息提醒与专注功能不受影响，仍可正常使用。</string>
+    <string name="legal_withdraw_privacy_dialog_title">撤回隐私政策同意</string>
+    <string name="legal_withdraw_privacy_dialog_message">确认后将停止与撤回同意相同的数据处理，并额外重置你的隐私政策同意状态。Project Lumen 将在下次启动时重新展示隐私政策，请重新阅读并作出选择。</string>
+    <string name="legal_withdraw_confirm">确认撤回</string>
+    <string name="legal_withdraw_cancel">暂不撤回</string>
+    <string name="legal_withdraw_consent_success">已撤回同意，统计与诊断上传已关闭。</string>
+    <string name="legal_withdraw_privacy_success">已撤回隐私政策同意，下次启动时将重新展示隐私政策。</string>
+</resources>

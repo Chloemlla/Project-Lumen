@@ -88,6 +88,12 @@ internal class ProjectLumenFirstOpenGateEntry(
         applyAutomaticGate()
     }
 
+    fun withdrawPrivacyConsent() {
+        secureCredentials.resetOnboardingCompletion()
+        installProfile = installProfile.copy(onboardingCompletedAt = 0L)
+        onboardingEligible = installProfile.ossNoticeCompletedAt > 0L
+    }
+
     fun completeBuildUpdateNotes() {
         if (_buildUpdateNotesState.value.reopenMode) {
             dismissBuildUpdateNotes()
