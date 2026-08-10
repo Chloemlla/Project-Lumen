@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Debug
+import android.provider.Settings
 import android.util.Log
 import com.projectlumen.app.BuildConfig
 import java.security.MessageDigest
@@ -48,6 +49,9 @@ object AppIntegrityGuard {
             if (javaDebugDetected) add("debugger")
             if (!nativeAllowed) add("native")
             if (hasRuntimeHookingClasses()) add("runtime-hook")
+            if (NativeSecurityBridge.isDebuggerAttachedNativeOrNull() == true) add("native-debugger")
+            if (NativeSecurityBridge.isAdbOverNetworkDetectedOrNull() == true) add("adb-over-network")
+            if (isAdbEnabled(appContext)) add("adb-enabled")
         }
         if (failureReasons.isNotEmpty()) {
             Log.e(TAG, "Integrity check failed: ${failureReasons.joinToString()}")
@@ -70,6 +74,8 @@ object AppIntegrityGuard {
         return buildList {
             add("nativeBridge=${if (NativeSecurityBridge.isAvailable) "available" else "unavailable"}")
             add("nativeEnvironment=${nativeAllowed?.let { if (it) "allowed" else "blocked" } ?: "unknown"}")
+            add("adbOverNetwork=${NativeSecurityBridge.isAdbOverNetworkDetectedOrNull()?.let { if (it) "detected" else "clean" } ?: "unknown"}")
+            add("nativeDebugger=${NativeSecurityBridge.isDebuggerAttachedNativeOrNull()?.let { if (it) "detected" else "clean" } ?: "unknown"}")
             add("requestSigning=${if (BuildConfig.DEBUG) "native_or_debug_fallback" else "native_required"}")
             add("appIntegrity=${if (BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED) "enabled" else "disabled"}")
         }.joinToString(separator = ";")
@@ -136,5 +142,11 @@ object AppIntegrityGuard {
         return classNames.any { className ->
             runCatching { Class.forName(className) }.isSuccess
         }
+    }
+
+    private fun isAdbEnabled(context: Context): Boolean {
+        return runCatching {
+            Settings.Global.getInt(context.contentResolver, "adb_enabled", 0) == 1
+        }.getOrDefault(false)
     }
 }

@@ -43,7 +43,9 @@
 
     <application
         android:name=".ProjectLumenApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:installLocation="internalOnly"
+        android:usesCleartextTraffic="false"
         android:enableOnBackInvokedCallback="true"
         android:intentMatchingFlags="enforceIntentFilter"
         android:icon="@mipmap/ic_launcher"

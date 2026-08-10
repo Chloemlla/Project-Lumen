@@ -11,6 +11,11 @@
 #include <string>
 #include <unistd.h>
 
+#include <cerrno>
+#include <csignal>
+#include <sys/ptrace.h>
+#include <sys/wait.h>
+
 #ifndef LUMEN_REQUEST_SIGNING_SECRET
 #define LUMEN_REQUEST_SIGNING_SECRET "project-lumen-local-request-signing-key"
 #endif
@@ -173,6 +178,55 @@ bool has_hooking_artifacts() {
         scan_fd_targets_for_artifacts(needles);
 }
 
+bool scan_proc_net_tcp_for_adb_port(const std::string &path) {
+    const std::string content = read_text_file(path, 65536);
+    if (content.empty()) return false;
+
+    std::istringstream stream(content);
+    std::string line;
+    std::getline(stream, line);
+    while (std::getline(stream, line)) {
+        std::istringstream line_stream(line);
+        std::string field;
+        std::string local_address;
+        std::string state;
+
+        line_stream >> field;
+        if (!(line_stream >> local_address)) continue;
+        line_stream >> field;
+        if (!(line_stream >> state)) continue;
+
+        if (state != "0A") continue;
+
+        const size_t colon_pos = local_address.rfind(':');
+        if (colon_pos == std::string::npos) continue;
+        if (local_address.substr(colon_pos + 1) == "15B3") return true;
+    }
+    return false;
+}
+
+bool is_traced_via_ptrace() {
+    const pid_t child = fork();
+    if (child == -1) return false;
+
+    if (child == 0) {
+        if (ptrace(PTRACE_TRACEME, 0, 0, 0) == -1) _exit(1);
+        raise(SIGSTOP);
+        _exit(0);
+    }
+
+    int status = 0;
+    if (waitpid(child, &status, 0) == -1) return false;
+
+    if (WIFEXITED(status)) return WEXITSTATUS(status) == 1;
+
+    if (WIFSTOPPED(status)) {
+        ptrace(PTRACE_DETACH, child, 0, 0);
+        waitpid(child, &status, 0);
+    }
+    return false;
+}
+
 }  // namespace
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -201,4 +255,31 @@ Java_com_projectlumen_app_core_security_NativeSecurityBridge_isNativeEnvironment
     if (debug_allowed == JNI_FALSE && has_debug_environment()) return JNI_FALSE;
     if (debug_allowed == JNI_FALSE && has_hooking_artifacts()) return JNI_FALSE;
     return JNI_TRUE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_projectlumen_app_core_security_NativeSecurityBridge_isAdbOverNetworkDetected(
+    JNIEnv *env,
+    jobject /* unused */
+) {
+    if (scan_proc_net_tcp_for_adb_port("/proc/net/tcp")) return JNI_TRUE;
+    if (scan_proc_net_tcp_for_adb_port("/proc/net/tcp6")) return JNI_TRUE;
+
+    static constexpr std::array<const char *, 1> adb_needle = {"adb"};
+    if (scan_text_file_for_artifacts("/proc/net/unix", adb_needle)) return JNI_TRUE;
+
+    return JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_projectlumen_app_core_security_NativeSecurityBridge_isDebuggerAttachedNative(
+    JNIEnv *env,
+    jobject /* unused */
+) {
+    if (has_tracer_pid()) return JNI_TRUE;
+
+    // ptrace probe is a best-effort heuristic; fail-open for safety
+    if (is_traced_via_ptrace()) return JNI_TRUE;
+
+    return JNI_FALSE;
 }

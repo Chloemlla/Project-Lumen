@@ -27,6 +27,20 @@ internal object NativeSecurityBridge {
         }.getOrNull()
     }
 
+    external fun isAdbOverNetworkDetected(): Boolean
+
+    external fun isDebuggerAttachedNative(): Boolean
+
+    fun isAdbOverNetworkDetectedOrNull(): Boolean? {
+        if (!isAvailable) return null
+        return runCatching { isAdbOverNetworkDetected() }.getOrNull()
+    }
+
+    fun isDebuggerAttachedNativeOrNull(): Boolean? {
+        if (!isAvailable) return null
+        return runCatching { isDebuggerAttachedNative() }.getOrNull()
+    }
+
     external fun requestSigningSecret(): String
 
     external fun isNativeEnvironmentAllowed(

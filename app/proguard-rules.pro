@@ -111,3 +111,11 @@
 # class is safe to ignore during R8 minification.
 -dontwarn android.hardware.fingerprint.FingerprintManager
 -dontwarn com.tencent.soter.**
+
+# === Anti-decompilation and obfuscation hardening ===
+-optimizationpasses 5
+-allowaccessmodification
+-overloadaggressively
+-obfuscationdictionary obfuscation-dictionary.txt
+-repackageclasses
+-printmapping mapping.txt
