@@ -33,6 +33,10 @@ class LumenCrashConfigBuilder internal constructor(
     var startupHangTimeoutMillis: Long = 15_000L
     var onReportSaved: ((CrashReport) -> Unit)? = null
     var onAnrDetected: ((CrashReport) -> Unit)? = null
+    var crashReportBackendEnabled: Boolean = true
+    var crashReportBackendBaseUrl: String = LumenCrashDefaults.DEFAULT_CRASH_BACKEND_BASE_URL
+    var crashReportAccessToken: String? = null
+    var deviceInstallationIdProvider: (() -> String?)? = null
 
     fun build(): LumenCrashConfig {
         val packageInfo = runCatching {
@@ -76,6 +80,10 @@ class LumenCrashConfigBuilder internal constructor(
             startupHangTimeoutMillis = startupHangTimeoutMillis,
             onReportSaved = onReportSaved,
             onAnrDetected = onAnrDetected,
+            crashReportBackendEnabled = crashReportBackendEnabled,
+            crashReportBackendBaseUrl = crashReportBackendBaseUrl,
+            crashReportAccessToken = crashReportAccessToken,
+            deviceInstallationIdProvider = deviceInstallationIdProvider,
         )
     }
 

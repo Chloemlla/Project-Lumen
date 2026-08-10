@@ -10,6 +10,9 @@ object LumenCrashDefaults {
     const val FILE_PROVIDER_AUTHORITY_SUFFIX: String = ".lumen.crash.fileprovider"
     const val SHARE_DIRECTORY_NAME: String = "lumen-crash-share"
 
+    /** Default HTTPS base URL for the Lumen crash-report backend. */
+    const val DEFAULT_CRASH_BACKEND_BASE_URL: String = "https://tts.chloemlla.com"
+
     fun fileProviderAuthority(packageName: String): String {
         return packageName + FILE_PROVIDER_AUTHORITY_SUFFIX
     }

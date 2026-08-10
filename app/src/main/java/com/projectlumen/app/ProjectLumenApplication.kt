@@ -193,6 +193,16 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
             reportTitle = runCatching { getString(R.string.crash_report_title) }.getOrNull()
             reportMessage = runCatching { getString(R.string.crash_report_message) }.getOrNull()
             onCrashSaved = { report -> scheduleCrashReportUpload(report) }
+            // Unconditional backend crash upload: the SDK fires a POST to the
+            // crash-report endpoint for every persisted report. The access token
+            // and device installation ID are supplied at crash time, not install
+            // time, so they remain safe even if the crash happens during early
+            // Application startup.
+            crashReportAccessToken = com.projectlumen.app.core.api.ProjectLumenApiConfig.telemetryAccessToken
+                .takeIf { it.isNotBlank() }
+            deviceInstallationIdProvider = {
+                runCatching<String?> { secureCredentials.deviceInstallationId() }.getOrNull()
+            }
         }
     }
 

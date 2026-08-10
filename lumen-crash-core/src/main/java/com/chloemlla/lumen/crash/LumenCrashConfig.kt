@@ -45,6 +45,42 @@ data class LumenCrashConfig(
     val onReportSaved: ((CrashReport) -> Unit)? = null,
     /** Receives synthetic startup-hang and main-thread freeze reports. */
     val onAnrDetected: ((CrashReport) -> Unit)? = null,
+
+    // ── Backend crash-report upload ──────────────────────────────────────────
+
+    /**
+     * Master switch for the built-in unconditional backend crash upload.
+     *
+     * When `true` (default), every persisted report is also POSTed to the
+     * crash-report backend. The upload is best-effort and never blocks the
+     * crash/main thread.
+     */
+    val crashReportBackendEnabled: Boolean = true,
+
+    /**
+     * HTTPS base URL for the crash-report endpoint.
+     *
+     * The full endpoint path is `{baseUrl}/api/lumen/v1/crash-report`.
+     * Must use HTTPS. Defaults to [LumenCrashDefaults.DEFAULT_CRASH_BACKEND_BASE_URL].
+     */
+    val crashReportBackendBaseUrl: String = LumenCrashDefaults.DEFAULT_CRASH_BACKEND_BASE_URL,
+
+    /**
+     * Bearer token sent as `Authorization: Bearer <token>`.
+     *
+     * When `null` or blank, the backend upload is skipped entirely. This lets the
+     * SDK remain generic for hosts without a Lumen backend.
+     */
+    val crashReportAccessToken: String? = null,
+
+    /**
+     * Supplier for the device installation ID, evaluated at upload time.
+     *
+     * The host should return a stable device fingerprint or install ID, or `null`
+     * if the value cannot be read (upload is skipped). The lambda is invoked on a
+     * background executor so it may safely read from MMKV / encrypted stores.
+     */
+    val deviceInstallationIdProvider: (() -> String?)? = null,
 )
 
 data class CrashAppInfo(

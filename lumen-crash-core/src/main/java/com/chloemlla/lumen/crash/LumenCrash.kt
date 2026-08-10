@@ -2,6 +2,9 @@ package com.chloemlla.lumen.crash
 
 import android.app.Application
 import android.os.Process
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.system.exitProcess
 
@@ -15,12 +18,33 @@ object LumenCrash {
     private val watchdogRef = AtomicReference<LumenCrashWatchdog?>(null)
     private val installLock = Any()
 
+    /** Host package name, captured at install time for the backend uploader. */
+    @Volatile
+    private var packageName: String = ""
+
+    /**
+     * Tracks [reportId]s that have already been submitted for backend upload
+     * within this process, so cold-start and saveReport paths do not duplicate
+     * the upload.
+     */
+    private val uploadedReportIds = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Single-thread executor for background crash-report uploads.
+     *
+     * Created lazily so the SDK does not allocate a thread when the host has
+     * disabled the backend upload or not configured an access token.
+     */
+    @Volatile
+    private var uploadExecutor: ExecutorService? = null
+
     @Volatile
     var startupCrashReport: CrashReport? = null
         private set
 
     fun install(application: Application, config: LumenCrashConfig) {
         AuthorIntegrity.verifyOrThrow("install")
+        packageName = application.packageName
         synchronized(installLock) {
             installedConfig.set(config)
             storeRef.set(CrashReportStore(application.applicationContext))
@@ -114,7 +138,14 @@ object LumenCrash {
 
     fun loadPendingReport(): CrashReport? {
         AuthorIntegrity.verifyOrThrow("load-pending")
-        return startupCrashReport ?: runCatching { store().load() }.getOrNull()
+        val report = startupCrashReport ?: runCatching { store().load() }.getOrNull()
+        if (report != null) {
+            val config = installedConfig.get()
+            if (config != null) {
+                submitBackendUpload(report, config)
+            }
+        }
+        return report
     }
 
     /**
@@ -211,6 +242,62 @@ object LumenCrash {
                     runCatching { config.onAnrDetected?.invoke(report) }
                 }
             }
+        // Unconditional backend upload fires after persistence regardless of whether
+        // the store save succeeded (best-effort).
+        submitBackendUpload(report, config)
+    }
+
+    /**
+     * Returns the shared background executor, creating it on first access.
+     */
+    private fun executor(): ExecutorService {
+        val existing = uploadExecutor
+        if (existing != null) return existing
+        return synchronized(this) {
+            uploadExecutor ?: Executors.newSingleThreadExecutor { r ->
+                Thread(r, "lumen-crash-backend-upload").apply { isDaemon = true }
+            }.also { uploadExecutor = it }
+        }
+    }
+
+    /**
+     * Submits a background upload of [report] to the crash-report backend.
+     *
+     * Guards against duplicate submissions within one process by tracking
+     * [reportId] in [uploadedReportIds]. All failures are silently caught so
+     * the caller (crash handler / cold-start loader) is never disrupted.
+     */
+    private fun submitBackendUpload(
+        report: CrashReport,
+        config: LumenCrashConfig,
+    ) {
+        // Deduplicate: only submit once per process.
+        if (!uploadedReportIds.add(report.reportId)) return
+        // Master switch.
+        if (!config.crashReportBackendEnabled) return
+        // Token must be non-blank; without it the backend would reject the request.
+        val accessToken = config.crashReportAccessToken?.takeIf { it.isNotBlank() } ?: return
+        // Provider must be wired.
+        val provider = config.deviceInstallationIdProvider ?: return
+        // Package name must be known.
+        val pkg = packageName.takeIf { it.isNotBlank() } ?: return
+
+        runCatching {
+            executor().submit {
+                runCatching {
+                    val deviceId = provider()
+                    if (deviceId.isNullOrBlank()) return@runCatching
+                    CrashReportBackendUploader.upload(
+                        report = report,
+                        deviceInstallationId = deviceId,
+                        packageName = pkg,
+                        versionCode = config.versionCode,
+                        accessToken = accessToken,
+                        baseUrl = config.crashReportBackendBaseUrl,
+                    )
+                }
+            }
+        }
     }
 
     private fun LumenCrashConfig.toAppInfo(): CrashAppInfo = CrashAppInfo(
