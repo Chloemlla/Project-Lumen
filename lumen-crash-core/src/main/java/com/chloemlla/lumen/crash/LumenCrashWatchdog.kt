@@ -66,6 +66,10 @@ internal class LumenCrashWatchdog(
         val startupTimeoutMillis = config.startupHangTimeoutMillis.coerceAtLeast(1_000L)
 
         while (running.get()) {
+            // Re-post the heartbeat every tick: a responsive main thread keeps
+            // refreshing lastHeartbeatAtMillis, so only a main thread that cannot
+            // process messages (a real freeze) lets the age cross the timeout.
+            mainHandler.post(heartbeat)
             val now = SystemClock.elapsedRealtime()
             val startupPending = config.startupHangWatchdogEnabled && !startupComplete.get()
 
