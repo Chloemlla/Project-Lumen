@@ -156,6 +156,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -198,6 +199,7 @@ import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.services.BackupImportSummary
+import com.projectlumen.app.ui.theme.lumenGlass
 import com.projectlumen.app.core.update.BuildMetadata
 import com.projectlumen.app.core.update.ReleaseAsset
 import com.projectlumen.app.core.update.ReleaseInfo
@@ -232,6 +234,7 @@ internal fun LumenTopBar(
      * expanded blank band before the user scrolls. Secondary pages may still expand.
      */
     expanded: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val topBarTokens = rememberLumenUiTokens(LocalContext.current).topBar
     val titleStyle = if (expanded) {
@@ -267,13 +270,20 @@ internal fun LumenTopBar(
         }
     }
 
+    val glassModifier = modifier.lumenGlass(
+        shape = RectangleShape,
+        blurRadius = 28f,
+        tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
+    )
+    val transparentContainer = Color.Transparent
     if (expanded) {
         LargeTopAppBar(
             title = titleContent,
             navigationIcon = navigationIcon,
+            modifier = glassModifier,
             colors = TopAppBarDefaults.largeTopAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                containerColor = transparentContainer,
+                scrolledContainerColor = transparentContainer,
                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                 navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
             ),
@@ -283,9 +293,10 @@ internal fun LumenTopBar(
         TopAppBar(
             title = titleContent,
             navigationIcon = navigationIcon,
+            modifier = glassModifier,
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                containerColor = transparentContainer,
+                scrolledContainerColor = transparentContainer,
                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                 navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
             ),

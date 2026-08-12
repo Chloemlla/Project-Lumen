@@ -8,8 +8,6 @@ import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -40,11 +38,7 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.WorkspacePremium
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,8 +55,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.projectlumen.app.ui.theme.LumenGlassHost
+import com.projectlumen.app.ui.theme.lumenGlass
+import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -341,7 +340,7 @@ fun ProjectLumenApp(
             ) {
                 return@ProjectLumenTheme
             }
-            Box(modifier = Modifier.fillMaxSize()) {
+            LumenGlassHost(modifier = Modifier.fillMaxSize()) {
             val navController = rememberNavController()
             val backStackEntry by navController.currentBackStackEntryAsState()
             val currentDestination = Destination.entries.firstOrNull {
@@ -398,12 +397,22 @@ fun ProjectLumenApp(
                             onNavigateBack = if (currentDestination.showInBottomNav) null else {
                                 { navigateBackFromSecondaryPage() }
                             },
+                            modifier = Modifier.lumenGlass(
+                                shape = RectangleShape,
+                                blurRadius = 28f,
+                                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
+                            ),
                         )
                     },
                     bottomBar = {
                         NavigationBar(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                            tonalElevation = 0.dp,
+                            modifier = Modifier.lumenGlass(
+                                shape = RectangleShape,
+                                blurRadius = 28f,
+                                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
+                            ),
+                            color = Color.Transparent,
+                            showDivider = false,
                         ) {
                             Destination.entries.filter { it.showInBottomNav }.forEach { destination ->
                                 val selected = backStackEntry?.destination?.hierarchy?.any {
@@ -411,13 +420,6 @@ fun ProjectLumenApp(
                                 } == true
                                 NavigationBarItem(
                                     selected = selected,
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    ),
                                     onClick = {
                                         navController.navigate(destination.route) {
                                             popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -425,35 +427,8 @@ fun ProjectLumenApp(
                                             restoreState = true
                                         }
                                     },
-                                    icon = {
-                                        val scale by animateFloatAsState(
-                                            targetValue = if (selected) 1.12f else 1f,
-                                            animationSpec = spring(stiffness = 600f, dampingRatio = 0.72f),
-                                            label = "bottomNavIconScale",
-                                        )
-                                        Icon(
-                                            destination.icon,
-                                            contentDescription = stringResource(destination.labelRes),
-                                            modifier = Modifier.graphicsLayer {
-                                                scaleX = scale
-                                                scaleY = scale
-                                            },
-                                        )
-                                    },
-                                    label = {
-                                        AnimatedContent(
-                                            targetState = selected,
-                                            transitionSpec = {
-                                                fadeIn(tween(120)) togetherWith fadeOut(tween(90))
-                                            },
-                                            label = "bottomNavLabel",
-                                        ) { isSelected ->
-                                            Text(
-                                                text = stringResource(destination.labelRes),
-                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                            )
-                                        }
-                                    },
+                                    icon = destination.icon,
+                                    label = stringResource(destination.labelRes),
                                 )
                             }
                         }
