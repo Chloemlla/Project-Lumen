@@ -16,13 +16,13 @@ import java.nio.charset.StandardCharsets
 object CrashReportBackendUploader {
 
     /**
-     * Uploads [report] to `{baseUrl}/api/lumen/v1/crash-report`.
+     * Uploads [report] to `{baseUrl}${LumenCrashDefaults.DEFAULT_CRASH_BACKEND_ENDPOINT_PATH}`.
      *
      * @param report The full crash report.
      * @param deviceInstallationId Stable device fingerprint / install ID.
      * @param packageName Android package name of the host app.
      * @param versionCode Host app version code.
-     * @param accessToken Bearer token for the crash-report endpoint.
+     * @param accessToken Optional Bearer token for the endpoint. When null/blank the report is sent anonymously.
      * @param baseUrl HTTPS base URL (trailing slash stripped automatically).
      * @param connectTimeoutMillis Connection timeout in ms (default 15 s).
      * @param readTimeoutMillis Read timeout in ms (default 30 s).
@@ -33,7 +33,7 @@ object CrashReportBackendUploader {
         deviceInstallationId: String,
         packageName: String,
         versionCode: Int,
-        accessToken: String,
+        accessToken: String?,
         baseUrl: String,
         connectTimeoutMillis: Int = 15_000,
         readTimeoutMillis: Int = 30_000,
@@ -41,7 +41,7 @@ object CrashReportBackendUploader {
         return try {
             AuthorIntegrity.verifyOrThrow("backend-upload")
 
-            val endpoint = normalizeBaseUrl(baseUrl) + "/api/lumen/v1/crash-report"
+            val endpoint = normalizeBaseUrl(baseUrl) + LumenCrashDefaults.DEFAULT_CRASH_BACKEND_ENDPOINT_PATH
             val body = report.toJson().apply {
                 put("deviceInstallationId", deviceInstallationId)
                 put("packageName", packageName)
@@ -51,6 +51,7 @@ object CrashReportBackendUploader {
 
             val url = URL(endpoint)
             val rawConnection = url.openConnection()
+            val effectiveToken = accessToken?.trim().orEmpty()
             val connection = (rawConnection as HttpURLConnection).apply {
                 requestMethod = "POST"
                 doInput = true
@@ -61,7 +62,9 @@ object CrashReportBackendUploader {
                 instanceFollowRedirects = true
                 setRequestProperty("Accept", "application/json, */*")
                 setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("Authorization", "Bearer $accessToken")
+                if (effectiveToken.isNotEmpty()) {
+                    setRequestProperty("Authorization", "Bearer $effectiveToken")
+                }
                 setRequestProperty("Content-Length", bodyBytes.size.toString())
                 setRequestProperty("User-Agent", "lumen-crash-sdk")
             }

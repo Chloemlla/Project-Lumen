@@ -1,6 +1,7 @@
 package com.chloemlla.lumen.crash
 
 import android.app.Application
+import android.content.Context
 import android.os.Process
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -21,6 +22,10 @@ object LumenCrash {
     /** Host package name, captured at install time for the backend uploader. */
     @Volatile
     private var packageName: String = ""
+
+    /** Application context, captured at install time for the default device ID. */
+    @Volatile
+    private var appContext: Context? = null
 
     /**
      * Tracks [reportId]s that have already been submitted for backend upload
@@ -45,6 +50,7 @@ object LumenCrash {
     fun install(application: Application, config: LumenCrashConfig) {
         AuthorIntegrity.verifyOrThrow("install")
         packageName = application.packageName
+        appContext = application.applicationContext
         synchronized(installLock) {
             installedConfig.set(config)
             storeRef.set(CrashReportStore(application.applicationContext))
@@ -263,9 +269,12 @@ object LumenCrash {
     /**
      * Submits a background upload of [report] to the crash-report backend.
      *
-     * Guards against duplicate submissions within one process by tracking
-     * [reportId] in [uploadedReportIds]. All failures are silently caught so
-     * the caller (crash handler / cold-start loader) is never disrupted.
+     * The SDK uploads by default even without a configured token or device-ID
+     * provider: the report is sent anonymously and tagged with the SDK's own
+     * persistent per-install device ID. Guards against duplicate submissions
+     * within one process by tracking [reportId] in [uploadedReportIds]. All
+     * failures are silently caught so the caller (crash handler / cold-start
+     * loader) is never disrupted.
      */
     private fun submitBackendUpload(
         report: CrashReport,
@@ -275,24 +284,22 @@ object LumenCrash {
         if (!uploadedReportIds.add(report.reportId)) return
         // Master switch.
         if (!config.crashReportBackendEnabled) return
-        // Token must be non-blank; without it the backend would reject the request.
-        val accessToken = config.crashReportAccessToken?.takeIf { it.isNotBlank() } ?: return
-        // Provider must be wired.
-        val provider = config.deviceInstallationIdProvider ?: return
         // Package name must be known.
         val pkg = packageName.takeIf { it.isNotBlank() } ?: return
+        val context = appContext ?: return
 
         runCatching {
             executor().submit {
                 runCatching {
-                    val deviceId = provider()
-                    if (deviceId.isNullOrBlank()) return@runCatching
+                    val deviceId = config.deviceInstallationIdProvider?.invoke()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: CrashDeviceId.resolve(context)
                     CrashReportBackendUploader.upload(
                         report = report,
                         deviceInstallationId = deviceId,
                         packageName = pkg,
                         versionCode = config.versionCode,
-                        accessToken = accessToken,
+                        accessToken = config.crashReportAccessToken,
                         baseUrl = config.crashReportBackendBaseUrl,
                     )
                 }

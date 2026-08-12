@@ -60,25 +60,27 @@ data class LumenCrashConfig(
     /**
      * HTTPS base URL for the crash-report endpoint.
      *
-     * The full endpoint path is `{baseUrl}/api/lumen/v1/crash-report`.
+     * The full endpoint path is
+     * `{baseUrl}${LumenCrashDefaults.DEFAULT_CRASH_BACKEND_ENDPOINT_PATH}`.
      * Must use HTTPS. Defaults to [LumenCrashDefaults.DEFAULT_CRASH_BACKEND_BASE_URL].
      */
     val crashReportBackendBaseUrl: String = LumenCrashDefaults.DEFAULT_CRASH_BACKEND_BASE_URL,
 
     /**
-     * Bearer token sent as `Authorization: Bearer <token>`.
+     * Optional Bearer token for the anonymous crash-report endpoint.
      *
-     * When `null` or blank, the backend upload is skipped entirely. This lets the
-     * SDK remain generic for hosts without a Lumen backend.
+     * When null or blank the SDK uploads without an Authorization header; the
+     * endpoint accepts anonymous posts. Configure it only when the backend
+     * requires a shared token.
      */
     val crashReportAccessToken: String? = null,
 
     /**
      * Supplier for the device installation ID, evaluated at upload time.
      *
-     * The host should return a stable device fingerprint or install ID, or `null`
-     * if the value cannot be read (upload is skipped). The lambda is invoked on a
-     * background executor so it may safely read from MMKV / encrypted stores.
+     * When null, the SDK persists its own per-install device ID (a UUID in
+     * SharedPreferences). The lambda is invoked on a background executor so it
+     * may safely read from MMKV / encrypted stores.
      */
     val deviceInstallationIdProvider: (() -> String?)? = null,
 )

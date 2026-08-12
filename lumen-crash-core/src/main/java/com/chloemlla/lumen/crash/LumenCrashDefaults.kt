@@ -13,6 +13,9 @@ object LumenCrashDefaults {
     /** Default HTTPS base URL for the Lumen crash-report backend. */
     const val DEFAULT_CRASH_BACKEND_BASE_URL: String = "https://tts.chloemlla.com"
 
+    /** Default path of the anonymous crash-report upload endpoint. */
+    const val DEFAULT_CRASH_BACKEND_ENDPOINT_PATH: String = "/api/crash-sdk/v1/crash-report"
+
     fun fileProviderAuthority(packageName: String): String {
         return packageName + FILE_PROVIDER_AUTHORITY_SUFFIX
     }
