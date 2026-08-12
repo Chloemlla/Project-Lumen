@@ -281,7 +281,7 @@ internal fun LumenTopBar(
             title = titleContent,
             navigationIcon = navigationIcon,
             modifier = glassModifier,
-            colors = TopAppBarDefaults.largeTopAppBarColors(
+            colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = transparentContainer,
                 scrolledContainerColor = transparentContainer,
                 titleContentColor = MaterialTheme.colorScheme.onSurface,
