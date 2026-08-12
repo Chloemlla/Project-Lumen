@@ -476,9 +476,19 @@ internal fun SettingsSection(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
         onClick = { expanded = !expanded },
         enabled = !forceExpanded,
+        shape = LumenCardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
     ) {
         Column {
             Row(
@@ -570,9 +580,14 @@ internal fun SettingsSection(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors().copy(containerColor = Color.Transparent),
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {
@@ -684,9 +699,14 @@ internal fun ActionCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors().copy(containerColor = Color.Transparent),
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {
@@ -814,8 +834,11 @@ internal fun FileSettingRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenPreferenceShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenPreferenceShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(
                 horizontal = SettingsPreferenceHorizontalPadding,
                 vertical = SettingsPreferenceVerticalPadding,
@@ -879,8 +902,11 @@ internal fun NotificationRequirementCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(
                 horizontal = SettingsPreferenceHorizontalPadding,

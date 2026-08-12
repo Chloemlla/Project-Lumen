@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -31,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +48,7 @@ import com.projectlumen.app.core.insights.DeviceInsightsState
 import com.projectlumen.app.core.insights.DeviceUsageAvailability
 import com.projectlumen.app.core.insights.InsightPriority
 import com.projectlumen.app.core.insights.UsageDataQuality
+import com.projectlumen.app.ui.theme.lumenGlass
 
 @Composable
 internal fun DeviceUsageAndPowerInsightsCard(
@@ -57,9 +60,13 @@ internal fun DeviceUsageAndPowerInsightsCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .lumenGlass(shape = LumenCardShape, blurRadius = 18f, tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {
