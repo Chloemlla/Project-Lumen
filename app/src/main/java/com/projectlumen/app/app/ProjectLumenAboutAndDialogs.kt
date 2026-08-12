@@ -193,6 +193,7 @@ import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.svg.DynamicColorImageVectors
 import com.projectlumen.app.ui.svg.drawablevectors.coder
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import com.projectlumen.app.ui.theme.lumenGlass
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -310,9 +311,14 @@ internal fun AboutHeroCard(versionLabel: String, onVersionClick: () -> Unit) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+                .lumenGlass(
+                    shape = LumenCardShape,
+                    blurRadius = 18f,
+                    tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+                ),
             shape = LumenCardShape,
-            colors = lumenCardColors(),
+            colors = lumenCardColors().copy(containerColor = Color.Transparent),
             elevation = lumenCardElevation(),
             border = lumenCardBorder(),
         ) {
@@ -346,7 +352,19 @@ internal fun AboutLinksCard(
     viewModel: ProjectLumenViewModel,
     openLegal: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = lumenCardColors(), elevation = lumenCardElevation(), border = lumenCardBorder()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
+        shape = LumenCardShape,
+        colors = lumenCardColors().copy(containerColor = Color.Transparent),
+        elevation = lumenCardElevation(),
+        border = lumenCardBorder(),
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Gavel, R.string.legal_center_title)
             OutlinedButton(onClick = openLegal) {
@@ -636,9 +654,14 @@ internal fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+                .lumenGlass(
+                    shape = LumenCardShape,
+                    blurRadius = 18f,
+                    tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+                ),
             shape = LumenCardShape,
-            colors = lumenCardColors(),
+            colors = lumenCardColors().copy(containerColor = Color.Transparent),
             elevation = lumenCardElevation(),
             border = lumenCardBorder(),
         ) {

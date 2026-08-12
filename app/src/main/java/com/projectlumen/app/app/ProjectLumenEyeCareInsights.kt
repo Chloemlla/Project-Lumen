@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +49,7 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.enums.PlanTier
 import com.projectlumen.app.core.enums.QuietMode
+import com.projectlumen.app.ui.theme.lumenGlass
 import kotlin.math.roundToInt
 
 internal data class EyeCareInsightSummary(
@@ -186,9 +188,13 @@ internal fun EyeCareInsightsHomeCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .lumenGlass(shape = LumenCardShape, blurRadius = 18f, tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {

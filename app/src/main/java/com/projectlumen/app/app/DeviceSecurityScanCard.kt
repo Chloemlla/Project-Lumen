@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.security.CroootReportFormatter
 import com.projectlumen.app.core.security.DeviceSecurityScanner
+import com.projectlumen.app.ui.theme.lumenGlass
 
 /**
  * Card that displays CRooot device-security scan results.
@@ -57,9 +58,14 @@ internal fun DeviceSecurityScanCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors().copy(containerColor = Color.Transparent),
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {

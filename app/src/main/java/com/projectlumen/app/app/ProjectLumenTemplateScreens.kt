@@ -185,6 +185,7 @@ import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import com.projectlumen.app.ui.theme.lumenGlass
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -226,11 +227,19 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .lumenGlass(
+                        shape = LumenCardShape,
+                        blurRadius = 18f,
+                        tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+                    )
                     .clickable(enabled = !locked && !selected) { viewModel.selectTemplate(template.id) }
                     .border(1.dp, borderColor, LumenCardShape)
                     .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
                 shape = LumenCardShape,
-                colors = lumenCardColors(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
                 elevation = lumenCardElevation(),
             ) {
                 Column(
@@ -342,7 +351,21 @@ internal fun CountdownStyleChip(
 
 @Composable
 internal fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = lumenCardColors(), elevation = lumenCardElevation()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
+        shape = LumenCardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        elevation = lumenCardElevation(),
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Style, R.string.system_background_color)
             LumenFlowRow {
