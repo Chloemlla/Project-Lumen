@@ -886,8 +886,11 @@ private fun GuideStepLine(step: EyeCareGuideStep) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -926,8 +929,11 @@ private fun PermissionTransparencyLine(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -970,8 +976,11 @@ private fun CapabilityLine(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,

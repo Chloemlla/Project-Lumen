@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
+import com.projectlumen.app.ui.theme.lumenGlass
 
 internal data class RecommendedEyeCareApplyFeedback(
     val applyCount: Int,
@@ -81,8 +82,11 @@ internal fun RecommendedEyeCareSetupFeedback(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),

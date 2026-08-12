@@ -187,6 +187,7 @@ import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import com.projectlumen.app.ui.theme.lumenGlass
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -223,8 +224,11 @@ internal fun SwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenPreferenceShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenPreferenceShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .clickable(enabled = enabled) { toggle(!checked) }
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .graphicsLayer { alpha = if (enabled) 1f else 0.52f }
@@ -257,8 +261,11 @@ internal fun NumberSlider(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenPreferenceShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenPreferenceShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(
                 horizontal = SettingsPreferenceHorizontalPadding,
                 vertical = SettingsPreferenceVerticalPadding,
