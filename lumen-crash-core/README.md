@@ -2,6 +2,8 @@
 
 Capture-only artifact without Compose UI.
 
+[English](./README.md) | [中文](./README.zh-CN.md)
+
 | Item | Value |
 |---|---|
 | Module | `:lumen-crash-core` |
