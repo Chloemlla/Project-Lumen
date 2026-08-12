@@ -56,6 +56,7 @@ object LumenCrash {
             storeRef.set(CrashReportStore(application.applicationContext))
             installUncaughtExceptionHandler(application)
             restartWatchdog(config)
+            collectPriorExitReport(application, config)
             CrashBreadcrumbs.record(
                 "LumenCrash installed watchdog=${config.anrWatchdogEnabled || config.startupHangWatchdogEnabled}",
             )
@@ -229,6 +230,15 @@ object LumenCrash {
                 threadDump = threadDump,
                 appInfo = config.toAppInfo(),
             )
+        }.getOrNull() ?: return
+        saveReport(report, config)
+    }
+
+    private fun collectPriorExitReport(application: Application, config: LumenCrashConfig) {
+        if (!config.priorExitCaptureEnabled) return
+        if (!PriorExitCrashCollector.isSupported()) return
+        val report = runCatching {
+            PriorExitCrashCollector(application.applicationContext) { config.toAppInfo() }.collect()
         }.getOrNull() ?: return
         saveReport(report, config)
     }

@@ -33,6 +33,7 @@ class LumenCrashConfigBuilder internal constructor(
     var startupHangTimeoutMillis: Long = 15_000L
     var onReportSaved: ((CrashReport) -> Unit)? = null
     var onAnrDetected: ((CrashReport) -> Unit)? = null
+    var priorExitCaptureEnabled: Boolean = true
     var crashReportBackendEnabled: Boolean = true
     var crashReportBackendBaseUrl: String = LumenCrashDefaults.DEFAULT_CRASH_BACKEND_BASE_URL
     var crashReportAccessToken: String? = null
@@ -80,6 +81,7 @@ class LumenCrashConfigBuilder internal constructor(
             startupHangTimeoutMillis = startupHangTimeoutMillis,
             onReportSaved = onReportSaved,
             onAnrDetected = onAnrDetected,
+            priorExitCaptureEnabled = priorExitCaptureEnabled,
             crashReportBackendEnabled = crashReportBackendEnabled,
             crashReportBackendBaseUrl = crashReportBackendBaseUrl,
             crashReportAccessToken = crashReportAccessToken,
