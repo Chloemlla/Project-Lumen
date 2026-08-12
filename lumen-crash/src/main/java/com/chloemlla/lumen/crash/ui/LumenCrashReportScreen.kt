@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -99,7 +97,7 @@ private val crashReportScreenTimeFormatter = DateTimeFormatter.ofPattern("yyyy-M
 private const val CRASH_STACK_COLLAPSED_LINES = 18
 private const val CRASH_EVENT_VISIBLE_COUNT = 12
 
-@OptIn(ExperimentalMaterial3WindowSizeClassApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun LumenCrashReportScreen(
     report: CrashReport,
@@ -216,10 +214,10 @@ fun LumenCrashReportScreen(
 
             CrashReportCard(contentPadding = layout.cardPadding) {
                 CrashReportSectionHeader(Icons.Outlined.Devices, stringResource(R.string.lumen_crash_report_system_info))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+                // Stack the pills vertically. FlowRow's FlowRowOverflow overload was removed in
+                // Compose foundation 1.8+, and the runtime foundation is forced upward by the
+                // Liquid Glass / Miuix dependencies — so reference only stable layout APIs here.
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     systemInfo.forEach { (label, value) ->
                         CrashReportMetadataPill(
                             label = label,
