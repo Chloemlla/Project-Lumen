@@ -214,6 +214,7 @@ internal fun AboutScreen(
 ) {
     val versionLabel = rememberBuildVersionLabel()
     val context = LocalContext.current
+    val developerUnlockedMessage = stringResource(R.string.developer_unlocked)
     var versionTapCount by rememberSaveable { mutableIntStateOf(0) }
     val fallbackScrollState = rememberScrollState()
     val scrollState = LocalLumenPageScrollState.current ?: fallbackScrollState
@@ -234,7 +235,7 @@ internal fun AboutScreen(
             versionTapCount >= 7 -> {
                 viewModel.updateSettings { current -> current.copy(developerModeEnabled = true) }
                 context.showLumenToast(
-                    context.getString(R.string.developer_unlocked),
+                    developerUnlockedMessage,
                     kind = LumenToastKind.SUCCESS,
                     long = true,
                 )
@@ -489,6 +490,7 @@ internal fun UpdateDialog(
     updateInstaller: UpdateInstaller,
 ) {
     val context = LocalContext.current
+    val installSettingsFailedMessage = stringResource(R.string.about_update_open_install_settings_failed)
     var pendingReleaseUrl by remember { mutableStateOf<String?>(null) }
     val showReleaseInfo: @Composable (ReleaseInfo, BuildMetadata, UpdateCandidate?) -> Unit = { release, current, candidate ->
         val publishTime = Instant.ofEpochMilli(release.publishedAtUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
@@ -610,7 +612,7 @@ internal fun UpdateDialog(
                             runCatching { context.startActivity(updateInstaller.createInstallPermissionIntent()) }
                                 .onFailure {
                                     onError(
-                                        it.message ?: context.getString(R.string.about_update_open_install_settings_failed),
+                                        it.message ?: installSettingsFailedMessage,
                                     )
                                 }
                         }

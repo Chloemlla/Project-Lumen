@@ -200,6 +200,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun rememberNotificationPermissionGate(): ((() -> Unit) -> Unit) {
     val context = LocalContext.current
+    val notificationDeniedMessage = stringResource(R.string.notification_permission_denied_message)
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val action = pendingAction
@@ -207,7 +208,7 @@ internal fun rememberNotificationPermissionGate(): ((() -> Unit) -> Unit) {
         if (granted) {
             action?.invoke()
         } else {
-            Toast.makeText(context, context.getString(R.string.notification_permission_denied_message), Toast.LENGTH_LONG).show()
+            Toast.makeText(context, notificationDeniedMessage, Toast.LENGTH_LONG).show()
         }
     }
     return { action ->
@@ -223,6 +224,7 @@ internal fun rememberNotificationPermissionGate(): ((() -> Unit) -> Unit) {
 @Composable
 internal fun rememberCameraPermissionGate(): ((() -> Unit) -> Unit) {
     val context = LocalContext.current
+    val cameraDeniedMessage = stringResource(R.string.camera_permission_denied_message)
     var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val action = pendingAction
@@ -230,7 +232,7 @@ internal fun rememberCameraPermissionGate(): ((() -> Unit) -> Unit) {
         if (granted) {
             action?.invoke()
         } else {
-            Toast.makeText(context, context.getString(R.string.camera_permission_denied_message), Toast.LENGTH_LONG).show()
+            Toast.makeText(context, cameraDeniedMessage, Toast.LENGTH_LONG).show()
         }
     }
     return { action ->

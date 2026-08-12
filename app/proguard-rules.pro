@@ -112,6 +112,22 @@
 -dontwarn android.hardware.fingerprint.FingerprintManager
 -dontwarn com.tencent.soter.**
 
+############################################################
+# Liquid Glass (backdrop) + Miuix theming libraries
+# These Compose Multiplatform libraries reference Compose runtime APIs via reflection
+# and rely on stable member names; R8 with -allowaccessmodification/-overloadaggressively
+# can rename or strip their composables, causing NoSuchMethodError at cold start of the
+# release (minified) build — which crashes the baseline-profile managed emulator.
+############################################################
+-keep class com.kyant.backdrop.** { *; }
+-keep class top.yukonga.miuix.** { *; }
+-keepclassmembers class com.kyant.backdrop.** { *; }
+-keepclassmembers class top.yukonga.miuix.** { *; }
+-dontwarn com.kyant.backdrop.**
+-dontwarn top.yukonga.miuix.**
+-keepnames class com.kyant.backdrop.** { *; }
+-keepnames class top.yukonga.miuix.** { *; }
+
 # === Anti-decompilation and obfuscation hardening ===
 -optimizationpasses 5
 -allowaccessmodification

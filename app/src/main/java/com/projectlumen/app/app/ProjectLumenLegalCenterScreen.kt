@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +35,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -43,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.toast.LumenToastKind
 import com.projectlumen.app.core.toast.showLumenToast
+import com.projectlumen.app.ui.theme.lumenGlass
 
 /** Destinations opened from the legal hub; the host NavHost maps each key to a screen. */
 internal enum class LegalDocKey { TERMS, PRIVACY, MEMBERSHIP, PERSONAL, PERMISSIONS }
@@ -53,6 +56,8 @@ internal fun LegalHubScreen(
     onOpenDoc: (LegalDocKey) -> Unit,
 ) {
     val context = LocalContext.current
+    val withdrawConsentSuccess = stringResource(R.string.legal_withdraw_consent_success)
+    val withdrawPrivacySuccess = stringResource(R.string.legal_withdraw_privacy_success)
     var showWithdrawConsentDialog by rememberSaveable { mutableStateOf(false) }
     var showWithdrawPrivacyDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -160,7 +165,7 @@ internal fun LegalHubScreen(
                 OutlinedButton(onClick = {
                     viewModel.withdrawDataConsent()
                     context.showLumenToast(
-                        context.getString(R.string.legal_withdraw_consent_success),
+                        withdrawConsentSuccess,
                         kind = LumenToastKind.SUCCESS,
                         long = true,
                     )
@@ -186,7 +191,7 @@ internal fun LegalHubScreen(
                 OutlinedButton(onClick = {
                     viewModel.withdrawPrivacyPolicyConsent()
                     context.showLumenToast(
-                        context.getString(R.string.legal_withdraw_privacy_success),
+                        withdrawPrivacySuccess,
                         kind = LumenToastKind.SUCCESS,
                         long = true,
                     )
@@ -278,9 +283,15 @@ private fun LegalRow(
 @Composable
 private fun PermissionCard(entry: PermissionEntry) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors().copy(containerColor = Color.Transparent),
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {

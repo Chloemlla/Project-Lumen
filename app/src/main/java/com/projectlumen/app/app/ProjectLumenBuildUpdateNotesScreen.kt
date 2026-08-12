@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -26,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -33,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.update.BuildUpdateNotes
+import com.projectlumen.app.ui.theme.lumenGlass
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -121,9 +124,15 @@ private fun BuildUpdateNotesIdentityCard(notes: BuildUpdateNotes) {
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 18f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors().copy(containerColor = Color.Transparent),
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {
