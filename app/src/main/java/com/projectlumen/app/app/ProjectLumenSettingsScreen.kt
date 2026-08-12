@@ -152,6 +152,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
@@ -175,6 +178,7 @@ import com.projectlumen.app.core.enums.QuietMode
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
+import com.projectlumen.app.core.services.AuraAudioService
 import com.projectlumen.app.core.services.BackupImportSummary
 import com.projectlumen.app.core.update.BuildMetadata
 import com.projectlumen.app.core.update.ReleaseAsset
@@ -1094,6 +1098,30 @@ internal fun SettingsScreen(
         }
         }
         SettingsSection(R.string.section_sound, Icons.AutoMirrored.Outlined.VolumeUp, initiallyExpanded = false) {
+            var auraInstalled by remember { mutableStateOf(AuraAudioService.isAuraInstalled(context)) }
+            val auraLifecycleOwner = LocalLifecycleOwner.current
+            DisposableEffect(auraLifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        auraInstalled = AuraAudioService.isAuraInstalled(context)
+                    }
+                }
+                auraLifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { auraLifecycleOwner.lifecycle.removeObserver(observer) }
+            }
+            AnimatedVisibility(
+                visible = !auraInstalled,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+            ) {
+                NotificationRequirementCard(
+                    titleRes = R.string.aura_not_installed,
+                    messageRes = R.string.aura_not_installed_message,
+                    actionLabelRes = R.string.aura_install_action,
+                    icon = Icons.AutoMirrored.Outlined.VolumeUp,
+                    onClick = { openUri(context, AuraAudioService.AURA_RELEASES_URL.toUri()) },
+                )
+            }
             SwitchRow(R.string.enable_sound, Icons.AutoMirrored.Outlined.VolumeUp, settings.soundEnabled) {
                 viewModel.updateSettings { current -> current.copy(soundEnabled = it) }
             }

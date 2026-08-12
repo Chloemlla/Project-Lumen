@@ -287,6 +287,9 @@
     <string name="choose_custom_file">选择文件</string>
     <string name="clear_custom_file">清除</string>
     <string name="custom_file_selected">已选择自定义文件</string>
+    <string name="aura_not_installed">未安装 Aura 铃声引擎</string>
+    <string name="aura_not_installed_message">提醒声音由第三方应用 Aura 播放。安装 Aura 后即可使用铃声提醒。</string>
+    <string name="aura_install_action">前往安装 Aura</string>
     <string name="open_system_settings">打开系统设置</string>
     <string name="system_settings_open_failed">无法打开系统设置。</string>
     <string name="share_action_failed">无法打开分享。</string>

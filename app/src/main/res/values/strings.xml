@@ -287,6 +287,9 @@
     <string name="choose_custom_file">Choose file</string>
     <string name="clear_custom_file">Clear</string>
     <string name="custom_file_selected">Custom file selected</string>
+    <string name="aura_not_installed">Aura sound engine not installed</string>
+    <string name="aura_not_installed_message">Reminder sounds are played by the third-party app Aura. Install Aura to use reminder tones.</string>
+    <string name="aura_install_action">Get Aura</string>
     <string name="open_system_settings">Open system settings</string>
     <string name="system_settings_open_failed">Unable to open system settings.</string>
     <string name="share_action_failed">Unable to open sharing.</string>
