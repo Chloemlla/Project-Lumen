@@ -16,6 +16,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import com.projectlumen.app.core.enums.AppThemeMode
 import org.json.JSONObject
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.darkColorScheme as miuixDarkColorScheme
+import top.yukonga.miuix.kmp.theme.lightColorScheme as miuixLightColorScheme
 
 private val LightColors = lightColorScheme(
     primary = LumenTeal,
@@ -97,7 +100,13 @@ fun ProjectLumenTheme(
             colorScheme = colorScheme,
             typography = LumenTypography,
             shapes = LumenShapes,
-            content = content,
+            content = {
+                MiuixTheme(
+                    colors = if (darkTheme) miuixDarkColorScheme() else miuixLightColorScheme(),
+                ) {
+                    content()
+                }
+            },
         )
     }
 }
