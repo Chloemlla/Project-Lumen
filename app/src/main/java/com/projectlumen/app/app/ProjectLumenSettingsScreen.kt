@@ -245,10 +245,6 @@ internal fun SettingsScreen(
     val proximityCalibrated = settings.proximityBaselineEyeDistancePx > 0f ||
         settings.proximityBaselineFaceWidthPercent > 0
     val proximityCaptureSeconds = settings.proximityCaptureSeconds.coerceIn(1, 2)
-    fun persistUri(uri: Uri): String {
-        persistReadableUri(context, uri)
-        return uri.toString()
-    }
     fun requestReminderTimingPermissions() {
         when {
             needsExactAlarmSettings(context) -> openExactAlarmSettings(context)
@@ -435,30 +431,6 @@ internal fun SettingsScreen(
             if (activePermissionSetupTarget == PermissionSetupTarget.DIAGNOSTICS) {
                 activePermissionSetupTarget = null
             }
-        }
-    }
-    val restSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let {
-            val path = persistUri(it)
-            viewModel.updateSettings { current -> current.copy(restSoundPath = path) }
-        }
-    }
-    val restStartSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let {
-            val path = persistUri(it)
-            viewModel.updateSettings { current -> current.copy(restStartSoundPath = path) }
-        }
-    }
-    val workStartSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let {
-            val path = persistUri(it)
-            viewModel.updateSettings { current -> current.copy(pomodoroWorkStartSoundPath = path) }
-        }
-    }
-    val workEndSoundLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let {
-            val path = persistUri(it)
-            viewModel.updateSettings { current -> current.copy(pomodoroWorkEndSoundPath = path) }
         }
     }
     val backupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -1125,9 +1097,6 @@ internal fun SettingsScreen(
             SwitchRow(R.string.enable_sound, Icons.AutoMirrored.Outlined.VolumeUp, settings.soundEnabled) {
                 viewModel.updateSettings { current -> current.copy(soundEnabled = it) }
             }
-            SwitchRow(R.string.enable_vibration, Icons.Outlined.NotificationsActive, settings.vibrationEnabled) {
-                viewModel.updateSettings { current -> current.copy(vibrationEnabled = it) }
-            }
             SwitchRow(R.string.pre_alert_sound, Icons.Outlined.Schedule, settings.preAlertSoundEnabled) {
                 viewModel.updateSettings { current -> current.copy(preAlertSoundEnabled = it) }
             }
@@ -1155,30 +1124,6 @@ internal fun SettingsScreen(
             NumberSlider(R.string.pomodoro_end_volume, Icons.AutoMirrored.Outlined.VolumeUp, settings.pomodoroWorkEndVolumePercent, 0f..100f, 20, stringResource(R.string.percent_value, settings.pomodoroWorkEndVolumePercent)) {
                 viewModel.updateSettings { current -> current.copy(pomodoroWorkEndVolumePercent = it) }
             }
-            FileSettingRow(
-                labelRes = R.string.rest_sound_file,
-                path = settings.restSoundPath,
-                onChoose = { restSoundLauncher.launch(arrayOf("audio/*")) },
-                onClear = { viewModel.updateSettings { current -> current.copy(restSoundPath = "") } },
-            )
-            FileSettingRow(
-                labelRes = R.string.rest_start_sound_file,
-                path = settings.restStartSoundPath,
-                onChoose = { restStartSoundLauncher.launch(arrayOf("audio/*")) },
-                onClear = { viewModel.updateSettings { current -> current.copy(restStartSoundPath = "") } },
-            )
-            FileSettingRow(
-                labelRes = R.string.pomodoro_work_start_sound_file,
-                path = settings.pomodoroWorkStartSoundPath,
-                onChoose = { workStartSoundLauncher.launch(arrayOf("audio/*")) },
-                onClear = { viewModel.updateSettings { current -> current.copy(pomodoroWorkStartSoundPath = "") } },
-            )
-            FileSettingRow(
-                labelRes = R.string.pomodoro_work_end_sound_file,
-                path = settings.pomodoroWorkEndSoundPath,
-                onChoose = { workEndSoundLauncher.launch(arrayOf("audio/*")) },
-                onClear = { viewModel.updateSettings { current -> current.copy(pomodoroWorkEndSoundPath = "") } },
-            )
         }
         SettingsSection(R.string.section_appearance, Icons.Outlined.Style) {
             val proEnabled = planTier(settings) >= PlanTier.PRO

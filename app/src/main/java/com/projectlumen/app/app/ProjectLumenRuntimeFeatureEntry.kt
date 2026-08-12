@@ -11,7 +11,7 @@ import com.projectlumen.app.core.runtime.AudioEvent
 import com.projectlumen.app.core.runtime.PomodoroEngine
 import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
-import com.projectlumen.app.core.services.AudioService
+import com.projectlumen.app.core.services.AuraAudioService
 import com.projectlumen.app.core.services.NotificationService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -24,7 +24,7 @@ internal class ProjectLumenRuntimeFeatureEntry(
     private val runtimeRepository: RuntimeRepository,
     private val statisticsRepository: StatisticsRepository,
     private val notifications: NotificationService,
-    private val audio: AudioService,
+    private val audio: AuraAudioService,
     private val startTimerService: () -> Unit,
     private val stopTimerService: () -> Unit,
     private val uploadTelemetrySnapshot: suspend () -> Unit,
@@ -237,12 +237,7 @@ internal class ProjectLumenRuntimeFeatureEntry(
     private fun playAudioEvent(event: AudioEvent) {
         when (event) {
             AudioEvent.None -> Unit
-            is AudioEvent.ReminderTone -> audio.playReminderTone(
-                enabled = event.enabled,
-                soundPath = event.path,
-                volumePercent = event.volumePercent,
-                vibrate = event.vibrate,
-            )
+            is AudioEvent.ReminderTone -> audio.playReminderTone(event)
         }
     }
 

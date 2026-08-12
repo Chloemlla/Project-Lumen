@@ -78,9 +78,7 @@ class LumenOpenRuntimeController(
         playAudioEvent(
             AudioEvent.ReminderTone(
                 enabled = settings.soundEnabled && settings.pomodoroWorkStartSoundEnabled,
-                path = settings.pomodoroWorkStartSoundPath,
                 volumePercent = settings.pomodoroWorkStartVolumePercent,
-                vibrate = settings.vibrationEnabled,
             ),
         )
         refreshActiveNotifications(settings, nextRuntime)
@@ -207,12 +205,7 @@ class LumenOpenRuntimeController(
     private fun playAudioEvent(event: AudioEvent) {
         when (event) {
             AudioEvent.None -> Unit
-            is AudioEvent.ReminderTone -> app.audio.playReminderTone(
-                enabled = event.enabled,
-                soundPath = event.path,
-                volumePercent = event.volumePercent,
-                vibrate = event.vibrate,
-            )
+            is AudioEvent.ReminderTone -> app.audio.playReminderTone(event)
         }
     }
 

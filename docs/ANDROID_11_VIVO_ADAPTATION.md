@@ -20,7 +20,7 @@ Apps targeting Android 11 must use scoped storage; broad external-storage access
 **Lumen response**
 - No `READ_EXTERNAL_STORAGE` / `WRITE_EXTERNAL_STORAGE` / `MANAGE_EXTERNAL_STORAGE`.
 - No `requestLegacyExternalStorage` opt-out.
-- Sound / backup / template image picks use SAF `OpenDocument` (+ persistable URI grants where needed).
+- Backup / template image picks use SAF `OpenDocument` (+ persistable URI grants where needed).
 - Shared/exported files go through FileProvider cache paths + `SecureShareIntents` URI grants.
 
 ### 2. One-time permissions (camera)
@@ -81,7 +81,7 @@ Android 11 adds `ActivityManager.getHistoricalProcessExitReasons()` for ANR / lo
 
 ## Verification checklist
 
-- Pick rest sound / backup / template image through SAF without storage permissions.
+- Pick backup / template image through SAF without storage permissions.
 - Enable proximity monitoring only after camera permission is granted; background camera FGS remains typed.
 - Shizuku network app list can enumerate installed apps with `QUERY_ALL_PACKAGES` (and shell fallback when elevated).
 - Background timer/proximity warnings still surface via notification fallback when custom toast UI cannot show.

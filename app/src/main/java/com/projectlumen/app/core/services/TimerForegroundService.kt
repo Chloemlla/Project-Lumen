@@ -261,12 +261,7 @@ class TimerForegroundService : LifecycleService() {
     private fun playAudioEvent(event: AudioEvent) {
         when (event) {
             AudioEvent.None -> Unit
-            is AudioEvent.ReminderTone -> app.audio.playReminderTone(
-                enabled = event.enabled,
-                soundPath = event.path,
-                volumePercent = event.volumePercent,
-                vibrate = event.vibrate,
-            )
+            is AudioEvent.ReminderTone -> app.audio.playReminderTone(event)
         }
     }
 

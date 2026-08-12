@@ -10,6 +10,7 @@ import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
 import com.projectlumen.app.core.repositories.RuntimeRepository
 import com.projectlumen.app.core.repositories.StatisticsRepository
+import com.projectlumen.app.core.runtime.AudioEvent
 import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
 import kotlinx.coroutines.CoroutineScope
@@ -68,6 +69,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
     ) {
         statisticsRepository.applyEyeDelta(settings.statsEnabled, now, transition.eyeStatsDelta)
         runtimeRepository.upsert(transition.nextRuntime)
+        playAudioEvent(app, transition.audioEvent)
         if (settings.globalOverlayEnabled && transition.nextRuntime.reminderPhase == ReminderPhase.RESTING.name) {
             EyeProtectionOverlayService.show(
                 context = app,
@@ -77,6 +79,13 @@ class ReminderActionReceiver : BroadcastReceiver() {
             )
         }
         refreshAfterAction(app, settings, transition.nextRuntime)
+    }
+
+    private fun playAudioEvent(app: ProjectLumenApplication, event: AudioEvent) {
+        when (event) {
+            AudioEvent.None -> Unit
+            is AudioEvent.ReminderTone -> app.audio.playReminderTone(event)
+        }
     }
 
     private fun refreshAfterAction(

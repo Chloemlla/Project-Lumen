@@ -21,7 +21,7 @@ import com.projectlumen.app.core.enums.PlanTier
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.repositories.DeviceInsightsRepository
-import com.projectlumen.app.core.services.AudioService
+import com.projectlumen.app.core.services.AuraAudioService
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.NotificationService
@@ -44,7 +44,7 @@ import org.json.JSONObject
 class ProjectLumenViewModel(
     private val database: AppDatabase,
     notifications: NotificationService,
-    audio: AudioService,
+    audio: AuraAudioService,
     export: ExportService,
     backup: DataBackupService,
     apiClient: ProjectLumenApiClient,

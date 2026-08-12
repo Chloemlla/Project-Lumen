@@ -19,9 +19,7 @@ class PomodoroEngine {
             ),
             audioEvent = AudioEvent.ReminderTone(
                 settings.soundEnabled && settings.pomodoroWorkStartSoundEnabled,
-                settings.pomodoroWorkStartSoundPath,
-                settings.pomodoroWorkStartVolumePercent,
-                settings.vibrationEnabled,
+                volumePercent = settings.pomodoroWorkStartVolumePercent,
             ),
         )
     }
@@ -64,9 +62,7 @@ class PomodoroEngine {
                     ),
                     audioEvent = AudioEvent.ReminderTone(
                         settings.soundEnabled && settings.pomodoroWorkEndSoundEnabled,
-                        settings.pomodoroWorkEndSoundPath,
-                        settings.pomodoroWorkEndVolumePercent,
-                        settings.vibrationEnabled,
+                        volumePercent = settings.pomodoroWorkEndVolumePercent,
                     ),
                 )
             }
@@ -87,9 +83,7 @@ class PomodoroEngine {
                     ),
                     audioEvent = AudioEvent.ReminderTone(
                         settings.soundEnabled && settings.pomodoroWorkStartSoundEnabled,
-                        settings.pomodoroWorkStartSoundPath,
-                        settings.pomodoroWorkStartVolumePercent,
-                        settings.vibrationEnabled,
+                        volumePercent = settings.pomodoroWorkStartVolumePercent,
                     ),
                 )
             }

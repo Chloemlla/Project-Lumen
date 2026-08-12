@@ -405,7 +405,6 @@
 现有能力：
 
 - 全局声音开关。
-- 震动开关。
 - 预提醒声音开关。
 - 休息开始声音开关。
 - 番茄钟工作开始声音开关。
@@ -416,17 +415,12 @@
   - 休息结束音量。
   - 番茄钟开始音量。
   - 番茄钟结束音量。
-- 选择自定义音频文件：
-  - 休息结束音频。
-  - 休息开始音频。
-  - 番茄钟工作开始音频。
-  - 番茄钟工作结束音频。
-- 清除自定义音频。
+- 铃声提醒声音通过 Aura 第三方接口播放（显式广播 `com.chloemlla.aura.action.PLAY_SOUND`），Lumen 不再自持本地 `MediaPlayer`/`ToneGenerator` 播放，也不再提供自定义音频文件选择。
 
 相关源码：
 
 - `app/ProjectLumenSettingsScreen.kt`
-- `core/services/AudioService.kt`
+- `core/services/AuraAudioService.kt`
 
 ## 15. 数据导出、分享与备份
 

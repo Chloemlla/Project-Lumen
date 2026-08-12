@@ -15,10 +15,9 @@ Android 17 requires foreground-visible state or a `mediaPlayback` FGS with While
 
 **Lumen decision**
 - Keep reminder cues as short notification sonification only.
-- `AudioService` uses `AudioAttributes.USAGE_NOTIFICATION` / `CONTENT_TYPE_SONIFICATION`.
-- Custom cue playback is transient `MediaPlayer` with completion/error release.
-- Do not introduce continuous background media playback without a `mediaPlayback` FGS.
+- Reminder sound playback is delegated to the Aura app (`com.chloemlla.aura`) through its exported `PLAY_SOUND` broadcast; Lumen no longer owns a local `MediaPlayer`/`ToneGenerator` for reminder cues.
 - Notification channels intentionally avoid embedding long custom channel sounds.
+- Do not introduce continuous background media playback without a `mediaPlayback` FGS.
 
 ### 2. Explicit URI grants for share/send (all apps / medium, prep for Android 18)
 Do not rely on implicit URI grants for `ACTION_SEND` / `ACTION_SEND_MULTIPLE` / stream URIs.

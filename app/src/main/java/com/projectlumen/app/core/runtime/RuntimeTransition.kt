@@ -46,8 +46,11 @@ sealed interface AudioEvent {
 
     data class ReminderTone(
         val enabled: Boolean,
-        val path: String = "",
+        val soundId: String = DEFAULT_SOUND_ID,
         val volumePercent: Int = 70,
-        val vibrate: Boolean = false,
-    ) : AudioEvent
+    ) : AudioEvent {
+        companion object {
+            const val DEFAULT_SOUND_ID = "SOUND::BUNDLED::bundled_ringtone_01"
+        }
+    }
 }

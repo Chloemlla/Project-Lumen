@@ -51,7 +51,7 @@ Apps targeting API 33 should not rely on broad storage access for media.
 
 **Lumen response**
 - No `READ_EXTERNAL_STORAGE` / `READ_MEDIA_*` gallery permissions.
-- Sound/backup/template picks use SAF `OpenDocument`.
+- Backup/template picks use SAF `OpenDocument`.
 
 ### 6. Nearby Wi-Fi / body sensors permissions
 New runtime permissions for Wi-Fi device discovery and background body sensors.

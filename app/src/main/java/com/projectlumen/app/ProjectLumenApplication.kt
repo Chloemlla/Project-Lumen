@@ -21,7 +21,6 @@ import com.chloemlla.lumen.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.debug.DeveloperDebugOverlayService
 import com.projectlumen.app.core.debug.MemoryHealthMonitor
-import com.projectlumen.app.core.haptics.HapticPlaybackService
 import com.projectlumen.app.core.insights.AndroidDeviceInsightDataSource
 import com.projectlumen.app.core.devicecontrol.PrivilegedDeviceControlCoordinator
 import com.projectlumen.app.core.lifecycle.AppLifecycleCoordinator
@@ -31,7 +30,7 @@ import com.projectlumen.app.core.mmkv.ProjectLumenMmkv
 import com.projectlumen.app.core.security.AppIntegrityGuard
 import com.projectlumen.app.core.security.DeviceSecurityGate
 import com.projectlumen.app.core.security.SecureCredentialStore
-import com.projectlumen.app.core.services.AudioService
+import com.projectlumen.app.core.services.AuraAudioService
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.ForegroundServiceController
@@ -63,8 +62,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     val database: AppDatabase by lazy { AppDatabase.create(this) }
     val eyeCarePreferences: EyeCarePreferencesDataStore by lazy { EyeCarePreferencesDataStore(this) }
     val notifications: NotificationService by lazy { NotificationService(this) }
-    val haptics: HapticPlaybackService by lazy { HapticPlaybackService() }
-    val audio: AudioService by lazy { AudioService(this, haptics) }
+    val audio: AuraAudioService by lazy { AuraAudioService(this) }
     val export: ExportService by lazy { ExportService(this) }
     val backup: DataBackupService by lazy {
         DataBackupService(this, database, eyeCarePreferences) { secureCredentials.deviceInstallationId() }

@@ -71,7 +71,7 @@ Media library grants may be partial; apps should not assume full gallery access.
 
 **Lumen response**
 - No `READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO` full-library permission path.
-- Sound/backup/template image picks use Storage Access Framework `OpenDocument` (+ persistable grants where needed).
+- Backup/template image picks use Storage Access Framework `OpenDocument` (+ persistable grants where needed).
 
 ### 8. Process kill API scope
 `killBackgroundProcesses()` can only kill the caller's own processes.
@@ -95,7 +95,7 @@ Media library grants may be partial; apps should not assume full gallery access.
 - Grant exact-alarm permission: next schedule uses exact alarms and permission-change receiver resyncs.
 - Start timer / proximity / light / overlay FGS: no missing-type crash.
 - Notification / alarm taps open MainActivity via explicit component.
-- Picking custom rest sound / backup file works through SAF without media-library permission.
+- Picking backup file works through SAF without media-library permission.
 
 ## Refresh log
 

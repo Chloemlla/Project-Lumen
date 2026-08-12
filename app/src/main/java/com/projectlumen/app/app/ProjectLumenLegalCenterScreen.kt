@@ -323,7 +323,6 @@ private val legalPermissions = listOf(
     PermissionEntry(R.string.legal_permission_battery_name, R.string.legal_permission_battery_desc),
     PermissionEntry(R.string.legal_permission_biometric_name, R.string.legal_permission_biometric_desc),
     PermissionEntry(R.string.legal_permission_install_packages_name, R.string.legal_permission_install_packages_desc),
-    PermissionEntry(R.string.legal_permission_vibrate_name, R.string.legal_permission_vibrate_desc),
     PermissionEntry(R.string.legal_permission_query_all_packages_name, R.string.legal_permission_query_all_packages_desc),
     PermissionEntry(R.string.legal_permission_open_api_access_name, R.string.legal_permission_open_api_access_desc),
     PermissionEntry(R.string.legal_permission_open_api_trigger_name, R.string.legal_permission_open_api_trigger_desc),

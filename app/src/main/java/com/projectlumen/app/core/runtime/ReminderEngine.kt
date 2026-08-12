@@ -58,9 +58,7 @@ class ReminderEngine {
             ),
             audioEvent = AudioEvent.ReminderTone(
                 enabled = settings.soundEnabled && settings.restStartSoundEnabled,
-                path = settings.restStartSoundPath,
                 volumePercent = settings.restStartVolumePercent,
-                vibrate = settings.vibrationEnabled,
             ),
         )
     }
@@ -130,9 +128,7 @@ class ReminderEngine {
                         ),
                         audioEvent = AudioEvent.ReminderTone(
                             enabled = settings.soundEnabled,
-                            path = settings.restSoundPath,
                             volumePercent = settings.restEndVolumePercent,
-                            vibrate = settings.vibrationEnabled,
                         ),
                     )
                 } else {
@@ -229,7 +225,6 @@ class ReminderEngine {
                 audioEvent = AudioEvent.ReminderTone(
                     enabled = settings.soundEnabled && settings.preAlertSoundEnabled,
                     volumePercent = settings.preAlertVolumePercent,
-                    vibrate = settings.vibrationEnabled,
                 ),
             )
         } else if (nowMillis >= state.nextReminderAt) {
@@ -280,14 +275,11 @@ class ReminderEngine {
                 AudioEvent.ReminderTone(
                     enabled = settings.soundEnabled,
                     volumePercent = settings.restStartVolumePercent,
-                    vibrate = settings.vibrationEnabled,
                 )
             } else {
                 AudioEvent.ReminderTone(
                     enabled = settings.soundEnabled && settings.restStartSoundEnabled,
-                    path = settings.restStartSoundPath,
                     volumePercent = settings.restStartVolumePercent,
-                    vibrate = settings.vibrationEnabled,
                 )
             },
         )
