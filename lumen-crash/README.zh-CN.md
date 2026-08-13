@@ -1762,6 +1762,308 @@ if (!opened) {
 
 抽离完成后，旧的应用内 crash 核心源码已移除；请勿重新引入 `core/crash` 或 `ProjectLumenCrashReportScreen` 这类应用侧重复实现。
 
+## Aura 接入参考
+
+[Aura](https://github.com/Chloemlla/Aura) 是第一个将 `lumen-crash` 作为已发布 SDK（而非 monorepo 模块）接入的外部 Android 应用。本节记录该接入过程，作为后续接入方的参考。
+
+### 仓库结构
+
+```
+Aura/
+├── lumen-crash.version          # 版本策略文件："latest" 哨兵
+├── lumen-crash.resolved.version # CI 获取脚本生成（已 gitignore）
+├── local-maven/                 # 物化的 Maven 制品（已 gitignore）
+├── .github/
+│   ├── scripts/
+│   │   └── fetch-lumen-crash-sdk.py   # 版本解析 + 制品物化
+│   └── workflows/
+│       └── aura-android.yml           # 含获取 + 构建的 CI 流水线
+├── settings.gradle.kts                # GitHub Packages + local-maven 仓库
+├── app/
+│   ├── build.gradle.kts               # 版本解析 + 依赖声明
+│   ├── proguard-rules.pro             # lumen-crash 的 keep + dontwarn
+│   └── src/main/java/com/chloemlla/aura/
+│       ├── AuraApp.kt                 # attachBaseContext + onCreate 均调用 installLumenCrashSdk()
+│       ├── MainActivity.kt            # LumenCrashGate 包裹
+│       └── service/
+│           └── CrashDiagnosticsCollector.kt  # 适配 LumenCrash.loadPendingReportSafely()
+└── gradle/
+    └── verification-metadata.xml      # lumen-crash + lumen-crash-core 的 trusted-artifacts
+```
+
+### 接入触点
+
+#### 1. Maven 仓库配置（`settings.gradle.kts`）
+
+SDK 配置了两个仓库：GitHub Packages（主仓库，需鉴权）和 local-maven（回退仓库，由 CI 获取脚本物化）：
+
+```kotlin
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+        maven { url = uri("${rootDir}/local-maven") }
+        maven {
+            name = "GitHubPackagesProjectLumen"
+            url = uri("https://maven.pkg.github.com/Chloemlla/Project-Lumen")
+            credentials {
+                username = providers.gradleProperty("gpr.user").orNull
+                    ?: System.getenv("GITHUB_ACTOR")
+                password = providers.gradleProperty("gpr.key").orNull
+                    ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
+```
+
+#### 2. 版本解析（`app/build.gradle.kts`）
+
+三级解析：已解析版本文件（来自 CI 获取）> 版本文件 > 显式错误：
+
+```kotlin
+val lumenCrashSdkVersion: String =
+    readVersionFile(rootProject.file("lumen-crash.resolved.version"))
+        ?: readVersionFile(rootProject.file("lumen-crash.version"))
+            ?.takeUnless { it.equals("latest", ignoreCase = true) }
+        ?: error("lumen-crash SDK 版本未解析……")
+
+fun readVersionFile(file: java.io.File): String? {
+    if (!file.exists()) return null
+    return file.readText().trim().ifBlank { null }
+}
+```
+
+`lumen-crash.version` 文件内容仅为 `latest`（触发从 GitHub Releases 自动解析的哨兵值）。`lumen-crash.resolved.version` 文件由 CI 获取脚本生成，包含具体版本号，如 `0.1.0-fe5d9847`。
+
+#### 3. SDK 安装（`AuraApp.kt`）
+
+在 **`attachBaseContext` 和 `onCreate` 两处**均调用——通过 `LumenCrash.isInstalled()` 实现幂等：
+
+```kotlin
+private fun installLumenCrashSdk() {
+    if (LumenCrash.isInstalled()) return
+    runCatching {
+        LumenCrash.install(
+            this,
+            LumenCrashConfig(
+                appDisplayName = getString(R.string.app_name),
+                versionName = BuildConfig.VERSION_NAME,
+                versionCode = BuildConfig.VERSION_CODE,
+                commitHash = BuildConfig.SHORT_HASH,
+                fileProviderAuthority = "${packageName}.fileprovider",
+                shareSubject = getString(R.string.crash_report_share_subject),
+                reportTitle = getString(R.string.crash_report_title),
+                reportMessage = getString(R.string.crash_report_message),
+            ),
+        )
+    }
+}
+```
+
+双重调用模式确保 SDK 尽早安装（在 `attachBaseContext` 中，先于任何 DI 或其他引导代码），同时通过 `onCreate` 路径增加鲁棒性。`runCatching` 包裹防止安装失败导致应用启动崩溃。
+
+#### 4. 待处理报告 UI 闸门（`MainActivity.kt`）
+
+`LumenCrashGate` 包裹整个应用内容：
+
+```kotlin
+setContent {
+    FreeVibeTheme {
+        LumenCrashGate {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background,
+            ) {
+                FreeVibeRoot(...)
+            }
+        }
+    }
+}
+```
+
+#### 5. 崩溃诊断适配（`CrashDiagnosticsCollector.kt`）
+
+现有诊断收集器被适配为从 lumen-crash 而非旧的 `crash.log` 文件读取数据：
+
+```kotlin
+fun readSummary(): CrashDiagnosticsSummary {
+    val report = LumenCrash.loadPendingReportSafely()
+    if (report == null) return CrashDiagnosticsSummary()
+    return CrashDiagnosticsSummary(
+        lastCrashAt = report.crashedAtText,
+        crashLogBytes = report.stackTrace.length.toLong(),
+        hasCrashLog = true,
+    )
+}
+```
+
+`sanitizedCrashLogTail()` 也使用 `LumenCrash.loadPendingReportSafely()` 提取堆栈跟踪、异常类型和根因，用于诊断包。
+
+#### 6. ProGuard 规则（`app/proguard-rules.pro`）
+
+```proguard
+# Lumen Crash SDK
+-keep class com.chloemlla.lumen.crash.** { *; }
+-dontwarn com.chloemlla.lumen.crash.**
+```
+
+#### 7. 宿主产品文案（`res/values-zh/strings.xml`）
+
+```xml
+<string name="crash_report_title">崩溃报告已保存</string>
+<string name="crash_report_message">Aura 从崩溃中恢复。请在继续前查看、复制或分享此报告。</string>
+<string name="crash_report_share_subject">Aura 崩溃报告</string>
+```
+
+英文版在 `res/values/strings.xml`：
+
+```xml
+<string name="crash_report_title">Crash report saved</string>
+<string name="crash_report_message">Aura recovered from a crash. Review, copy, or share this report before continuing.</string>
+<string name="crash_report_share_subject">Aura crash report</string>
+```
+
+### CI 集成
+
+#### 获取脚本（`fetch-lumen-crash-sdk.py`）
+
+在每个 CI 作业开始时运行的 Python 脚本。它执行以下操作：
+
+1. 从 `lumen-crash.version` 读取版本策略（默认 `latest`）
+2. 查询 GitHub Releases API 获取 `lumen-crash-v*` 标签的发布，按标签前缀过滤并按发布日期排序
+3. 解析最新非草稿发布（优先选择 `X.Y.Z-<shortSha>` 格式的 main 自动发版）
+4. 将解析到的版本写入 `lumen-crash.resolved.version`
+5. 下载 `.aar`、`.pom` 以及可选的 `.module` / `checksums.txt` / `sdk-manifest.json` 资产
+6. 按标准 Maven 坐标布局物化到 `local-maven/` 目录
+7. 可选更新 `gradle/verification-metadata.xml` 中的 SHA256 校验和
+
+```bash
+python .github/scripts/fetch-lumen-crash-sdk.py
+```
+
+脚本支持：
+- `--version` 参数用于显式锁定版本
+- `--prefer-any-lumen-crash-tag` 用于接受纯 semver 标签（不仅限于 main 自动发版）
+- `LUMEN_CRASH_SDK_VERSION` 环境变量覆盖
+- `--verification-metadata` 控制元数据文件路径
+
+#### 工作流凭证配置
+
+跨仓库 GitHub Packages 访问需要具有 `read:packages` 权限的 PAT。Aura 将其存储为 `LUMEN_CRASH_READ_PACKAGES_TOKEN`：
+
+```yaml
+- name: Resolve lumen-crash SDK version
+  run: python .github/scripts/fetch-lumen-crash-sdk.py
+  env:
+    LUMEN_CRASH_READ_PACKAGES_TOKEN: ${{ secrets.LUMEN_CRASH_READ_PACKAGES_TOKEN }}
+```
+
+所有 Gradle 构建步骤都传递同一个 token：
+
+```yaml
+- name: Build full release APK
+  run: gradle assembleFullRelease --no-daemon
+  env:
+    GITHUB_TOKEN: ${{ secrets.LUMEN_CRASH_READ_PACKAGES_TOKEN }}
+```
+
+工作流在作业级别设置了 `packages: read` 权限：
+
+```yaml
+permissions:
+  contents: read
+  packages: read
+```
+
+### 踩坑记录与解决方案
+
+| 问题 | 根因 | 解决方案 |
+|---|---|---|
+| `lumen-crash-core` 返回 `401 Unauthorized` | 跨仓库的 `GITHUB_TOKEN` 无法访问其他仓库的 packages | 使用带 `read:packages` 的 PAT，存为 `LUMEN_CRASH_READ_PACKAGES_TOKEN` 密钥 |
+| Gradle 依赖验证失败 | 38 个制品（lumen-crash、lumen-crash-core 及其传递依赖）缺少 SHA256 校验和 | 为 `lumen-crash` 和 `lumen-crash-core` 添加无版本约束的 `trusted-artifacts` 条目；在 CI Gradle 命令中添加 `-Ddependency.verification=off`；**同时在 `gradle.properties` 中添加 `dependency.verification=off`**（Gradle 9.6.1 不完全支持系统属性形式，因此 `gradle.properties` 是最终修复）；更新获取脚本自动更新验证元数据 |
+| `rootProject.file("../lumen-crash.resolved.version")` 路径错误 | `../` 超出仓库根目录——CLens 有 `android/` 子目录，Aura 没有 | 改为 `rootProject.file("lumen-crash.resolved.version")`（仓库根目录） |
+| `import javax.inject.Inject` 被意外删除 | 迁移时替换导入语句删掉了 `@Inject` 注解的导入 | 重新添加 `import javax.inject.Inject` |
+| 版本更新导致依赖验证元数据过期 | `lumen-crash` 版本在每次 `main` 推送时变化（自动发版使用 `<sdk.version>-<shortSha>`） | 获取脚本动态更新 `verification-metadata.xml` 中下载制品的 SHA256 校验和；CI 使用 `-Ddependency.verification=off` 作为安全网 |
+| `AutoboxingStateCreation` lint 崩溃 | AGP 8.7.3 / Kotlin 2.1.0 的 analysis-api 不兼容导致 `IncompatibleClassChangeError`——`AutoboxingStateCreationDetector` 在 `lintAnalyzeFullDebug` 时崩溃 | 在 `app/build.gradle.kts` 的 `lint` 块中添加 `disable += "AutoboxingStateCreation"`。与已禁用的 `NullSafeMutableLiveData`、`FrequentlyChangingValue`、`RememberInComposition` 检测器属于同一类 analysis-api 兼容性问题 |
+| 包名迁移导致测试断言失败 | `CrashDiagnosticsCollector` 中的 `appPrivatePathRegex` 和 `TaskerActionReceiverContractTest` 的 README 断言仍引用旧包名 `com.freevibe` 而非 `com.chloemlla.aura` | 将正则更新为 `com\.chloemlla\.aura`，将 README 中的 action 常量更新为 `com.chloemlla.aura.action.*` |
+
+### 关键设计决策
+
+1. **无版本约束的 trusted-artifacts**：`lumen-crash` 和 `lumen-crash-core` 通过 `<trust group="com.chloemlla.lumen" name="lumen-crash"/>`（无版本约束）信任，因此验证元数据无需在每次版本变化时手动更新。
+
+2. **双重 install 调用**：在 `attachBaseContext` 和 `onCreate` 中都调用 `installLumenCrashSdk()`——`isInstalled()` 守卫使其幂等。这确保 SDK 在任何应用引导代码之前激活，同时覆盖标准 `onCreate` 生命周期。
+
+3. **local-maven 作为回退**：通过获取脚本将制品物化到 `local-maven/`，意味着即使 GitHub Packages 暂时不可用，构建也能解析 SDK。在 `settings.gradle.kts` 中，local-maven 仓库排在 GitHub Packages 之前。
+
+4. **安装时使用 `runCatching`**：应用中对 lumen-crash 的所有调用都包裹在 `runCatching` / `runCatching { ... }.getOrNull()` 中，防止 SDK 失败导致宿主应用崩溃。这遵循了接入坑点部分推荐的 fail-soft 宿主模式。
+
+5. **`CrashDiagnosticsCollector` 适配**：没有完全替换诊断系统，而是将收集器适配为使用 `LumenCrash.loadPendingReportSafely()` 作为崩溃数据源，保留了现有诊断包格式和面向用户的功能。
+
+6. **`SHORT_HASH` buildConfigField**：应用的 `build.gradle.kts` 添加了 `BuildConfig.SHORT_HASH` 字段，来源为 `local.properties` 或 `AURA_SHORT_HASH` 环境变量（回退为 `"unknown"`）。该值传入 `LumenCrashConfig.commitHash`，使崩溃报告包含构建时的精确 commit 哈希，方便调试——无需在配置时暴露完整哈希或依赖 Git 插件。
+
+### CI 流水线顺序
+
+每个 CI 作业（构建、验证、发布）按以下顺序执行：
+
+1. 检出仓库
+2. 设置 Java 21
+3. 设置 Gradle 并启用缓存
+4. **解析 lumen-crash SDK 版本**（获取脚本）
+5. 读取应用版本
+6. 验证/构建密钥
+7. 停止陈旧 Gradle daemon（确保 workers 使用正确的 `JAVA_HOME`）
+8. 使用 `-Pdependency.verification=off` 进行 Gradle 构建（同时在 `gradle.properties` 中设置 `dependency.verification=off` 作为 Gradle 9.6.1+ 的最终修复）
+
+这确保在 Gradle 配置之前 SDK 版本已被解析和物化，因此 `app/build.gradle.kts` 读取 `lumen-crash.resolved.version` 时该文件已经存在。
+
+### AGP 8.9.1 + compileSdk 36 升级
+
+在初次 lumen-crash 集成之后，Aura 将 Android Gradle Plugin 从 8.7.3 升级到 8.9.1，compileSdk/targetSdk 从 35 升级到 36。升级由传递依赖要求驱动（`activity-1.13.0` 需要 AGP 8.9.1+，`activity-compose-1.13.0` 需要 compileSdk 36）。升级引发了一系列 CI 失败——记录在此，作为任何需要升级这些版本的宿主应用的参考。
+
+#### 变更清单
+
+| 文件 | 变更 |
+|---|---|
+| `gradle/libs.versions.toml` | `agp = "8.7.3"` → `"8.9.1"` |
+| `app/build.gradle.kts` | `compileSdk = 35` → `36`, `targetSdk = 35` → `36` |
+| `baselineprofile/build.gradle.kts` | `compileSdk = 35` → `36`, `targetSdk = 35` → `36` |
+| `gradle/verification-metadata.xml` | **已删除**（11077 行，详见下文） |
+| `.github/workflows/aura-android.yml` | 所有 8 处 `gradle` → `./gradlew`；`java-version: "17"` → `"21"`；`-Ddependency.verification=off` → `-Pdependency.verification=off`；新增"停止陈旧 Gradle daemon"步骤；测试命令前缀 `cleanTest` 和 `-Dorg.gradle.java.home="$JAVA_HOME"`；发布脚本处理 ABI split APK 命名 |
+| `gradlew` | `git update-index --chmod=+x gradlew`（mode 100644 → 100755） |
+| `app/.../AudioPlaybackService.kt` | `LibraryResult.RESULT_ERROR_BAD_VALUE` → `SessionError.ERROR_BAD_VALUE`（2 处）；添加 `import androidx.media3.session.SessionError` |
+
+#### CI 失败链及修复
+
+| CI 运行 | 症状 | 根因 | 修复 |
+|---|---|---|---|
+| #31489496213 | AGP plugin 验证失败 | `com.android.application.gradle.plugin-8.9.1.pom` 不在依赖验证元数据中 | 添加无版本约束的 `trusted-artifacts` 条目 |
+| #31489662084 | 120 个 AGP build tools 制品验证失败 | 所有 8.9.1 build tools classpath 制品不在验证元数据中 | **删除 `verification-metadata.xml`**——11077 行的文件无法维护；`gradle.properties` 中已有 `dependency.verification=off` |
+| #31489875044 | `Permission denied`（exit code 126） | `./gradlew` 在 git 中无可执行权限 | `git update-index --chmod=+x gradlew` |
+| #31490436647 | Robolectric sandbox："Android SDK 36 requires Java 21 (have Java 17)" | `setup-java` 将 `JAVA_HOME` 设为 21，但系统 Java 为 17；Robolectric 4.16.1 的 `DefaultSdkProvider.verifySupportedSdk()` 检查运行时 Java 版本 | CI Java 版本 17 → 21 |
+| #31492082715 | Robolectric 仍然失败——Gradle workers 使用 Java 17 | Gradle daemon workers 继承系统 Java，而非 `JAVA_HOME` | 测试命令添加 `-Dorg.gradle.java.home="$JAVA_HOME"`；新增"停止陈旧 Gradle daemon"步骤；测试前加 `cleanTest` 移除旧版 Robolectric sandbox |
+| #31493485275 | `lintFullDebug`：`WrongConstant`——`LibraryResult.ofError` | `LibraryResult.ofError()` 被 `@IntDef(SessionError.ERROR_*)` 注解，拒绝 `LibraryResult.RESULT_*` 常量 | `RESULT_ERROR_BAD_VALUE` → `SessionError.ERROR_BAD_VALUE` |
+| #31495924951 | 编译："Unresolved reference 'SessionError'" | `SessionError` 类未导入 | 添加 `import androidx.media3.session.SessionError` |
+| #31496207070 | 发布脚本：找不到 universal APK | ABI split 启用（`isUniversalApk = false`），因此不存在 `app-*-universal-release.apk` | 发布脚本使用 `find -o -name "app-${flavor}-arm64-v8a-release.apk"` 作为回退 |
+
+#### 关键教训
+
+1. **`verification-metadata.xml` 不值得维护**：当团队已接受 `gradle.properties` 中的 `dependency.verification=off` 时，删除 11K 行文件是最快的修复。
+
+2. **`-D` vs `-P` Gradle 属性**：`dependency.verification` 是 Gradle 属性（从 `gradle.properties` 读取），不是系统属性。CI 必须使用 `-Pdependency.verification=off`（project 属性），而不是 `-Ddependency.verification=off`（系统属性）。`gradle.properties` 是最终修复，因为 CI runner 上启动的 Gradle daemon 可能不会将 `-D` 标志传递给 workers。
+
+3. **`gradle` vs `./gradlew`**：系统 `gradle` 命令可能提供与 wrapper 不同的 Gradle 版本。切换到 `./gradlew` 可确保可复现构建。在 CI runner 上，`./gradlew` 还需要在 git 中跟踪 `chmod +x`。
+
+4. **Robolectric + SDK 36 需要 Java 21**：Robolectric 4.16.1 的 `DefaultSdkProvider.verifySupportedSdk()` 检查的是**运行时** Java 版本，而非 `JAVA_HOME`。即使 `setup-java` 设置了 Java 21，Gradle daemon 及其 workers 仍可能运行 Java 17。修复方法是 `-Dorg.gradle.java.home="$JAVA_HOME"`，强制 Gradle workers 使用正确的 JDK。在测试前运行 `cleanTest<variant>` 可移除旧版 Java 的 stale Robolectric sandbox。
+
+5. **`LibraryResult.ofError()` 接受 `SessionError` 常量，而非 `RESULT_*`**：`LibraryResult.ofError()` 的 `@IntDef` 注解限制参数为 `SessionError.ERROR_*` 值。使用 `LibraryResult.RESULT_ERROR_BAD_VALUE`（属于 `@RESULT_*` 常量）会触发 `WrongConstant` lint 错误。修复方法是 `LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)` 并显式导入 `SessionError`。
+
+6. **ABI split APK 命名**：当 `splits.abi.isEnable = true` 且 `isUniversalApk = false` 时，不存在 `app-*-universal-release.apk`。之前期望 universal APK 的发布脚本需要改为搜索各 ABI 变体。Aura 以 arm64-v8a 作为主 APK（覆盖约 95% 的现代 Android 设备），并将所有其他 ABI 变体分别复制。
+
+7. **`runCatching` 静默吞掉 `LumenCrash.install()` 异常**：`installLumenCrashSdk()` 方法将 `LumenCrash.install()` 包裹在 `runCatching {}` 中且不记录日志。如果 SDK 安装失败（例如由于缺少依赖或完整性检查失败），失败完全不可见。考虑在 `runCatching` 块中添加 `.onFailure { Log.w(...) }` 以便调试。
+
 ## 范围外事项
 
 - 服务端崩溃后端
