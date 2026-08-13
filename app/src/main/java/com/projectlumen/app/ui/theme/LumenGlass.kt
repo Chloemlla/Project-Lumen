@@ -83,9 +83,16 @@ fun Modifier.lumenGlass(
     if (backdrop == null) {
         return this.clip(shape).background(tint)
     }
-    return this.drawBackdrop(
-        backdrop = backdrop,
-        shape = shapeProvider,
-        effects = glassEffects,
-    )
+    // Hoist the whole chain so its elements are referentially stable across recompositions.
+    // drawBackdrop wraps `shape` in a fresh ShapeProvider per call, and DrawBackdropElement
+    // compares shapeProvider by identity, so a rebuilt chain would re-run update()/RenderEffect
+    // rebuild every recomposition even with stable lambdas.
+    val glassModifier = remember(backdrop, shapeProvider, glassEffects) {
+        Modifier.drawBackdrop(
+            backdrop = backdrop,
+            shape = shapeProvider,
+            effects = glassEffects,
+        )
+    }
+    return this.then(glassModifier)
 }
