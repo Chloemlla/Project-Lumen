@@ -11,6 +11,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
@@ -77,21 +78,33 @@ fun ProjectLumenTheme(
         AppThemeMode.DARK -> true
     }
     val context = LocalContext.current
-    val baseColorScheme = when {
-        useDynamicColors && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    val colorScheme = remember(
+        useDynamicColors,
+        darkTheme,
+        context,
+        themePrimaryColor,
+        themeBackgroundColor,
+        themePaletteJson,
+    ) {
+        val baseColorScheme = when {
+            useDynamicColors && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            }
+            darkTheme -> DarkColors
+            else -> LightColors
         }
-        darkTheme -> DarkColors
-        else -> LightColors
+        if (useDynamicColors) {
+            baseColorScheme
+        } else {
+            baseColorScheme.applyTemplatePalette(
+                primaryHex = themePrimaryColor,
+                backgroundHex = themeBackgroundColor,
+                paletteJson = themePaletteJson,
+            )
+        }
     }
-    val colorScheme = if (useDynamicColors) {
-        baseColorScheme
-    } else {
-        baseColorScheme.applyTemplatePalette(
-            primaryHex = themePrimaryColor,
-            backgroundHex = themeBackgroundColor,
-            paletteJson = themePaletteJson,
-        )
+    val miuixColors = remember(darkTheme) {
+        if (darkTheme) miuixDarkColorScheme() else miuixLightColorScheme()
     }
     CompositionLocalProvider(
         LocalFixedColorRoles provides FixedColorRoles.fromActiveScheme(colorScheme),
@@ -102,7 +115,7 @@ fun ProjectLumenTheme(
             shapes = LumenShapes,
             content = {
                 MiuixTheme(
-                    colors = if (darkTheme) miuixDarkColorScheme() else miuixLightColorScheme(),
+                    colors = miuixColors,
                 ) {
                     content()
                 }
