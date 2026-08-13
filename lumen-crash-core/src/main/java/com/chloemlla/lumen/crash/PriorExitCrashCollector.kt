@@ -46,6 +46,7 @@ internal class PriorExitCrashCollector(
             for (entry in eligible) {
                 if (entry.timestamp > marker) {
                     val report = CrashReport.fromPriorExit(
+                        exitTimestampMillis = entry.timestamp,
                         appInfo = appInfo(),
                         exitProcessName = entry.processName ?: "",
                         reasonCode = entry.reason,

@@ -169,6 +169,7 @@ data class CrashReport(
         }
 
         fun fromPriorExit(
+            exitTimestampMillis: Long,
             appInfo: CrashAppInfo,
             exitProcessName: String,
             reasonCode: Int,
@@ -177,15 +178,14 @@ data class CrashReport(
         ): CrashReport {
             AuthorIntegrity.verifyOrThrow("from-prior-exit")
             val author = AuthorIntegrity.verifiedAuthorBlock()
-            val nowMillis = System.currentTimeMillis()
             val reasonName = processExitReasonName(reasonCode)
             val exceptionType = reasonName
             val rootCause = description.ifBlank { reasonName }
             val stackTrace = sanitize(trace).ifBlank { "<exit trace unavailable>" }
             return CrashReport(
-                reportId = reportId(nowMillis, exceptionType, rootCause, stackTrace, CrashReportKind.PRIOR_EXIT),
-                crashedAtMillis = nowMillis,
-                crashedAtText = formatTime(nowMillis),
+                reportId = reportId(exitTimestampMillis, exceptionType, rootCause, stackTrace, CrashReportKind.PRIOR_EXIT),
+                crashedAtMillis = exitTimestampMillis,
+                crashedAtText = formatTime(exitTimestampMillis),
                 exceptionType = exceptionType,
                 rootCause = rootCause,
                 threadName = "previous-process",
