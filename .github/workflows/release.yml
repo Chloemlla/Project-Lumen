@@ -307,6 +307,7 @@ jobs:
           PROJECT_LUMEN_ADMIN_ACTIONS_URL: ${{ secrets.PROJECT_LUMEN_ADMIN_ACTIONS_URL }}
           PROJECT_LUMEN_ADMIN_TOKEN: ${{ secrets.PROJECT_LUMEN_ADMIN_TOKEN }}
         run: |
+          set -euo pipefail
           if [ -z "$PROJECT_LUMEN_ADMIN_TOKEN" ]; then
             echo "Release sync skipped; PROJECT_LUMEN_ADMIN_TOKEN is not configured."
             exit 0
@@ -333,8 +334,18 @@ jobs:
               encoding="utf-8",
           )
           PY
-          curl -fsS \
+          HTTP_CODE="$(curl -sS \
+            -o /tmp/admin-release-action-response.json \
+            -w '%{http_code}' \
             -H "Authorization: Bearer ${PROJECT_LUMEN_ADMIN_TOKEN}" \
             -H "Content-Type: application/json" \
             --data-binary @release-assets/admin-release-action.json \
-            "$ADMIN_ACTIONS_URL"
+            "$ADMIN_ACTIONS_URL" || true)"
+          case "$HTTP_CODE" in
+            2*)
+              echo "Admin API release sync succeeded (HTTP $HTTP_CODE)."
+              ;;
+            *)
+              echo "::warning::Admin API release sync failed (HTTP ${HTTP_CODE:-no-response}); the release manifest is still published as a GitHub release asset. Verify PROJECT_LUMEN_ADMIN_TOKEN / PROJECT_LUMEN_ADMIN_ACTIONS_URL."
+              ;;
+          esac

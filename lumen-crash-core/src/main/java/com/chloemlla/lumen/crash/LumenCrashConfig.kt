@@ -45,6 +45,12 @@ data class LumenCrashConfig(
     val onReportSaved: ((CrashReport) -> Unit)? = null,
     /** Receives synthetic startup-hang and main-thread freeze reports. */
     val onAnrDetected: ((CrashReport) -> Unit)? = null,
+    /**
+     * Collects the previous process's unexpected exit (native crash / signal /
+     * system ANR) via ApplicationExitInfo (API 30+) at install time and persists
+     * a PRIOR_EXIT report. Requires Android 11+. Defaults to true.
+     */
+    val priorExitCaptureEnabled: Boolean = true,
 
     // ── Backend crash-report upload ──────────────────────────────────────────
 

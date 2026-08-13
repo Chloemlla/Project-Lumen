@@ -85,6 +85,35 @@ class CrashReportPersistenceTest {
         }
     }
 
+    @Test
+    fun priorExitReportRoundTripsThroughJsonWithExitReason() {
+        val report = CrashReport(
+            reportId = "a1b2c3d4e5f6",
+            crashedAtMillis = 1_753_960_844_732L,
+            crashedAtText = "2026-07-31 18:20:44.732",
+            exceptionType = "REASON_CRASH_NATIVE",
+            rootCause = "SIGSEGV",
+            threadName = "previous-process",
+            processName = "com.chloemlla.projectlumen",
+            systemInfo = "Android: 16 (SDK 36)\nABI: arm64-v8a",
+            stackTrace = "backtrace",
+            kind = CrashReportKind.PRIOR_EXIT,
+            exitReason = "REASON_CRASH_NATIVE / SIGSEGV",
+        )
+
+        assertEquals(report, crashReportFromJson(report.toJson()))
+        assertEquals("REASON_CRASH_NATIVE / SIGSEGV", report.toJson().getString("exitReason"))
+    }
+
+    @Test
+    fun processExitReasonNamesMatchApplicationExitInfoConstants() {
+        assertEquals("REASON_CRASH_NATIVE", processExitReasonName(13))
+        assertEquals("REASON_ANR", processExitReasonName(10))
+        assertEquals("REASON_SIGNALED", processExitReasonName(2))
+        assertEquals("REASON_CRASH", processExitReasonName(4))
+        assertEquals("UNKNOWN(99)", processExitReasonName(99))
+    }
+
     private fun withTemporaryStore(block: (File, CrashReportStore) -> Unit) {
         val root = Files.createTempDirectory("lumen-crash-store").toFile()
         try {

@@ -9,7 +9,8 @@ enum class CrashReportKind(val wireValue: String) {
     CRASH("crash"),
     ANR("anr"),
     STARTUP_HANG("startup_hang"),
-    FREEZE("freeze");
+    FREEZE("freeze"),
+    PRIOR_EXIT("prior_exit");
 
     companion object {
         fun fromWireValue(value: String?): CrashReportKind {
