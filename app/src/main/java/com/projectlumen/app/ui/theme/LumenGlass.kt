@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import com.kyant.backdrop.BackdropEffectScope
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
@@ -75,7 +76,7 @@ fun Modifier.lumenGlass(
 ): Modifier {
     val backdrop = LocalLumenBackdrop.current
     val shapeProvider = remember(shape) { { shape } }
-    val glassEffects = remember(blurRadius, tint) {
+    val glassEffects: BackdropEffectScope.() -> Unit = remember(blurRadius, tint) {
         val tintFilter = ColorFilter.tint(tint)
         { blur(blurRadius); colorFilter(tintFilter) }
     }
