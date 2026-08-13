@@ -189,7 +189,7 @@ internal fun EyeCareInsightsHomeCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
-            .lumenGlass(shape = LumenCardShape, blurRadius = 18f, tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)),
+            .lumenGlass(shape = LumenCardShape, blurRadius = 14f, tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)),
         shape = LumenCardShape,
         colors = CardDefaults.cardColors(
             containerColor = Color.Transparent,
@@ -888,7 +888,7 @@ private fun GuideStepLine(step: EyeCareGuideStep) {
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             )
             .padding(12.dp),
@@ -931,7 +931,7 @@ private fun PermissionTransparencyLine(
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             )
             .padding(12.dp),
@@ -978,7 +978,7 @@ private fun CapabilityLine(
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),

@@ -315,7 +315,7 @@ internal fun AboutHeroCard(versionLabel: String, onVersionClick: () -> Unit) {
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
                 .lumenGlass(
                     shape = LumenCardShape,
-                    blurRadius = 18f,
+                    blurRadius = 14f,
                     tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
                 ),
             shape = LumenCardShape,
@@ -358,7 +358,7 @@ internal fun AboutLinksCard(
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             ),
         shape = LumenCardShape,
@@ -659,7 +659,7 @@ internal fun StateCard(runtime: RuntimeStateEntity, nowMillis: Long) {
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
                 .lumenGlass(
                     shape = LumenCardShape,
-                    blurRadius = 18f,
+                    blurRadius = 14f,
                     tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
                 ),
             shape = LumenCardShape,

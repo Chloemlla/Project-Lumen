@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,14 +41,16 @@ fun LumenGlassHost(
     val backdrop = rememberLayerBackdrop()
     Box(modifier = modifier.fillMaxSize()) {
         val scheme = MaterialTheme.colorScheme
-        val background = Brush.verticalGradient(
-            colors = listOf(
-                scheme.primary.copy(alpha = 0.55f),
-                scheme.primaryContainer.copy(alpha = 0.45f),
-                scheme.tertiaryContainer.copy(alpha = 0.40f),
-                scheme.surface,
-            ),
-        )
+        val background = remember(scheme) {
+            Brush.verticalGradient(
+                colors = listOf(
+                    scheme.primary.copy(alpha = 0.55f),
+                    scheme.primaryContainer.copy(alpha = 0.45f),
+                    scheme.tertiaryContainer.copy(alpha = 0.40f),
+                    scheme.surface,
+                ),
+            )
+        }
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -71,15 +74,17 @@ fun Modifier.lumenGlass(
     tint: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.30f),
 ): Modifier {
     val backdrop = LocalLumenBackdrop.current
+    val shapeProvider = remember(shape) { { shape } }
+    val glassEffects = remember(blurRadius, tint) {
+        val tintFilter = ColorFilter.tint(tint)
+        { blur(blurRadius); colorFilter(tintFilter) }
+    }
     if (backdrop == null) {
         return this.clip(shape).background(tint)
     }
     return this.drawBackdrop(
         backdrop = backdrop,
-        shape = { shape },
-        effects = {
-            blur(blurRadius)
-            colorFilter(ColorFilter.tint(tint))
-        },
+        shape = shapeProvider,
+        effects = glassEffects,
     )
 }

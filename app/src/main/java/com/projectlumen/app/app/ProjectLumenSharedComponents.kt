@@ -272,7 +272,7 @@ internal fun LumenTopBar(
 
     val glassModifier = modifier.lumenGlass(
         shape = RectangleShape,
-        blurRadius = 28f,
+        blurRadius = 14f,
         tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
     )
     val transparentContainer = Color.Transparent
@@ -479,7 +479,7 @@ internal fun SettingsSection(
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             ),
         onClick = { expanded = !expanded },
@@ -583,7 +583,7 @@ internal fun SettingsSection(
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             ),
         shape = LumenCardShape,
@@ -702,7 +702,7 @@ internal fun ActionCard(content: @Composable ColumnScope.() -> Unit) {
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             ),
         shape = LumenCardShape,
@@ -836,7 +836,7 @@ internal fun FileSettingRow(
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenPreferenceShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             )
             .padding(
@@ -904,7 +904,7 @@ internal fun NotificationRequirementCard(
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))

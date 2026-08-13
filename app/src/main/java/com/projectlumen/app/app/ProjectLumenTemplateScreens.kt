@@ -229,7 +229,7 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                     .fillMaxWidth()
                     .lumenGlass(
                         shape = LumenCardShape,
-                        blurRadius = 18f,
+                        blurRadius = 14f,
                         tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
                     )
                     .clickable(enabled = !locked && !selected) { viewModel.selectTemplate(template.id) }
@@ -356,7 +356,7 @@ internal fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: Proj
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             ),
         shape = LumenCardShape,

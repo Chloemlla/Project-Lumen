@@ -68,7 +68,7 @@ internal fun HomeConvenienceCard(
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             ),
         shape = LumenCardShape,
