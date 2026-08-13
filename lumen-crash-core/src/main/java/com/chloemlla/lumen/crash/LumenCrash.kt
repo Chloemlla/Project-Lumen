@@ -240,6 +240,8 @@ object LumenCrash {
         val report = runCatching {
             PriorExitCrashCollector(application.applicationContext) { config.toAppInfo() }.collect()
         }.getOrNull() ?: return
+        // Never clobber a pending real crash/watchdog report with a derived PRIOR_EXIT report.
+        if (runCatching { store().load() != null }.getOrDefault(false)) return
         saveReport(report, config)
     }
 
