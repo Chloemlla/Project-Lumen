@@ -75,23 +75,22 @@ fun Modifier.lumenGlass(
     tint: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.30f),
 ): Modifier {
     val backdrop = LocalLumenBackdrop.current
-    val shapeProvider = remember(shape) { { shape } }
-    val glassEffects: BackdropEffectScope.() -> Unit = remember(blurRadius, tint) {
-        val tintFilter = ColorFilter.tint(tint)
-        { blur(blurRadius); colorFilter(tintFilter) }
-    }
     if (backdrop == null) {
         return this.clip(shape).background(tint)
     }
-    // Hoist the whole chain so its elements are referentially stable across recompositions.
-    // drawBackdrop wraps `shape` in a fresh ShapeProvider per call, and DrawBackdropElement
-    // compares shapeProvider by identity, so a rebuilt chain would re-run update()/RenderEffect
-    // rebuild every recomposition even with stable lambdas.
-    val glassModifier = remember(backdrop, shapeProvider, glassEffects) {
+    // Hoist the whole chain so its elements stay referentially stable across recompositions.
+    // drawBackdrop wraps `shape` in a fresh ShapeProvider per call and DrawBackdropElement
+    // compares it by identity, so a rebuilt chain would re-run update()/RenderEffect rebuild
+    // every recomposition. The explicit receiver type keeps blur/colorFilter resolvable.
+    val glassModifier = remember(backdrop, shape, blurRadius, tint) {
+        val effects: BackdropEffectScope.() -> Unit = {
+            blur(blurRadius)
+            colorFilter(ColorFilter.tint(tint))
+        }
         Modifier.drawBackdrop(
             backdrop = backdrop,
-            shape = shapeProvider,
-            effects = glassEffects,
+            shape = { shape },
+            effects = effects,
         )
     }
     return this.then(glassModifier)
