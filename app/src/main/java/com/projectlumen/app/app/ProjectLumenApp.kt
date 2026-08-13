@@ -403,7 +403,7 @@ fun ProjectLumenApp(
                         NavigationBar(
                             modifier = Modifier.lumenGlass(
                                 shape = RectangleShape,
-                                blurRadius = 20f,
+                                blurRadius = 14f,
                                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
                             ),
                             color = Color.Transparent,

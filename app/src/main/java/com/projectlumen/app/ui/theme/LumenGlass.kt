@@ -71,7 +71,7 @@ fun LumenGlassHost(
 @Composable
 fun Modifier.lumenGlass(
     shape: Shape = RectangleShape,
-    blurRadius: Float = 24f,
+    blurRadius: Float = 14f,
     tint: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.30f),
 ): Modifier {
     val backdrop = LocalLumenBackdrop.current
