@@ -205,7 +205,7 @@ internal fun TrendCard(uiState: ProjectLumenUiState) {
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
-            .lumenGlass(shape = LumenCardShape, blurRadius = 18f, tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)),
+            .lumenGlass(shape = LumenCardShape, blurRadius = 14f, tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)),
         shape = LumenCardShape,
         colors = CardDefaults.cardColors(
             containerColor = Color.Transparent,
@@ -276,7 +276,7 @@ internal fun HabitSuggestionCard(uiState: ProjectLumenUiState) {
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
-            .lumenGlass(shape = LumenCardShape, blurRadius = 18f, tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)),
+            .lumenGlass(shape = LumenCardShape, blurRadius = 12f, tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)),
         shape = LumenCardShape,
         colors = CardDefaults.cardColors(
             containerColor = Color.Transparent,

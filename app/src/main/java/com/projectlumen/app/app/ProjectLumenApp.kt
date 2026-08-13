@@ -397,18 +397,13 @@ fun ProjectLumenApp(
                             onNavigateBack = if (currentDestination.showInBottomNav) null else {
                                 { navigateBackFromSecondaryPage() }
                             },
-                            modifier = Modifier.lumenGlass(
-                                shape = RectangleShape,
-                                blurRadius = 28f,
-                                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
-                            ),
                         )
                     },
                     bottomBar = {
                         NavigationBar(
                             modifier = Modifier.lumenGlass(
                                 shape = RectangleShape,
-                                blurRadius = 28f,
+                                blurRadius = 20f,
                                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
                             ),
                             color = Color.Transparent,

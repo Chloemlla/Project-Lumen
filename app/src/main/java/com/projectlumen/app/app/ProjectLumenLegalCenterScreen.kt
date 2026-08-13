@@ -287,7 +287,7 @@ private fun PermissionCard(entry: PermissionEntry) {
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             ),
         shape = LumenCardShape,

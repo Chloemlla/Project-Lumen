@@ -242,7 +242,7 @@ internal fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
             .weight(1f)
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 12f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
@@ -289,7 +289,7 @@ internal fun MetricRow(label: String, value: String) {
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 12f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),

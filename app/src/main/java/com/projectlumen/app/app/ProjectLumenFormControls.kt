@@ -226,7 +226,7 @@ internal fun SwitchRow(
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenPreferenceShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             )
             .clickable(enabled = enabled) { toggle(!checked) }
@@ -263,7 +263,7 @@ internal fun NumberSlider(
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenPreferenceShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             )
             .padding(

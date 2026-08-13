@@ -84,7 +84,7 @@ internal fun RecommendedEyeCareSetupFeedback(
             .fillMaxWidth()
             .lumenGlass(
                 shape = LumenCardShape,
-                blurRadius = 18f,
+                blurRadius = 14f,
                 tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
             )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
