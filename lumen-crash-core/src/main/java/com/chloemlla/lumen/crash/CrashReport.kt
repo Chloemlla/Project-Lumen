@@ -30,6 +30,7 @@ data class CrashReport(
     val authorFingerprint: String = CrashAuthorAttribution.FINGERPRINT_HEX,
     val kind: CrashReportKind = CrashReportKind.CRASH,
     val durationMillis: Long = 0L,
+    val exitReason: String? = null,
 ) {
     fun toClipboardText(): String {
         AuthorIntegrity.verifyOrThrow("export-clipboard")
@@ -40,6 +41,9 @@ data class CrashReport(
             appendLine("Crash time: $crashedAtText")
             if (durationMillis > 0L) {
                 appendLine("Unresponsive duration: ${durationMillis} ms")
+            }
+            if (exitReason != null) {
+                appendLine("Exit reason: $exitReason")
             }
             appendLine("Exception type: $exceptionType")
             appendLine("Root cause: $rootCause")
@@ -134,6 +138,7 @@ data class CrashReport(
                 CrashReportKind.STARTUP_HANG -> "com.chloemlla.lumen.crash.StartupHang"
                 CrashReportKind.FREEZE -> "com.chloemlla.lumen.crash.MainThreadFreeze"
                 CrashReportKind.CRASH -> error("Unreachable crash watchdog kind")
+                CrashReportKind.PRIOR_EXIT -> error("Unreachable crash watchdog kind")
             }
             val rootCause = when (kind) {
                 CrashReportKind.ANR, CrashReportKind.FREEZE ->
@@ -141,6 +146,7 @@ data class CrashReport(
                 CrashReportKind.STARTUP_HANG ->
                     "Application did not report its first rendered frame within $duration ms"
                 CrashReportKind.CRASH -> error("Unreachable crash watchdog kind")
+                CrashReportKind.PRIOR_EXIT -> error("Unreachable crash watchdog kind")
             }
             val stackTrace = sanitize(threadDump).ifBlank { "<thread dump unavailable>" }
             return CrashReport(
@@ -159,6 +165,39 @@ data class CrashReport(
                 authorFingerprint = author.authorFingerprint,
                 kind = kind,
                 durationMillis = duration,
+            )
+        }
+
+        fun fromPriorExit(
+            exitTimestampMillis: Long,
+            appInfo: CrashAppInfo,
+            exitProcessName: String,
+            reasonCode: Int,
+            description: String,
+            trace: String,
+        ): CrashReport {
+            AuthorIntegrity.verifyOrThrow("from-prior-exit")
+            val author = AuthorIntegrity.verifiedAuthorBlock()
+            val reasonName = processExitReasonName(reasonCode)
+            val exceptionType = reasonName
+            val rootCause = description.ifBlank { reasonName }
+            val stackTrace = sanitize(trace).ifBlank { "<exit trace unavailable>" }
+            return CrashReport(
+                reportId = reportId(exitTimestampMillis, exceptionType, rootCause, stackTrace, CrashReportKind.PRIOR_EXIT),
+                crashedAtMillis = exitTimestampMillis,
+                crashedAtText = formatTime(exitTimestampMillis),
+                exceptionType = exceptionType,
+                rootCause = rootCause,
+                threadName = "previous-process",
+                processName = exitProcessName.ifBlank { "unknown" },
+                systemInfo = buildSystemInfo(appInfo),
+                stackTrace = stackTrace,
+                recentEvents = CrashBreadcrumbs.snapshot(),
+                authorName = author.authorName,
+                authorUrl = author.authorUrl,
+                authorFingerprint = author.authorFingerprint,
+                kind = CrashReportKind.PRIOR_EXIT,
+                exitReason = listOfNotNull(reasonName, description.takeIf { it.isNotBlank() }).joinToString(" / "),
             )
         }
 
@@ -266,6 +305,7 @@ fun crashReportFromJson(json: JSONObject): CrashReport {
         authorFingerprint = author.authorFingerprint,
         kind = CrashReportKind.fromWireValue(json.optString("kind").takeIf { it.isNotBlank() }),
         durationMillis = json.optLong("durationMillis", 0L).coerceAtLeast(0L),
+        exitReason = json.optString("exitReason").takeIf { it.isNotBlank() },
     )
 }
 
@@ -287,8 +327,32 @@ fun CrashReport.toJson(): JSONObject {
         })
         put("kind", kind.wireValue)
         put("durationMillis", durationMillis.coerceAtLeast(0L))
+        exitReason?.let { put("exitReason", it) }
         put("authorName", author.authorName)
         put("authorUrl", author.authorUrl)
         put("authorFingerprint", author.authorFingerprint)
     }
+}
+
+internal fun processExitReasonName(code: Int): String = when (code) {
+    1 -> "REASON_EXIT_SELF"
+    2 -> "REASON_SIGNALED"
+    3 -> "REASON_LOW_MEMORY"
+    4 -> "REASON_CRASH"
+    5 -> "REASON_PERMISSION_CHANGE"
+    6 -> "REASON_EXCEPTION"
+    7 -> "REASON_USER_REQUESTED"
+    8 -> "REASON_USER_STOPPED"
+    9 -> "REASON_OTHER"
+    10 -> "REASON_ANR"
+    11 -> "REASON_DEPENDENCY_DIED"
+    12 -> "REASON_DEADLOCK"
+    13 -> "REASON_CRASH_NATIVE"
+    14 -> "REASON_SUSPENDED"
+    15 -> "REASON_INITIALIZATION_FAILURE"
+    16 -> "REASON_QUIET"
+    17 -> "REASON_MEMORY_PRESSURE"
+    18 -> "REASON_FREEZER"
+    19 -> "REASON_PACKAGE_UPDATED"
+    else -> "UNKNOWN($code)"
 }
