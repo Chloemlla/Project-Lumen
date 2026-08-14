@@ -100,7 +100,6 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -109,13 +108,13 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -184,7 +183,11 @@ import com.projectlumen.app.core.update.ReleaseInfo
 import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import com.projectlumen.app.ui.theme.lumenControlGlass
+import com.projectlumen.app.ui.theme.lumenFilterChipColors
 import com.projectlumen.app.ui.theme.lumenGlass
 import org.json.JSONObject
 import java.io.File
@@ -300,7 +303,7 @@ internal fun HomeScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                OutlinedButton(
+                GlassOutlinedButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = openTranslation,
                 ) {
@@ -317,7 +320,7 @@ internal fun HomeScreen(
                 )
                 !reminderActive && timerActive -> {
                     EmptyStateMessage(R.string.other_timer_running_hint)
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::stopAll,
                     ) {
@@ -325,7 +328,7 @@ internal fun HomeScreen(
                     }
                 }
                 canStartReminder -> {
-                    Button(
+                    GlassButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { runReminderAction(viewModel::startReminder) },
                     ) {
@@ -334,20 +337,20 @@ internal fun HomeScreen(
                 }
                 canPauseReminder -> {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
+                        GlassButton(
                             modifier = Modifier.weight(1f),
                             onClick = viewModel::pauseReminder,
                         ) {
                             ButtonLabel(Icons.Outlined.Pause, R.string.pause)
                         }
-                        OutlinedButton(
+                        GlassOutlinedButton(
                             modifier = Modifier.weight(1f),
                             onClick = viewModel::pauseForOneHour,
                         ) {
                             ButtonLabel(Icons.Outlined.Schedule, R.string.silent_until)
                         }
                     }
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::stopAll,
                     ) {
@@ -355,13 +358,13 @@ internal fun HomeScreen(
                     }
                 }
                 canResumeReminder -> {
-                    Button(
+                    GlassButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { runReminderAction(viewModel::resumeReminder) },
                     ) {
                         ButtonLabel(Icons.Outlined.Refresh, R.string.resume_now)
                     }
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::stopAll,
                     ) {
@@ -369,7 +372,7 @@ internal fun HomeScreen(
                     }
                 }
                 timerActive -> {
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::stopAll,
                     ) {
@@ -433,20 +436,20 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                 )
                 canStartBreak && canSkip -> {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
+                        GlassButton(
                             modifier = Modifier.weight(1f),
                             onClick = viewModel::startBreak,
                         ) {
                             ButtonLabel(Icons.Outlined.Spa, R.string.start_break)
                         }
-                        OutlinedButton(
+                        GlassOutlinedButton(
                             modifier = Modifier.weight(1f),
                             onClick = viewModel::skipBreak,
                         ) {
                             ButtonLabel(Icons.Outlined.SkipNext, R.string.skip_break)
                         }
                     }
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::stopAll,
                     ) {
@@ -454,13 +457,13 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                     }
                 }
                 canStartBreak -> {
-                    Button(
+                    GlassButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::startBreak,
                     ) {
                         ButtonLabel(Icons.Outlined.Spa, R.string.start_break)
                     }
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::stopAll,
                     ) {
@@ -468,13 +471,13 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                     }
                 }
                 canSkip -> {
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::skipBreak,
                     ) {
                         ButtonLabel(Icons.Outlined.SkipNext, R.string.skip_break)
                     }
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::stopAll,
                     ) {
@@ -482,7 +485,7 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                     }
                 }
                 !reminderActive && runtime.activeEngine == ActiveEngine.IDLE.name -> {
-                    Button(
+                    GlassButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { runReminderAction(viewModel::startReminder) },
                     ) {
@@ -490,7 +493,7 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                     }
                 }
                 timerActive -> {
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::stopAll,
                     ) {
@@ -532,7 +535,7 @@ internal fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                     illustration = EmptyStateIllustration.VideoStreaming,
                 )
                 running -> {
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::stopPomodoro,
                     ) {
@@ -540,7 +543,7 @@ internal fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                     }
                 }
                 canStartPomodoro -> {
-                    Button(
+                    GlassButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { runPomodoroAction(viewModel::startPomodoro) },
                     ) {
@@ -548,7 +551,7 @@ internal fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                     }
                 }
                 timerActive -> {
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = viewModel::stopAll,
                     ) {
@@ -632,9 +635,27 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
         )
         TodayStatsCard(eye)
         LumenFlowRow {
-            FilterChip(selected = statsWindow == 7, onClick = { statsWindow = 7 }, label = { Text(stringResource(R.string.stats_range_7_days)) })
-            FilterChip(selected = statsWindow == 30, onClick = { statsWindow = 30 }, label = { Text(stringResource(R.string.stats_range_30_days)) })
-            FilterChip(selected = statsWindow == 31, onClick = { statsWindow = 31 }, label = { Text(stringResource(R.string.stats_range_month)) })
+            FilterChip(
+                selected = statsWindow == 7,
+                onClick = { statsWindow = 7 },
+                label = { Text(stringResource(R.string.stats_range_7_days)) },
+                modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+                colors = lumenFilterChipColors(),
+            )
+            FilterChip(
+                selected = statsWindow == 30,
+                onClick = { statsWindow = 30 },
+                label = { Text(stringResource(R.string.stats_range_30_days)) },
+                modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+                colors = lumenFilterChipColors(),
+            )
+            FilterChip(
+                selected = statsWindow == 31,
+                onClick = { statsWindow = 31 },
+                label = { Text(stringResource(R.string.stats_range_month)) },
+                modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+                colors = lumenFilterChipColors(),
+            )
         }
         AdvancedStatsCard(windowEyeStats, windowPomodoroStats)
         HabitSuggestionCard(uiState)
@@ -669,17 +690,17 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
             SectionHeader(Icons.Outlined.FileDownload, R.string.statistics_export)
             if (hasExportableStats) {
                 LumenFlowRow {
-                    Button(
+                    GlassButton(
                         onClick = viewModel::shareStatistics,
                     ) {
                         ButtonLabel(Icons.Outlined.FileDownload, R.string.export_csv)
                     }
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         onClick = viewModel::shareStatisticsImage,
                     ) {
                         ButtonLabel(Icons.Outlined.BarChart, R.string.share_stats_image)
                     }
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         onClick = viewModel::shareMonthlyReportPdf,
                     ) {
                         ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)

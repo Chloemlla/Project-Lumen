@@ -18,11 +18,10 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Translate
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +44,11 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.api.ProjectLumenTranslationApiClient
 import com.projectlumen.app.core.api.TranslationConfig
 import com.projectlumen.app.core.api.TranslationResult
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
+import com.projectlumen.app.ui.theme.lumenControlGlass
+import com.projectlumen.app.ui.theme.lumenFilterChipColors
+import com.projectlumen.app.ui.theme.lumenOutlinedTextFieldColors
 import kotlinx.coroutines.launch
 
 private data class TranslationLanguageOption(
@@ -152,6 +156,7 @@ internal fun TranslationScreen() {
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = sourceText,
+                colors = lumenOutlinedTextFieldColors(),
                 onValueChange = {
                     sourceText = it.take(5000)
                     if (errorMessage == blankTextMessage || errorMessage == textTooLongMessage) {
@@ -167,7 +172,7 @@ internal fun TranslationScreen() {
             LanguageOptionsRow(sourceLanguageOptions, sourceLang) { sourceLang = it }
             Text(stringResource(R.string.translation_target_language), style = MaterialTheme.typography.titleSmall)
             LanguageOptionsRow(targetLanguageOptions, targetLang) { targetLang = it }
-            Button(
+            GlassButton(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !translating && trimmedText.isNotBlank() && serviceEnabled,
                 onClick = ::translate,
@@ -224,7 +229,7 @@ internal fun TranslationScreen() {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         onClick = {
                             scope.launch {
                                 clipboard.setClipEntry(
@@ -253,7 +258,7 @@ internal fun TranslationScreen() {
                 }
             }
         }
-        OutlinedButton(
+        GlassOutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             enabled = !loadingConfig,
             onClick = ::refreshConfig,
@@ -272,6 +277,8 @@ private fun LanguageOptionsRow(
     LumenFlowRow {
         options.forEach { option ->
             FilterChip(
+                modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+                colors = lumenFilterChipColors(),
                 selected = selectedCode == option.code,
                 onClick = { onSelected(option.code) },
                 label = { Text(stringResource(option.labelRes)) },

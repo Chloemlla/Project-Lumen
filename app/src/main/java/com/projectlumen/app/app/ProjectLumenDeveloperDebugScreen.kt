@@ -36,10 +36,8 @@ import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Sensors
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -67,6 +65,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.R
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
+import com.projectlumen.app.ui.theme.lumenOutlinedTextFieldColors
 import com.projectlumen.app.core.api.CertificatePinPolicy
 import com.projectlumen.app.core.api.ProjectLumenApiConfig
 import com.projectlumen.app.core.api.ProjectLumenApiTrace
@@ -134,7 +135,7 @@ internal fun DeveloperDebugScreen(
                 viewModel.updateSettings { current -> current.copy(developerDebugPreviewEnabled = it) }
             }
             if (settings.developerDebugOverlayEnabled && permissionRequirements.overlay) {
-                OutlinedButton(
+                GlassOutlinedButton(
                     onClick = { openOverlaySettings(context) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -202,7 +203,7 @@ internal fun DeveloperDebugScreen(
                     stringResource(R.string.developer_battery_limited)
                 },
             )
-            OutlinedButton(
+            GlassOutlinedButton(
                 onClick = { openBatteryOptimizationSettings(context) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -214,7 +215,7 @@ internal fun DeveloperDebugScreen(
             DeveloperMetricRow(R.string.shizuku_status, developerShizukuStatusLabel(shizukuState))
             DeveloperMetricRow(R.string.shizuku_foreground_context, developerShizukuContextLabel(shizukuState))
             DeveloperMetricRow(R.string.shizuku_system_guards, developerShizukuSystemGuardLabel(settings, shizukuState))
-            OutlinedButton(
+            GlassOutlinedButton(
                 onClick = viewModel::refreshShizukuState,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -233,7 +234,7 @@ internal fun DeveloperDebugScreen(
             DeveloperMetricRow(R.string.developer_memory_last_sample, timestampLabel(memoryHealth.sampledAtMillis))
             DeveloperMetricRow(R.string.developer_memory_last_trim, memoryTrimLabel(memoryHealth))
             DeveloperMetricRow(R.string.developer_low_memory_last, timestampLabel(runtime.developerLastLowMemorySimulatedAt))
-            Button(
+            GlassButton(
                 onClick = viewModel::simulateLowMemory,
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -306,6 +307,7 @@ internal fun DeveloperDebugScreen(
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = purchaseProductId,
+                colors = lumenOutlinedTextFieldColors(),
                 onValueChange = { purchaseProductId = it },
                 enabled = backendAccessEnabled && !remoteState.busy,
                 singleLine = true,
@@ -314,13 +316,14 @@ internal fun DeveloperDebugScreen(
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = purchaseToken,
+                colors = lumenOutlinedTextFieldColors(),
                 onValueChange = { purchaseToken = it },
                 enabled = backendAccessEnabled && !remoteState.busy,
                 singleLine = true,
                 label = { Text(stringResource(R.string.remote_cloud_purchase_token)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             )
-            Button(
+            GlassButton(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = backendAccessEnabled &&
                     remoteState.signedIn &&
@@ -339,7 +342,7 @@ internal fun DeveloperDebugScreen(
                 DeveloperMetricRow(R.string.developer_api_last_error, remoteState.errorMessage)
             }
             DeveloperMetricRow(R.string.developer_api_recent_count, apiTraces.size.toString())
-            OutlinedButton(
+            GlassOutlinedButton(
                 onClick = viewModel::clearApiDiagnostics,
                 enabled = apiTraces.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
@@ -373,7 +376,7 @@ internal fun DeveloperDebugScreen(
 
         SettingsSection(R.string.developer_section_crash, Icons.Outlined.BugReport) {
             DeveloperNote(stringResource(R.string.developer_crash_preview_message))
-            Button(
+            GlassButton(
                 onClick = { onPreviewCrashReport(createDeveloperCrashPreview(context)) },
                 modifier = Modifier.fillMaxWidth(),
             ) {

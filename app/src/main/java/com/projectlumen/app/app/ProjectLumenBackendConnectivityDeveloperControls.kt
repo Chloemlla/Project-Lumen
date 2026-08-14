@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -12,6 +11,7 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.api.BackendCapabilityDecision
 import com.projectlumen.app.core.api.BackendConnectivityState
 import com.projectlumen.app.core.api.BackendHealthStatus
+import com.projectlumen.app.ui.theme.GlassButton
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -60,7 +60,7 @@ internal fun BackendConnectivityDeveloperControls(
         onCheckedChange = onForceEnabledChange,
     )
     DeveloperNote(stringResource(R.string.backend_connectivity_force_enable_warning))
-    Button(
+    GlassButton(
         onClick = onRefresh,
         enabled = state.status != BackendHealthStatus.CHECKING,
         modifier = Modifier.fillMaxWidth(),

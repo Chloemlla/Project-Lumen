@@ -103,7 +103,6 @@ import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -118,7 +117,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -192,6 +190,8 @@ import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.svg.DynamicColorImageVectors
 import com.projectlumen.app.ui.svg.drawablevectors.coder
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
 import com.projectlumen.app.ui.theme.lumenGlass
 import org.json.JSONObject
@@ -368,18 +368,18 @@ internal fun AboutLinksCard(
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Gavel, R.string.legal_center_title)
-            OutlinedButton(onClick = openLegal) {
+            GlassOutlinedButton(onClick = openLegal) {
                 Icon(Icons.Outlined.Gavel, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.legal_center_title))
             }
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
-            OutlinedButton(onClick = viewModel::reopenOssNotice) {
+            GlassOutlinedButton(onClick = viewModel::reopenOssNotice) {
                 Icon(Icons.Outlined.Gavel, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.oss_notice_reopen))
             }
-            OutlinedButton(onClick = viewModel::reopenBuildUpdateNotes) {
+            GlassOutlinedButton(onClick = viewModel::reopenBuildUpdateNotes) {
                 Icon(Icons.Outlined.NewReleases, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.build_update_notes_reopen))
@@ -393,18 +393,19 @@ internal fun AboutLinksCard(
 @Composable
 internal fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String, viewModel: ProjectLumenViewModel) {
     var pendingUrl by remember { mutableStateOf<String?>(null) }
-    OutlinedButton(onClick = { pendingUrl = url }) {
+    GlassOutlinedButton(onClick = { pendingUrl = url }) {
         Icon(icon, contentDescription = null)
         Spacer(Modifier.width(8.dp))
         Text(stringResource(labelRes))
     }
     pendingUrl?.let { targetUrl ->
         AlertDialog(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
             onDismissRequest = { pendingUrl = null },
             title = { Text(stringResource(R.string.about_external_link_prompt_title)) },
             text = { Text(stringResource(R.string.about_external_link_prompt_message)) },
             confirmButton = {
-                OutlinedButton(onClick = {
+                GlassOutlinedButton(onClick = {
                     pendingUrl = null
                     viewModel.navigateWebPage(targetUrl)
                 }) {
@@ -412,7 +413,7 @@ internal fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: I
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { pendingUrl = null }) {
+                GlassOutlinedButton(onClick = { pendingUrl = null }) {
                     Text(stringResource(android.R.string.cancel))
                 }
             },
@@ -426,17 +427,18 @@ internal fun ProximityCalibrationDialog(
     onConfirm: () -> Unit,
 ) {
     AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Outlined.PhotoCamera, contentDescription = null) },
         title = { Text(stringResource(R.string.proximity_calibration_title)) },
         text = { Text(stringResource(R.string.proximity_calibration_message)) },
         confirmButton = {
-            Button(onClick = onConfirm) {
+            GlassButton(onClick = onConfirm) {
                 Text(stringResource(R.string.proximity_record_baseline))
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
+            GlassOutlinedButton(onClick = onDismiss) {
                 Text(stringResource(R.string.generic_cancel))
             }
         },
@@ -450,6 +452,7 @@ internal fun BackupImportDialog(
     onConfirm: () -> Unit,
 ) {
     AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.backup_import_title)) },
         text = {
@@ -464,12 +467,12 @@ internal fun BackupImportDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onConfirm) {
+            GlassButton(onClick = onConfirm) {
                 Text(stringResource(R.string.backup_import_confirm))
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
+            GlassOutlinedButton(onClick = onDismiss) {
                 Text(stringResource(android.R.string.cancel))
             }
         },
@@ -510,6 +513,7 @@ internal fun UpdateDialog(
     when (val currentState = state) {
         UpdateDialogState.Hidden -> Unit
         UpdateDialogState.Checking -> AlertDialog(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
             onDismissRequest = {},
             title = { Text(stringResource(R.string.about_update_checking_title)) },
             text = {
@@ -521,19 +525,21 @@ internal fun UpdateDialog(
             confirmButton = {},
         )
         UpdateDialogState.NoUpdate -> AlertDialog(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
             onDismissRequest = onDismiss,
             title = { Text(stringResource(R.string.about_update_up_to_date_title)) },
             text = { Text(stringResource(R.string.about_update_up_to_date_message)) },
             confirmButton = {
-                OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.ok)) }
+                GlassOutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.ok)) }
             },
         )
         is UpdateDialogState.Error -> AlertDialog(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
             onDismissRequest = onDismiss,
             title = { Text(stringResource(R.string.about_update_failed_title)) },
             text = { Text(currentState.message) },
             confirmButton = {
-                OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.ok)) }
+                GlassOutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.ok)) }
             },
         )
         is UpdateDialogState.UpdateAvailable -> {
@@ -541,11 +547,12 @@ internal fun UpdateDialog(
             val release = candidate.release
             val targetAsset = candidate.matchedAsset ?: chooseFallbackAsset(release.assets)
             AlertDialog(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
                 onDismissRequest = onDismiss,
                 title = { Text(release.tagName) },
                 text = { showReleaseInfo(release, candidate.currentBuild, candidate) },
                 confirmButton = {
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         enabled = !downloadingUpdate,
                         onClick = {
                             if (targetAsset != null) {
@@ -559,7 +566,7 @@ internal fun UpdateDialog(
                     }
                 },
                 dismissButton = {
-                    OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+                    GlassOutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
                 },
             )
         }
@@ -567,6 +574,7 @@ internal fun UpdateDialog(
             val candidate = currentState.candidate
             val release = candidate.release
             AlertDialog(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
                 onDismissRequest = {},
                 title = { Text(stringResource(R.string.about_update_downloading_title)) },
                 text = {
@@ -596,6 +604,7 @@ internal fun UpdateDialog(
             val release = candidate.release
             val permissionGranted = updateInstaller.canInstallPackages()
             AlertDialog(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
                 onDismissRequest = onDismiss,
                 title = { Text(stringResource(R.string.about_install_permission_prompt_title)) },
                 text = {
@@ -605,7 +614,7 @@ internal fun UpdateDialog(
                     }
                 },
                 confirmButton = {
-                    OutlinedButton(onClick = {
+                    GlassOutlinedButton(onClick = {
                         if (permissionGranted) {
                             onInstallDownloadedApk(candidate, currentState.file)
                         } else {
@@ -624,7 +633,7 @@ internal fun UpdateDialog(
                     }
                 },
                 dismissButton = {
-                    OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+                    GlassOutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
                 },
             )
         }
@@ -632,11 +641,12 @@ internal fun UpdateDialog(
 
     pendingReleaseUrl?.let { url ->
         AlertDialog(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
             onDismissRequest = { pendingReleaseUrl = null },
             title = { Text(stringResource(R.string.about_external_link_prompt_title)) },
             text = { Text(stringResource(R.string.about_external_link_prompt_message)) },
             confirmButton = {
-                OutlinedButton(onClick = {
+                GlassOutlinedButton(onClick = {
                     pendingReleaseUrl = null
                     viewModel.navigateWebPage(url)
                 }) {
@@ -644,7 +654,7 @@ internal fun UpdateDialog(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { pendingReleaseUrl = null }) {
+                GlassOutlinedButton(onClick = { pendingReleaseUrl = null }) {
                     Text(stringResource(android.R.string.cancel))
                 }
             },

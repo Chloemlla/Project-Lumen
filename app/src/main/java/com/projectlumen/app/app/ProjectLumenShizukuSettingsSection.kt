@@ -20,15 +20,15 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
 import java.time.Instant
@@ -155,7 +155,7 @@ private fun ShizukuDiagnosticUploadSettings(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             LumenFlowRow {
-                Button(onClick = viewModel::uploadDiagnosticsNow) {
+                GlassButton(onClick = viewModel::uploadDiagnosticsNow) {
                     ButtonLabel(Icons.Outlined.Refresh, R.string.upload_diagnostics_now)
                 }
             }
@@ -202,33 +202,33 @@ private fun ShizukuQuickActions(
 ) {
     ShizukuGroupTitle(R.string.shizuku_quick_actions)
     LumenFlowRow {
-        Button(onClick = {
+        GlassButton(onClick = {
             applyShizukuCorePreset(viewModel)
         }) {
             ButtonLabel(Icons.Outlined.CheckCircle, R.string.shizuku_quick_enable_core)
         }
-        OutlinedButton(onClick = {
+        GlassOutlinedButton(onClick = {
             applyShizukuSmartGuardPreset(viewModel)
         }) {
             ButtonLabel(Icons.Outlined.Schedule, R.string.shizuku_quick_smart_guards)
         }
-        OutlinedButton(onClick = {
+        GlassOutlinedButton(onClick = {
             applyShizukuComfortShieldPreset(viewModel)
         }) {
             ButtonLabel(Icons.Outlined.Spa, R.string.shizuku_quick_comfort_shield)
         }
         if (settings.shizukuNativeEyeProtectionEnabled || state.nativeEyeProtectionApplied) {
-            OutlinedButton(onClick = {
+            GlassOutlinedButton(onClick = {
                 disableShizukuNativeShield(viewModel)
             }) {
                 ButtonLabel(Icons.Outlined.Style, R.string.shizuku_quick_native_off)
             }
         }
-        OutlinedButton(onClick = viewModel::refreshShizukuState) {
+        GlassOutlinedButton(onClick = viewModel::refreshShizukuState) {
             ButtonLabel(Icons.Outlined.Refresh, R.string.shizuku_refresh_status)
         }
         if (!state.ready) {
-            OutlinedButton(onClick = viewModel::requestShizukuAuthorization) {
+            GlassOutlinedButton(onClick = viewModel::requestShizukuAuthorization) {
                 ButtonLabel(Icons.Outlined.Lock, R.string.shizuku_authorize)
             }
         }

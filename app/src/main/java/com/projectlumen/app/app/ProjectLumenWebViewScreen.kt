@@ -108,12 +108,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -182,6 +180,8 @@ import com.projectlumen.app.core.update.ReleaseInfo
 import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
+import com.projectlumen.app.ui.theme.GlassIconButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
 import java.io.File
 import java.time.Instant
@@ -229,13 +229,14 @@ internal fun WebViewScreen(
     if (showCompatibilityDialog) {
         AlertDialog(
             onDismissRequest = { showCompatibilityDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
             icon = { Icon(Icons.Outlined.WarningAmber, contentDescription = null) },
             title = { Text(stringResource(R.string.webview_compatibility_title)) },
             text = {
                 Text(stringResource(R.string.webview_compatibility_message, chromeVersion))
             },
             confirmButton = {
-                OutlinedButton(onClick = { showCompatibilityDialog = false }) {
+                GlassOutlinedButton(onClick = { showCompatibilityDialog = false }) {
                     Text(stringResource(android.R.string.ok))
                 }
             },
@@ -247,7 +248,7 @@ internal fun WebViewScreen(
         topBar = {
             TopAppBar(
                 navigationIcon = {
-                    IconButton(onClick = onDismiss) {
+                    GlassIconButton(onClick = onDismiss) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.navigate_back))
                     }
                 },
@@ -265,17 +266,18 @@ internal fun WebViewScreen(
                 },
                 actions = {
                     if (chromeVersion in 1 until MINI_CHROME_VERSION) {
-                        IconButton(onClick = { showCompatibilityDialog = true }) {
+                        GlassIconButton(onClick = { showCompatibilityDialog = true }) {
                             Icon(Icons.Outlined.WarningAmber, contentDescription = stringResource(R.string.webview_compatibility_action))
                         }
                     }
-                    IconButton(onClick = { expanded = true }) {
+                    GlassIconButton(onClick = { expanded = true }) {
                         Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.webview_more_options))
                     }
                     Box(modifier = Modifier.wrapContentSize(Alignment.TopStart)) {
                         DropdownMenu(
                             expanded = expanded,
                             onDismissRequest = { expanded = false },
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f),
                         ) {
                             if (!isLoading) {
                                 DropdownMenuItem(

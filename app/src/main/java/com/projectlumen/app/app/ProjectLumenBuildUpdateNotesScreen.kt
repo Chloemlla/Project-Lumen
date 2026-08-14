@@ -16,7 +16,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NewReleases
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -35,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.update.BuildUpdateNotes
+import com.projectlumen.app.ui.theme.GlassButton
 import com.projectlumen.app.ui.theme.lumenGlass
 import java.time.Instant
 import java.time.ZoneId
@@ -61,7 +61,7 @@ internal fun ProjectLumenBuildUpdateNotesScreen(
                     .background(MaterialTheme.colorScheme.background)
                     .padding(horizontal = 20.dp, vertical = 16.dp),
             ) {
-                Button(
+                GlassButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = onContinue,
                 ) {

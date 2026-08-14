@@ -109,13 +109,13 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -184,8 +184,12 @@ import com.projectlumen.app.core.update.ReleaseInfo
 import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import com.projectlumen.app.ui.theme.lumenControlGlass
+import com.projectlumen.app.ui.theme.lumenFilterChipColors
 import com.projectlumen.app.ui.theme.lumenGlass
+import com.projectlumen.app.ui.theme.lumenOutlinedTextFieldColors
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -265,6 +269,8 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                         locked -> StatusPill(Icons.Outlined.Lock, R.string.pro_required)
                         selected -> StatusPill(Icons.Outlined.CheckCircle, R.string.active_template)
                         else -> FilterChip(
+                            modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+                            colors = lumenFilterChipColors(),
                             selected = false,
                             onClick = { viewModel.selectTemplate(template.id) },
                             label = { Text(stringResource(R.string.use_template)) },
@@ -272,7 +278,7 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                     }
                     if (!locked) {
                         LumenFlowRow {
-                            OutlinedButton(
+                            GlassOutlinedButton(
                                 onClick = {
                                     imageTargetTemplateId = template.id
                                     templateImageLauncher.launch(arrayOf("image/*"))
@@ -281,7 +287,7 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                                 ButtonLabel(Icons.Outlined.FileDownload, R.string.choose_template_image)
                             }
                             if (template.imagePath.isNotBlank()) {
-                                OutlinedButton(
+                                GlassOutlinedButton(
                                     onClick = { viewModel.updateTemplateImage(template, "") },
                                 ) {
                                     Text(stringResource(R.string.clear_custom_file))
@@ -307,6 +313,7 @@ internal fun TemplateEditor(template: TipTemplateEntity, viewModel: ProjectLumen
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = titleText,
+            colors = lumenOutlinedTextFieldColors(),
             onValueChange = {
                 titleText = it
                 viewModel.updateTemplateContent(template, it, subtitleText, template.showSkipButton)
@@ -317,6 +324,7 @@ internal fun TemplateEditor(template: TipTemplateEntity, viewModel: ProjectLumen
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = subtitleText,
+            colors = lumenOutlinedTextFieldColors(),
             onValueChange = {
                 subtitleText = it
                 viewModel.updateTemplateContent(template, titleText, it, template.showSkipButton)
@@ -343,6 +351,8 @@ internal fun CountdownStyleChip(
     viewModel: ProjectLumenViewModel,
 ) {
     FilterChip(
+        modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+        colors = lumenFilterChipColors(),
         selected = templateCountdownStyle(template) == style,
         onClick = { viewModel.updateTemplateCountdownStyle(template, style) },
         label = { Text(stringResource(labelRes)) },
@@ -371,6 +381,8 @@ internal fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: Proj
             LumenFlowRow {
                 SystemBackgroundColor.entries.forEach { option ->
                     FilterChip(
+                        modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+                        colors = lumenFilterChipColors(),
                         selected = template.backgroundType == TemplateBackgroundType.SYSTEM.name &&
                             template.backgroundValue == option.key,
                         onClick = {
