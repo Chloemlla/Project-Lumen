@@ -93,5 +93,5 @@ fun Modifier.lumenGlass(
             effects = effects,
         )
     }
-    return this.then(glassModifier)
+    return this.clip(shape).then(glassModifier)
 }

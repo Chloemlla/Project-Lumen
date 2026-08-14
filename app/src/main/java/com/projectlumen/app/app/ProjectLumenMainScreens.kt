@@ -656,6 +656,7 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
                 containerColor = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ),
+            elevation = lumenCardElevation(),
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionHeader(Icons.Outlined.LocalCafe, R.string.section_pomodoro)
