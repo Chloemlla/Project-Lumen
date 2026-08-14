@@ -180,7 +180,7 @@ class ProjectLumenViewModel(
         securityEvidence = {
             val ctx = ProjectLumenApplication.applicationContext()
             (ctx as? ProjectLumenApplication)?.deviceSecurityGate?.backendEvidence()
-        } as () -> JSONObject?,
+        },
     )
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val webPageRequests = _webPageRequests.asSharedFlow()
