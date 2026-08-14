@@ -29,7 +29,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.ListAlt
+import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -123,7 +123,7 @@ internal enum class Destination(
     LEGAL_TERMS("legal_terms", R.string.legal_terms_title, Icons.Outlined.Description, false),
     LEGAL_PRIVACY("legal_privacy", R.string.legal_privacy_title, Icons.Outlined.PrivacyTip, false),
     LEGAL_MEMBERSHIP("legal_membership", R.string.legal_membership_title, Icons.Outlined.WorkspacePremium, false),
-    LEGAL_PERSONAL("legal_personal", R.string.legal_personal_title, Icons.Outlined.ListAlt, false),
+    LEGAL_PERSONAL("legal_personal", R.string.legal_personal_title, Icons.AutoMirrored.Outlined.ListAlt, false),
     LEGAL_PERMISSIONS("legal_permissions", R.string.legal_permissions_title, Icons.Outlined.Lock, false),
     WEB("web", R.string.about_external_link_prompt_title, Icons.AutoMirrored.Outlined.OpenInNew, false),
 }

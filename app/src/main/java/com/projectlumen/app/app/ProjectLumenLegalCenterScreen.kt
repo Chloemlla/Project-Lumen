@@ -9,13 +9,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Gavel
-import androidx.compose.material.icons.outlined.ListAlt
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Refresh
@@ -97,7 +97,7 @@ internal fun LegalHubScreen(
                     onOpenDoc(LegalDocKey.MEMBERSHIP)
                 }
                 HorizontalDivider()
-                LegalRow(Icons.Outlined.ListAlt, R.string.legal_center_personal_info_collection) {
+                LegalRow(Icons.AutoMirrored.Outlined.ListAlt, R.string.legal_center_personal_info_collection) {
                     onOpenDoc(LegalDocKey.PERSONAL)
                 }
             }
@@ -215,7 +215,7 @@ internal fun LegalDocumentScreen(
     @StringRes bodyRes: Int,
 ) {
     LumenPage {
-        SectionHeader(Icons.Outlined.Article, titleRes)
+        SectionHeader(Icons.AutoMirrored.Outlined.Article, titleRes)
         val body = stringResource(bodyRes)
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             body.split('\n')
