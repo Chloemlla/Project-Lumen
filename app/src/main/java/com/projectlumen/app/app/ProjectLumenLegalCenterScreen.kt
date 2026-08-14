@@ -26,7 +26,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.toast.LumenToastKind
 import com.projectlumen.app.core.toast.showLumenToast
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
 import com.projectlumen.app.ui.theme.lumenGlass
 
 /** Destinations opened from the legal hub; the host NavHost maps each key to a screen. */
@@ -159,10 +159,11 @@ internal fun LegalHubScreen(
     if (showWithdrawConsentDialog) {
         AlertDialog(
             onDismissRequest = { showWithdrawConsentDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
             title = { Text(stringResource(R.string.legal_withdraw_consent_dialog_title)) },
             text = { Text(stringResource(R.string.legal_withdraw_consent_dialog_message)) },
             confirmButton = {
-                OutlinedButton(onClick = {
+                GlassOutlinedButton(onClick = {
                     viewModel.withdrawDataConsent()
                     context.showLumenToast(
                         withdrawConsentSuccess,
@@ -175,7 +176,7 @@ internal fun LegalHubScreen(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showWithdrawConsentDialog = false }) {
+                GlassOutlinedButton(onClick = { showWithdrawConsentDialog = false }) {
                     Text(stringResource(R.string.legal_withdraw_cancel))
                 }
             },
@@ -185,10 +186,11 @@ internal fun LegalHubScreen(
     if (showWithdrawPrivacyDialog) {
         AlertDialog(
             onDismissRequest = { showWithdrawPrivacyDialog = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
             title = { Text(stringResource(R.string.legal_withdraw_privacy_dialog_title)) },
             text = { Text(stringResource(R.string.legal_withdraw_privacy_dialog_message)) },
             confirmButton = {
-                OutlinedButton(onClick = {
+                GlassOutlinedButton(onClick = {
                     viewModel.withdrawPrivacyPolicyConsent()
                     context.showLumenToast(
                         withdrawPrivacySuccess,
@@ -201,7 +203,7 @@ internal fun LegalHubScreen(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showWithdrawPrivacyDialog = false }) {
+                GlassOutlinedButton(onClick = { showWithdrawPrivacyDialog = false }) {
                     Text(stringResource(R.string.legal_withdraw_cancel))
                 }
             },

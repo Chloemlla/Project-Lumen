@@ -25,11 +25,9 @@ import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Style
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +42,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
+import com.projectlumen.app.ui.theme.lumenSwitchColors
 
 @Composable
 internal fun SettingsPrivacyPermissionCenter(
@@ -86,7 +87,7 @@ internal fun SettingsPrivacyPermissionCenter(
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
             if (nextTarget != null) {
-                Button(
+                GlassButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { onConfigureTarget(nextTarget) },
                 ) {
@@ -323,6 +324,7 @@ private fun PermissionControlTileItem(
             Switch(
                 checked = tile.checked,
                 onCheckedChange = null,
+                colors = lumenSwitchColors(),
             )
         }
         Text(
@@ -412,6 +414,7 @@ private fun PrivacyPermissionRow(
                 Switch(
                     checked = switchChecked,
                     onCheckedChange = { onTargetCheckedChange(target, it) },
+                    colors = lumenSwitchColors(),
                 )
             }
         }
@@ -426,7 +429,7 @@ private fun PrivacyPermissionRow(
                 style = MaterialTheme.typography.labelLarge,
                 color = statusColor,
             )
-            OutlinedButton(onClick = { onConfigureTarget(target) }) {
+            GlassOutlinedButton(onClick = { onConfigureTarget(target) }) {
                 ButtonLabel(
                     Icons.AutoMirrored.Outlined.OpenInNew,
                     if (actionNeeded) R.string.settings_permission_resolve else R.string.settings_permission_configure,

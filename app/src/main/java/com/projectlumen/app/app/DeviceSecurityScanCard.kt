@@ -18,13 +18,11 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Report
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.security.CroootReportFormatter
 import com.projectlumen.app.core.security.DeviceSecurityScanner
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassTextButton
 import com.projectlumen.app.ui.theme.lumenGlass
 
 /**
@@ -111,7 +111,7 @@ internal fun DeviceSecurityScanCard(
                 }
             }
 
-            Button(
+            GlassButton(
                 onClick = onStartScan,
                 enabled = scanState !is DeviceSecurityScanState.Running,
                 modifier = Modifier.fillMaxWidth(),
@@ -206,7 +206,7 @@ private fun SecurityResultSummary(assessment: DeviceSecurityScanner.SecurityAsse
 @Composable
 private fun CroootDetailedReport(result: com.chloemlla.crooot.CRoootScanResult) {
     var expanded by remember { mutableStateOf(false) }
-    TextButton(
+    GlassTextButton(
         onClick = { expanded = !expanded },
         modifier = Modifier.fillMaxWidth(),
     ) {

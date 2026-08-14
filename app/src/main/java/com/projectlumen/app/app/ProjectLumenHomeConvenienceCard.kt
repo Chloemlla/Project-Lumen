@@ -17,10 +17,8 @@ import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Spa
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -34,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.ReminderPhase
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
 import com.projectlumen.app.ui.theme.lumenGlass
 import kotlinx.coroutines.launch
 
@@ -87,7 +87,7 @@ internal fun HomeConvenienceCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
+                GlassButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = recommendedFeedback.onApply,
                 ) {
@@ -100,25 +100,25 @@ internal fun HomeConvenienceCard(
                     applyFeedbackCount = recommendedFeedback.applyCount,
                 )
                 LumenFlowRow {
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         enabled = canStartBreak,
                         onClick = onStartBreak,
                     ) {
                         ButtonLabel(Icons.Outlined.Spa, R.string.home_convenience_rest_now)
                     }
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         enabled = canStartPomodoro,
                         onClick = onStartPomodoro,
                     ) {
                         ButtonLabel(Icons.Outlined.LocalCafe, R.string.home_convenience_focus_now)
                     }
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         enabled = canPauseOneHour,
                         onClick = onPauseOneHour,
                     ) {
                         ButtonLabel(Icons.Outlined.Schedule, R.string.home_convenience_quiet_hour)
                     }
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         onClick = {
                             scope.launch {
                                 clipboard.setClipEntry(
@@ -132,7 +132,7 @@ internal fun HomeConvenienceCard(
                     ) {
                         ButtonLabel(Icons.Outlined.ContentCopy, R.string.home_convenience_copy_summary)
                     }
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         onClick = { shareHomeConvenienceSummary(context, summaryText) },
                     ) {
                         ButtonLabel(Icons.Outlined.Share, R.string.home_convenience_share_summary)

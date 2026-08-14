@@ -19,14 +19,12 @@ import androidx.compose.material.icons.outlined.Nightlight
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,6 +46,8 @@ import com.projectlumen.app.core.insights.DeviceInsightsState
 import com.projectlumen.app.core.insights.DeviceUsageAvailability
 import com.projectlumen.app.core.insights.InsightPriority
 import com.projectlumen.app.core.insights.UsageDataQuality
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
 import com.projectlumen.app.ui.theme.lumenGlass
 
 @Composable
@@ -99,10 +99,10 @@ internal fun DeviceUsageAndPowerInsightsCard(
                 }
             }
             LumenFlowRow {
-                OutlinedButton(onClick = onRefresh, enabled = !state.isRefreshing) {
+                GlassOutlinedButton(onClick = onRefresh, enabled = !state.isRefreshing) {
                     ButtonLabel(Icons.Outlined.Refresh, R.string.device_insights_refresh)
                 }
-                OutlinedButton(onClick = onOpenBatteryUsage) {
+                GlassOutlinedButton(onClick = onOpenBatteryUsage) {
                     ButtonLabel(Icons.AutoMirrored.Outlined.OpenInNew, R.string.device_insights_open_battery_usage)
                 }
             }
@@ -140,7 +140,7 @@ private fun UsageAvailabilityContent(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(modifier = Modifier.fillMaxWidth(), onClick = onOpenUsageAccess) {
+            GlassButton(modifier = Modifier.fillMaxWidth(), onClick = onOpenUsageAccess) {
                 ButtonLabel(Icons.AutoMirrored.Outlined.OpenInNew, R.string.device_insights_grant_access)
             }
         }

@@ -12,9 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +27,9 @@ import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
 import com.projectlumen.app.core.shizuku.ShizukuNetworkApp
 import com.projectlumen.app.core.shizuku.ShizukuNetworkAppTypes
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
+import com.projectlumen.app.ui.theme.lumenOutlinedTextFieldColors
 
 @Composable
 internal fun ShizukuNetworkControlsSection(
@@ -64,11 +65,11 @@ internal fun ShizukuNetworkControlsSection(
             ),
         )
         LumenFlowRow {
-            OutlinedButton(onClick = onRefresh, enabled = shizukuState.ready) {
+            GlassOutlinedButton(onClick = onRefresh, enabled = shizukuState.ready) {
                 DeveloperButtonLabel(Icons.Outlined.Sync, R.string.developer_shizuku_network_refresh_apps)
             }
             if (!shizukuState.ready) {
-                OutlinedButton(onClick = onAuthorize, enabled = shizukuState.binderAvailable) {
+                GlassOutlinedButton(onClick = onAuthorize, enabled = shizukuState.binderAvailable) {
                     DeveloperButtonLabel(Icons.Outlined.Lock, R.string.shizuku_authorize)
                 }
             }
@@ -77,6 +78,7 @@ internal fun ShizukuNetworkControlsSection(
             modifier = Modifier.fillMaxWidth(),
             value = query,
             onValueChange = onQueryChange,
+            colors = lumenOutlinedTextFieldColors(),
             singleLine = true,
             label = { Text(stringResource(R.string.developer_shizuku_network_search_label)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
@@ -136,7 +138,7 @@ private fun DeveloperNetworkAppCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             softWrap = true,
         )
-        Button(
+        GlassButton(
             modifier = Modifier.fillMaxWidth(),
             enabled = record?.hasActiveNetworkRestriction != true,
             onClick = onRestrict,
@@ -188,7 +190,7 @@ private fun DeveloperNetworkControlRecordCard(
         if (record.lastError.isNotBlank()) {
             ApiTraceLine(R.string.developer_shizuku_network_last_error, record.lastError)
         }
-        OutlinedButton(
+        GlassOutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             enabled = record.hasActiveNetworkRestriction,
             onClick = onRestore,
