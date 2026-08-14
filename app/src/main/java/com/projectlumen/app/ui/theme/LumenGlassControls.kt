@@ -183,7 +183,6 @@ fun lumenFilterChipColors(): SelectableChipColors = FilterChipDefaults.filterChi
     containerColor = Color.Transparent,
     labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
     iconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    trailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
     selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
     selectedLabelColor = MaterialTheme.colorScheme.primary,
     selectedLeadingIconColor = MaterialTheme.colorScheme.primary,
