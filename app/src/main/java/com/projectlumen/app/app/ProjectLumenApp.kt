@@ -18,6 +18,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material.icons.Icons
@@ -56,10 +57,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.projectlumen.app.ui.theme.LumenGlassHost
-import com.projectlumen.app.ui.theme.lumenGlass
+import com.projectlumen.app.ui.theme.lumenDockGlass
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -400,31 +400,35 @@ fun ProjectLumenApp(
                         )
                     },
                     bottomBar = {
-                        NavigationBar(
-                            modifier = Modifier.lumenGlass(
-                                shape = RectangleShape,
-                                blurRadius = 14f,
-                                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
-                            ),
-                            color = Color.Transparent,
-                            showDivider = false,
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                         ) {
-                            Destination.entries.filter { it.showInBottomNav }.forEach { destination ->
-                                val selected = backStackEntry?.destination?.hierarchy?.any {
-                                    it.route == destination.route
-                                } == true
-                                NavigationBarItem(
-                                    selected = selected,
-                                    onClick = {
-                                        navController.navigate(destination.route) {
-                                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    },
-                                    icon = destination.icon,
-                                    label = stringResource(destination.labelRes),
-                                )
+                            NavigationBar(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .lumenDockGlass(),
+                                color = Color.Transparent,
+                                showDivider = false,
+                            ) {
+                                Destination.entries.filter { it.showInBottomNav }.forEach { destination ->
+                                    val selected = backStackEntry?.destination?.hierarchy?.any {
+                                        it.route == destination.route
+                                    } == true
+                                    NavigationBarItem(
+                                        selected = selected,
+                                        onClick = {
+                                            navController.navigate(destination.route) {
+                                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        },
+                                        icon = destination.icon,
+                                        label = stringResource(destination.labelRes),
+                                    )
+                                }
                             }
                         }
                     },
