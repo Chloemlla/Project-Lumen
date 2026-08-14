@@ -106,7 +106,7 @@ fun Modifier.lumenGlass(
  */
 @Composable
 fun Modifier.lumenDockGlass(
-    shape: Shape = RoundedCornerShape(28.dp),
+    shape: Shape = RoundedCornerShape(50.dp),
     blurRadius: Dp = 14.dp,
     tint: Color = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
 ): Modifier {
