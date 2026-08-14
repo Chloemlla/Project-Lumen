@@ -17,7 +17,6 @@ import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedButtonDefaults
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SelectableChipColors
 import androidx.compose.material3.SliderColors
@@ -25,7 +24,6 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SwitchColors
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextButtonDefaults
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -99,7 +97,7 @@ fun GlassOutlinedButton(
         modifier = modifier.lumenControlGlass(shape),
         enabled = enabled,
         shape = shape,
-        colors = colors ?: OutlinedButtonDefaults.outlinedButtonColors(),
+        colors = colors ?: ButtonDefaults.outlinedButtonColors(),
         elevation = elevation,
         border = border,
         contentPadding = contentPadding,
@@ -129,7 +127,7 @@ fun GlassTextButton(
         modifier = modifier.lumenControlGlass(shape),
         enabled = enabled,
         shape = shape,
-        colors = colors ?: TextButtonDefaults.textButtonColors(),
+        colors = colors ?: ButtonDefaults.textButtonColors(),
         elevation = elevation,
         border = border,
         contentPadding = contentPadding,
