@@ -96,7 +96,6 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -105,13 +104,13 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -186,7 +185,11 @@ import com.projectlumen.app.core.update.ReleaseInfo
 import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import com.projectlumen.app.ui.theme.lumenControlGlass
+import com.projectlumen.app.ui.theme.lumenFilterChipColors
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -473,11 +476,12 @@ internal fun SettingsScreen(
     }
     if (showGrowthConfiguredDialog) {
         AlertDialog(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
             onDismissRequest = { showGrowthConfiguredDialog = false },
             title = { Text(stringResource(R.string.eye_care_guide_done)) },
             text = { Text(stringResource(R.string.eye_care_capability_active)) },
             confirmButton = {
-                OutlinedButton(
+                GlassOutlinedButton(
                     onClick = {
                         showGrowthConfiguredDialog = false
                         activeGrowthConfigTarget = null
@@ -600,8 +604,8 @@ internal fun SettingsScreen(
                 viewModel.updateSettings { current -> current.copy(translationEntryEnabled = it) }
             }
             LumenFlowRow {
-                OutlinedButton(onClick = openTemplates) { ButtonLabel(Icons.Outlined.Style, R.string.nav_templates) }
-                OutlinedButton(onClick = openAbout) { ButtonLabel(Icons.Outlined.Info, R.string.nav_about) }
+                GlassOutlinedButton(onClick = openTemplates) { ButtonLabel(Icons.Outlined.Style, R.string.nav_templates) }
+                GlassOutlinedButton(onClick = openAbout) { ButtonLabel(Icons.Outlined.Info, R.string.nav_about) }
             }
             SwitchRow(
                 R.string.auto_dark_window,
@@ -691,10 +695,10 @@ internal fun SettingsScreen(
         }
         SettingsSection(R.string.section_data, Icons.Outlined.FileDownload) {
             LumenFlowRow {
-                Button(onClick = viewModel::shareBackup) {
+                GlassButton(onClick = viewModel::shareBackup) {
                     ButtonLabel(Icons.Outlined.FileDownload, R.string.backup_export)
                 }
-                OutlinedButton(onClick = { backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) {
+                GlassOutlinedButton(onClick = { backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) {
                     ButtonLabel(Icons.AutoMirrored.Outlined.OpenInNew, R.string.backup_import)
                 }
             }
@@ -743,7 +747,7 @@ internal fun SettingsScreen(
             if (checkingUpdate) {
                 StatusLine(Icons.Outlined.Sync, stringResource(R.string.about_update_checking))
             } else {
-                OutlinedButton(onClick = onManualUpdateCheck) {
+                GlassOutlinedButton(onClick = onManualUpdateCheck) {
                     ButtonLabel(Icons.Outlined.Sync, R.string.about_check_updates)
                 }
             }
@@ -819,7 +823,7 @@ internal fun SettingsScreen(
                 )
             }
             if (!notificationPermissionNeeded) {
-                OutlinedButton(onClick = {
+                GlassOutlinedButton(onClick = {
                     openAppNotificationSettings(context)
                 }) {
                     ButtonLabel(Icons.AutoMirrored.Outlined.OpenInNew, R.string.notification_system_settings)
@@ -926,7 +930,7 @@ internal fun SettingsScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(
+            GlassButton(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { showProximityCalibrationDialog = true },
             ) {
@@ -1190,6 +1194,8 @@ internal fun SettingsScreen(
                         uiState.templates.filter { !it.isPremium || proEnabled }.forEach { template ->
                             val selected = settings.activeTipTemplateId == template.id
                             FilterChip(
+                                modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+                                colors = lumenFilterChipColors(),
                                 selected = selected,
                                 onClick = { viewModel.selectTemplate(template.id) },
                                 label = { Text(templateDisplayName(template)) },
@@ -1274,7 +1280,7 @@ internal fun SettingsScreen(
         }
         if (settings.developerModeEnabled) {
             SettingsSection(R.string.nav_developer, Icons.Outlined.Code, initiallyExpanded = false) {
-                OutlinedButton(onClick = openDeveloperOptions) {
+                GlassOutlinedButton(onClick = openDeveloperOptions) {
                     ButtonLabel(Icons.Outlined.Code, R.string.nav_developer)
                 }
             }

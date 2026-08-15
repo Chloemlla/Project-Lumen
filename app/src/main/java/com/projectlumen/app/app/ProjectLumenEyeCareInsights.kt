@@ -27,12 +27,11 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,6 +47,9 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.enums.PlanTier
 import com.projectlumen.app.core.enums.QuietMode
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
+import com.projectlumen.app.ui.theme.lumenGlass
 import kotlin.math.roundToInt
 
 internal data class EyeCareInsightSummary(
@@ -148,19 +150,19 @@ internal fun EyeCareGuidedSetupCard(
             )
             steps.forEach { step -> GuideStepLine(step) }
             LumenFlowRow {
-                Button(onClick = recommendedFeedback.onApply) {
+                GlassButton(onClick = recommendedFeedback.onApply) {
                     ButtonLabel(Icons.Outlined.CheckCircle, R.string.eye_care_apply_recommended)
                 }
-                OutlinedButton(onClick = onResolveNextPermission) {
+                GlassOutlinedButton(onClick = onResolveNextPermission) {
                     ButtonLabel(Icons.Outlined.Lock, R.string.eye_care_guide_fix_next_permission)
                 }
-                OutlinedButton(onClick = onCalibrateDistance) {
+                GlassOutlinedButton(onClick = onCalibrateDistance) {
                     ButtonLabel(Icons.Outlined.PhotoCamera, R.string.eye_care_guide_calibrate_now)
                 }
-                OutlinedButton(onClick = onStartReminder, enabled = canStartReminder) {
+                GlassOutlinedButton(onClick = onStartReminder, enabled = canStartReminder) {
                     ButtonLabel(Icons.Outlined.Schedule, R.string.eye_care_guide_start_session)
                 }
-                OutlinedButton(onClick = onExportReport) {
+                GlassOutlinedButton(onClick = onExportReport) {
                     ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)
                 }
             }
@@ -186,9 +188,13 @@ internal fun EyeCareInsightsHomeCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .lumenGlass(shape = LumenCardShape, blurRadius = 14f, tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {
@@ -206,7 +212,7 @@ internal fun EyeCareInsightsHomeCard(
                     stringResource(R.string.eye_care_setup_missing_count, summary.missingSetupCount),
                 )
             }
-            Button(
+            GlassButton(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = recommendedFeedback.onApply,
             ) {
@@ -284,10 +290,10 @@ internal fun EyeCareActionPlanCard(
     ) {
         InsightActionList(summary.actionRes)
         LumenFlowRow {
-            Button(onClick = recommendedFeedback.onApply) {
+            GlassButton(onClick = recommendedFeedback.onApply) {
                 ButtonLabel(Icons.Outlined.CheckCircle, R.string.eye_care_apply_recommended)
             }
-            OutlinedButton(onClick = onExportReport) {
+            GlassOutlinedButton(onClick = onExportReport) {
                 ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)
             }
         }
@@ -493,17 +499,17 @@ internal fun EyeCareGrowthCapabilityCard(
                 onConfigure = onConfigureGuidance,
             )
             LumenFlowRow {
-                OutlinedButton(onClick = onOpenTemplates) {
+                GlassOutlinedButton(onClick = onOpenTemplates) {
                     ButtonLabel(Icons.Outlined.Style, R.string.nav_templates)
                 }
-                OutlinedButton(onClick = if (advancedReportsReady) onExportReport else onConfigureReports) {
+                GlassOutlinedButton(onClick = if (advancedReportsReady) onExportReport else onConfigureReports) {
                     ButtonLabel(
                         Icons.Outlined.BarChart,
                         if (advancedReportsReady) R.string.eye_care_growth_advanced_reports else R.string.eye_care_capability_enable,
                     )
                 }
                 if (cloudCapabilityVisible) {
-                    OutlinedButton(onClick = if (cloudSyncReady) onSyncCloud else onConfigureCloud) {
+                    GlassOutlinedButton(onClick = if (cloudSyncReady) onSyncCloud else onConfigureCloud) {
                         ButtonLabel(
                             Icons.Outlined.Sync,
                             when {
@@ -514,10 +520,10 @@ internal fun EyeCareGrowthCapabilityCard(
                         )
                     }
                 }
-                Button(onClick = onApplyFamilyMode) {
+                GlassButton(onClick = onApplyFamilyMode) {
                     ButtonLabel(Icons.Outlined.Lock, R.string.eye_care_apply_family_profile)
                 }
-                Button(onClick = onApplyGuidance) {
+                GlassButton(onClick = onApplyGuidance) {
                     ButtonLabel(Icons.Outlined.Info, R.string.eye_care_apply_local_guidance)
                 }
             }
@@ -880,8 +886,11 @@ private fun GuideStepLine(step: EyeCareGuideStep) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -920,8 +929,11 @@ private fun PermissionTransparencyLine(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -964,8 +976,11 @@ private fun CapabilityLine(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -979,7 +994,7 @@ private fun CapabilityLine(
         if (active) {
             StatusPill(Icons.Outlined.CheckCircle, R.string.eye_care_capability_active)
         } else {
-            OutlinedButton(onClick = onConfigure) {
+            GlassOutlinedButton(onClick = onConfigure) {
                 ButtonLabel(Icons.Outlined.Schedule, inactiveActionRes)
             }
         }

@@ -8,8 +8,6 @@ import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,7 +16,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -30,7 +27,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.ListAlt
+import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -40,11 +37,7 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material.icons.outlined.WorkspacePremium
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,8 +54,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.projectlumen.app.ui.theme.LumenGlassHost
+import com.projectlumen.app.ui.theme.lumenDockGlass
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -124,7 +121,7 @@ internal enum class Destination(
     LEGAL_TERMS("legal_terms", R.string.legal_terms_title, Icons.Outlined.Description, false),
     LEGAL_PRIVACY("legal_privacy", R.string.legal_privacy_title, Icons.Outlined.PrivacyTip, false),
     LEGAL_MEMBERSHIP("legal_membership", R.string.legal_membership_title, Icons.Outlined.WorkspacePremium, false),
-    LEGAL_PERSONAL("legal_personal", R.string.legal_personal_title, Icons.Outlined.ListAlt, false),
+    LEGAL_PERSONAL("legal_personal", R.string.legal_personal_title, Icons.AutoMirrored.Outlined.ListAlt, false),
     LEGAL_PERMISSIONS("legal_permissions", R.string.legal_permissions_title, Icons.Outlined.Lock, false),
     WEB("web", R.string.about_external_link_prompt_title, Icons.AutoMirrored.Outlined.OpenInNew, false),
 }
@@ -341,7 +338,7 @@ fun ProjectLumenApp(
             ) {
                 return@ProjectLumenTheme
             }
-            Box(modifier = Modifier.fillMaxSize()) {
+            LumenGlassHost(modifier = Modifier.fillMaxSize()) {
             val navController = rememberNavController()
             val backStackEntry by navController.currentBackStackEntryAsState()
             val currentDestination = Destination.entries.firstOrNull {
@@ -401,23 +398,17 @@ fun ProjectLumenApp(
                         )
                     },
                     bottomBar = {
-                        NavigationBar(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                            tonalElevation = 0.dp,
+                        FloatingNavigationBar(
+                            modifier = Modifier.lumenDockGlass(),
+                            color = Color.Transparent,
+                            showDivider = false,
                         ) {
                             Destination.entries.filter { it.showInBottomNav }.forEach { destination ->
                                 val selected = backStackEntry?.destination?.hierarchy?.any {
                                     it.route == destination.route
                                 } == true
-                                NavigationBarItem(
+                                FloatingNavigationBarItem(
                                     selected = selected,
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    ),
                                     onClick = {
                                         navController.navigate(destination.route) {
                                             popUpTo(navController.graph.startDestinationId) { saveState = true }
@@ -425,35 +416,8 @@ fun ProjectLumenApp(
                                             restoreState = true
                                         }
                                     },
-                                    icon = {
-                                        val scale by animateFloatAsState(
-                                            targetValue = if (selected) 1.12f else 1f,
-                                            animationSpec = spring(stiffness = 600f, dampingRatio = 0.72f),
-                                            label = "bottomNavIconScale",
-                                        )
-                                        Icon(
-                                            destination.icon,
-                                            contentDescription = stringResource(destination.labelRes),
-                                            modifier = Modifier.graphicsLayer {
-                                                scaleX = scale
-                                                scaleY = scale
-                                            },
-                                        )
-                                    },
-                                    label = {
-                                        AnimatedContent(
-                                            targetState = selected,
-                                            transitionSpec = {
-                                                fadeIn(tween(120)) togetherWith fadeOut(tween(90))
-                                            },
-                                            label = "bottomNavLabel",
-                                        ) { isSelected ->
-                                            Text(
-                                                text = stringResource(destination.labelRes),
-                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                            )
-                                        }
-                                    },
+                                    icon = destination.icon,
+                                    label = stringResource(destination.labelRes),
                                 )
                             }
                         }

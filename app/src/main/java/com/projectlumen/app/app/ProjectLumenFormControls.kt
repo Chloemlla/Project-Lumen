@@ -109,6 +109,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -187,6 +188,11 @@ import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import com.projectlumen.app.ui.theme.lumenControlGlass
+import com.projectlumen.app.ui.theme.lumenFilterChipColors
+import com.projectlumen.app.ui.theme.lumenGlass
+import com.projectlumen.app.ui.theme.lumenSliderColors
+import com.projectlumen.app.ui.theme.lumenSwitchColors
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -223,8 +229,11 @@ internal fun SwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenPreferenceShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenPreferenceShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .clickable(enabled = enabled) { toggle(!checked) }
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .graphicsLayer { alpha = if (enabled) 1f else 0.52f }
@@ -236,7 +245,7 @@ internal fun SwitchRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LabelWithIcon(icon, labelRes, Modifier.weight(1f), maxLines = labelMaxLines)
-        Switch(checked = checked, enabled = enabled, onCheckedChange = { toggle(it) })
+        Switch(checked = checked, enabled = enabled, colors = lumenSwitchColors(), onCheckedChange = { toggle(it) })
     }
 }
 
@@ -257,8 +266,11 @@ internal fun NumberSlider(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenPreferenceShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenPreferenceShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(
                 horizontal = SettingsPreferenceHorizontalPadding,
                 vertical = SettingsPreferenceVerticalPadding,
@@ -282,6 +294,7 @@ internal fun NumberSlider(
             value = sliderValue,
             valueRange = range,
             steps = steps,
+            colors = lumenSliderColors(),
             onValueChange = { sliderValue = it.coerceIn(range.start, range.endInclusive) },
             onValueChangeFinished = {
                 val committedValue = sliderValue.roundToInt()
@@ -337,6 +350,8 @@ internal fun LumenFlowRow(content: @Composable () -> Unit) {
 @Composable
 internal fun LanguageChip(@StringRes labelRes: Int, code: String, settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
     FilterChip(
+        modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+        colors = lumenFilterChipColors(),
         selected = LocaleController.normalize(settings.languageCode) == LocaleController.normalize(code),
         onClick = { viewModel.setLanguageCode(code) },
         label = { Text(stringResource(labelRes)) },
@@ -352,7 +367,9 @@ internal fun ThemeChip(
     enabled: Boolean = true,
 ) {
     FilterChip(
+        modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
         enabled = enabled,
+        colors = lumenFilterChipColors(),
         selected = settings.themeMode == mode.name,
         onClick = { viewModel.setThemeMode(mode) },
         label = { Text(stringResource(labelRes)) },
@@ -362,6 +379,8 @@ internal fun ThemeChip(
 @Composable
 internal fun QuietModeChip(@StringRes labelRes: Int, mode: QuietMode, settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
     FilterChip(
+        modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+        colors = lumenFilterChipColors(),
         selected = settings.quietMode == mode.name,
         onClick = { viewModel.updateSettings { current -> current.copy(quietMode = mode.name) } },
         label = { Text(stringResource(labelRes)) },

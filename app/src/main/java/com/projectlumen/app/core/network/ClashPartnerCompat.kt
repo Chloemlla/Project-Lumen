@@ -14,6 +14,7 @@ import android.os.Looper
 import androidx.core.content.edit
 import androidx.core.content.getSystemService
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Executors
 
 /**
  * Full ClashMeta VPN partner adapt for Project-Lumen (system utility).
@@ -134,8 +135,19 @@ object ClashPartnerCompat {
         networkAdaptHook = hook
     }
 
+    // PM queries + ContentResolver calls are blocking binder IPC; run all
+    // refresh work off the main thread and serialize it to avoid interleaved
+    // status writes from startup / network callbacks / UI toggles.
+    private val refreshExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "clash-compat-refresh").apply { isDaemon = true }
+    }
+
     fun refresh(context: Context? = null) {
         val ctx = context?.applicationContext ?: appContext ?: return
+        refreshExecutor.execute { refreshBlocking(ctx) }
+    }
+
+    private fun refreshBlocking(ctx: Context) {
         val previousBound = boundVpnNetwork
         val next = buildStatus(ctx)
         status = next
@@ -192,8 +204,8 @@ object ClashPartnerCompat {
         val partner = queryPartnerStatus(context)
         val partnerStatusAvailable = partner != null
         val clashVpnRunning =
-            if (partnerStatusAvailable) {
-                partner?.get("vpnRunning") as? Boolean ?: false
+            if (partner != null) {
+                partner.get("vpnRunning") as? Boolean ?: false
             } else {
                 clashInstalled && vpnActive
             }
@@ -255,6 +267,7 @@ object ClashPartnerCompat {
         refresh(context)
     }
 
+    @Suppress("DEPRECATION")
     private fun isVpnActive(context: Context): Boolean {
         val cm = context.getSystemService<ConnectivityManager>() ?: return false
         for (network in cm.allNetworks) {
@@ -339,6 +352,7 @@ object ClashPartnerCompat {
         boundVpnNetwork = null
     }
 
+    @Suppress("DEPRECATION")
     private fun findVpnNetwork(cm: ConnectivityManager): Network? {
         for (network in cm.allNetworks) {
             val caps = cm.getNetworkCapabilities(network) ?: continue

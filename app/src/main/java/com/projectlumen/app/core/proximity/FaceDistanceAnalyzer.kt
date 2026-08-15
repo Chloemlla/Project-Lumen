@@ -41,7 +41,8 @@ class FaceDistanceAnalyzer(private val includeTopology: Boolean = false) {
     suspend fun analyze(bitmap: Bitmap, rotationDegrees: Int): FaceDistanceSample? {
         val startedAt = System.currentTimeMillis()
         val image = InputImage.fromBitmap(bitmap, rotationDegrees)
-        val faces = detector.process(image).await()
+        return try {
+            val faces = detector.process(image).await()
         val face = faces.maxByOrNull { it.boundingBox.width() * it.boundingBox.height() } ?: return null
         val orientedWidth = if (rotationDegrees % 180 == 0) bitmap.width else bitmap.height
         val box = face.boundingBox
@@ -71,6 +72,10 @@ class FaceDistanceAnalyzer(private val includeTopology: Boolean = false) {
             meshPoints = topology.meshPoints,
             meshTriangles = topology.meshTriangles,
         )
+    } finally {
+        detector.close()
+        meshDetector?.close()
+    }
     }
 
     private fun Face.eyeDistancePx(): Float {

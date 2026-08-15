@@ -33,7 +33,11 @@ internal class ProjectLumenSettingsFeatureEntry(
     private val shizuku: ShizukuCapabilityManager,
 ) {
     fun applyStartupMonitoring(settings: AppSettingsEntity) {
-        if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) scheduleProximityMonitoring()
+        if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) {
+            scheduleProximityMonitoring()
+        } else {
+            cancelProximityMonitoring()
+        }
         applyLightMonitoringSettings(settings)
         applyDeveloperDebugSettings(settings)
         applyShizukuResilienceSettings(settings)
@@ -214,9 +218,10 @@ internal class ProjectLumenSettingsFeatureEntry(
     }
 
     private fun applyShizukuNativeEyeProtectionSettings(settings: AppSettingsEntity, smooth: Boolean) {
-        if (!settings.shizukuNativeEyeProtectionEnabled && !shizuku.state.value.nativeEyeProtectionApplied) return
+        // Always reconcile against the system: the in-memory applied flag does not survive
+        // process death, so residual native adjustments must still be cleared on the disable path.
         scope.launch {
-            shizuku.applyNativeEyeProtection(settings, smooth)
+            runCatching { shizuku.applyNativeEyeProtection(settings, smooth) }
         }
     }
 

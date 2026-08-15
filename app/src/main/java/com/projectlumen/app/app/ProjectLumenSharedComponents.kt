@@ -124,13 +124,11 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.TopAppBar
@@ -156,6 +154,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -198,6 +197,9 @@ import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.services.BackupImportSummary
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
+import com.projectlumen.app.ui.theme.GlassTextButton
+import com.projectlumen.app.ui.theme.lumenGlass
 import com.projectlumen.app.core.update.BuildMetadata
 import com.projectlumen.app.core.update.ReleaseAsset
 import com.projectlumen.app.core.update.ReleaseInfo
@@ -232,6 +234,7 @@ internal fun LumenTopBar(
      * expanded blank band before the user scrolls. Secondary pages may still expand.
      */
     expanded: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val topBarTokens = rememberLumenUiTokens(LocalContext.current).topBar
     val titleStyle = if (expanded) {
@@ -267,13 +270,20 @@ internal fun LumenTopBar(
         }
     }
 
+    val glassModifier = modifier.lumenGlass(
+        shape = RectangleShape,
+        blurRadius = 14f,
+        tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.35f),
+    )
+    val transparentContainer = Color.Transparent
     if (expanded) {
         LargeTopAppBar(
             title = titleContent,
             navigationIcon = navigationIcon,
-            colors = TopAppBarDefaults.largeTopAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            modifier = glassModifier,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = transparentContainer,
+                scrolledContainerColor = transparentContainer,
                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                 navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
             ),
@@ -283,9 +293,10 @@ internal fun LumenTopBar(
         TopAppBar(
             title = titleContent,
             navigationIcon = navigationIcon,
+            modifier = glassModifier,
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                containerColor = transparentContainer,
+                scrolledContainerColor = transparentContainer,
                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                 navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
             ),
@@ -304,8 +315,11 @@ internal fun PageIntroText(icon: ImageVector, title: String, message: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -465,9 +479,19 @@ internal fun SettingsSection(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
         onClick = { expanded = !expanded },
         enabled = !forceExpanded,
+        shape = LumenCardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
     ) {
         Column {
             Row(
@@ -559,9 +583,14 @@ internal fun SettingsSection(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors().copy(containerColor = Color.Transparent),
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {
@@ -647,7 +676,7 @@ internal fun SettingsSectionToolbar(
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(onClick = { controller.expandAll() }) {
+        GlassTextButton(onClick = { controller.expandAll() }) {
             Icon(
                 Icons.Outlined.UnfoldMore,
                 contentDescription = null,
@@ -656,7 +685,7 @@ internal fun SettingsSectionToolbar(
             Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.settings_expand_all))
         }
-        TextButton(onClick = { controller.collapseAll() }) {
+        GlassTextButton(onClick = { controller.collapseAll() }) {
             Icon(
                 Icons.Outlined.UnfoldLess,
                 contentDescription = null,
@@ -673,9 +702,14 @@ internal fun ActionCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors().copy(containerColor = Color.Transparent),
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {
@@ -714,8 +748,11 @@ internal fun EmptyStateMessage(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -744,8 +781,11 @@ internal fun StatusLine(icon: ImageVector, text: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -778,8 +818,11 @@ internal fun StatusLine(icon: ImageVector, text: String) {
 internal fun StatusPill(icon: ImageVector, @StringRes labelRes: Int) {
     Row(
         modifier = Modifier
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .lumenGlass(
+                shape = CircleShape,
+                blurRadius = 10f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.40f),
+            )
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -803,8 +846,11 @@ internal fun FileSettingRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenPreferenceShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenPreferenceShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .padding(
                 horizontal = SettingsPreferenceHorizontalPadding,
                 vertical = SettingsPreferenceVerticalPadding,
@@ -821,14 +867,14 @@ internal fun FileSettingRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
         ) {
-            OutlinedButton(
+            GlassOutlinedButton(
                 modifier = Modifier.weight(if (path.isBlank()) 1f else 0.62f),
                 onClick = onChoose,
             ) {
                 ButtonLabel(Icons.Outlined.FileDownload, R.string.choose_custom_file)
             }
             if (path.isNotBlank()) {
-                OutlinedButton(
+                GlassOutlinedButton(
                     modifier = Modifier.weight(0.38f),
                     onClick = onClear,
                 ) {
@@ -868,8 +914,11 @@ internal fun NotificationRequirementCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(
                 horizontal = SettingsPreferenceHorizontalPadding,
@@ -911,7 +960,7 @@ internal fun NotificationRequirementCard(
                 )
             }
         }
-        OutlinedButton(modifier = Modifier.align(Alignment.End), onClick = onClick) {
+        GlassOutlinedButton(modifier = Modifier.align(Alignment.End), onClick = onClick) {
             Text(
                 stringResource(actionLabelRes),
                 maxLines = 2,

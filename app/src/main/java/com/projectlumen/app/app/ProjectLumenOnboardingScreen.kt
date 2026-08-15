@@ -41,16 +41,13 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.Spa
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -68,6 +65,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
+import com.projectlumen.app.ui.theme.GlassTextButton
 
 @Composable
 internal fun ProjectLumenOnboardingScreen(
@@ -113,7 +113,7 @@ internal fun ProjectLumenOnboardingScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { onComplete(false) }) {
+                    GlassTextButton(onClick = { onComplete(false) }) {
                         Icon(Icons.Outlined.SkipNext, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.onboarding_skip))
@@ -155,7 +155,7 @@ internal fun ProjectLumenOnboardingScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (pageIndex > 0) {
-                    OutlinedButton(
+                    GlassOutlinedButton(
                         modifier = Modifier.weight(1f),
                         onClick = { pageIndex -= 1 },
                     ) {
@@ -164,7 +164,7 @@ internal fun ProjectLumenOnboardingScreen(
                         Text(stringResource(R.string.onboarding_back))
                     }
                 }
-                Button(
+                GlassButton(
                     modifier = Modifier.weight(1f),
                     onClick = {
                         if (pageIndex < pages.lastIndex) {
@@ -208,6 +208,7 @@ private fun OnboardingPageCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(

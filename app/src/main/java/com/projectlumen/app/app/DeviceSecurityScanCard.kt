@@ -18,13 +18,11 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Report
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.WarningAmber
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +39,9 @@ import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.security.CroootReportFormatter
 import com.projectlumen.app.core.security.DeviceSecurityScanner
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassTextButton
+import com.projectlumen.app.ui.theme.lumenGlass
 
 /**
  * Card that displays CRooot device-security scan results.
@@ -57,9 +58,14 @@ internal fun DeviceSecurityScanCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors().copy(containerColor = Color.Transparent),
         elevation = lumenCardElevation(),
         border = lumenCardBorder(),
     ) {
@@ -105,7 +111,7 @@ internal fun DeviceSecurityScanCard(
                 }
             }
 
-            Button(
+            GlassButton(
                 onClick = onStartScan,
                 enabled = scanState !is DeviceSecurityScanState.Running,
                 modifier = Modifier.fillMaxWidth(),
@@ -200,7 +206,7 @@ private fun SecurityResultSummary(assessment: DeviceSecurityScanner.SecurityAsse
 @Composable
 private fun CroootDetailedReport(result: com.chloemlla.crooot.CRoootScanResult) {
     var expanded by remember { mutableStateOf(false) }
-    TextButton(
+    GlassTextButton(
         onClick = { expanded = !expanded },
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -218,6 +224,7 @@ private fun CroootDetailedReport(result: com.chloemlla.crooot.CRoootScanResult) 
             ),
         )
     }
+    val reportScrollState = rememberScrollState()
     if (expanded) {
         val report = remember(result) { CroootReportFormatter.format(result) }
         SelectionContainer {
@@ -226,7 +233,7 @@ private fun CroootDetailedReport(result: com.chloemlla.crooot.CRoootScanResult) 
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 520.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(reportScrollState)
                     .padding(horizontal = 8.dp),
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,

@@ -109,13 +109,13 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -184,7 +184,12 @@ import com.projectlumen.app.core.update.ReleaseInfo
 import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import com.projectlumen.app.ui.theme.lumenControlGlass
+import com.projectlumen.app.ui.theme.lumenFilterChipColors
+import com.projectlumen.app.ui.theme.lumenGlass
+import com.projectlumen.app.ui.theme.lumenOutlinedTextFieldColors
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -203,10 +208,10 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
     val activeTemplate = activeTemplate(uiState)
     val context = LocalContext.current
     val proEnabled = planTier(uiState.settings) >= PlanTier.PRO
-    var imageTargetTemplateId by remember { mutableStateOf<Long?>(null) }
+    var imageTargetTemplateId by rememberSaveable { mutableStateOf(-1L) }
     val templateImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val targetTemplate = uiState.templates.firstOrNull { it.id == imageTargetTemplateId }
-        imageTargetTemplateId = null
+        imageTargetTemplateId = -1L
         if (uri != null && targetTemplate != null) {
             persistReadableUri(context, uri)
             viewModel.updateTemplateImage(targetTemplate, uri.toString())
@@ -226,11 +231,19 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .lumenGlass(
+                        shape = LumenCardShape,
+                        blurRadius = 14f,
+                        tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+                    )
                     .clickable(enabled = !locked && !selected) { viewModel.selectTemplate(template.id) }
                     .border(1.dp, borderColor, LumenCardShape)
                     .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
                 shape = LumenCardShape,
-                colors = lumenCardColors(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
                 elevation = lumenCardElevation(),
             ) {
                 Column(
@@ -256,6 +269,8 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                         locked -> StatusPill(Icons.Outlined.Lock, R.string.pro_required)
                         selected -> StatusPill(Icons.Outlined.CheckCircle, R.string.active_template)
                         else -> FilterChip(
+                            modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+                            colors = lumenFilterChipColors(),
                             selected = false,
                             onClick = { viewModel.selectTemplate(template.id) },
                             label = { Text(stringResource(R.string.use_template)) },
@@ -263,7 +278,7 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                     }
                     if (!locked) {
                         LumenFlowRow {
-                            OutlinedButton(
+                            GlassOutlinedButton(
                                 onClick = {
                                     imageTargetTemplateId = template.id
                                     templateImageLauncher.launch(arrayOf("image/*"))
@@ -272,7 +287,7 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                                 ButtonLabel(Icons.Outlined.FileDownload, R.string.choose_template_image)
                             }
                             if (template.imagePath.isNotBlank()) {
-                                OutlinedButton(
+                                GlassOutlinedButton(
                                     onClick = { viewModel.updateTemplateImage(template, "") },
                                 ) {
                                     Text(stringResource(R.string.clear_custom_file))
@@ -291,13 +306,14 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
 
 @Composable
 internal fun TemplateEditor(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
-    var titleText by remember(template.id, template.updatedAt) { mutableStateOf(template.titleText) }
-    var subtitleText by remember(template.id, template.updatedAt) { mutableStateOf(template.subtitleText) }
+    var titleText by remember(template.id) { mutableStateOf(template.titleText) }
+    var subtitleText by remember(template.id) { mutableStateOf(template.subtitleText) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.template_editor), style = MaterialTheme.typography.titleSmall)
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = titleText,
+            colors = lumenOutlinedTextFieldColors(),
             onValueChange = {
                 titleText = it
                 viewModel.updateTemplateContent(template, it, subtitleText, template.showSkipButton)
@@ -308,6 +324,7 @@ internal fun TemplateEditor(template: TipTemplateEntity, viewModel: ProjectLumen
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = subtitleText,
+            colors = lumenOutlinedTextFieldColors(),
             onValueChange = {
                 subtitleText = it
                 viewModel.updateTemplateContent(template, titleText, it, template.showSkipButton)
@@ -334,6 +351,8 @@ internal fun CountdownStyleChip(
     viewModel: ProjectLumenViewModel,
 ) {
     FilterChip(
+        modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+        colors = lumenFilterChipColors(),
         selected = templateCountdownStyle(template) == style,
         onClick = { viewModel.updateTemplateCountdownStyle(template, style) },
         label = { Text(stringResource(labelRes)) },
@@ -342,12 +361,28 @@ internal fun CountdownStyleChip(
 
 @Composable
 internal fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = lumenCardColors(), elevation = lumenCardElevation()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .lumenGlass(
+                shape = LumenCardShape,
+                blurRadius = 14f,
+                tint = MaterialTheme.colorScheme.surface.copy(alpha = 0.45f),
+            ),
+        shape = LumenCardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        elevation = lumenCardElevation(),
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Style, R.string.system_background_color)
             LumenFlowRow {
                 SystemBackgroundColor.entries.forEach { option ->
                     FilterChip(
+                        modifier = Modifier.lumenControlGlass(FilterChipDefaults.shape),
+                        colors = lumenFilterChipColors(),
                         selected = template.backgroundType == TemplateBackgroundType.SYSTEM.name &&
                             template.backgroundValue == option.key,
                         onClick = {

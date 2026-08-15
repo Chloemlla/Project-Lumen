@@ -128,7 +128,7 @@ internal class AndroidDeviceInsightDataSource(
             if (packageName == null || packageName == SYSTEM_PACKAGE) continue
             val componentKey = event.className.orEmpty()
             when (event.eventType) {
-                UsageEvents.Event.MOVE_TO_FOREGROUND -> {
+                UsageEvents.Event.ACTIVITY_RESUMED -> {
                     val active = activeComponents.getOrPut(packageName) { mutableSetOf() }
                     if (active.isEmpty()) {
                         startedAt[packageName] = timestamp
@@ -139,7 +139,7 @@ internal class AndroidDeviceInsightDataSource(
                     }
                     active += componentKey
                 }
-                UsageEvents.Event.MOVE_TO_BACKGROUND -> {
+                UsageEvents.Event.ACTIVITY_PAUSED -> {
                     val active = activeComponents[packageName] ?: continue
                     active -= componentKey
                     if (active.isEmpty()) closePackage(packageName, timestamp)
@@ -283,6 +283,7 @@ internal class AndroidDeviceInsightDataSource(
     }
 }
 
+@Suppress("DEPRECATION")
 internal fun Context.hasUsageStatsAccess(): Boolean {
     val appOps = getSystemService(AppOpsManager::class.java) ?: return false
     val mode = runCatching {

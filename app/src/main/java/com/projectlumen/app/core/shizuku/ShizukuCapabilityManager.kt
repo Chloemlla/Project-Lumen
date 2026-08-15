@@ -30,6 +30,7 @@ class ShizukuCapabilityManager(
 ) {
     private val _state = MutableStateFlow(ShizukuCapabilityState())
     val state = _state.asStateFlow()
+    @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
     private val shellServiceLock = java.lang.Object()
     @Volatile
     private var shellServiceBinder: IBinder? = null

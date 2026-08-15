@@ -14,10 +14,8 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Sync
-import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +30,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
+import com.projectlumen.app.ui.theme.GlassButton
+import com.projectlumen.app.ui.theme.GlassOutlinedButton
+import com.projectlumen.app.ui.theme.lumenOutlinedTextFieldColors
 
 @Composable
 internal fun RemoteCloudAccountCard(
@@ -136,18 +137,19 @@ internal fun RemoteCloudAccountCard(
                         value = email,
                         onValueChange = { email = it },
                         enabled = !state.busy,
+                        colors = lumenOutlinedTextFieldColors(),
                         singleLine = true,
                         label = { Text(stringResource(R.string.remote_cloud_email)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     )
                     LumenFlowRow {
-                        Button(
+                        GlassButton(
                             enabled = !state.busy && normalizedEmail.isNotBlank(),
                             onClick = { onStartEmailLogin(normalizedEmail) },
                         ) {
                             ButtonLabel(Icons.Outlined.Person, R.string.remote_cloud_request_code)
                         }
-                        OutlinedButton(enabled = !state.busy, onClick = onCheckHealth) {
+                        GlassOutlinedButton(enabled = !state.busy, onClick = onCheckHealth) {
                             ButtonLabel(Icons.Outlined.Refresh, R.string.remote_cloud_check_health)
                         }
                     }
@@ -158,6 +160,7 @@ internal fun RemoteCloudAccountCard(
                                 value = code,
                                 onValueChange = { code = it },
                                 enabled = !state.busy,
+                                colors = lumenOutlinedTextFieldColors(),
                                 singleLine = true,
                                 label = { Text(stringResource(R.string.remote_cloud_code)) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -165,7 +168,7 @@ internal fun RemoteCloudAccountCard(
                             if (state.devCode.isNotBlank()) {
                                 StatusLine(Icons.Outlined.Lock, stringResource(R.string.remote_cloud_dev_code, state.devCode))
                             }
-                            Button(
+                            GlassButton(
                                 enabled = !state.busy && normalizedCode.isNotBlank(),
                                 onClick = { onVerifyEmailLogin(normalizedCode) },
                             ) {
@@ -179,24 +182,24 @@ internal fun RemoteCloudAccountCard(
             AnimatedVisibility(visible = state.signedIn) {
                 Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
                     LumenFlowRow {
-                        Button(enabled = !state.busy && cloudSyncAllowed, onClick = onSyncNow) {
+                        GlassButton(enabled = !state.busy && cloudSyncAllowed, onClick = onSyncNow) {
                             ButtonLabel(Icons.Outlined.Sync, R.string.remote_cloud_sync_now)
                         }
-                        OutlinedButton(enabled = !state.busy && cloudSyncAllowed, onClick = onUploadBackup) {
+                        GlassOutlinedButton(enabled = !state.busy && cloudSyncAllowed, onClick = onUploadBackup) {
                             ButtonLabel(Icons.Outlined.CloudUpload, R.string.remote_cloud_upload_backup)
                         }
-                        OutlinedButton(enabled = !state.busy && cloudSyncAllowed, onClick = onRestoreBackup) {
+                        GlassOutlinedButton(enabled = !state.busy && cloudSyncAllowed, onClick = onRestoreBackup) {
                             ButtonLabel(Icons.Outlined.Refresh, R.string.remote_cloud_restore_backup)
                         }
                     }
                     LumenFlowRow {
-                        OutlinedButton(enabled = !state.busy, onClick = onRefreshAccount) {
+                        GlassOutlinedButton(enabled = !state.busy, onClick = onRefreshAccount) {
                             ButtonLabel(Icons.Outlined.Refresh, R.string.remote_cloud_refresh_account)
                         }
-                        OutlinedButton(enabled = !state.busy, onClick = onCheckHealth) {
+                        GlassOutlinedButton(enabled = !state.busy, onClick = onCheckHealth) {
                             ButtonLabel(Icons.Outlined.Refresh, R.string.remote_cloud_check_health)
                         }
-                        OutlinedButton(enabled = !state.busy, onClick = onSignOut) {
+                        GlassOutlinedButton(enabled = !state.busy, onClick = onSignOut) {
                             ButtonLabel(Icons.Outlined.Lock, R.string.remote_cloud_sign_out)
                         }
                     }
