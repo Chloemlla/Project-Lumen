@@ -274,7 +274,9 @@ internal object ForegroundServiceController {
 
     private val expectedRefusalRecordedAt = ConcurrentHashMap<String, AtomicLong>()
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+    // Lazily bound so pure-JVM unit tests (no Looper on the main thread) never initialize it
+    // during class load; on device it is only touched on the mAllowStartForeground retry path.
+    private val mainHandler: Handler by lazy { Handler(Looper.getMainLooper()) }
 
     private const val TAG = "ForegroundService"
     private const val EXPECTED_REFUSAL_LOG_WINDOW_MILLIS = 30_000L
