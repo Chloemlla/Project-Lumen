@@ -218,7 +218,7 @@ internal fun WebViewScreen(
     }
     if (!initialPageAllowed) return
 
-    BackHandler(onBack = onDismiss)
+    BackHandler(onBack = { if (webView?.canGoBack() == true) webView?.goBack() else onDismiss() })
     DisposableEffect(webView) {
         val disposableWebView = webView
         onDispose {

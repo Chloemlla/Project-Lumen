@@ -15,9 +15,16 @@ import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
 class RuntimeRepository(private val dao: RuntimeStateDao) {
+    // Serializes get/upsert entry points so the last-write-wins MMKV store cannot have
+    // two writers interleave their read/transform/write cycles and rewind `phase`.
+    // All read-modify-write callers funnel through this repository (the MmkvStore object
+    // is private), so this single lock covers TimerForegroundService, notification actions,
+    // and LumenOpenRuntimeController alike.
+    private val mutateLock = Mutex()
+
     fun observe(): Flow<RuntimeStateEntity?> = RuntimeStateMmkvStore.observe(dao)
 
-    suspend fun get(): RuntimeStateEntity? = RuntimeStateMmkvStore.get(dao)
+    suspend fun get(): RuntimeStateEntity? = mutateLock.withLock { RuntimeStateMmkvStore.get(dao) }
 
     suspend fun getOrDefault(): RuntimeStateEntity = get() ?: RuntimeStateEntity()
 
@@ -25,8 +32,8 @@ class RuntimeRepository(private val dao: RuntimeStateDao) {
         if (get() == null) upsert(RuntimeStateEntity())
     }
 
-    suspend fun upsert(state: RuntimeStateEntity): RuntimeStateEntity {
-        return RuntimeStateMmkvStore.upsert(dao, state.copy(id = 1))
+    suspend fun upsert(state: RuntimeStateEntity): RuntimeStateEntity = mutateLock.withLock {
+        RuntimeStateMmkvStore.upsert(dao, state.copy(id = 1))
     }
 
     suspend fun reset(nowMillis: Long): RuntimeStateEntity {

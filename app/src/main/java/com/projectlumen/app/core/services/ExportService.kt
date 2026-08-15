@@ -18,54 +18,59 @@ import java.io.FileOutputStream
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ExportService(private val context: Context) {
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     fun shareCsv(eyeStats: List<DailyEyeStatsEntity>, pomodoroStats: List<DailyPomodoroStatsEntity>) {
-        val file = File(context.cacheDir, "project_lumen_stats.csv")
-        file.writeText(buildCsv(eyeStats, pomodoroStats), Charsets.UTF_8)
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        SecureShareIntents.shareStream(
-            context = context,
-            uri = uri,
-            mimeType = "text/csv",
-            subject = context.getString(R.string.export_subject),
-            chooserTitle = context.getString(R.string.export_share),
-        )
+        ioScope.launch {
+            val file = File(context.cacheDir, "project_lumen_stats.csv")
+            file.writeText(buildCsv(eyeStats, pomodoroStats), Charsets.UTF_8)
+            shareOnMain(file, "text/csv", R.string.export_subject, R.string.export_share)
+        }
     }
 
     fun shareMonthlyPdf(eyeStats: List<DailyEyeStatsEntity>, pomodoroStats: List<DailyPomodoroStatsEntity>) {
-        val file = File(context.cacheDir, "project_lumen_monthly_report.pdf")
-        FileOutputStream(file).use { output ->
-            val document = buildMonthlyPdf(eyeStats, pomodoroStats)
-            try {
-                document.writeTo(output)
-            } finally {
-                document.close()
+        ioScope.launch {
+            val file = File(context.cacheDir, "project_lumen_monthly_report.pdf")
+            FileOutputStream(file).use { output ->
+                val document = buildMonthlyPdf(eyeStats, pomodoroStats)
+                try {
+                    document.writeTo(output)
+                } finally {
+                    document.close()
+                }
             }
+            shareOnMain(file, "application/pdf", R.string.monthly_report_subject, R.string.export_share)
         }
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        SecureShareIntents.shareStream(
-            context = context,
-            uri = uri,
-            mimeType = "application/pdf",
-            subject = context.getString(R.string.monthly_report_subject),
-            chooserTitle = context.getString(R.string.export_share),
-        )
     }
 
     fun shareStatsImage(eyeStats: List<DailyEyeStatsEntity>, pomodoroStats: List<DailyPomodoroStatsEntity>) {
-        val file = File(context.cacheDir, "project_lumen_stats.png")
-        FileOutputStream(file).use { output ->
-            buildStatsBitmap(eyeStats, pomodoroStats).compress(Bitmap.CompressFormat.PNG, 100, output)
+        ioScope.launch {
+            val file = File(context.cacheDir, "project_lumen_stats.png")
+            FileOutputStream(file).use { output ->
+                buildStatsBitmap(eyeStats, pomodoroStats).compress(Bitmap.CompressFormat.PNG, 100, output)
+            }
+            shareOnMain(file, "image/png", R.string.export_subject, R.string.export_share)
         }
+    }
+
+    private suspend fun shareOnMain(file: File, mimeType: String, subjectRes: Int, chooserRes: Int) {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        SecureShareIntents.shareStream(
-            context = context,
-            uri = uri,
-            mimeType = "image/png",
-            subject = context.getString(R.string.export_subject),
-            chooserTitle = context.getString(R.string.export_share),
-        )
+        withContext(Dispatchers.Main) {
+            SecureShareIntents.shareStream(
+                context = context,
+                uri = uri,
+                mimeType = mimeType,
+                subject = context.getString(subjectRes),
+                chooserTitle = context.getString(chooserRes),
+            )
+        }
     }
 
     private fun buildCsv(

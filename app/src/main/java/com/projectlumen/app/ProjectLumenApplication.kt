@@ -144,9 +144,13 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
                 installLumenCrashSdk()
                 CrashBreadcrumbs.record("Application.onCreate")
             }.onFailure { Log.e(TAG, "LumenCrash install failed in onCreate", it) }
-            runCatching { recordRecentProcessExitReason() }
             initializeMmkvOrRecordCrash()
-            runCatching { MemoryHealthMonitor.sample(this) }
+            // Debug.getMemoryInfo / getHistoricalProcessExitReasons are blocking binder calls;
+            // keep them off the cold-start main thread.
+            applicationScope.launch {
+                runCatching { recordRecentProcessExitReason() }
+                runCatching { MemoryHealthMonitor.sample(this@ProjectLumenApplication) }
+            }
             // Integrity remains enforced for real release builds that configure the cert fingerprint,
             // but must not process-kill managed-emulator boots when the native bridge fails.
             runCatching { AppIntegrityGuard.enforce(this) }

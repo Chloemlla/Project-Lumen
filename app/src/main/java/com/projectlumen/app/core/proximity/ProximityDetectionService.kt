@@ -20,14 +20,16 @@ import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.debug.DeveloperDebugFrameStore
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
+import com.projectlumen.app.core.repositories.StatisticsRepository
 import com.projectlumen.app.core.services.ForegroundServiceController
-import com.projectlumen.app.core.time.todayKey
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.roundToInt
 
 class ProximityDetectionService : Service() {
@@ -38,6 +40,14 @@ class ProximityDetectionService : Service() {
                 ?.recordCrash(throwable)
         },
     )
+    // Serializes the runtime get -> copy -> upsert cycles (recordStart/recordStop, task removal,
+    // detection start/end, clearActiveState) so concurrent writers cannot rewind each other's fields.
+    private val runtimeStateMutex = Mutex()
+    // Single shared instance so all callers funnel through the same stats read-modify-write lock.
+    private val statisticsRepository: StatisticsRepository by lazy {
+        val app = application as ProjectLumenApplication
+        StatisticsRepository(app.database.dailyEyeStatsDao(), app.database.dailyPomodoroStatsDao())
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val app = application as ProjectLumenApplication
@@ -83,13 +93,15 @@ class ProximityDetectionService : Service() {
             scope.launch {
                 val now = System.currentTimeMillis()
                 val runtimeRepository = app.runtimeRepository()
-                runtimeRepository.get()?.let {
-                    runtimeRepository.upsert(
-                        it.copy(
-                            foregroundServiceLastTaskRemovedAt = now,
-                            updatedAt = now,
-                        ),
-                    )
+                runtimeStateMutex.withLock {
+                    runtimeRepository.get()?.let {
+                        runtimeRepository.upsert(
+                            it.copy(
+                                foregroundServiceLastTaskRemovedAt = now,
+                                updatedAt = now,
+                            ),
+                        )
+                    }
                 }
             }
         }
@@ -135,8 +147,10 @@ class ProximityDetectionService : Service() {
         }
 
         val now = System.currentTimeMillis()
-        runtimeRepository.get()?.let {
-            runtimeRepository.upsert(it.copy(proximityMonitoringActive = true, updatedAt = now))
+        runtimeStateMutex.withLock {
+            runtimeRepository.get()?.let {
+                runtimeRepository.upsert(it.copy(proximityMonitoringActive = true, updatedAt = now))
+            }
         }
 
         val captureSeconds = when {
@@ -210,25 +224,27 @@ class ProximityDetectionService : Service() {
             )
         }
 
-        runtimeRepository.get()?.let {
-            runtimeRepository.upsert(
-                it.copy(
-                    proximityMonitoringActive = false,
-                    proximityTooClose = tooClose,
-                    proximityLastFaceAt = if (sample != null) now else it.proximityLastFaceAt,
-                    proximityCloseStartedAt = if (tooClose && !it.proximityTooClose) now else if (tooClose) it.proximityCloseStartedAt else 0L,
-                    proximityCloseTickAt = if (tooClose) now else 0L,
-                    proximityLastWarningAt = if (shouldWarn) now else it.proximityLastWarningAt,
-                    proximityLastRatioPercent = ratioPercent,
-                    proximityDebugInferenceMillis = sample?.inferenceMillis ?: it.proximityDebugInferenceMillis,
-                    proximityDebugCameraLatencyMillis = sample?.cameraLatencyMillis ?: it.proximityDebugCameraLatencyMillis,
-                    proximityDebugFaceWidthPx = sample?.faceWidthPx ?: it.proximityDebugFaceWidthPx,
-                    blinkLastBlinkAt = blinkState.lastBlinkAt,
-                    blinkLastWarningAt = if (blinkState.shouldWarn) now else it.blinkLastWarningAt,
-                    blinkLastEyeOpenProbabilityPercent = blinkState.eyeOpenProbabilityPercent,
-                    updatedAt = now,
-                ),
-            )
+        runtimeStateMutex.withLock {
+            runtimeRepository.get()?.let {
+                runtimeRepository.upsert(
+                    it.copy(
+                        proximityMonitoringActive = false,
+                        proximityTooClose = tooClose,
+                        proximityLastFaceAt = if (sample != null) now else it.proximityLastFaceAt,
+                        proximityCloseStartedAt = if (tooClose && !it.proximityTooClose) now else if (tooClose) it.proximityCloseStartedAt else 0L,
+                        proximityCloseTickAt = if (tooClose) now else 0L,
+                        proximityLastWarningAt = if (shouldWarn) now else it.proximityLastWarningAt,
+                        proximityLastRatioPercent = ratioPercent,
+                        proximityDebugInferenceMillis = sample?.inferenceMillis ?: it.proximityDebugInferenceMillis,
+                        proximityDebugCameraLatencyMillis = sample?.cameraLatencyMillis ?: it.proximityDebugCameraLatencyMillis,
+                        proximityDebugFaceWidthPx = sample?.faceWidthPx ?: it.proximityDebugFaceWidthPx,
+                        blinkLastBlinkAt = blinkState.lastBlinkAt,
+                        blinkLastWarningAt = if (blinkState.shouldWarn) now else it.blinkLastWarningAt,
+                        blinkLastEyeOpenProbabilityPercent = blinkState.eyeOpenProbabilityPercent,
+                        updatedAt = now,
+                    ),
+                )
+            }
         }
         val distanceViolationTelemetry = if (tooClose) {
             app.telemetry.distanceViolation(
@@ -274,28 +290,32 @@ class ProximityDetectionService : Service() {
         flags: Int,
     ) {
         val runtimeRepository = app.runtimeRepository()
-        runtimeRepository.get()?.let {
-            val restarted = flags and (START_FLAG_REDELIVERY or START_FLAG_RETRY) != 0
-            runtimeRepository.upsert(
-                it.copy(
-                    foregroundServiceStartedAt = nowMillis,
-                    foregroundServiceStoppedAt = 0L,
-                    foregroundServiceLastStickyRestartAt = if (restarted) nowMillis else it.foregroundServiceLastStickyRestartAt,
-                    updatedAt = nowMillis,
-                ),
-            )
+        runtimeStateMutex.withLock {
+            runtimeRepository.get()?.let {
+                val restarted = flags and (START_FLAG_REDELIVERY or START_FLAG_RETRY) != 0
+                runtimeRepository.upsert(
+                    it.copy(
+                        foregroundServiceStartedAt = nowMillis,
+                        foregroundServiceStoppedAt = 0L,
+                        foregroundServiceLastStickyRestartAt = if (restarted) nowMillis else it.foregroundServiceLastStickyRestartAt,
+                        updatedAt = nowMillis,
+                    ),
+                )
+            }
         }
     }
 
     private suspend fun recordForegroundServiceStop(app: ProjectLumenApplication, nowMillis: Long) {
         val runtimeRepository = app.runtimeRepository()
-        runtimeRepository.get()?.let {
-            runtimeRepository.upsert(
-                it.copy(
-                    foregroundServiceStoppedAt = nowMillis,
-                    updatedAt = nowMillis,
-                ),
-            )
+        runtimeStateMutex.withLock {
+            runtimeRepository.get()?.let {
+                runtimeRepository.upsert(
+                    it.copy(
+                        foregroundServiceStoppedAt = nowMillis,
+                        updatedAt = nowMillis,
+                    ),
+                )
+            }
         }
     }
 
@@ -304,24 +324,26 @@ class ProximityDetectionService : Service() {
         nowMillis: Long,
         transform: (DailyEyeStatsEntity) -> DailyEyeStatsEntity,
     ) {
-        if (app.settingsRepository().get()?.statsEnabled == false) return
-        val date = todayKey(nowMillis)
-        val dao = app.database.dailyEyeStatsDao()
-        val current = dao.get(date) ?: DailyEyeStatsEntity(statDate = date)
-        dao.upsert(transform(current).copy(updatedAt = nowMillis))
+        statisticsRepository.updateEyeStats(
+            statsEnabled = app.settingsRepository().get()?.statsEnabled == true,
+            nowMillis = nowMillis,
+            transform = transform,
+        )
     }
 
     private suspend fun clearActiveState(app: ProjectLumenApplication) {
         val now = System.currentTimeMillis()
         val runtimeRepository = app.runtimeRepository()
-        runtimeRepository.get()?.let {
-            runtimeRepository.upsert(
-                it.copy(
-                    proximityMonitoringActive = false,
-                    proximityTooClose = false,
-                    updatedAt = now,
-                ),
-            )
+        runtimeStateMutex.withLock {
+            runtimeRepository.get()?.let {
+                runtimeRepository.upsert(
+                    it.copy(
+                        proximityMonitoringActive = false,
+                        proximityTooClose = false,
+                        updatedAt = now,
+                    ),
+                )
+            }
         }
     }
 

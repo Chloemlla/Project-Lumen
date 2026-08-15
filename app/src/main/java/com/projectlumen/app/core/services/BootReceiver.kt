@@ -19,6 +19,10 @@ import kotlinx.coroutines.launch
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (!isRecoveryAction(intent.action)) return
+        // LOCKED_BOOT_COMPLETED fires before user unlock when directBootAware is set; the
+        // Room DB lives in CE storage and is not readable yet, so restoring alarms there is
+        // meaningless. BOOT_COMPLETED is delivered after unlock and does the recovery.
+        if (intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED) return
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             val app = context.applicationContext as? ProjectLumenApplication

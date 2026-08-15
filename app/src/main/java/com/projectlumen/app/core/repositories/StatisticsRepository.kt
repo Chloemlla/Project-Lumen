@@ -8,12 +8,19 @@ import com.projectlumen.app.core.runtime.EyeStatsDelta
 import com.projectlumen.app.core.runtime.PomodoroStatsDelta
 import com.projectlumen.app.core.time.todayKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.max
 
 class StatisticsRepository(
     private val eyeStatsDao: DailyEyeStatsDao,
     private val pomodoroStatsDao: DailyPomodoroStatsDao,
 ) {
+    // Serializes the get -> transform -> upsert read-modify-write cycles of the two
+    // in-place stat mutation entry points so concurrent writers (TimerForegroundService,
+    // AlarmReceiver, ReminderActionReceiver, LumenOpenRuntimeController) cannot drop deltas.
+    private val statsMutex = Mutex()
+
     fun observeEyeStats(): Flow<List<DailyEyeStatsEntity>> = eyeStatsDao.observeAll()
 
     fun observePomodoroStats(): Flow<List<DailyPomodoroStatsEntity>> = pomodoroStatsDao.observeAll()
@@ -51,9 +58,11 @@ class StatisticsRepository(
         transform: (DailyEyeStatsEntity) -> DailyEyeStatsEntity,
     ) {
         if (!statsEnabled) return
-        val date = todayKey(nowMillis)
-        val current = eyeStatsDao.get(date) ?: DailyEyeStatsEntity(statDate = date)
-        eyeStatsDao.upsert(transform(current).copy(updatedAt = nowMillis))
+        statsMutex.withLock {
+            val date = todayKey(nowMillis)
+            val current = eyeStatsDao.get(date) ?: DailyEyeStatsEntity(statDate = date)
+            eyeStatsDao.upsert(transform(current).copy(updatedAt = nowMillis))
+        }
     }
 
     suspend fun updatePomodoroStats(
@@ -62,8 +71,10 @@ class StatisticsRepository(
         transform: (DailyPomodoroStatsEntity) -> DailyPomodoroStatsEntity,
     ) {
         if (!statsEnabled) return
-        val date = todayKey(nowMillis)
-        val current = pomodoroStatsDao.get(date) ?: DailyPomodoroStatsEntity(statDate = date)
-        pomodoroStatsDao.upsert(transform(current).copy(updatedAt = nowMillis))
+        statsMutex.withLock {
+            val date = todayKey(nowMillis)
+            val current = pomodoroStatsDao.get(date) ?: DailyPomodoroStatsEntity(statDate = date)
+            pomodoroStatsDao.upsert(transform(current).copy(updatedAt = nowMillis))
+        }
     }
 }

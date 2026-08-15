@@ -30,6 +30,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -48,6 +50,7 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
     private var lastYaw = 0f
     private var lastAccelerationMagnitude = 0f
     private var lastMemoryHealthSampleAt = 0L
+    private val runtimeStateMutex = Mutex()
 
     override fun onCreate() {
         super.onCreate()
@@ -240,18 +243,20 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
     private fun writeSensorRuntime(nowMillis: Long) {
         val app = application as ProjectLumenApplication
         scope.launch {
-            val runtimeRepository = app.runtimeRepository()
-            runtimeRepository.get()?.let {
-                runtimeRepository.upsert(
-                    it.copy(
-                        ambientLastLux = lastLux,
-                        sensorPitchDegrees = lastPitch,
-                        sensorRollDegrees = lastRoll,
-                        sensorYawDegrees = lastYaw,
-                        sensorLastAccelerationMagnitude = lastAccelerationMagnitude,
-                        updatedAt = nowMillis,
-                    ),
-                )
+            runtimeStateMutex.withLock {
+                val runtimeRepository = app.runtimeRepository()
+                runtimeRepository.get()?.let {
+                    runtimeRepository.upsert(
+                        it.copy(
+                            ambientLastLux = lastLux,
+                            sensorPitchDegrees = lastPitch,
+                            sensorRollDegrees = lastRoll,
+                            sensorYawDegrees = lastYaw,
+                            sensorLastAccelerationMagnitude = lastAccelerationMagnitude,
+                            updatedAt = nowMillis,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -261,33 +266,37 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         DeveloperDebugFrameStore.clear()
         onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
         scope.launch {
-            val now = System.currentTimeMillis()
-            val runtimeRepository = app.runtimeRepository()
-            runtimeRepository.get()?.let {
-                runtimeRepository.upsert(
-                    it.copy(
-                        developerLastLowMemorySimulatedAt = now,
-                        updatedAt = now,
-                    ),
-                )
+            runtimeStateMutex.withLock {
+                val now = System.currentTimeMillis()
+                val runtimeRepository = app.runtimeRepository()
+                runtimeRepository.get()?.let {
+                    runtimeRepository.upsert(
+                        it.copy(
+                            developerLastLowMemorySimulatedAt = now,
+                            updatedAt = now,
+                        ),
+                    )
+                }
             }
         }
     }
 
     private fun recordServiceStart(app: ProjectLumenApplication, flags: Int) {
         scope.launch {
-            val now = System.currentTimeMillis()
-            val restarted = flags and (START_FLAG_REDELIVERY or START_FLAG_RETRY) != 0
-            val runtimeRepository = app.runtimeRepository()
-            runtimeRepository.get()?.let {
-                runtimeRepository.upsert(
-                    it.copy(
-                        foregroundServiceStartedAt = now,
-                        foregroundServiceStoppedAt = 0L,
-                        foregroundServiceLastStickyRestartAt = if (restarted) now else it.foregroundServiceLastStickyRestartAt,
-                        updatedAt = now,
-                    ),
-                )
+            runtimeStateMutex.withLock {
+                val now = System.currentTimeMillis()
+                val restarted = flags and (START_FLAG_REDELIVERY or START_FLAG_RETRY) != 0
+                val runtimeRepository = app.runtimeRepository()
+                runtimeRepository.get()?.let {
+                    runtimeRepository.upsert(
+                        it.copy(
+                            foregroundServiceStartedAt = now,
+                            foregroundServiceStoppedAt = 0L,
+                            foregroundServiceLastStickyRestartAt = if (restarted) now else it.foregroundServiceLastStickyRestartAt,
+                            updatedAt = now,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -295,15 +304,17 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
     private fun recordServiceStop() {
         val app = application as? ProjectLumenApplication ?: return
         CoroutineScope(Dispatchers.IO).launch {
-            val now = System.currentTimeMillis()
-            val runtimeRepository = app.runtimeRepository()
-            runtimeRepository.get()?.let {
-                runtimeRepository.upsert(
-                    it.copy(
-                        foregroundServiceStoppedAt = now,
-                        updatedAt = now,
-                    ),
-                )
+            runtimeStateMutex.withLock {
+                val now = System.currentTimeMillis()
+                val runtimeRepository = app.runtimeRepository()
+                runtimeRepository.get()?.let {
+                    runtimeRepository.upsert(
+                        it.copy(
+                            foregroundServiceStoppedAt = now,
+                            updatedAt = now,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -316,7 +327,11 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         val now = System.currentTimeMillis()
         if (!force && now - lastMemoryHealthSampleAt < MEMORY_HEALTH_SAMPLE_INTERVAL_MILLIS) return
         lastMemoryHealthSampleAt = now
-        MemoryHealthMonitor.sample(this, now)
+        // Debug.getMemoryInfo / ActivityManager.getMemoryInfo are blocking binder calls; sample
+        // off the main thread on the service IO scope.
+        scope.launch {
+            MemoryHealthMonitor.sample(this@DeveloperDebugOverlayService, now)
+        }
     }
 
     companion object {

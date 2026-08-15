@@ -41,11 +41,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewModelScope
 import com.projectlumen.app.R
 import com.projectlumen.app.core.toast.LumenToastKind
 import com.projectlumen.app.core.toast.showLumenToast
 import com.projectlumen.app.ui.theme.GlassOutlinedButton
 import com.projectlumen.app.ui.theme.lumenGlass
+import kotlinx.coroutines.launch
 
 /** Destinations opened from the legal hub; the host NavHost maps each key to a screen. */
 internal enum class LegalDocKey { TERMS, PRIVACY, MEMBERSHIP, PERSONAL, PERMISSIONS }
@@ -164,12 +166,16 @@ internal fun LegalHubScreen(
             text = { Text(stringResource(R.string.legal_withdraw_consent_dialog_message)) },
             confirmButton = {
                 GlassOutlinedButton(onClick = {
-                    viewModel.withdrawDataConsent()
-                    context.showLumenToast(
-                        withdrawConsentSuccess,
-                        kind = LumenToastKind.SUCCESS,
-                        long = true,
-                    )
+                    viewModel.viewModelScope.launch {
+                        runCatching { viewModel.withdrawDataConsent() }
+                            .onSuccess {
+                                context.showLumenToast(
+                                    withdrawConsentSuccess,
+                                    kind = LumenToastKind.SUCCESS,
+                                    long = true,
+                                )
+                            }
+                    }
                     showWithdrawConsentDialog = false
                 }) {
                     Text(stringResource(R.string.legal_withdraw_confirm))
@@ -191,12 +197,16 @@ internal fun LegalHubScreen(
             text = { Text(stringResource(R.string.legal_withdraw_privacy_dialog_message)) },
             confirmButton = {
                 GlassOutlinedButton(onClick = {
-                    viewModel.withdrawPrivacyPolicyConsent()
-                    context.showLumenToast(
-                        withdrawPrivacySuccess,
-                        kind = LumenToastKind.SUCCESS,
-                        long = true,
-                    )
+                    viewModel.viewModelScope.launch {
+                        runCatching { viewModel.withdrawPrivacyPolicyConsent() }
+                            .onSuccess {
+                                context.showLumenToast(
+                                    withdrawPrivacySuccess,
+                                    kind = LumenToastKind.SUCCESS,
+                                    long = true,
+                                )
+                            }
+                    }
                     showWithdrawPrivacyDialog = false
                 }) {
                     Text(stringResource(R.string.legal_withdraw_confirm))

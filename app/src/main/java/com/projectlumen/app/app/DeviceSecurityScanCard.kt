@@ -224,6 +224,7 @@ private fun CroootDetailedReport(result: com.chloemlla.crooot.CRoootScanResult) 
             ),
         )
     }
+    val reportScrollState = rememberScrollState()
     if (expanded) {
         val report = remember(result) { CroootReportFormatter.format(result) }
         SelectionContainer {
@@ -232,7 +233,7 @@ private fun CroootDetailedReport(result: com.chloemlla.crooot.CRoootScanResult) 
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 520.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(reportScrollState)
                     .padding(horizontal = 8.dp),
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
