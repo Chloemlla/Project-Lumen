@@ -5,6 +5,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.ServiceCompat
@@ -65,24 +67,25 @@ internal object ForegroundServiceController {
             ContextCompat.startForegroundService(context, intent)
             true
         } catch (exception: Exception) {
-            // Android 16: mAllowStartForeground may be false during cold start.
-            // Retry once after a short delay to give the platform time to set the flag.
+            // Android 16: mAllowStartForeground may be false during cold start. Retry once after a
+            // short delay on the main handler instead of blocking the calling thread.
             if (isForegroundServiceStartNotAllowed(exception)) {
                 Log.i(TAG, "Foreground service start refused (mAllowStartForeground false); " +
-                    "retrying ${serviceName} in ${RETRY_DELAY_MILLIS}ms")
-                SystemClock.sleep(RETRY_DELAY_MILLIS)
-                try {
-                    ContextCompat.startForegroundService(context, intent)
-                    return true
-                } catch (retryException: Exception) {
-                    handleFailure(
-                        context = context,
-                        serviceName = serviceName,
-                        operation = "start",
-                        throwable = retryException,
-                        becameIneligible = becameIneligible(eligibilityCheck),
-                    )
-                }
+                    "scheduling retry of ${serviceName} in ${RETRY_DELAY_MILLIS}ms")
+                mainHandler.postDelayed({
+                    runCatching {
+                        ContextCompat.startForegroundService(context, intent)
+                    }.onFailure { retryException ->
+                        handleFailure(
+                            context = context,
+                            serviceName = serviceName,
+                            operation = "start",
+                            throwable = retryException,
+                            becameIneligible = becameIneligible(eligibilityCheck),
+                        )
+                    }
+                }, RETRY_DELAY_MILLIS)
+                false
             } else {
                 handleFailure(
                     context = context,
@@ -270,6 +273,8 @@ internal object ForegroundServiceController {
     }
 
     private val expectedRefusalRecordedAt = ConcurrentHashMap<String, AtomicLong>()
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private const val TAG = "ForegroundService"
     private const val EXPECTED_REFUSAL_LOG_WINDOW_MILLIS = 30_000L

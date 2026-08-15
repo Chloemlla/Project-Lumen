@@ -68,13 +68,16 @@ class EyeCareTelemetryReporter(
     private val apiClient: ProjectLumenApiClient,
     private val backendGate: BackendCapabilityGate = AllowAllBackendCapabilityGate,
     private val shizuku: ShizukuCapabilityManager? = null,
+    private val eyeCarePreferences: EyeCarePreferencesDataStore? = null,
     private val accessTokenProvider: suspend () -> String? = {
         ProjectLumenApiConfig.telemetryAccessToken.takeIf { it.isNotBlank() }
     },
 ) {
     private val lastUploadAt = AtomicLong(0L)
     private val settingsRepository by lazy {
-        SettingsRepository(database.appSettingsDao(), EyeCarePreferencesDataStore(context))
+        // Prefer the injected shared instance (fresh in-memory state) over a private one that
+        // snapshots MMKV once and never sees later preference changes.
+        SettingsRepository(database.appSettingsDao(), eyeCarePreferences ?: EyeCarePreferencesDataStore(context))
     }
 
     suspend fun uploadCurrentSnapshot(

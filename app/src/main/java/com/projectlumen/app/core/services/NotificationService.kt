@@ -119,6 +119,12 @@ class NotificationService(private val context: Context) {
             ActiveEngine.REMINDER.name -> {
                 if (QuietHours.suppressesReminderNotifications(settings, nowMillis)) {
                     dismissTimerNotifications(reminderNotificationIds)
+                    // Schedule one wake-up when quiet hours end so syncRuntimeAlarms re-runs then:
+                    // a break that came due during quiet is reconciled instead of being dropped.
+                    val quietEndsAt = QuietHours.activeEndMillis(settings, nowMillis)
+                    if (quietEndsAt > nowMillis) {
+                        schedule(NotificationIds.PRE_ALERT, quietEndsAt, AlarmReceiver.ACTION_PRE_ALERT)
+                    }
                     return
                 }
                 when (state.reminderPhase) {

@@ -17,7 +17,10 @@ import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.repositories.FeatureFlagRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
+import androidx.room.withTransaction
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -38,8 +41,11 @@ class DataBackupService(
     private val deviceInstallationIdProvider: ((String?) -> String)? = null,
 ) {
     suspend fun shareBackup() {
+        val json = exportBackupJson().toString(2)
         val file = File(context.cacheDir, "project_lumen_backup.json")
-        file.writeText(exportBackupJson().toString(2), Charsets.UTF_8)
+        withContext(Dispatchers.IO) {
+            file.writeText(json, Charsets.UTF_8)
+        }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         SecureShareIntents.shareStream(
             context = context,
@@ -72,14 +78,16 @@ class DataBackupService(
 
     suspend fun importBackupJson(json: JSONObject): BackupImportSummary {
         val summary = backupSummary(json)
-        importSettings(json.optJSONObject("settings"))
-        importDailyGoal(json.optJSONObject("dailyGoal"))
-        importTemplates(json.optJSONArray("templates"))
-        importEyeStats(json.optJSONArray("dailyEyeStats"))
-        importPomodoroStats(json.optJSONArray("dailyPomodoroStats"))
-        importEntitlements(json.optJSONArray("entitlements"))
-        importFeatureFlags(json.optJSONArray("featureFlags"))
-        importReminderPlans(json.optJSONArray("reminderPlans"))
+        // All-or-nothing: a malformed backup must not leave the app half-imported.
+        database.withTransaction {
+            importSettings(json.optJSONObject("settings"))
+            importDailyGoal(json.optJSONObject("dailyGoal"))
+            importTemplates(json.optJSONArray("templates"))
+            importEyeStats(json.optJSONArray("dailyEyeStats"))
+            importPomodoroStats(json.optJSONArray("dailyPomodoroStats"))
+            importFeatureFlags(json.optJSONArray("featureFlags"))
+            importReminderPlans(json.optJSONArray("reminderPlans"))
+        }
         return summary
     }
 
@@ -133,9 +141,8 @@ class DataBackupService(
             languageCode = json.optString("languageCode", current.languageCode),
             themeMode = json.optString("themeMode", current.themeMode),
             useDynamicColors = json.optBoolean("useDynamicColors", current.useDynamicColors),
-            planTier = json.optString("planTier", current.planTier),
-            entitlementExpiresAt = json.optLong("entitlementExpiresAt", current.entitlementExpiresAt),
-            lastEntitlementSyncAt = json.optLong("lastEntitlementSyncAt", current.lastEntitlementSyncAt),
+            // Entitlements are intentionally NOT imported from backups: planTier/expiry would let a
+            // hand-crafted JSON grant paid features locally. The server-side sync restores them.
             reminderEnabled = json.optBoolean("reminderEnabled", current.reminderEnabled),
             warnIntervalMinutes = json.optInt("warnIntervalMinutes", current.warnIntervalMinutes),
             restDurationSeconds = json.optInt("restDurationSeconds", current.restDurationSeconds),
@@ -351,14 +358,6 @@ class DataBackupService(
                     )
                 },
             )
-        }
-    }
-
-    private suspend fun importEntitlements(array: JSONArray?) {
-        if (array == null) return
-        for (index in 0 until array.length()) {
-            val entitlement = array.optJSONObject(index)?.toEntitlement() ?: continue
-            database.entitlementsDao().upsert(entitlement)
         }
     }
 
@@ -604,19 +603,6 @@ class DataBackupService(
         totalFocusSeconds = optLong("totalFocusSeconds", 0L),
         totalBreakSeconds = optLong("totalBreakSeconds", 0L),
         updatedAt = System.currentTimeMillis(),
-    )
-
-    private fun JSONObject.toEntitlement(): EntitlementEntity = EntitlementEntity(
-        id = optLong("id", 0L),
-        source = optString("source", "manual_license"),
-        productId = optString("productId", ""),
-        purchaseToken = optString("purchaseToken", ""),
-        tier = optString("tier", "FREE"),
-        status = optString("status", "pending"),
-        purchasedAt = optLong("purchasedAt", System.currentTimeMillis()),
-        expiresAt = optLong("expiresAt", 0L),
-        lastVerifiedAt = optLong("lastVerifiedAt", 0L),
-        rawPayloadJson = optString("rawPayloadJson", ""),
     )
 
     private fun JSONObject.toFeatureFlag(): FeatureFlagEntity = FeatureFlagEntity(

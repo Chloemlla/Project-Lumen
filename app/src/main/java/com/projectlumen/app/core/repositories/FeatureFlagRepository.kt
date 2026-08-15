@@ -30,6 +30,10 @@ private object FeatureFlagMmkvStore {
     private const val KEY_MMKV_MIGRATION_COMPLETE = "__mmkv_migration_complete"
 
     private val migrationLock = Mutex()
+    // Serializes the read -> filter -> plus -> write cycle inside upsert so concurrent
+    // writers cannot drop flags; also prevents a writer seeing a stale list while another
+    // reorders it.
+    private val upsertLock = Mutex()
     private val mmkv by lazy { ProjectLumenMmkv.multiProcessMmkvWithId(STORE_ID) }
     private val state by lazy { MutableStateFlow(readFromMmkv()) }
 
@@ -47,16 +51,22 @@ private object FeatureFlagMmkvStore {
     }
 
     suspend fun upsert(dao: FeatureFlagsDao, flag: FeatureFlagEntity) {
-        ensureMigrated(dao)
         val normalized = flag.copy(key = flag.key.trim())
         if (normalized.key.isBlank()) return
-        dao.upsert(normalized)
-        writeToMmkv(
-            readFromMmkv()
+        upsertLock.withLock {
+            ensureMigrated(dao)
+            val next = readFromMmkv()
                 .filterNot { it.key == normalized.key }
                 .plus(normalized)
-                .sortedBy { it.key },
-        )
+                .sortedBy { it.key }
+            // MMKV first so a crash after dao.upsert but before this write can no longer leave
+            // the flag permanently missing (previously the migration flag was already set and
+            // readFromMmkv would not reconcile from Room). MMKV is the authoritative source,
+            // Room is the durable back-fill; a crash between the two leaves Room stale but MMKV
+            // current, which the read paths honor.
+            writeToMmkv(next)
+            dao.upsert(normalized)
+        }
     }
 
     private suspend fun ensureMigrated(dao: FeatureFlagsDao) {

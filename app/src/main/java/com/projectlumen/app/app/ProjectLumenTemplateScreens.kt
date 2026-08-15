@@ -208,10 +208,10 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
     val activeTemplate = activeTemplate(uiState)
     val context = LocalContext.current
     val proEnabled = planTier(uiState.settings) >= PlanTier.PRO
-    var imageTargetTemplateId by remember { mutableStateOf<Long?>(null) }
+    var imageTargetTemplateId by rememberSaveable { mutableStateOf(-1L) }
     val templateImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val targetTemplate = uiState.templates.firstOrNull { it.id == imageTargetTemplateId }
-        imageTargetTemplateId = null
+        imageTargetTemplateId = -1L
         if (uri != null && targetTemplate != null) {
             persistReadableUri(context, uri)
             viewModel.updateTemplateImage(targetTemplate, uri.toString())
@@ -306,8 +306,8 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
 
 @Composable
 internal fun TemplateEditor(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
-    var titleText by remember(template.id, template.updatedAt) { mutableStateOf(template.titleText) }
-    var subtitleText by remember(template.id, template.updatedAt) { mutableStateOf(template.subtitleText) }
+    var titleText by remember(template.id) { mutableStateOf(template.titleText) }
+    var subtitleText by remember(template.id) { mutableStateOf(template.subtitleText) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.template_editor), style = MaterialTheme.typography.titleSmall)
         OutlinedTextField(

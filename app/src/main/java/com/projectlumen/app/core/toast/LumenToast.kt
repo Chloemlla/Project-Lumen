@@ -171,7 +171,11 @@ object LumenToast {
     ) {
         val root = activity.window.decorView as? ViewGroup
             ?: return showFallbackNotification(activity, message, kind)
-        foregroundView?.let { runCatching { root.removeView(it) } }
+        foregroundView?.let { oldView ->
+            // The previous toast may belong to a prior activity's decor view; detach via its
+            // actual parent so cross-activity removals don't silently fail.
+            runCatching { (oldView.parent as? ViewGroup)?.removeView(oldView) }
+        }
         overlayView?.let {
             runCatching {
                 activity.applicationContext.getSystemService(WindowManager::class.java)?.removeView(it)
@@ -208,6 +212,9 @@ object LumenToast {
     ) {
         val windowManager = context.getSystemService(WindowManager::class.java) ?: return
         overlayView?.let { runCatching { windowManager.removeView(it) } }
+        foregroundView?.let { oldView ->
+            runCatching { (oldView.parent as? ViewGroup)?.removeView(oldView) }
+        }
         foregroundView = null
 
         val metrics = ToastLayoutMetrics.from(context)

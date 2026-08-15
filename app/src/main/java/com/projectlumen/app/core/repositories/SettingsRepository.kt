@@ -7,12 +7,17 @@ import com.projectlumen.app.core.preferences.withEyeCarePreferences
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class SettingsRepository(
     private val dao: AppSettingsDao,
     private val preferences: EyeCarePreferencesDataStore? = null,
     private val deviceInstallationIdProvider: ((String?) -> String)? = null,
 ) {
+    // Serializes the whole-row read-modify-write in update() so concurrent writers
+    // (settings UI, ProximityDetectionService, remote sync) cannot clobber each other's fields.
+    private val updateMutex = Mutex()
     fun observe(): Flow<AppSettingsEntity?> {
         val preferencesStore = preferences ?: return dao.observe()
         return combine(dao.observe(), preferencesStore.observe()) { settings, persistedPreferences ->
@@ -68,11 +73,14 @@ class SettingsRepository(
     suspend fun update(
         nowMillis: Long = System.currentTimeMillis(),
         transform: (AppSettingsEntity) -> AppSettingsEntity,
-    ): AppSettingsEntity {
+    ): AppSettingsEntity = updateMutex.withLock {
         val current = getOrDefault()
         val updated = transform(current).copy(id = 1, updatedAt = nowMillis)
-        dao.upsert(updated)
+        // MMKV first (authoritative for these fields on the read side), then Room, so a
+        // crash or MMKV write before the persisted-preferences write cannot let stale MMKV
+        // values permanently override fresh Room values.
         preferences?.saveFromSettings(updated)
-        return updated
+        dao.upsert(updated)
+        updated
     }
 }
