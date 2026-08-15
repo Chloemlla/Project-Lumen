@@ -76,6 +76,7 @@ class FaceDistanceAnalyzer(private val includeTopology: Boolean = false) {
         detector.close()
         meshDetector?.close()
     }
+    }
 
     private fun Face.eyeDistancePx(): Float {
         val left = getLandmark(FaceLandmark.LEFT_EYE)?.position
