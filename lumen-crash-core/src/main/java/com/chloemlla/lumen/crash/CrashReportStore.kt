@@ -6,11 +6,14 @@ import java.io.File
 import java.io.IOException
 
 /**
- * Persists the latest crash or watchdog report outside app-private internal storage.
+ * Persists the latest crash or watchdog report, preferring app-specific external storage.
  *
  * Primary locations are app-specific external directories so the report is not kept only
- * under internal private paths (`filesDir` / `noBackupFilesDir` / `cacheDir`).
- * Legacy private copies are still readable/cleared for migration.
+ * under internal private paths (`filesDir` / `noBackupFilesDir` / `cacheDir`). When no
+ * external target is writable (e.g. `getExternalFilesDir` returns null on the device),
+ * [save] falls back to those app-private internal paths so a captured report is never
+ * silently dropped with the dying process. Legacy private copies remain readable/cleared
+ * for migration.
  */
 class CrashReportStore private constructor(
     private val externalTargetsProvider: () -> List<File>,
@@ -61,12 +64,25 @@ class CrashReportStore private constructor(
     private fun saveLocked(report: CrashReport) {
         AuthorIntegrity.verifyOrThrow("store-save")
         val payload = report.toJson().toString()
-        val targets = writableTargets()
-        if (targets.isEmpty()) {
-            throw IOException("No external crash report directory is available.")
-        }
-
         val failures = mutableListOf<Throwable>()
+        // Prefer app-external storage, then fall back to app-private internal storage when no
+        // external target is writable (e.g. getExternalFilesDir is null on the device), so a
+        // captured report is never silently dropped with the dying process.
+        if (!writeAny(payload, externalTargets(), failures)) {
+            if (!writeAny(payload, legacyPrivateTargets(), failures)) {
+                throw IOException("Unable to persist crash report.", failures.firstOrNull())
+            }
+            return
+        }
+        // External write succeeded; internal copies are now stale.
+        clearLegacyPrivateCopies()
+    }
+
+    private fun writeAny(
+        payload: String,
+        targets: List<File>,
+        failures: MutableList<Throwable>,
+    ): Boolean {
         var saved = false
         targets.forEach { file ->
             runCatching {
@@ -74,12 +90,7 @@ class CrashReportStore private constructor(
                 saved = true
             }.onFailure(failures::add)
         }
-        if (!saved) {
-            throw IOException("Unable to persist crash report.", failures.firstOrNull())
-        }
-
-        // Avoid leaving stale private copies after a successful external write.
-        clearLegacyPrivateCopies()
+        return saved
     }
 
     private fun loadLocked(): CrashReport? {
@@ -94,8 +105,6 @@ class CrashReportStore private constructor(
         }
         return null
     }
-
-    private fun writableTargets(): List<File> = externalTargets()
 
     private fun externalTargets(): List<File> = externalTargetsProvider()
 

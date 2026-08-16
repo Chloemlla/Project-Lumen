@@ -86,6 +86,35 @@ class CrashReportPersistenceTest {
     }
 
     @Test
+    fun storeFallsBackToInternalStorageWhenExternalIsUnwritable() {
+        val root = Files.createTempDirectory("lumen-crash-store").toFile()
+        try {
+            val external = File(root, "external/lumen-crash/crash_report.json")
+            val internal = File(root, "internal/crash_report.json")
+            val store = CrashReportStore(
+                externalTargets = listOf(external),
+                legacyPrivateTargets = listOf(internal),
+            )
+            // Block the external target by placing a regular file where its directory must go.
+            val blocker = File(root, "external").apply { writeText("not a directory") }
+
+            store.save(sampleReport())
+
+            assertFalse(external.exists())
+            assertTrue(internal.isFile)
+            assertEquals(sampleReport(), store.load())
+
+            // External becomes writable again: the next save migrates out and drops the internal copy.
+            assertTrue(blocker.delete())
+            store.save(sampleReport())
+            assertTrue(external.isFile)
+            assertFalse(internal.exists())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun priorExitReportRoundTripsThroughJsonWithExitReason() {
         val report = CrashReport(
             reportId = "a1b2c3d4e5f6",
