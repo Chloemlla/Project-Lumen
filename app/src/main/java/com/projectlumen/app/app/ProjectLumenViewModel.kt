@@ -39,7 +39,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 
 class ProjectLumenViewModel(
     private val database: AppDatabase,
@@ -180,7 +179,7 @@ class ProjectLumenViewModel(
         securityEvidence = {
             val ctx = ProjectLumenApplication.applicationContext()
             (ctx as? ProjectLumenApplication)?.deviceSecurityGate?.backendEvidence()
-        } as () -> JSONObject?,
+        },
     )
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val webPageRequests = _webPageRequests.asSharedFlow()

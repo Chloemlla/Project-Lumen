@@ -30,7 +30,7 @@ class ShizukuCapabilityManager(
 ) {
     private val _state = MutableStateFlow(ShizukuCapabilityState())
     val state = _state.asStateFlow()
-    private val shellServiceLock = java.lang.Object()
+    private val shellServiceLock = Any()
     @Volatile
     private var shellServiceBinder: IBinder? = null
     private val shellServiceConnection = object : ServiceConnection {

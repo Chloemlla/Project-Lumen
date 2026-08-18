@@ -92,7 +92,7 @@ internal fun LegalHubScreen(
                     onOpenDoc(LegalDocKey.MEMBERSHIP)
                 }
                 HorizontalDivider()
-                LegalRow(Icons.Outlined.ListAlt, R.string.legal_center_personal_info_collection) {
+                LegalRow(Icons.AutoMirrored.Outlined.ListAlt, R.string.legal_center_personal_info_collection) {
                     onOpenDoc(LegalDocKey.PERSONAL)
                 }
             }
@@ -210,7 +210,7 @@ internal fun LegalDocumentScreen(
     @StringRes bodyRes: Int,
 ) {
     LumenPage {
-        SectionHeader(Icons.Outlined.Article, titleRes)
+        SectionHeader(Icons.AutoMirrored.Outlined.Article, titleRes)
         val body = stringResource(bodyRes)
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             body.split('\n')

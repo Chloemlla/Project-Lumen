@@ -193,7 +193,7 @@ object ClashPartnerCompat {
         val partnerStatusAvailable = partner != null
         val clashVpnRunning =
             if (partnerStatusAvailable) {
-                partner?.get("vpnRunning") as? Boolean ?: false
+                partner!!["vpnRunning"] as? Boolean ?: false
             } else {
                 clashInstalled && vpnActive
             }
@@ -257,6 +257,7 @@ object ClashPartnerCompat {
 
     private fun isVpnActive(context: Context): Boolean {
         val cm = context.getSystemService<ConnectivityManager>() ?: return false
+        @Suppress("DEPRECATION")
         for (network in cm.allNetworks) {
             val caps = cm.getNetworkCapabilities(network) ?: continue
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return true
@@ -340,6 +341,7 @@ object ClashPartnerCompat {
     }
 
     private fun findVpnNetwork(cm: ConnectivityManager): Network? {
+        @Suppress("DEPRECATION")
         for (network in cm.allNetworks) {
             val caps = cm.getNetworkCapabilities(network) ?: continue
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {

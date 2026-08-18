@@ -152,7 +152,7 @@ class DeviceSecurityScanner(private val context: Context) {
             },
             teeAttestationOk = when {
                 tee == null -> null
-                tee.stage == TeeScanStage.READY -> tee.verdict?.let { v ->
+                tee.stage == TeeScanStage.READY -> tee.verdict.let { v ->
                     v == TeeVerdict.CONSISTENT
                 }
                 else -> false
