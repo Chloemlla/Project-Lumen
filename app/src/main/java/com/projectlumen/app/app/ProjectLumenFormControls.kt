@@ -50,6 +50,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +65,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -145,6 +147,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -223,9 +226,17 @@ internal fun SwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = LumenMinTouchTargetHeight)
             .clip(LumenPreferenceShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable(enabled = enabled) { toggle(!checked) }
+            .background(lumenNestedContainerColor)
+            // toggleable (not clickable + an independently clickable Switch) so the row is a
+            // single accessibility target that announces its on/off state once.
+            .toggleable(
+                value = checked,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = { toggle(it) },
+            )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .graphicsLayer { alpha = if (enabled) 1f else 0.52f }
             .padding(
@@ -236,7 +247,7 @@ internal fun SwitchRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LabelWithIcon(icon, labelRes, Modifier.weight(1f), maxLines = labelMaxLines)
-        Switch(checked = checked, enabled = enabled, onCheckedChange = { toggle(it) })
+        Switch(checked = checked, enabled = enabled, onCheckedChange = null)
     }
 }
 
@@ -258,7 +269,7 @@ internal fun NumberSlider(
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenPreferenceShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(lumenNestedContainerColor)
             .padding(
                 horizontal = SettingsPreferenceHorizontalPadding,
                 vertical = SettingsPreferenceVerticalPadding,
@@ -299,20 +310,7 @@ internal fun LabelWithIcon(
     maxLines: Int = 2,
 ) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap)) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(LumenIconChipShape)
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(22.dp),
-            )
-        }
+        LumenIconChip(icon)
         Text(
             stringResource(labelRes),
             modifier = Modifier.weight(1f),

@@ -267,12 +267,15 @@ internal fun LumenTopBar(
         }
     }
 
+    // The Scaffold paints `background`, so an unscrolled bar must match it exactly or a
+    // horizontal seam appears under the title. Lift to `surfaceContainer` only once the
+    // content actually scrolls beneath the bar.
     if (expanded) {
         LargeTopAppBar(
             title = titleContent,
             navigationIcon = navigationIcon,
             colors = TopAppBarDefaults.largeTopAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.background,
                 scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                 navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
@@ -284,12 +287,39 @@ internal fun LumenTopBar(
             title = titleContent,
             navigationIcon = navigationIcon,
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.background,
                 scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 titleContentColor = MaterialTheme.colorScheme.onSurface,
                 navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
             ),
             scrollBehavior = scrollBehavior,
+        )
+    }
+}
+
+/**
+ * The single icon-chip vocabulary for the app. Every leading icon badge — page intros,
+ * section headers, status lines, preference labels — renders through this so chips stop
+ * disagreeing on size (32 vs 40dp) and shape (circle vs rounded square) between screens.
+ */
+@Composable
+internal fun LumenIconChip(
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    size: Dp = 36.dp,
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(LumenIconChipShape)
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.size(size * 0.55f),
         )
     }
 }
@@ -310,22 +340,11 @@ internal fun PageIntroText(icon: ImageVector, title: String, message: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(LumenIconChipShape)
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(22.dp),
-            )
-        }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        LumenIconChip(icon)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // titleLarge (22sp) competes with the top-bar title directly above it; an in-card
+            // lead-in belongs one step down the scale.
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -346,20 +365,7 @@ internal fun SectionHeader(icon: ImageVector, title: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(18.dp),
-            )
-        }
+        LumenIconChip(icon)
         Text(
             title,
             modifier = Modifier.weight(1f),
@@ -376,20 +382,7 @@ internal fun SectionHeader(icon: ImageVector, @StringRes titleRes: Int) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(18.dp),
-            )
-        }
+        LumenIconChip(icon)
         Text(
             stringResource(titleRes),
             modifier = Modifier.weight(1f),
@@ -466,24 +459,37 @@ internal fun SettingsSection(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-        onClick = { expanded = !expanded },
-        enabled = !forceExpanded,
+        shape = LumenCardShape,
+        colors = lumenCardColors(),
+        elevation = lumenCardElevation(),
+        border = lumenCardBorder(),
     ) {
-        Column {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (!forceExpanded) Modifier.clickable { expanded = !expanded } else Modifier)
+                    .clip(LumenPreferenceShape)
+                    .background(lumenNestedContainerColor)
+                    .then(
+                        if (forceExpanded) {
+                            Modifier
+                        } else {
+                            Modifier.clickable(
+                                role = Role.Button,
+                                onClickLabel = stringResource(
+                                    if (expanded) R.string.settings_section_collapse else R.string.settings_section_expand,
+                                ),
+                            ) { expanded = !expanded }
+                        },
+                    )
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
             ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
-                )
+                LumenIconChip(icon)
                 Text(
                     title,
                     modifier = Modifier.weight(1f),
@@ -500,23 +506,23 @@ internal fun SettingsSection(
                     )
                 }
             }
+            summary?.let { summaryContent ->
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
+                    content = summaryContent,
+                )
+            }
             AnimatedVisibility(
                 visible = expanded,
                 enter = fadeIn(tween(160)) + slideInVertically(tween(160)) { -it / 8 },
                 exit = fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 8 },
             ) {
                 Column(
-                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
                     content = content,
                 )
             }
         }
-    }
-    summary?.let { summaryContent ->
-        Column(
-            modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-            content = summaryContent,
-        )
     }
 }
 
@@ -572,8 +578,8 @@ internal fun SettingsSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(LumenCardShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f))
+                    .clip(LumenPreferenceShape)
+                    .background(lumenNestedContainerColor)
                     .clickable(
                         role = Role.Button,
                         onClickLabel = stringResource(
@@ -584,20 +590,7 @@ internal fun SettingsSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(LumenIconChipShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
+                LumenIconChip(icon)
                 Text(
                     stringResource(titleRes),
                     modifier = Modifier.weight(1f),
@@ -647,7 +640,10 @@ internal fun SettingsSectionToolbar(
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(onClick = { controller.expandAll() }) {
+        TextButton(
+            onClick = { controller.expandAll() },
+            modifier = Modifier.heightIn(min = LumenMinTouchTargetHeight),
+        ) {
             Icon(
                 Icons.Outlined.UnfoldMore,
                 contentDescription = null,
@@ -656,7 +652,10 @@ internal fun SettingsSectionToolbar(
             Spacer(Modifier.width(6.dp))
             Text(stringResource(R.string.settings_expand_all))
         }
-        TextButton(onClick = { controller.collapseAll() }) {
+        TextButton(
+            onClick = { controller.collapseAll() },
+            modifier = Modifier.heightIn(min = LumenMinTouchTargetHeight),
+        ) {
             Icon(
                 Icons.Outlined.UnfoldLess,
                 contentDescription = null,
@@ -714,8 +713,8 @@ internal fun EmptyStateMessage(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
             .padding(14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -745,26 +744,13 @@ internal fun StatusLine(icon: ImageVector, text: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(18.dp),
-            )
-        }
+        LumenIconChip(icon)
         Text(
             wrappedText,
             modifier = Modifier.weight(1f),
@@ -805,7 +791,7 @@ internal fun FileSettingRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenPreferenceShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(lumenNestedContainerColor)
             .padding(
                 horizontal = SettingsPreferenceHorizontalPadding,
                 vertical = SettingsPreferenceVerticalPadding,
@@ -870,7 +856,7 @@ internal fun NotificationRequirementCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(lumenNestedContainerColor)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(
                 horizontal = SettingsPreferenceHorizontalPadding,
@@ -883,20 +869,7 @@ internal fun NotificationRequirementCard(
             horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(LumenIconChipShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
+            LumenIconChip(icon)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(titleRes),

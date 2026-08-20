@@ -239,8 +239,8 @@ internal fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
     Column(
         modifier = Modifier
             .weight(1f)
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -283,8 +283,8 @@ internal fun MetricRow(label: String, value: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -360,8 +360,10 @@ internal fun LumenPage(horizontalAlignment: Alignment.Horizontal = Alignment.Sta
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = pageTokens.maxContentWidthDp.dp)
+                // No animateContentSize here: animating the height of the same node that owns
+                // verticalScroll fights the scroll offset and drops frames whenever a card
+                // expands mid-scroll. Individual cards animate their own size instead.
                 .verticalScroll(scrollState)
-                .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
                 .padding(
                     PaddingValues(
                         start = horizontalPadding.dp,

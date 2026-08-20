@@ -32,9 +32,16 @@ private val LightColors = lightColorScheme(
     tertiaryContainer = LumenIndigoContainer,
     onTertiaryContainer = LumenOnIndigoContainer,
     surface = LumenSurface,
+    onSurface = LumenOnSurface,
     surfaceVariant = LumenSurfaceVariant,
+    onSurfaceVariant = LumenOnSurfaceVariant,
+    surfaceContainerLowest = LumenSurfaceContainerLowest,
+    surfaceContainerLow = LumenSurfaceContainerLow,
     surfaceContainer = LumenSurfaceContainer,
+    surfaceContainerHigh = LumenSurfaceContainerHigh,
+    surfaceContainerHighest = LumenSurfaceContainerHighest,
     background = LumenBackground,
+    onBackground = LumenOnSurface,
     outline = LumenOutline,
     outlineVariant = LumenOutlineVariant,
 )
@@ -53,9 +60,16 @@ private val DarkColors = darkColorScheme(
     tertiaryContainer = LumenIndigoContainerDark,
     onTertiaryContainer = LumenOnIndigoContainerDark,
     surface = LumenSurfaceDark,
+    onSurface = LumenOnSurfaceDark,
     surfaceVariant = LumenSurfaceVariantDark,
+    onSurfaceVariant = LumenOnSurfaceVariantDark,
+    surfaceContainerLowest = LumenSurfaceContainerLowestDark,
+    surfaceContainerLow = LumenSurfaceContainerLowDark,
     surfaceContainer = LumenSurfaceContainerDark,
+    surfaceContainerHigh = LumenSurfaceContainerHighDark,
+    surfaceContainerHighest = LumenSurfaceContainerHighestDark,
     background = LumenBackgroundDark,
+    onBackground = LumenOnSurfaceDark,
     outline = LumenOutlineDark,
     outlineVariant = LumenOutlineVariantDark,
 )
@@ -135,7 +149,11 @@ private fun ColorScheme.applyTemplatePalette(
             onSurface = palette.text100,
             surfaceVariant = palette.bg300,
             onSurfaceVariant = palette.text200,
+            surfaceContainerLowest = palette.bg100,
+            surfaceContainerLow = palette.bg100.blend(palette.bg200, 0.5f),
             surfaceContainer = palette.bg200,
+            surfaceContainerHigh = palette.bg200.blend(palette.bg300, 0.5f),
+            surfaceContainerHighest = palette.bg300,
             background = palette.bg100,
             onBackground = palette.text100,
             outline = palette.text200,
@@ -167,6 +185,26 @@ private fun ColorScheme.applyTemplatePalette(
     } else {
         backgroundSeed.blend(Color.White, 0.76f)
     }
+    val surfaceContainerLowest = if (darkTheme) {
+        backgroundSeed.blend(Color.Black, 0.88f)
+    } else {
+        backgroundSeed.blend(Color.White, 0.95f)
+    }
+    val surfaceContainerLow = if (darkTheme) {
+        backgroundSeed.blend(Color.Black, 0.74f)
+    } else {
+        backgroundSeed.blend(Color.White, 0.82f)
+    }
+    val surfaceContainerHigh = if (darkTheme) {
+        backgroundSeed.blend(Color.Black, 0.64f)
+    } else {
+        backgroundSeed.blend(Color.White, 0.70f)
+    }
+    val surfaceContainerHighest = if (darkTheme) {
+        backgroundSeed.blend(Color.Black, 0.58f)
+    } else {
+        backgroundSeed.blend(Color.White, 0.64f)
+    }
     val surfaceVariant = if (darkTheme) {
         backgroundSeed.blend(Color.Black, 0.58f)
     } else {
@@ -187,7 +225,11 @@ private fun ColorScheme.applyTemplatePalette(
         onSurface = surface.contentColor(),
         surfaceVariant = surfaceVariant,
         onSurfaceVariant = surfaceVariant.contentColor(variant = true),
+        surfaceContainerLowest = surfaceContainerLowest,
+        surfaceContainerLow = surfaceContainerLow,
         surfaceContainer = surfaceContainer,
+        surfaceContainerHigh = surfaceContainerHigh,
+        surfaceContainerHighest = surfaceContainerHighest,
         background = background,
         onBackground = background.contentColor(),
         outline = primarySeed.blend(if (darkTheme) Color.White else Color.Black, if (darkTheme) 0.46f else 0.54f),

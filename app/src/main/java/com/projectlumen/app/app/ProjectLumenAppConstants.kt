@@ -227,9 +227,33 @@ internal enum class SystemBackgroundColor(
 
 internal val LumenCardShape = RoundedCornerShape(20.dp)
 
-internal val LumenPreferenceShape = RoundedCornerShape(20.dp)
+// Nested rows sit inside a 20dp card with 12-16dp padding, so their radius has to be
+// smaller than the parent's or the corners read as concentric rings.
+internal val LumenPreferenceShape = RoundedCornerShape(14.dp)
 
 internal val LumenIconChipShape = RoundedCornerShape(12.dp)
+
+/** Minimum height for any row that is itself the tap target. */
+internal val LumenMinTouchTargetHeight = 48.dp
+
+/**
+ * Background for a tile nested inside a Lumen card. Cards are painted from
+ * `surfaceContainerLow`, so nested content has to move one ladder step or it disappears
+ * into its own parent.
+ */
+internal val lumenNestedContainerColor: Color
+    @Composable get() = MaterialTheme.colorScheme.surfaceContainerHigh
+
+/**
+ * How much a card should stand out on its page. Screens are long stacks of cards, so at
+ * most one [Primary] card per screen — everything else is [Standard] or [Quiet].
+ */
+internal enum class LumenCardEmphasis {
+    Primary,
+    Standard,
+    Quiet,
+}
+
 @Composable
 internal fun lumenCardElevation() = CardDefaults.cardElevation(
     defaultElevation = 0.dp,
@@ -241,12 +265,20 @@ internal fun lumenCardElevation() = CardDefaults.cardElevation(
 )
 
 @Composable
-internal fun lumenCardColors() = CardDefaults.cardColors(
-    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+internal fun lumenCardColors(emphasis: LumenCardEmphasis = LumenCardEmphasis.Standard) = CardDefaults.cardColors(
+    containerColor = when (emphasis) {
+        LumenCardEmphasis.Primary -> MaterialTheme.colorScheme.surfaceContainer
+        LumenCardEmphasis.Standard -> MaterialTheme.colorScheme.surfaceContainerLow
+        LumenCardEmphasis.Quiet -> MaterialTheme.colorScheme.surfaceContainerLowest
+    },
     contentColor = MaterialTheme.colorScheme.onSurface,
 )
 
 @Composable
-internal fun lumenCardBorder(): BorderStroke? = null
+internal fun lumenCardBorder(emphasis: LumenCardEmphasis = LumenCardEmphasis.Standard): BorderStroke? = when (emphasis) {
+    LumenCardEmphasis.Primary -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.32f))
+    LumenCardEmphasis.Standard -> null
+    LumenCardEmphasis.Quiet -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+}
 
 
