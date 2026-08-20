@@ -130,13 +130,14 @@ class EyeCareTelemetryReporter(
         val settings = settingsRepository.get() ?: return null
         if (!settings.statsEnabled && !settings.diagnosticTelemetryUploadEnabled) return null
         val runtime = RuntimeRepository(database.runtimeStateDao()).getOrDefault()
+        val statDate = todayKey(nowMillis)
         val stats = if (settings.statsEnabled) {
-            database.dailyEyeStatsDao().get(todayKey(nowMillis)) ?: DailyEyeStatsEntity(statDate = todayKey(nowMillis))
+            database.dailyEyeStatsDao().get(statDate) ?: DailyEyeStatsEntity(statDate = statDate)
         } else {
             null
         }
         val pomodoroStats = if (settings.statsEnabled) {
-            database.dailyPomodoroStatsDao().get(todayKey(nowMillis))
+            database.dailyPomodoroStatsDao().get(statDate)
         } else {
             null
         }
@@ -340,11 +341,11 @@ class EyeCareTelemetryReporter(
     private fun frontCameraResolution(): String {
         return runCatching {
             val manager = context.getSystemService(CameraManager::class.java) ?: return "unknown"
-            val cameraId = manager.cameraIdList.firstOrNull { id ->
-                manager.getCameraCharacteristics(id)
-                    .get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
+            val characteristics = manager.cameraIdList.firstNotNullOfOrNull { id ->
+                manager.getCameraCharacteristics(id).takeIf {
+                    it.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
+                }
             } ?: return "unknown"
-            val characteristics = manager.getCameraCharacteristics(cameraId)
             val size = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                 ?.getOutputSizes(ImageFormat.YUV_420_888)
                 ?.maxByOrNull { it.width * it.height }

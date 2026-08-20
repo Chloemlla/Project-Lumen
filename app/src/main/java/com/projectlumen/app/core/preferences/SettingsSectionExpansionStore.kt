@@ -1,6 +1,7 @@
 package com.projectlumen.app.core.preferences
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.annotation.StringRes
 
 /**
@@ -10,11 +11,11 @@ import androidx.annotation.StringRes
 internal object SettingsSectionExpansionStore {
     private const val PREFS_NAME = "lumen_settings_section_expansion"
 
+    @Volatile
+    private var cachedPrefs: SharedPreferences? = null
+
     fun isExpanded(context: Context, title: String, default: Boolean): Boolean {
-        val prefs = prefs(context)
-        val key = key(title)
-        if (!prefs.contains(key)) return default
-        return prefs.getBoolean(key, default)
+        return prefs(context).getBoolean(key(title), default)
     }
 
     fun setExpanded(context: Context, title: String, expanded: Boolean) {
@@ -22,18 +23,17 @@ internal object SettingsSectionExpansionStore {
     }
 
     fun isExpanded(context: Context, @StringRes titleRes: Int, default: Boolean): Boolean {
-        val prefs = prefs(context)
-        val key = key(titleRes)
-        if (!prefs.contains(key)) return default
-        return prefs.getBoolean(key, default)
+        return prefs(context).getBoolean(key(titleRes), default)
     }
 
     fun setExpanded(context: Context, @StringRes titleRes: Int, expanded: Boolean) {
         prefs(context).edit().putBoolean(key(titleRes), expanded).apply()
     }
 
-    private fun prefs(context: Context) =
-        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private fun prefs(context: Context): SharedPreferences =
+        cachedPrefs ?: context.applicationContext
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .also { cachedPrefs = it }
 
     private fun key(title: String): String = "section_str_$title"
 

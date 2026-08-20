@@ -199,7 +199,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 internal fun TrendCard(uiState: ProjectLumenUiState) {
-    val recent = uiState.eyeStats.take(7).reversed()
+    val recent = remember(uiState.eyeStats) { uiState.eyeStats.take(7).reversed() }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -251,21 +251,23 @@ internal fun TrendCard(uiState: ProjectLumenUiState) {
 
 @Composable
 internal fun HabitSuggestionCard(uiState: ProjectLumenUiState) {
-    val recentEyeStats = uiState.eyeStats.take(14)
-    val completedBreaks = recentEyeStats.sumOf { it.completedBreakCount }
-    val skips = recentEyeStats.sumOf { it.skipCount }
-    val totalBreakDecisions = completedBreaks + skips
-    val skipRate = if (totalBreakDecisions > 0) (skips * 100) / totalBreakDecisions else 0
-    val completionRate = if (totalBreakDecisions > 0) (completedBreaks * 100) / totalBreakDecisions else 100
-    val maxContinuousMinutes = (recentEyeStats.maxOfOrNull { it.maxContinuousWorkSeconds } ?: 0L) / 60L
-    val lowLightWarnings = recentEyeStats.sumOf { it.lowLightWarningCount }
-    val eyeDryWarnings = recentEyeStats.sumOf { it.eyeDryWarningCount }
-    val suggestionIds = buildList {
-        if (skipRate > 50 && completionRate < 40) add(R.string.habit_suggestion_shorter_break)
-        if (maxContinuousMinutes > uiState.dailyGoal.maxContinuousWorkMinutes.toLong()) add(R.string.habit_suggestion_strict_overlay)
-        if (lowLightWarnings >= 3) add(R.string.habit_suggestion_room_light)
-        if (eyeDryWarnings >= 3) add(R.string.habit_suggestion_blink_pause)
-        if (isEmpty()) add(R.string.habit_suggestion_keep_rhythm)
+    val suggestionIds = remember(uiState.eyeStats, uiState.dailyGoal.maxContinuousWorkMinutes) {
+        val recentEyeStats = uiState.eyeStats.take(14)
+        val completedBreaks = recentEyeStats.sumOf { it.completedBreakCount }
+        val skips = recentEyeStats.sumOf { it.skipCount }
+        val totalBreakDecisions = completedBreaks + skips
+        val skipRate = if (totalBreakDecisions > 0) (skips * 100) / totalBreakDecisions else 0
+        val completionRate = if (totalBreakDecisions > 0) (completedBreaks * 100) / totalBreakDecisions else 100
+        val maxContinuousMinutes = (recentEyeStats.maxOfOrNull { it.maxContinuousWorkSeconds } ?: 0L) / 60L
+        val lowLightWarnings = recentEyeStats.sumOf { it.lowLightWarningCount }
+        val eyeDryWarnings = recentEyeStats.sumOf { it.eyeDryWarningCount }
+        buildList {
+            if (skipRate > 50 && completionRate < 40) add(R.string.habit_suggestion_shorter_break)
+            if (maxContinuousMinutes > uiState.dailyGoal.maxContinuousWorkMinutes.toLong()) add(R.string.habit_suggestion_strict_overlay)
+            if (lowLightWarnings >= 3) add(R.string.habit_suggestion_room_light)
+            if (eyeDryWarnings >= 3) add(R.string.habit_suggestion_blink_pause)
+            if (isEmpty()) add(R.string.habit_suggestion_keep_rhythm)
+        }.distinct()
     }
     Card(
         modifier = Modifier
@@ -277,7 +279,7 @@ internal fun HabitSuggestionCard(uiState: ProjectLumenUiState) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.WarningAmber, R.string.habit_suggestions)
-            suggestionIds.distinct().forEach { suggestionRes ->
+            suggestionIds.forEach { suggestionRes ->
                 StatusLine(Icons.Outlined.CheckCircle, stringResource(suggestionRes))
             }
         }
@@ -289,17 +291,20 @@ internal fun AdvancedStatsCard(
     eyeStats: List<DailyEyeStatsEntity>,
     pomodoroStats: List<com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity>,
 ) {
-    val workSeconds = eyeStats.sumOf { it.workingSeconds }
-    val restSeconds = eyeStats.sumOf { it.restSeconds }
-    val completedBreaks = eyeStats.sumOf { it.completedBreakCount }
-    val skips = eyeStats.sumOf { it.skipCount }
+    val workSeconds = remember(eyeStats) { eyeStats.sumOf { it.workingSeconds } }
+    val restSeconds = remember(eyeStats) { eyeStats.sumOf { it.restSeconds } }
+    val completedBreaks = remember(eyeStats) { eyeStats.sumOf { it.completedBreakCount } }
+    val skips = remember(eyeStats) { eyeStats.sumOf { it.skipCount } }
     val totalBreakDecisions = (completedBreaks + skips).coerceAtLeast(1)
-    val averageContinuousMinutes = eyeStats
-        .filter { it.maxContinuousWorkSeconds > 0L }
-        .map { it.maxContinuousWorkSeconds / 60L }
-        .average()
-        .takeIf { !it.isNaN() }
-        ?: 0.0
+    val averageContinuousMinutes = remember(eyeStats) {
+        eyeStats
+            .filter { it.maxContinuousWorkSeconds > 0L }
+            .map { it.maxContinuousWorkSeconds / 60L }
+            .average()
+            .takeIf { !it.isNaN() }
+            ?: 0.0
+    }
+    val completedTomatoes = remember(pomodoroStats) { pomodoroStats.sumOf { it.completedTomatoCount } }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -315,7 +320,7 @@ internal fun AdvancedStatsCard(
             MetricRow(R.string.rest_completion_rate, stringResource(R.string.percent_value, ((completedBreaks * 100) / totalBreakDecisions).coerceIn(0, 100)))
             MetricRow(R.string.skip_rate, stringResource(R.string.percent_value, ((skips * 100) / totalBreakDecisions).coerceIn(0, 100)))
             MetricRow(R.string.average_continuous_work, stringResource(R.string.minutes_value, averageContinuousMinutes.roundToInt()))
-            MetricRow(R.string.completed_tomatoes, pomodoroStats.sumOf { it.completedTomatoCount }.toString())
+            MetricRow(R.string.completed_tomatoes, completedTomatoes.toString())
         }
     }
 }

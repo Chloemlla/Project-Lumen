@@ -48,6 +48,13 @@ object ProjectLumenRequestSigner {
     }
 
     private fun hmacSha256Hex(payload: String): String {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(signingKey())
+        return mac.doFinal(payload.toByteArray(Charsets.UTF_8)).toHex()
+    }
+
+    private fun signingKey(): SecretKeySpec {
+        cachedSigningKey?.let { return it }
         val nativeSecret = NativeSecurityBridge.requestSigningSecretOrNull()
             ?.trim()
             ?.takeIf { it.isNotBlank() }
@@ -57,16 +64,27 @@ object ProjectLumenRequestSigner {
             error("Project Lumen native request signing bridge is unavailable.")
         }
         require(secret.isNotBlank()) { "Project Lumen request signing secret is not configured." }
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
-        return mac.doFinal(payload.toByteArray(Charsets.UTF_8)).toHex()
+        return SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256")
+            .also { cachedSigningKey = it }
     }
 
     private fun sha256Hex(bytes: ByteArray): String {
         return MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
     }
 
-    private fun ByteArray.toHex(): String = joinToString(separator = "") { "%02x".format(it) }
+    private fun ByteArray.toHex(): String {
+        val output = CharArray(size * 2)
+        for (index in indices) {
+            val unsigned = this[index].toInt() and 0xff
+            output[index * 2] = HEX_CHARS[unsigned ushr 4]
+            output[index * 2 + 1] = HEX_CHARS[unsigned and 0x0f]
+        }
+        return String(output)
+    }
+
+    @Volatile
+    private var cachedSigningKey: SecretKeySpec? = null
 
     private const val FALLBACK_REQUEST_SIGNING_SECRET = "project-lumen-local-request-signing-key"
+    private const val HEX_CHARS = "0123456789abcdef"
 }

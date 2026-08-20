@@ -18,8 +18,7 @@ object QuietHours {
         val start = settings.quietStartMinute.coerceIn(0, 1439)
         val end = settings.quietEndMinute.coerceIn(0, 1439)
         if (start == end) return false
-        val now = Instant.ofEpochMilli(nowMillis).atZone(ZoneId.systemDefault()).toLocalTime()
-        val currentMinute = now.hour * 60 + now.minute
+        val currentMinute = localMinuteOfDay(nowMillis)
         return if (start < end) {
             currentMinute in start until end
         } else {
@@ -42,28 +41,35 @@ object QuietHours {
     }
 
     fun activeStartMillis(settings: AppSettingsEntity, nowMillis: Long): Long {
-        return activeBoundary(settings, nowMillis).first
+        return activeBoundary(settings, nowMillis, wantStart = true)
     }
 
     fun activeEndMillis(settings: AppSettingsEntity, nowMillis: Long): Long {
-        return activeBoundary(settings, nowMillis).second
+        return activeBoundary(settings, nowMillis, wantStart = false)
     }
 
-    private fun activeBoundary(settings: AppSettingsEntity, nowMillis: Long): Pair<Long, Long> {
+    private fun activeBoundary(settings: AppSettingsEntity, nowMillis: Long, wantStart: Boolean): Long {
         val zone = ZoneId.systemDefault()
         val now = Instant.ofEpochMilli(nowMillis).atZone(zone)
         val startMinute = settings.quietStartMinute.coerceIn(0, 1439)
         val endMinute = settings.quietEndMinute.coerceIn(0, 1439)
         val currentMinute = now.hour * 60 + now.minute
         val date = now.toLocalDate()
-        val (startDate, endDate) = if (startMinute < endMinute) {
-            date to date
+        return if (startMinute < endMinute) {
+            if (wantStart) minuteAt(date, startMinute, zone) else minuteAt(date, endMinute, zone)
         } else if (currentMinute >= startMinute) {
-            date to date.plusDays(1)
+            if (wantStart) minuteAt(date, startMinute, zone) else minuteAt(date.plusDays(1), endMinute, zone)
         } else {
-            date.minusDays(1) to date
+            if (wantStart) minuteAt(date.minusDays(1), startMinute, zone) else minuteAt(date, endMinute, zone)
         }
-        return minuteAt(startDate, startMinute, zone) to minuteAt(endDate, endMinute, zone)
+    }
+
+    private fun localMinuteOfDay(nowMillis: Long): Int {
+        val offsetSeconds = ZoneId.systemDefault().rules
+            .getOffset(Instant.ofEpochMilli(nowMillis))
+            .totalSeconds
+        val localSeconds = nowMillis.floorDiv(1000L) + offsetSeconds
+        return (localSeconds.mod(86_400L) / 60L).toInt()
     }
 
     private fun minuteAt(date: LocalDate, minuteOfDay: Int, zone: ZoneId): Long {

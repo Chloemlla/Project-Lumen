@@ -43,6 +43,12 @@ private object RuntimeStateMmkvStore {
     private val mmkv by lazy { ProjectLumenMmkv.multiProcessMmkvWithId(STORE_ID) }
     private val state by lazy { MutableStateFlow(readFromMmkv()) }
 
+    @Volatile
+    private var migrationComplete = false
+
+    @Volatile
+    private var parsedCache: Pair<String, RuntimeStateEntity>? = null
+
     fun observe(dao: RuntimeStateDao): Flow<RuntimeStateEntity?> {
         return flow {
             ensureMigrated(dao)
@@ -63,24 +69,37 @@ private object RuntimeStateMmkvStore {
     }
 
     private suspend fun ensureMigrated(dao: RuntimeStateDao) {
-        if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) return
+        if (migrationComplete) return
+        if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
+            migrationComplete = true
+            return
+        }
         migrationLock.withLock {
-            if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) return
+            if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
+                migrationComplete = true
+                return
+            }
             if (!mmkv.containsKey(KEY_STATE_JSON)) {
                 dao.get()?.let(::writeToMmkv)
             }
             mmkv.encode(KEY_MMKV_MIGRATION_COMPLETE, true)
+            migrationComplete = true
             state.value = readFromMmkv()
         }
     }
 
     private fun readFromMmkv(): RuntimeStateEntity? {
         val json = mmkv.decodeString(KEY_STATE_JSON)?.takeIf { it.isNotBlank() } ?: return null
-        return runCatching { JSONObject(json).toRuntimeState() }.getOrNull()
+        parsedCache?.let { cached -> if (cached.first == json) return cached.second }
+        val runtime = runCatching { JSONObject(json).toRuntimeState() }.getOrNull() ?: return null
+        parsedCache = json to runtime
+        return runtime
     }
 
     private fun writeToMmkv(runtime: RuntimeStateEntity) {
-        mmkv.encode(KEY_STATE_JSON, runtime.toJson().toString())
+        val json = runtime.toJson().toString()
+        mmkv.encode(KEY_STATE_JSON, json)
+        parsedCache = json to runtime
         state.value = runtime
     }
 

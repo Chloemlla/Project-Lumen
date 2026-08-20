@@ -11,6 +11,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
@@ -81,17 +82,26 @@ fun ProjectLumenTheme(
         darkTheme -> DarkColors
         else -> LightColors
     }
-    val colorScheme = if (useDynamicColors) {
-        baseColorScheme
-    } else {
-        baseColorScheme.applyTemplatePalette(
-            primaryHex = themePrimaryColor,
-            backgroundHex = themeBackgroundColor,
-            paletteJson = themePaletteJson,
-        )
+    val colorScheme = remember(
+        baseColorScheme,
+        useDynamicColors,
+        themePrimaryColor,
+        themeBackgroundColor,
+        themePaletteJson,
+    ) {
+        if (useDynamicColors) {
+            baseColorScheme
+        } else {
+            baseColorScheme.applyTemplatePalette(
+                primaryHex = themePrimaryColor,
+                backgroundHex = themeBackgroundColor,
+                paletteJson = themePaletteJson,
+            )
+        }
     }
+    val fixedColorRoles = remember(colorScheme) { FixedColorRoles.fromActiveScheme(colorScheme) }
     CompositionLocalProvider(
-        LocalFixedColorRoles provides FixedColorRoles.fromActiveScheme(colorScheme),
+        LocalFixedColorRoles provides fixedColorRoles,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

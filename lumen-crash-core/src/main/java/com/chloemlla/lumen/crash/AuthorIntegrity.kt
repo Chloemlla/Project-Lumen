@@ -9,11 +9,7 @@ object AuthorIntegrity {
     private val expectedDigest: ByteArray = hexToBytes(CrashAuthorAttribution.FINGERPRINT_HEX)
 
     @JvmStatic
-    fun fingerprintHex(): String {
-        return MessageDigest.getInstance("SHA-256")
-            .digest(CrashAuthorAttribution.payload().toByteArray(Charsets.UTF_8))
-            .joinToString(separator = "") { "%02x".format(it) }
-    }
+    fun fingerprintHex(): String = toHex(payloadDigest())
 
     @JvmStatic
     fun verifyOrThrow(reason: String = "author-integrity") {
@@ -32,12 +28,10 @@ object AuthorIntegrity {
         ) {
             failures += "footer-label"
         }
-        val liveHex = fingerprintHex()
-        if (liveHex != CrashAuthorAttribution.FINGERPRINT_HEX) {
+        val liveDigest = payloadDigest()
+        if (toHex(liveDigest) != CrashAuthorAttribution.FINGERPRINT_HEX) {
             failures += "fingerprint-const"
         }
-        val liveDigest = MessageDigest.getInstance("SHA-256")
-            .digest(CrashAuthorAttribution.payload().toByteArray(Charsets.UTF_8))
         if (!liveDigest.contentEquals(expectedDigest)) {
             failures += "fingerprint-digest"
         }
@@ -58,12 +52,26 @@ object AuthorIntegrity {
         )
     }
 
+    private fun payloadDigest(): ByteArray =
+        MessageDigest.getInstance("SHA-256")
+            .digest(CrashAuthorAttribution.payload().toByteArray(Charsets.UTF_8))
+
+    private fun toHex(bytes: ByteArray): String = buildString(bytes.size * 2) {
+        bytes.forEach { byte ->
+            val value = byte.toInt() and 0xFF
+            append(HEX_DIGITS[value ushr 4])
+            append(HEX_DIGITS[value and 0x0F])
+        }
+    }
+
     private fun hexToBytes(hex: String): ByteArray {
         require(hex.length % 2 == 0) { "Invalid fingerprint hex length." }
         return ByteArray(hex.length / 2) { index ->
             hex.substring(index * 2, index * 2 + 2).toInt(16).toByte()
         }
     }
+
+    private const val HEX_DIGITS = "0123456789abcdef"
 }
 
 data class AuthorBlock(

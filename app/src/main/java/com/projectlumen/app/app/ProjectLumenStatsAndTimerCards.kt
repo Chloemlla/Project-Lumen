@@ -234,13 +234,15 @@ internal fun GoalProgressCard(uiState: ProjectLumenUiState) {
     val goal = uiState.dailyGoal
     val eye = uiState.eyeStats.firstOrNull()
     val pomodoro = uiState.pomodoroStats.firstOrNull()
-    val eyeActiveDates = uiState.eyeStats.take(7)
-        .filter { it.workingSeconds > 0L || it.restSeconds > 0L }
-        .map { it.statDate }
-        .toSet()
-    val activeDays = eyeActiveDates.size + uiState.pomodoroStats.take(7)
-        .filter { it.completedFocusSessions > 0 && it.statDate !in eyeActiveDates }
-        .size
+    val activeDays = remember(uiState.eyeStats, uiState.pomodoroStats) {
+        val eyeActiveDates = uiState.eyeStats.take(7)
+            .filter { it.workingSeconds > 0L || it.restSeconds > 0L }
+            .map { it.statDate }
+            .toSet()
+        eyeActiveDates.size + uiState.pomodoroStats.take(7)
+            .filter { it.completedFocusSessions > 0 && it.statDate !in eyeActiveDates }
+            .size
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -310,7 +312,7 @@ internal fun TimerCard(
     val timerText = if (seconds > 0) compactTime(seconds) else fallbackText
     val running = seconds > 0
     val transition = rememberInfiniteTransition(label = "timerPulse")
-    val pulseScale by transition.animateFloat(
+    val pulseScale = transition.animateFloat(
         initialValue = 1f,
         targetValue = 1.035f,
         animationSpec = infiniteRepeatable(
@@ -319,7 +321,6 @@ internal fun TimerCard(
         ),
         label = "timerPulseScale",
     )
-    val pulse = if (running) pulseScale else 1f
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -357,6 +358,7 @@ internal fun TimerCard(
                         modifier = Modifier
                             .padding(vertical = 56.dp)
                             .graphicsLayer {
+                                val pulse = if (running) pulseScale.value else 1f
                                 scaleX = pulse
                                 scaleY = pulse
                             },
@@ -367,6 +369,7 @@ internal fun TimerCard(
                         modifier = Modifier
                             .size(210.dp)
                             .graphicsLayer {
+                                val pulse = if (running) pulseScale.value else 1f
                                 scaleX = pulse
                                 scaleY = pulse
                             },

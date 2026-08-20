@@ -84,7 +84,7 @@ class ReminderEngine {
         state: RuntimeStateEntity,
         nowMillis: Long,
     ): RuntimeTransition? {
-        if (QuietHours.isPauseTimerActive(settings, nowMillis) && state.reminderPhase in activeWorkPhases) {
+        if (state.reminderPhase in activeWorkPhases && QuietHours.isPauseTimerActive(settings, nowMillis)) {
             val workEndAt = QuietHours.activeStartMillis(settings, nowMillis).coerceAtMost(nowMillis)
             return RuntimeTransition(
                 nextRuntime = newWorkingStateFrom(
@@ -146,7 +146,7 @@ class ReminderEngine {
         nowMillis: Long,
     ): RuntimeStateEntity {
         if (!settings.reminderEnabled) return RuntimeStateEntity(updatedAt = nowMillis)
-        if (QuietHours.isPauseTimerActive(settings, nowMillis) && state.reminderPhase in activeWorkPhases) {
+        if (state.reminderPhase in activeWorkPhases && QuietHours.isPauseTimerActive(settings, nowMillis)) {
             return newWorkingStateFrom(settings, QuietHours.activeEndMillis(settings, nowMillis), nowMillis)
         }
         return when (state.reminderPhase) {

@@ -5,7 +5,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
-import androidx.core.graphics.scale
 import com.projectlumen.app.core.proximity.FaceDistanceSample
 import com.projectlumen.app.core.proximity.FaceTopologyPoint
 import java.util.concurrent.atomic.AtomicReference
@@ -20,6 +19,34 @@ data class DeveloperDebugFrame(
 
 object DeveloperDebugFrameStore {
     private val latestFrame = AtomicReference<DeveloperDebugFrame?>(null)
+    private val thumbnailPaint by lazy { Paint(Paint.FILTER_BITMAP_FLAG) }
+    private val framePaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = Color.argb(210, 255, 82, 82)
+            strokeWidth = 3f
+        }
+    }
+    private val contourPaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = Color.argb(230, 105, 240, 174)
+            strokeWidth = 2.5f
+        }
+    }
+    private val meshPaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = Color.argb(120, 64, 196, 255)
+            strokeWidth = 1f
+        }
+    }
+    private val pointPaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            color = Color.argb(220, 255, 214, 102)
+        }
+    }
 
     fun latest(): DeveloperDebugFrame? = latestFrame.get()
 
@@ -49,50 +76,32 @@ object DeveloperDebugFrameStore {
         val scale = (maxWidth.toFloat() / bitmap.width.toFloat()).coerceAtMost(1f)
         val width = (bitmap.width * scale).roundToInt().coerceAtLeast(1)
         val height = (bitmap.height * scale).roundToInt().coerceAtLeast(1)
-        val output = bitmap.scale(width, height)
-            .copy(Bitmap.Config.ARGB_8888, true)
-        if (sample != null) drawTopology(output, sample, scale)
+        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        canvas.drawBitmap(bitmap, null, Rect(0, 0, width, height), thumbnailPaint)
+        if (sample != null) drawTopology(canvas, sample, scale)
         return output
     }
 
-    private fun drawTopology(bitmap: Bitmap, sample: FaceDistanceSample, scale: Float) {
-        val canvas = Canvas(bitmap)
-        val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            color = Color.argb(210, 255, 82, 82)
-            strokeWidth = 3f
-        }
-        val contourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            color = Color.argb(230, 105, 240, 174)
-            strokeWidth = 2.5f
-        }
-        val meshPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            color = Color.argb(120, 64, 196, 255)
-            strokeWidth = 1f
-        }
-        val pointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = Color.argb(220, 255, 214, 102)
-        }
-
+    private fun drawTopology(canvas: Canvas, sample: FaceDistanceSample, scale: Float) {
         if (sample.faceWidthPx > 0) {
             canvas.drawRect(
-                Rect(
-                    (sample.faceLeftPx * scale).roundToInt(),
-                    (sample.faceTopPx * scale).roundToInt(),
-                    (sample.faceRightPx * scale).roundToInt(),
-                    (sample.faceBottomPx * scale).roundToInt(),
-                ),
+                (sample.faceLeftPx * scale).roundToInt().toFloat(),
+                (sample.faceTopPx * scale).roundToInt().toFloat(),
+                (sample.faceRightPx * scale).roundToInt().toFloat(),
+                (sample.faceBottomPx * scale).roundToInt().toFloat(),
                 framePaint,
             )
         }
-        val pointsByIndex = sample.meshPoints.associateBy { it.index }
+        val meshPoints = sample.meshPoints
+        val pointsByIndex = arrayOfNulls<FaceTopologyPoint>((meshPoints.maxOfOrNull { it.index } ?: -1) + 1)
+        meshPoints.forEach { point ->
+            if (point.index >= 0) pointsByIndex[point.index] = point
+        }
         sample.meshTriangles.forEach { triangle ->
-            val first = pointsByIndex[triangle.firstPointIndex]
-            val second = pointsByIndex[triangle.secondPointIndex]
-            val third = pointsByIndex[triangle.thirdPointIndex]
+            val first = pointsByIndex.getOrNull(triangle.firstPointIndex)
+            val second = pointsByIndex.getOrNull(triangle.secondPointIndex)
+            val third = pointsByIndex.getOrNull(triangle.thirdPointIndex)
             if (first != null && second != null && third != null) {
                 canvas.drawScaledLine(first, second, scale, meshPaint)
                 canvas.drawScaledLine(second, third, scale, meshPaint)
@@ -100,11 +109,12 @@ object DeveloperDebugFrameStore {
             }
         }
         sample.contourPolylines.forEach { polyline ->
-            polyline.points.zipWithNext { first, second ->
-                canvas.drawScaledLine(first, second, scale, contourPaint)
+            val points = polyline.points
+            for (index in 1 until points.size) {
+                canvas.drawScaledLine(points[index - 1], points[index], scale, contourPaint)
             }
         }
-        sample.meshPoints.forEach { point ->
+        meshPoints.forEach { point ->
             canvas.drawCircle(point.xPx * scale, point.yPx * scale, 1.5f, pointPaint)
         }
     }

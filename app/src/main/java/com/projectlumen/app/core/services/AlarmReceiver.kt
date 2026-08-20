@@ -33,7 +33,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 val nowMillis = System.currentTimeMillis()
                 val reconciledRuntime = reconcileRuntime(app, notifications, settings, runtime, nowMillis)
                 val suppressReminder = QuietHours.suppressesReminderNotifications(settings, nowMillis) &&
-                    intent.action in setOf(ACTION_PRE_ALERT, ACTION_BREAK_DUE, ACTION_BREAK_DONE)
+                    intent.action in REMINDER_ACTIONS
                 notifications.ensureChannels()
                 if (settings.notificationEnabled && !suppressReminder) {
                     when (intent.action) {
@@ -135,5 +135,7 @@ class AlarmReceiver : BroadcastReceiver() {
         const val ACTION_BREAK_DUE = "com.projectlumen.app.action.BREAK_DUE"
         const val ACTION_BREAK_DONE = "com.projectlumen.app.action.BREAK_DONE"
         const val ACTION_POMODORO = "com.projectlumen.app.action.POMODORO"
+
+        private val REMINDER_ACTIONS = setOf(ACTION_PRE_ALERT, ACTION_BREAK_DUE, ACTION_BREAK_DONE)
     }
 }

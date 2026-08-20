@@ -148,6 +148,9 @@ fun LumenCrashReportScreen(
             if (parts.size == 2) parts[0].trim() to parts[1].trim() else null
         }
     }
+    val visibleEvents = remember(report.recentEvents) {
+        report.recentEvents.takeLast(CRASH_EVENT_VISIBLE_COUNT)
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -236,7 +239,7 @@ fun LumenCrashReportScreen(
                         stringResource(R.string.lumen_crash_report_recent_events),
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        report.recentEvents.takeLast(CRASH_EVENT_VISIBLE_COUNT).forEach { event ->
+                        visibleEvents.forEach { event ->
                             CrashReportEventRow(event = event, dense = layout.denseControls)
                         }
                     }
@@ -524,10 +527,22 @@ private fun rememberCrashLayoutTokens(
     maxHeight: Dp,
 ): CrashLayoutTokens {
     val configuration = LocalConfiguration.current
-    val widthClass = windowSizeClass?.widthSizeClass
-    val heightClass = windowSizeClass?.heightSizeClass
     val screenWidth = configuration.screenWidthDp.dp
     val screenHeight = configuration.screenHeightDp.dp
+    return remember(windowSizeClass, maxWidth, maxHeight, screenWidth, screenHeight) {
+        crashLayoutTokens(windowSizeClass, maxWidth, maxHeight, screenWidth, screenHeight)
+    }
+}
+
+private fun crashLayoutTokens(
+    windowSizeClass: WindowSizeClass?,
+    maxWidth: Dp,
+    maxHeight: Dp,
+    screenWidth: Dp,
+    screenHeight: Dp,
+): CrashLayoutTokens {
+    val widthClass = windowSizeClass?.widthSizeClass
+    val heightClass = windowSizeClass?.heightSizeClass
     val effectiveWidth = minOf(maxWidth, screenWidth)
     val effectiveHeight = minOf(maxHeight, screenHeight)
     val compactWidth =
@@ -1388,34 +1403,39 @@ private fun uploadCrashReportPasteLink(
     // Never let network / integrity / clipboard failures crash the host process.
     // Upload is best-effort; text/file share remain available after a failed paste upload.
     runCatching {
-        Executors.newSingleThreadExecutor().execute {
-            val result = runCatching {
-                AuthorIntegrity.verifyOrThrow("share-link")
-                CrashReportPasteUploader.uploadText(
-                    text = report.toClipboardText(),
-                    baseUrl = baseUrl,
-                )
-            }
-            mainHandler.post {
-                runCatching {
-                    result.fold(
-                        onSuccess = { url ->
-                            runCatching {
-                                copyTextToClipboard(
-                                    appContext,
-                                    label = "crash report link",
-                                    text = url,
-                                )
-                            }
-                            onSuccess(url)
-                        },
-                        onFailure = onFailure,
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            executor.execute {
+                val result = runCatching {
+                    AuthorIntegrity.verifyOrThrow("share-link")
+                    CrashReportPasteUploader.uploadText(
+                        text = report.toClipboardText(),
+                        baseUrl = baseUrl,
                     )
-                }.onFailure { callbackError ->
-                    // Last-resort: still clear in-flight UI via failure path if possible.
-                    runCatching { onFailure(callbackError) }
+                }
+                mainHandler.post {
+                    runCatching {
+                        result.fold(
+                            onSuccess = { url ->
+                                runCatching {
+                                    copyTextToClipboard(
+                                        appContext,
+                                        label = "crash report link",
+                                        text = url,
+                                    )
+                                }
+                                onSuccess(url)
+                            },
+                            onFailure = onFailure,
+                        )
+                    }.onFailure { callbackError ->
+                        // Last-resort: still clear in-flight UI via failure path if possible.
+                        runCatching { onFailure(callbackError) }
+                    }
                 }
             }
+        } finally {
+            executor.shutdown()
         }
     }.onFailure { scheduleError ->
         mainHandler.post {

@@ -238,9 +238,10 @@ internal fun snapTimeMinute(value: Int): Int {
 }
 
 internal fun isAutoDarkActive(nowMillis: Long, startMinute: Int, endMinute: Int): Boolean {
-    val currentMinute = Instant.ofEpochMilli(nowMillis)
-        .atZone(ZoneId.systemDefault())
-        .let { it.hour * 60 + it.minute }
+    val offsetSeconds = ZoneId.systemDefault().rules
+        .getOffset(Instant.ofEpochMilli(nowMillis))
+        .totalSeconds
+    val currentMinute = ((nowMillis.floorDiv(1000L) + offsetSeconds).mod(86_400L) / 60L).toInt()
     val start = snapTimeMinute(startMinute)
     val end = snapTimeMinute(endMinute)
     return when {
@@ -297,9 +298,9 @@ internal fun templateBreakSubtitle(template: TipTemplateEntity?): String {
 }
 
 internal fun templateCountdownStyle(template: TipTemplateEntity?): String {
+    val layoutJson = template?.layoutJson?.takeIf { it.isNotBlank() } ?: return COUNTDOWN_STYLE_CIRCLE
     val style = runCatching {
-        JSONObject(template?.layoutJson?.takeIf { it.isNotBlank() } ?: "{}")
-            .optString("countdownStyle", COUNTDOWN_STYLE_CIRCLE)
+        JSONObject(layoutJson).optString("countdownStyle", COUNTDOWN_STYLE_CIRCLE)
     }.getOrDefault(COUNTDOWN_STYLE_CIRCLE)
     return when (style) {
         COUNTDOWN_STYLE_BAR,

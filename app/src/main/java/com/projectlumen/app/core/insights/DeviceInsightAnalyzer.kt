@@ -171,7 +171,8 @@ internal object DeviceInsightAnalyzer {
         if (sorted.isEmpty()) return emptyList()
         val merged = mutableListOf<ForegroundInterval>()
         var current = sorted.first()
-        for (next in sorted.drop(1)) {
+        for (index in 1 until sorted.size) {
+            val next = sorted[index]
             if (next.startMillis <= current.endMillis + maxGapMillis) {
                 current = current.copy(endMillis = max(current.endMillis, next.endMillis))
             } else {

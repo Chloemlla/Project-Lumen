@@ -32,6 +32,11 @@ private const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIF
 
 class NotificationService(private val context: Context) {
     private val lastPublishedLiveUpdateSignature = AtomicReference<String?>(null)
+    private val notificationManager by lazy { NotificationManagerCompat.from(context) }
+    private val ongoingContentIntent by lazy { openAppPendingIntent(NotificationIds.FOREGROUND_TIMER) }
+    private val ongoingStopIntent by lazy {
+        actionPendingIntent(NotificationIds.STOP_TIMER_ACTION, ReminderActionReceiver.ACTION_STOP_ALL)
+    }
 
     fun ensureChannels() {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -213,7 +218,7 @@ class NotificationService(private val context: Context) {
             includeBreakActions = false,
         )
         try {
-            NotificationManagerCompat.from(context).notify(
+            notificationManager.notify(
                 NotificationIds.POMODORO + 1001,
                 NotificationCompat.Builder(context, NotificationChannels.STATUS)
                     .setSmallIcon(R.drawable.ic_notification_lumen)
@@ -242,7 +247,7 @@ class NotificationService(private val context: Context) {
             .setContentTitle(content.title)
             .setContentText(content.message)
             .setSubText(content.subText)
-            .setContentIntent(openAppPendingIntent(NotificationIds.FOREGROUND_TIMER))
+            .setContentIntent(ongoingContentIntent)
             .applyForegroundServiceDefaults()
             .setSilent(true)
             .setShowWhen(false)
@@ -252,7 +257,7 @@ class NotificationService(private val context: Context) {
             .addAction(
                 R.drawable.ic_launcher_foreground,
                 context.getString(R.string.notification_action_stop),
-                actionPendingIntent(NotificationIds.STOP_TIMER_ACTION, ReminderActionReceiver.ACTION_STOP_ALL),
+                ongoingStopIntent,
             )
 
         // Official Live Update chip: prefer chronometer for >= 2 minutes, short text otherwise.
@@ -376,7 +381,7 @@ class NotificationService(private val context: Context) {
         val content = ongoingLiveUpdateContent(state, nowMillis)
         if (!shouldPublishLiveUpdate(content)) return
         try {
-            NotificationManagerCompat.from(context).notify(
+            notificationManager.notify(
                 NotificationIds.FOREGROUND_TIMER,
                 buildOngoingStatusNotification(content),
             )
@@ -387,17 +392,12 @@ class NotificationService(private val context: Context) {
 
     fun cancelOngoingStatus() {
         lastPublishedLiveUpdateSignature.set(null)
-        NotificationManagerCompat.from(context).cancel(NotificationIds.FOREGROUND_TIMER)
+        notificationManager.cancel(NotificationIds.FOREGROUND_TIMER)
     }
 
     fun cancelAllScheduled() {
         val manager = context.getSystemService(AlarmManager::class.java)
-        listOf(
-            NotificationIds.PRE_ALERT to AlarmReceiver.ACTION_PRE_ALERT,
-            NotificationIds.BREAK_DUE to AlarmReceiver.ACTION_BREAK_DUE,
-            NotificationIds.BREAK_DONE to AlarmReceiver.ACTION_BREAK_DONE,
-            NotificationIds.POMODORO to AlarmReceiver.ACTION_POMODORO,
-        ).forEach { (id, action) ->
+        scheduledAlarmActions.forEach { (id, action) ->
             existingPendingIntent(id, action)?.let(manager::cancel)
         }
     }
@@ -473,7 +473,7 @@ class NotificationService(private val context: Context) {
             )
         }
         try {
-            NotificationManagerCompat.from(context).notify(id, builder.build())
+            notificationManager.notify(id, builder.build())
         } catch (_: SecurityException) {
             return
         }
@@ -521,8 +521,7 @@ class NotificationService(private val context: Context) {
     }
 
     private fun dismissTimerNotifications(ids: List<Int>) {
-        val manager = NotificationManagerCompat.from(context)
-        ids.forEach { id -> manager.cancel(id) }
+        ids.forEach { id -> notificationManager.cancel(id) }
     }
 
     private fun canPostNotifications(): Boolean {
@@ -766,17 +765,8 @@ class NotificationService(private val context: Context) {
             shortCriticalText = shortText,
             whenMillis = if (useChronometer) endAt else null,
             chronometerCountDown = true,
-            signature = listOf(
-                phaseKey,
-                progressBucket,
-                remainingBucketSeconds,
-                useChronometer,
-                endAt,
-                title,
-                resolvedMessage,
-                subText.orEmpty(),
-                shortText.orEmpty(),
-            ).joinToString("|"),
+            signature = "$phaseKey|$progressBucket|$remainingBucketSeconds|$useChronometer|$endAt|" +
+                "$title|$resolvedMessage|${subText.orEmpty()}|${shortText.orEmpty()}",
         )
     }
 
@@ -797,7 +787,7 @@ class NotificationService(private val context: Context) {
             progressStyle = style,
             requestPromotedOngoing = true,
             shortCriticalText = shortCriticalText,
-            signature = listOf(phaseKey, title, message, shortCriticalText).joinToString("|"),
+            signature = "$phaseKey|$title|$message|$shortCriticalText",
         )
     }
 
@@ -816,14 +806,8 @@ class NotificationService(private val context: Context) {
             progressStyle = ProgressStyle().setProgressIndeterminate(true),
             requestPromotedOngoing = requestPromotedOngoing,
             shortCriticalText = shortCriticalText,
-            signature = listOf(
-                phaseKey,
-                requestPromotedOngoing,
-                title,
-                message,
-                subText.orEmpty(),
-                shortCriticalText.orEmpty(),
-            ).joinToString("|"),
+            signature = "$phaseKey|$requestPromotedOngoing|$title|$message|" +
+                "${subText.orEmpty()}|${shortCriticalText.orEmpty()}",
         )
     }
 
@@ -899,6 +883,12 @@ class NotificationService(private val context: Context) {
             NotificationIds.BREAK_DUE,
             NotificationIds.BREAK_DONE,
             NotificationIds.POMODORO,
+        )
+        val scheduledAlarmActions = listOf(
+            NotificationIds.PRE_ALERT to AlarmReceiver.ACTION_PRE_ALERT,
+            NotificationIds.BREAK_DUE to AlarmReceiver.ACTION_BREAK_DUE,
+            NotificationIds.BREAK_DONE to AlarmReceiver.ACTION_BREAK_DONE,
+            NotificationIds.POMODORO to AlarmReceiver.ACTION_POMODORO,
         )
     }
 

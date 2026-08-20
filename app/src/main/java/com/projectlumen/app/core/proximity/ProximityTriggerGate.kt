@@ -76,9 +76,9 @@ internal class ProximityTriggerGate(private val context: Context) {
     }
 
     private fun vectorMagnitude(values: FloatArray): Float {
-        val x = values.getOrNull(0) ?: 0f
-        val y = values.getOrNull(1) ?: 0f
-        val z = values.getOrNull(2) ?: 0f
+        val x = if (values.isNotEmpty()) values[0] else 0f
+        val y = if (values.size > 1) values[1] else 0f
+        val z = if (values.size > 2) values[2] else 0f
         return kotlin.math.sqrt((x * x + y * y + z * z).toDouble()).toFloat()
     }
 

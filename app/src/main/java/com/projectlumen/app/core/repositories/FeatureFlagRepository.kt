@@ -33,6 +33,12 @@ private object FeatureFlagMmkvStore {
     private val mmkv by lazy { ProjectLumenMmkv.multiProcessMmkvWithId(STORE_ID) }
     private val state by lazy { MutableStateFlow(readFromMmkv()) }
 
+    @Volatile
+    private var migrationComplete = false
+
+    @Volatile
+    private var parsedCache: Pair<String, List<FeatureFlagEntity>>? = null
+
     fun observeAll(dao: FeatureFlagsDao): Flow<List<FeatureFlagEntity>> {
         return flow {
             ensureMigrated(dao)
@@ -54,26 +60,34 @@ private object FeatureFlagMmkvStore {
         writeToMmkv(
             readFromMmkv()
                 .filterNot { it.key == normalized.key }
-                .plus(normalized)
-                .sortedBy { it.key },
+                .plus(normalized),
         )
     }
 
     private suspend fun ensureMigrated(dao: FeatureFlagsDao) {
-        if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) return
+        if (migrationComplete) return
+        if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
+            migrationComplete = true
+            return
+        }
         migrationLock.withLock {
-            if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) return
+            if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
+                migrationComplete = true
+                return
+            }
             if (!mmkv.containsKey(KEY_FLAGS_JSON)) {
                 dao.getAll().takeIf { it.isNotEmpty() }?.let(::writeToMmkv)
             }
             mmkv.encode(KEY_MMKV_MIGRATION_COMPLETE, true)
+            migrationComplete = true
             state.value = readFromMmkv()
         }
     }
 
     private fun readFromMmkv(): List<FeatureFlagEntity> {
         val json = mmkv.decodeString(KEY_FLAGS_JSON)?.takeIf { it.isNotBlank() } ?: return emptyList()
-        return runCatching {
+        parsedCache?.let { cached -> if (cached.first == json) return cached.second }
+        val flags: List<FeatureFlagEntity> = runCatching {
             val array = JSONArray(json)
             buildList {
                 for (index in 0 until array.length()) {
@@ -82,15 +96,20 @@ private object FeatureFlagMmkvStore {
                 }
             }.sortedBy { it.key }
         }.getOrDefault(emptyList())
+        parsedCache = json to flags
+        return flags
     }
 
     private fun writeToMmkv(flags: List<FeatureFlagEntity>) {
+        val sorted = flags.sortedBy { it.key }
         val array = JSONArray()
-        flags.sortedBy { it.key }.forEach { flag ->
+        sorted.forEach { flag ->
             array.put(flag.toJson())
         }
-        mmkv.encode(KEY_FLAGS_JSON, array.toString())
-        state.value = flags.sortedBy { it.key }
+        val json = array.toString()
+        mmkv.encode(KEY_FLAGS_JSON, json)
+        parsedCache = json to sorted
+        state.value = sorted
     }
 
     private fun FeatureFlagEntity.toJson(): JSONObject = JSONObject()

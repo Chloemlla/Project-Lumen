@@ -5,8 +5,10 @@ package com.chloemlla.lumen.crash
  */
 internal object CrashThreadDump {
     private const val DEFAULT_MAX_CHARS = 64 * 1024
+    private const val INITIAL_BUFFER_CHARS = 8 * 1024
 
     fun capture(mainThread: Thread, maxChars: Int = DEFAULT_MAX_CHARS): String {
+        val limit = maxChars.coerceAtLeast(4_096)
         val stacks = runCatching { Thread.getAllStackTraces() }.getOrDefault(emptyMap())
         val orderedThreads = buildList {
             add(mainThread)
@@ -17,8 +19,9 @@ internal object CrashThreadDump {
                 .forEach { add(it) }
         }
 
-        val output = buildString {
-            orderedThreads.forEach { thread ->
+        val output = buildString(minOf(limit, INITIAL_BUFFER_CHARS)) {
+            for (thread in orderedThreads) {
+                if (length >= limit) break
                 append("--- ")
                     .append(thread.name.ifBlank { "unnamed" })
                     .append(" [")
@@ -28,7 +31,8 @@ internal object CrashThreadDump {
                 if (stack.isEmpty()) {
                     append("  <no stack available>\n")
                 } else {
-                    stack.forEach { frame ->
+                    for (frame in stack) {
+                        if (length >= limit) break
                         append("  at ").append(frame).append('\n')
                     }
                 }
@@ -36,7 +40,7 @@ internal object CrashThreadDump {
         }
 
         if (output.isNotBlank()) {
-            return output.take(maxChars.coerceAtLeast(4_096))
+            return output.take(limit)
         }
         return "<thread dump unavailable>"
     }

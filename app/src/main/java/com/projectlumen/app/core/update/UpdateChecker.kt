@@ -223,17 +223,17 @@ class UpdateChecker(
     }
 
     private fun fetchSha256ChecksumAssets(assets: List<ReleaseAsset>): Map<String, String> {
-        return assets
+        val checksums = mutableMapOf<String, String>()
+        assets
             .filter { asset ->
                 !asset.name.endsWith(".apk", ignoreCase = true) &&
                     normalizeName(asset.name).let { it.contains("checksum") || it.contains("sha256") }
             }
-            .fold(emptyMap()) { checksums, asset ->
-                val assetChecksums = fetchTextAsset(asset.downloadUrl)
-                    ?.let(::parseSha256Checksums)
-                    .orEmpty()
-                checksums + assetChecksums
+            .forEach { asset ->
+                val text = fetchTextAsset(asset.downloadUrl) ?: return@forEach
+                checksums.putAll(parseSha256Checksums(text))
             }
+        return checksums
     }
 
     private fun fetchTextAsset(url: String): String? {
@@ -266,7 +266,8 @@ class UpdateChecker(
                 val hash = match.value.lowercase()
                 val beforeHash = line.substring(0, match.range.first)
                 val afterHash = line.substring(match.range.last + 1)
-                val assetName = (apkFileNames(afterHash) + apkFileNames(beforeHash)).firstOrNull()
+                val assetName = apkFileNames(afterHash).firstOrNull()
+                    ?: apkFileNames(beforeHash).firstOrNull()
                     ?: return@forEach
                 put(normalizeChecksumName(assetName), hash)
             }
@@ -392,8 +393,9 @@ class UpdateChecker(
     }
 
     private fun isSdkRelease(tagName: String): Boolean {
+        val normalizedTagName = tagName.lowercase()
         return SDK_RELEASE_PREFIXES.any { prefix ->
-            tagName.lowercase().startsWith(prefix)
+            normalizedTagName.startsWith(prefix)
         }
     }
 

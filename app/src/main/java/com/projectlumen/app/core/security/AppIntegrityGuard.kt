@@ -112,6 +112,7 @@ object AppIntegrityGuard {
 
     @Suppress("DEPRECATION")
     private fun signingCertificateSha256(context: Context): String {
+        cachedSigningCertificateSha256?.let { return it }
         val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             context.packageManager.getPackageInfo(
                 context.packageName,
@@ -126,19 +127,30 @@ object AppIntegrityGuard {
         } else {
             packageInfo.signatures?.firstOrNull()?.toByteArray()
         }) ?: ByteArray(0)
-        return MessageDigest.getInstance("SHA-256")
-            .digest(signatureBytes)
-            .joinToString(separator = "") { "%02X".format(it) }
+        val digest = MessageDigest.getInstance("SHA-256").digest(signatureBytes)
+        val output = CharArray(digest.size * 2)
+        for (index in digest.indices) {
+            val unsigned = digest[index].toInt() and 0xff
+            output[index * 2] = HEX_CHARS[unsigned ushr 4]
+            output[index * 2 + 1] = HEX_CHARS[unsigned and 0x0f]
+        }
+        return String(output).also { cachedSigningCertificateSha256 = it }
     }
 
     private fun hasRuntimeHookingClasses(): Boolean {
-        val classNames = listOf(
-            "de.robv.android.xposed.XposedBridge",
-            "de.robv.android.xposed.XC_MethodHook",
-            "com.saurik.substrate.MS$2",
-        )
-        return classNames.any { className ->
+        return RUNTIME_HOOKING_CLASS_NAMES.any { className ->
             runCatching { Class.forName(className) }.isSuccess
         }
     }
+
+    @Volatile
+    private var cachedSigningCertificateSha256: String? = null
+
+    private const val HEX_CHARS = "0123456789ABCDEF"
+
+    private val RUNTIME_HOOKING_CLASS_NAMES = listOf(
+        "de.robv.android.xposed.XposedBridge",
+        "de.robv.android.xposed.XC_MethodHook",
+        "com.saurik.substrate.MS$2",
+    )
 }

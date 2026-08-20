@@ -53,6 +53,7 @@ class TimerForegroundService : LifecycleService() {
     )
     @Volatile private var loopStarted = false
     private var screenReceiverRegistered = false
+    private val powerManager by lazy { getSystemService(PowerManager::class.java) }
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
@@ -296,7 +297,7 @@ class TimerForegroundService : LifecycleService() {
     }
 
     private fun isDeviceInteractive(): Boolean {
-        return getSystemService(PowerManager::class.java)?.isInteractive != false
+        return powerManager?.isInteractive != false
     }
 
     private fun adjustForScreenState(

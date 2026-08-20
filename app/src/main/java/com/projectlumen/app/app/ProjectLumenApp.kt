@@ -130,6 +130,8 @@ internal enum class Destination(
     WEB("web", R.string.about_external_link_prompt_title, Icons.AutoMirrored.Outlined.OpenInNew, false),
 }
 
+private val BottomNavDestinations = Destination.entries.filter { it.showInBottomNav }
+
 @Composable
 fun ProjectLumenApp(
     viewModel: ProjectLumenViewModel,
@@ -140,17 +142,25 @@ fun ProjectLumenApp(
     val ossNoticeState by viewModel.ossNoticeState.collectAsStateWithLifecycle()
     val onboardingState by viewModel.onboardingState.collectAsStateWithLifecycle()
     val buildUpdateNotesState by viewModel.buildUpdateNotesState.collectAsStateWithLifecycle()
-    val configuredThemeMode = runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }
-        .getOrDefault(AppThemeMode.SYSTEM)
+    val configuredThemeMode = remember(uiState.settings.themeMode) {
+        runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }
+            .getOrDefault(AppThemeMode.SYSTEM)
+    }
     val templateAppearanceEnabled = !uiState.settings.useDynamicColors
+    val autoDarkActive = remember(
+        uiState.nowMillis / 60_000L,
+        uiState.settings.autoDarkStartMinute,
+        uiState.settings.autoDarkEndMinute,
+    ) {
+        isAutoDarkActive(
+            nowMillis = uiState.nowMillis,
+            startMinute = uiState.settings.autoDarkStartMinute,
+            endMinute = uiState.settings.autoDarkEndMinute,
+        )
+    }
     val themeMode = when {
         templateAppearanceEnabled -> AppThemeMode.LIGHT
-        uiState.settings.useAutoDarkWindow &&
-            isAutoDarkActive(
-                nowMillis = uiState.nowMillis,
-                startMinute = uiState.settings.autoDarkStartMinute,
-                endMinute = uiState.settings.autoDarkEndMinute,
-            ) -> AppThemeMode.DARK
+        uiState.settings.useAutoDarkWindow && autoDarkActive -> AppThemeMode.DARK
         else -> configuredThemeMode
     }
     val baseContext = LocalContext.current
@@ -298,7 +308,13 @@ fun ProjectLumenApp(
             triggerUpdateCheck(manual = false)
         }
     }
-    val activeThemeTemplate = if (uiState.settings.useDynamicColors) null else activeTemplate(uiState)
+    val activeThemeTemplate = remember(
+        uiState.settings.useDynamicColors,
+        uiState.templates,
+        uiState.settings.activeTipTemplateId,
+    ) {
+        if (uiState.settings.useDynamicColors) null else activeTemplate(uiState)
+    }
 
     LocalizedContextProvider(localizedContext) {
         ProjectLumenTheme(
@@ -345,9 +361,10 @@ fun ProjectLumenApp(
             Box(modifier = Modifier.fillMaxSize()) {
             val navController = rememberNavController()
             val backStackEntry by navController.currentBackStackEntryAsState()
-            val currentDestination = Destination.entries.firstOrNull {
-                it.route == backStackEntry?.destination?.route
-            } ?: Destination.HOME
+            val currentRoute = backStackEntry?.destination?.route
+            val currentDestination = remember(currentRoute) {
+                Destination.entries.firstOrNull { it.route == currentRoute } ?: Destination.HOME
+            }
             val topBarScrollState = rememberSaveable(
                 currentDestination.route,
                 saver = ScrollState.Saver,
@@ -406,19 +423,20 @@ fun ProjectLumenApp(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                             tonalElevation = 0.dp,
                         ) {
-                            Destination.entries.filter { it.showInBottomNav }.forEach { destination ->
+                            val navItemColors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            BottomNavDestinations.forEach { destination ->
                                 val selected = backStackEntry?.destination?.hierarchy?.any {
                                     it.route == destination.route
                                 } == true
                                 NavigationBarItem(
                                     selected = selected,
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    ),
+                                    colors = navItemColors,
                                     onClick = {
                                         navController.navigate(destination.route) {
                                             popUpTo(navController.graph.startDestinationId) { saveState = true }

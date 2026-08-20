@@ -73,11 +73,13 @@ class ExportService(private val context: Context) {
         pomodoroStats: List<DailyPomodoroStatsEntity>,
     ): String {
         val pomodoroByDate = pomodoroStats.associateBy { it.statDate }
+        val eyeByDate = HashMap<String, DailyEyeStatsEntity>(eyeStats.size)
+        eyeStats.forEach { eyeByDate.putIfAbsent(it.statDate, it) }
         val dates = (eyeStats.map { it.statDate } + pomodoroStats.map { it.statDate }).distinct().sortedDescending()
         return buildString {
             appendLine("date,working_seconds,rest_seconds,skip_count,completed_break_count,max_continuous_work_seconds,proximity_warning_count,proximity_close_seconds,eye_dry_warning_count,low_light_warning_count,completed_tomato_count,focus_sessions,total_focus_seconds,total_pomodoro_break_seconds")
             dates.forEach { date ->
-                val eye = eyeStats.firstOrNull { it.statDate == date }
+                val eye = eyeByDate[date]
                 val pomodoro = pomodoroByDate[date]
                 appendLine(
                     listOf(

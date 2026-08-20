@@ -5,6 +5,11 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val crashBreadcrumbTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+private val breadcrumbWindowsHomeRegex = Regex("""[A-Za-z]:\\Users\\[^\\\s]+""")
+private val breadcrumbLinuxHomeRegex = Regex("""/home/[^/\s]+""")
+private val breadcrumbMacHomeRegex = Regex("""/Users/[^/\s]+""")
+private val breadcrumbContentUriRegex = Regex("""content://[^\s]+""")
+private val breadcrumbFileUriRegex = Regex("""file://[^\s]+""")
 
 object CrashBreadcrumbs {
     private const val MAX_EVENTS = 40
@@ -33,10 +38,10 @@ object CrashBreadcrumbs {
 
     private fun sanitize(value: String): String {
         return value
-            .replace(Regex("""[A-Za-z]:\\Users\\[^\\\s]+"""), "[user-home]")
-            .replace(Regex("""/home/[^/\s]+"""), "[user-home]")
-            .replace(Regex("""/Users/[^/\s]+"""), "[user-home]")
-            .replace(Regex("""content://[^\s]+"""), "[content-uri]")
-            .replace(Regex("""file://[^\s]+"""), "[file-uri]")
+            .replace(breadcrumbWindowsHomeRegex, "[user-home]")
+            .replace(breadcrumbLinuxHomeRegex, "[user-home]")
+            .replace(breadcrumbMacHomeRegex, "[user-home]")
+            .replace(breadcrumbContentUriRegex, "[content-uri]")
+            .replace(breadcrumbFileUriRegex, "[file-uri]")
     }
 }

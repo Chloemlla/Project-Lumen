@@ -428,8 +428,9 @@ class PrivilegedDeviceControlCoordinator(
     }
 
     private suspend fun loadCachedPolicy(): DeviceControlPolicy {
-        val silentFlag = featureFlags.getAll().firstOrNull { it.key == "policy_privileged_silent_vision" }
-        val lifeFlag = featureFlags.getAll().firstOrNull { it.key == "policy_enforced_lifecycle_lock" }
+        val flags = featureFlags.getAll()
+        val silentFlag = flags.firstOrNull { it.key == "policy_privileged_silent_vision" }
+        val lifeFlag = flags.firstOrNull { it.key == "policy_enforced_lifecycle_lock" }
         val silent = silentFlag?.payloadJson?.let { runCatching { JSONObject(it) }.getOrNull() }
         val life = lifeFlag?.payloadJson?.let { runCatching { JSONObject(it) }.getOrNull() }
         return DeviceControlPolicy(

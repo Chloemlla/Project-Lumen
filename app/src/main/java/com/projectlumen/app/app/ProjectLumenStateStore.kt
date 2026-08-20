@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 
 internal class ProjectLumenStateStore(
@@ -24,33 +25,33 @@ internal class ProjectLumenStateStore(
         repositories.settings.observe().catch { throwable ->
             recordCrash(throwable)
             emit(null)
-        },
+        }.distinctUntilChanged(),
         settingsPreview,
     ) { persisted, preview ->
         SettingsSnapshot(
             settings = resolveSettings(persisted, preview),
             persistedReady = persisted != null,
         )
-    }
+    }.distinctUntilChanged()
 
     private val baseDataState = combine(
         settingsState,
         repositories.runtime.observe().catch { throwable ->
             recordCrash(throwable)
             emit(null)
-        },
+        }.distinctUntilChanged(),
         repositories.statistics.observeEyeStats().catch { throwable ->
             recordCrash(throwable)
             emit(emptyList())
-        },
+        }.distinctUntilChanged(),
         repositories.statistics.observePomodoroStats().catch { throwable ->
             recordCrash(throwable)
             emit(emptyList())
-        },
+        }.distinctUntilChanged(),
         repositories.tipTemplates.observeAll().catch { throwable ->
             recordCrash(throwable)
             emit(emptyList())
-        },
+        }.distinctUntilChanged(),
     ) { settingsState, runtime, eyeStats, pomodoroStats, templates ->
         ProjectLumenUiState(
             settings = settingsState.settings ?: AppSettingsEntity(),
@@ -67,15 +68,15 @@ internal class ProjectLumenStateStore(
         repositories.dailyGoals.observe().catch { throwable ->
             recordCrash(throwable)
             emit(null)
-        },
+        }.distinctUntilChanged(),
         repositories.entitlements.observeAll().catch { throwable ->
             recordCrash(throwable)
             emit(emptyList())
-        },
+        }.distinctUntilChanged(),
         repositories.reminderPlans.observeActive().catch { throwable ->
             recordCrash(throwable)
             emit(emptyList())
-        },
+        }.distinctUntilChanged(),
         repositories.deviceInsights.observe(),
     ) { state, dailyGoal, entitlements, reminderPlans, deviceInsights ->
         state.copy(

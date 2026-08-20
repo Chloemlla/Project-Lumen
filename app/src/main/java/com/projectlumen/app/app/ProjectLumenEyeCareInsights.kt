@@ -35,6 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -94,42 +95,49 @@ internal fun EyeCareGuidedSetupCard(
     val distanceCalibrated = uiState.settings.proximityBaselineEyeDistancePx > 0f ||
         uiState.settings.proximityBaselineFaceWidthPercent > 0
     val missingRuntimePermission = summary.missingSetupCount > 0
-    val steps = listOf(
-        EyeCareGuideStep(
-            icon = Icons.Outlined.CheckCircle,
-            titleRes = R.string.eye_care_guide_step_recommended,
-            detailRes = R.string.eye_care_guide_step_recommended_detail,
-            complete = uiState.settings.reminderEnabled &&
-                uiState.settings.statsEnabled &&
-                uiState.settings.proximityMonitoringEnabled &&
-                uiState.settings.blinkMonitoringEnabled &&
-                uiState.settings.ambientLightMonitoringEnabled,
-        ),
-        EyeCareGuideStep(
-            icon = Icons.Outlined.Lock,
-            titleRes = R.string.eye_care_guide_step_permissions,
-            detailRes = R.string.eye_care_guide_step_permissions_detail,
-            complete = !missingRuntimePermission,
-        ),
-        EyeCareGuideStep(
-            icon = Icons.Outlined.PhotoCamera,
-            titleRes = R.string.eye_care_guide_step_calibration,
-            detailRes = R.string.eye_care_guide_step_calibration_detail,
-            complete = !uiState.settings.proximityMonitoringEnabled || distanceCalibrated,
-        ),
-        EyeCareGuideStep(
-            icon = Icons.Outlined.Schedule,
-            titleRes = R.string.eye_care_guide_step_first_session,
-            detailRes = R.string.eye_care_guide_step_first_session_detail,
-            complete = uiState.eyeStats.any { it.workingSeconds > 0L || it.completedBreakCount > 0 },
-        ),
-        EyeCareGuideStep(
-            icon = Icons.Outlined.BarChart,
-            titleRes = R.string.eye_care_guide_step_report,
-            detailRes = R.string.eye_care_guide_step_report_detail,
-            complete = uiState.eyeStats.size >= 3,
-        ),
-    )
+    val steps = remember(
+        uiState.settings,
+        uiState.eyeStats,
+        missingRuntimePermission,
+        distanceCalibrated,
+    ) {
+        listOf(
+            EyeCareGuideStep(
+                icon = Icons.Outlined.CheckCircle,
+                titleRes = R.string.eye_care_guide_step_recommended,
+                detailRes = R.string.eye_care_guide_step_recommended_detail,
+                complete = uiState.settings.reminderEnabled &&
+                    uiState.settings.statsEnabled &&
+                    uiState.settings.proximityMonitoringEnabled &&
+                    uiState.settings.blinkMonitoringEnabled &&
+                    uiState.settings.ambientLightMonitoringEnabled,
+            ),
+            EyeCareGuideStep(
+                icon = Icons.Outlined.Lock,
+                titleRes = R.string.eye_care_guide_step_permissions,
+                detailRes = R.string.eye_care_guide_step_permissions_detail,
+                complete = !missingRuntimePermission,
+            ),
+            EyeCareGuideStep(
+                icon = Icons.Outlined.PhotoCamera,
+                titleRes = R.string.eye_care_guide_step_calibration,
+                detailRes = R.string.eye_care_guide_step_calibration_detail,
+                complete = !uiState.settings.proximityMonitoringEnabled || distanceCalibrated,
+            ),
+            EyeCareGuideStep(
+                icon = Icons.Outlined.Schedule,
+                titleRes = R.string.eye_care_guide_step_first_session,
+                detailRes = R.string.eye_care_guide_step_first_session_detail,
+                complete = uiState.eyeStats.any { it.workingSeconds > 0L || it.completedBreakCount > 0 },
+            ),
+            EyeCareGuideStep(
+                icon = Icons.Outlined.BarChart,
+                titleRes = R.string.eye_care_guide_step_report,
+                detailRes = R.string.eye_care_guide_step_report_detail,
+                complete = uiState.eyeStats.size >= 3,
+            ),
+        )
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -183,6 +191,7 @@ internal fun EyeCareInsightsHomeCard(
 ) {
     val summary = rememberEyeCareInsightSummary(uiState, permissionRequirements, shizukuReady)
     val recommendedFeedback = rememberRecommendedEyeCareApplyFeedback(onApplyRecommended)
+    val topReasons = remember(summary.riskReasonRes) { summary.riskReasonRes.take(3) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -199,7 +208,7 @@ internal fun EyeCareInsightsHomeCard(
                 SmallMetric(R.string.eye_care_config_score, stringResource(R.string.percent_value, summary.configurationScore))
                 SmallMetric(R.string.eye_care_active_protections, summary.activeProtectionCount.toString())
             }
-            InsightReasonList(summary.riskReasonRes.take(3))
+            InsightReasonList(topReasons)
             if (summary.missingSetupCount > 0) {
                 StatusLine(
                     Icons.Outlined.WarningAmber,
@@ -652,6 +661,20 @@ private fun rememberEyeCareInsightSummary(
     uiState: ProjectLumenUiState,
     permissionRequirements: PermissionRequirements,
     shizukuReady: Boolean = false,
+): EyeCareInsightSummary = remember(
+    uiState.eyeStats,
+    uiState.settings,
+    uiState.dailyGoal,
+    permissionRequirements,
+    shizukuReady,
+) {
+    eyeCareInsightSummary(uiState, permissionRequirements, shizukuReady)
+}
+
+private fun eyeCareInsightSummary(
+    uiState: ProjectLumenUiState,
+    permissionRequirements: PermissionRequirements,
+    shizukuReady: Boolean,
 ): EyeCareInsightSummary {
     val recentEyeStats = uiState.eyeStats.take(14)
     val completedBreaks = recentEyeStats.sumOf { it.completedBreakCount }
@@ -849,13 +872,14 @@ private fun RiskScoreHeader(summary: EyeCareInsightSummary) {
 
 @Composable
 private fun InsightReasonList(reasons: List<Int>) {
+    val distinctReasons = remember(reasons) { reasons.distinct() }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             stringResource(R.string.eye_care_key_findings),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
         )
-        reasons.distinct().forEach { reasonRes ->
+        distinctReasons.forEach { reasonRes ->
             StatusLine(Icons.Outlined.Info, stringResource(reasonRes))
         }
     }
@@ -863,13 +887,14 @@ private fun InsightReasonList(reasons: List<Int>) {
 
 @Composable
 private fun InsightActionList(actions: List<Int>) {
+    val distinctActions = remember(actions) { actions.distinct() }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             stringResource(R.string.eye_care_today_actions),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
         )
-        actions.distinct().forEach { actionRes ->
+        distinctActions.forEach { actionRes ->
             StatusLine(Icons.Outlined.CheckCircle, stringResource(actionRes))
         }
     }

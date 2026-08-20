@@ -5,6 +5,7 @@ import java.lang.reflect.Field
 import java.lang.reflect.Modifier
 import java.util.Collections
 import java.util.IdentityHashMap
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Converts the complete CRooot result into a selectable developer diagnostic report.
@@ -38,7 +39,7 @@ internal object CroootReportFormatter {
         label: String?,
     ) {
         if (output.length >= MAX_REPORT_LENGTH) return
-        val prefix = "  ".repeat(depth)
+        val prefix = indent(depth)
         if (label != null) output.append(prefix).append(label).append(": ")
 
         when (value) {
@@ -75,7 +76,7 @@ internal object CroootReportFormatter {
         output.appendLine(value.javaClass.simpleName.ifBlank { value.javaClass.name })
         val fields = allInstanceFields(value.javaClass)
         if (fields.isEmpty()) {
-            output.append("  ".repeat(depth + 1)).appendLine(value.toString())
+            output.append(indent(depth + 1)).appendLine(value.toString())
             return
         }
         fields.forEach { field ->
@@ -130,12 +131,17 @@ internal object CroootReportFormatter {
 
     private fun appendCollectionLimit(output: StringBuilder, size: Int, depth: Int) {
         if (size > MAX_ITEMS_PER_COLLECTION) {
-            output.append("  ".repeat(depth + 1))
+            output.append(indent(depth + 1))
                 .appendLine("… $size total; showing first $MAX_ITEMS_PER_COLLECTION")
         }
     }
 
+    private fun indent(depth: Int): String {
+        return INDENTS.getOrNull(depth) ?: "  ".repeat(depth)
+    }
+
     private fun allInstanceFields(type: Class<*>): List<Field> {
+        fieldCache[type]?.let { return it }
         val fields = buildList {
             var current: Class<*>? = type
             while (current != null && current != Any::class.java) {
@@ -147,7 +153,12 @@ internal object CroootReportFormatter {
                     .forEach(::add)
                 current = current.superclass
             }
-        }
-        return fields.sortedBy(Field::getName)
+        }.sortedBy(Field::getName)
+        fieldCache[type] = fields
+        return fields
     }
+
+    private val fieldCache = ConcurrentHashMap<Class<*>, List<Field>>()
+
+    private val INDENTS = List(MAX_DEPTH + 2) { depth -> "  ".repeat(depth) }
 }

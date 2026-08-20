@@ -83,6 +83,9 @@ class EyeCarePreferencesDataStore(context: Context) {
     private val migrationLock = Mutex()
     private val state by lazy { MutableStateFlow(readFromMmkv()) }
 
+    @Volatile
+    private var legacyMigrationComplete = false
+
     fun observe(): Flow<EyeCarePreferences> {
         return flow {
             ensureLegacyMigrated()
@@ -152,9 +155,16 @@ class EyeCarePreferencesDataStore(context: Context) {
     }
 
     private suspend fun ensureLegacyMigrated() {
-        if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) return
+        if (legacyMigrationComplete) return
+        if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
+            legacyMigrationComplete = true
+            return
+        }
         migrationLock.withLock {
-            if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) return
+            if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
+                legacyMigrationComplete = true
+                return
+            }
             if (!hasMmkvPersistedValues()) {
                 val legacyPreferences = legacyDataStore.data
                     .catch { throwable ->
@@ -171,6 +181,7 @@ class EyeCarePreferencesDataStore(context: Context) {
                 }
             }
             mmkv.encode(KEY_MMKV_MIGRATION_COMPLETE, true)
+            legacyMigrationComplete = true
             state.value = readFromMmkv()
         }
     }
@@ -277,6 +288,7 @@ class EyeCarePreferencesDataStore(context: Context) {
         mmkv.encode(Keys.SHIZUKU_NATIVE_EXTRA_DIM_ENABLED.name, preferences.shizukuNativeExtraDimEnabled)
         mmkv.encode(Keys.SHIZUKU_NATIVE_EXTRA_DIM_PERCENT.name, preferences.shizukuNativeExtraDimPercent)
         mmkv.encode(KEY_MMKV_MIGRATION_COMPLETE, true)
+        legacyMigrationComplete = true
         state.value = readFromMmkv()
     }
 

@@ -44,6 +44,17 @@ object ClashPartnerCompat {
     // Lazy: JVM unit tests load this object via shouldSkipManualProxy() without a
     // prepared main Looper; constructing Handler eagerly crashes class init.
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
+
+    // Lazy for the same reason: android.net.Uri is unavailable during JVM unit tests.
+    private val partnerStatusUris by lazy {
+        clashPackages.map { pkg ->
+            pkg to Uri
+                .Builder()
+                .scheme("content")
+                .authority("$pkg.status")
+                .build()
+        }
+    }
     private val listeners = CopyOnWriteArrayList<(Status) -> Unit>()
 
     /**
@@ -55,6 +66,9 @@ object ClashPartnerCompat {
 
     @Volatile
     private var appContext: Context? = null
+
+    @Volatile
+    private var cachedPrefs: SharedPreferences? = null
 
     @Volatile
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -184,7 +198,9 @@ object ClashPartnerCompat {
     }
 
     private fun prefs(context: Context): SharedPreferences =
-        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        cachedPrefs ?: context.applicationContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .also { cachedPrefs = it }
 
     private fun buildStatus(context: Context): Status {
         val clashInstalled = isClashInstalled(context)
@@ -245,8 +261,8 @@ object ClashPartnerCompat {
     private fun onNetworkMaybeChanged() {
         val context = appContext ?: return
         val cm = context.getSystemService<ConnectivityManager>()
-        val vpnActive = isVpnActive(context)
         val vpnNetwork = cm?.let { findVpnNetwork(it) }
+        val vpnActive = vpnNetwork != null
         // Re-evaluate when VPN goes up/down *or* the underlying Network handle
         // is replaced (Clash restart / re-establish) so process binding follows.
         if (lastVpnActive == vpnActive && lastVpnNetwork == vpnNetwork) return
@@ -257,12 +273,7 @@ object ClashPartnerCompat {
 
     private fun isVpnActive(context: Context): Boolean {
         val cm = context.getSystemService<ConnectivityManager>() ?: return false
-        @Suppress("DEPRECATION")
-        for (network in cm.allNetworks) {
-            val caps = cm.getNetworkCapabilities(network) ?: continue
-            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return true
-        }
-        return false
+        return findVpnNetwork(cm) != null
     }
 
     private fun isClashInstalled(context: Context): Boolean {
@@ -279,13 +290,7 @@ object ClashPartnerCompat {
 
     private fun queryPartnerStatus(context: Context): Map<String, Any?>? {
         val resolver = context.contentResolver
-        for (pkg in clashPackages) {
-            val uri =
-                Uri
-                    .Builder()
-                    .scheme("content")
-                    .authority("$pkg.status")
-                    .build()
+        for ((pkg, uri) in partnerStatusUris) {
             val bundle =
                 runCatching {
                     resolver.call(uri, METHOD_PARTNER_STATUS, null, null)

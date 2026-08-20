@@ -741,6 +741,7 @@ internal fun EmptyStateMessage(
 
 @Composable
 internal fun StatusLine(icon: ImageVector, text: String) {
+    val wrappedText = remember(text) { smartWrapDisplayText(text) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -765,7 +766,7 @@ internal fun StatusLine(icon: ImageVector, text: String) {
             )
         }
         Text(
-            smartWrapDisplayText(text),
+            wrappedText,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -26,9 +26,11 @@ import kotlin.math.max
 
 class EyeProtectionOverlayService : Service() {
     private val handler = Handler(Looper.getMainLooper())
+    private val countdownTicker = Runnable { tickCountdown() }
     private var overlayView: View? = null
     private var removeAtMillis: Long = 0L
     private var countdownText: TextView? = null
+    private var renderedRemainingSeconds: Int = -1
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val app = application as ProjectLumenApplication
@@ -69,6 +71,7 @@ class EyeProtectionOverlayService : Service() {
         removeOverlay()
         removeAtMillis = System.currentTimeMillis() + durationSeconds * 1000L
         val windowManager = getSystemService(WindowManager::class.java)
+        renderedRemainingSeconds = durationSeconds
         countdownText = TextView(this).apply {
             text = getString(R.string.overlay_countdown_seconds, durationSeconds)
             textSize = 56f
@@ -152,12 +155,16 @@ class EyeProtectionOverlayService : Service() {
 
     private fun tickCountdown() {
         val remainingSeconds = max(0L, (removeAtMillis - System.currentTimeMillis() + 999L) / 1000L)
-        countdownText?.text = getString(R.string.overlay_countdown_seconds, remainingSeconds.toInt())
+        val secondsToRender = remainingSeconds.toInt()
+        if (secondsToRender != renderedRemainingSeconds) {
+            renderedRemainingSeconds = secondsToRender
+            countdownText?.text = getString(R.string.overlay_countdown_seconds, secondsToRender)
+        }
         if (remainingSeconds <= 0L) {
             stopSelf()
             return
         }
-        handler.postDelayed(::tickCountdown, 250L)
+        handler.postDelayed(countdownTicker, 250L)
     }
 
     private fun removeOverlay() {

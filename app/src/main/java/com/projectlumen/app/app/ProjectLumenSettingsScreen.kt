@@ -206,6 +206,31 @@ private enum class GrowthConfigTarget {
     GUIDANCE,
 }
 
+private val GeneralGrowthAnchors = listOf(
+    GrowthConfigTarget.REPORTS,
+    GrowthConfigTarget.GUIDANCE,
+)
+
+private val NotificationPermissionAnchors = listOf(
+    PermissionSetupTarget.NOTIFICATIONS,
+    PermissionSetupTarget.EXACT_ALARM,
+    PermissionSetupTarget.FULL_SCREEN,
+)
+
+private val ShizukuPermissionAnchors = listOf(PermissionSetupTarget.SHIZUKU)
+
+private val DiagnosticsAndShizukuPermissionAnchors = listOf(
+    PermissionSetupTarget.DIAGNOSTICS,
+    PermissionSetupTarget.SHIZUKU,
+)
+
+private val EyeProtectionPermissionAnchors = listOf(
+    PermissionSetupTarget.BLINK_CAMERA,
+    PermissionSetupTarget.AMBIENT_LIGHT,
+    PermissionSetupTarget.BRIGHTNESS,
+    PermissionSetupTarget.OVERLAY,
+)
+
 @Composable
 internal fun SettingsScreen(
     uiState: ProjectLumenUiState,
@@ -217,7 +242,7 @@ internal fun SettingsScreen(
     openDeveloperOptions: () -> Unit,
 ) {
     val settings = uiState.settings
-    val template = activeTemplate(uiState)
+    val template = remember(uiState.templates, settings.activeTipTemplateId) { activeTemplate(uiState) }
     val context = LocalContext.current
     val runWithNotificationPermission = rememberNotificationPermissionGate()
     val runWithCameraPermission = rememberCameraPermissionGate()
@@ -568,10 +593,7 @@ internal fun SettingsScreen(
             onExportReport = viewModel::shareMonthlyReportPdf,
         )
         SettingsScrollAnchors(
-            targets = listOf(
-                GrowthConfigTarget.REPORTS,
-                GrowthConfigTarget.GUIDANCE,
-            ),
+            targets = GeneralGrowthAnchors,
             scrollState = settingsScrollState,
             anchorPositions = growthAnchorPositions,
         ) {
@@ -749,11 +771,7 @@ internal fun SettingsScreen(
             }
         }
         SettingsScrollAnchors(
-            targets = listOf(
-                PermissionSetupTarget.NOTIFICATIONS,
-                PermissionSetupTarget.EXACT_ALARM,
-                PermissionSetupTarget.FULL_SCREEN,
-            ),
+            targets = NotificationPermissionAnchors,
             scrollState = settingsScrollState,
             anchorPositions = permissionAnchorPositions,
         ) {
@@ -845,9 +863,9 @@ internal fun SettingsScreen(
         }
         SettingsScrollAnchors(
             targets = if (backendFeaturesVisible) {
-                listOf(PermissionSetupTarget.DIAGNOSTICS, PermissionSetupTarget.SHIZUKU)
+                DiagnosticsAndShizukuPermissionAnchors
             } else {
-                listOf(PermissionSetupTarget.SHIZUKU)
+                ShizukuPermissionAnchors
             },
             scrollState = settingsScrollState,
             anchorPositions = permissionAnchorPositions,
@@ -986,12 +1004,7 @@ internal fun SettingsScreen(
         }
         }
         SettingsScrollAnchors(
-            targets = listOf(
-                PermissionSetupTarget.BLINK_CAMERA,
-                PermissionSetupTarget.AMBIENT_LIGHT,
-                PermissionSetupTarget.BRIGHTNESS,
-                PermissionSetupTarget.OVERLAY,
-            ),
+            targets = EyeProtectionPermissionAnchors,
             scrollState = settingsScrollState,
             anchorPositions = permissionAnchorPositions,
         ) {
@@ -1186,8 +1199,11 @@ internal fun SettingsScreen(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
                     TemplatePreviewCard(template)
+                    val selectableTemplates = remember(uiState.templates, proEnabled) {
+                        uiState.templates.filter { !it.isPremium || proEnabled }
+                    }
                     LumenFlowRow {
-                        uiState.templates.filter { !it.isPremium || proEnabled }.forEach { template ->
+                        selectableTemplates.forEach { template ->
                             val selected = settings.activeTipTemplateId == template.id
                             FilterChip(
                                 selected = selected,

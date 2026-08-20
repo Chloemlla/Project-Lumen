@@ -387,6 +387,8 @@ class ShizukuCapabilityManager(
         val start = if (smooth) readCurrentNativeEyeProtectionTarget(target) else target
         val steps = if (smooth) SMOOTH_TRANSITION_STEPS else 1
         var lastFrameApplied = false
+        var lastAppliedFrame: NativeEyeProtectionTarget? = null
+        executeShellCommand("settings put system screen_brightness_mode 0")
         for (step in 1..steps) {
             val fraction = step / steps.toFloat()
             val frame = NativeEyeProtectionTarget(
@@ -399,13 +401,16 @@ class ShizukuCapabilityManager(
                     fraction,
                 ),
             )
-            val nightDisplayApplied = setNightDisplay(frame.colorTemperatureKelvin)
-            val brightnessApplied = setSystemBrightness(frame.brightnessPercent)
-            val extraDimApplied = setExtraDim(
-                enabled = frame.extraDimEnabled && frame.extraDimPercent > 0,
-                percent = frame.extraDimPercent,
-            )
-            lastFrameApplied = nightDisplayApplied && brightnessApplied && extraDimApplied
+            if (frame != lastAppliedFrame) {
+                val nightDisplayApplied = setNightDisplay(frame.colorTemperatureKelvin)
+                val brightnessApplied = setSystemBrightness(frame.brightnessPercent)
+                val extraDimApplied = setExtraDim(
+                    enabled = frame.extraDimEnabled && frame.extraDimPercent > 0,
+                    percent = frame.extraDimPercent,
+                )
+                lastFrameApplied = nightDisplayApplied && brightnessApplied && extraDimApplied
+                lastAppliedFrame = frame
+            }
             if (step < steps) {
                 delay(SMOOTH_TRANSITION_MILLIS / steps)
             }
@@ -479,7 +484,6 @@ class ShizukuCapabilityManager(
     private fun setSystemBrightness(percent: Int): Boolean {
         val normalizedPercent = percent.coerceIn(1, 100)
         val brightness = percentToSystemBrightness(normalizedPercent)
-        executeShellCommand("settings put system screen_brightness_mode 0")
         return executeShellCommand("settings put system screen_brightness $brightness").success
     }
 
@@ -708,7 +712,6 @@ class ShizukuCapabilityManager(
             .lineSequence()
             .mapNotNull { parseNetworkAppLine(it, appType) }
             .distinctBy { it.packageName }
-            .sortedBy { it.packageName }
             .toList()
     }
 

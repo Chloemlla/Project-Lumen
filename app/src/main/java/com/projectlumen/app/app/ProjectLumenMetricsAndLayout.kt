@@ -205,29 +205,29 @@ internal fun smartWrapDisplayText(value: String): String {
     val normalized = value.trim().ifBlank { "-" }
     if (normalized.length <= DISPLAY_WRAP_CHUNK_SIZE) return normalized
 
-    val withBreakpoints = normalized
-        .replace("://", "://$ZERO_WIDTH_SPACE")
-        .replace("/", "/$ZERO_WIDTH_SPACE")
-        .replace("?", "?$ZERO_WIDTH_SPACE")
-        .replace("&", "&$ZERO_WIDTH_SPACE")
-        .replace("=", "=$ZERO_WIDTH_SPACE")
-        .replace(".", ".$ZERO_WIDTH_SPACE")
-        .replace("-", "-$ZERO_WIDTH_SPACE")
-        .replace("_", "_$ZERO_WIDTH_SPACE")
-        .replace("@", "@$ZERO_WIDTH_SPACE")
-        .replace(":", ":$ZERO_WIDTH_SPACE")
-
-    val wrapped = StringBuilder(withBreakpoints.length)
+    val zeroWidthChar = ZERO_WIDTH_SPACE.first()
+    val wrapped = StringBuilder(normalized.length + normalized.length / 2)
     var tokenLength = 0
-    withBreakpoints.forEach { char ->
+    normalized.forEachIndexed { index, char ->
         wrapped.append(char)
-        if (char.isWhitespace() || char == ZERO_WIDTH_SPACE.first()) {
+        if (char.isWhitespace() || char == zeroWidthChar) {
             tokenLength = 0
         } else {
             tokenLength += 1
             if (tokenLength >= DISPLAY_WRAP_CHUNK_SIZE) {
                 wrapped.append(ZERO_WIDTH_SPACE)
                 tokenLength = 0
+            }
+        }
+        val isBreakpoint = when (char) {
+            '/', '?', '&', '=', '.', '-', '_', '@', ':' -> true
+            else -> false
+        }
+        if (isBreakpoint) {
+            wrapped.append(ZERO_WIDTH_SPACE)
+            tokenLength = 0
+            if (char == '/' && index >= 2 && normalized[index - 1] == '/' && normalized[index - 2] == ':') {
+                wrapped.append(ZERO_WIDTH_SPACE)
             }
         }
     }

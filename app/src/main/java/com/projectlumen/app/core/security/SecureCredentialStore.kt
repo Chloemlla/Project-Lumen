@@ -52,6 +52,12 @@ class SecureCredentialStore(context: Context) {
         ProjectLumenMmkv.encryptedMmkvWithId(STORE_NAME, mmkvCryptKey())
     }
 
+    @Volatile
+    private var legacyMigrationComplete = false
+
+    @Volatile
+    private var cachedDeviceInstallationId: String? = null
+
     fun save(session: AuthSession) {
         migrateLegacyCredentialsIfNeeded()
         encryptedMmkv.encode(KEY_ACCESS_TOKEN, session.accessToken)
@@ -175,6 +181,7 @@ class SecureCredentialStore(context: Context) {
     }
 
     fun deviceInstallationId(): String {
+        cachedDeviceInstallationId?.let { return it }
         return runCatching {
             migrateLegacyCredentialsIfNeeded()
             val existing = encryptedMmkv.decodeString(KEY_DEVICE_INSTALLATION_ID)
@@ -190,6 +197,8 @@ class SecureCredentialStore(context: Context) {
             encryptedMmkv.encode(KEY_DEVICE_INSTALLATION_ID, generated)
             encryptedMmkv.encode(KEY_DEVICE_FINGERPRINT_VERSION, DEVICE_FINGERPRINT_VERSION)
             generated
+        }.onSuccess { resolved ->
+            cachedDeviceInstallationId = resolved
         }.getOrElse { error ->
             Log.e(TAG, "deviceInstallationId failed; using ephemeral fingerprint", error)
             generateDeviceFingerprint()
@@ -197,9 +206,16 @@ class SecureCredentialStore(context: Context) {
     }
 
     private fun migrateLegacyCredentialsIfNeeded() {
-        if (encryptedMmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) return
+        if (legacyMigrationComplete) return
+        if (encryptedMmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
+            legacyMigrationComplete = true
+            return
+        }
         synchronized(migrationLock) {
-            if (encryptedMmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) return
+            if (encryptedMmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
+                legacyMigrationComplete = true
+                return
+            }
 
             val legacyAccessToken = secureMetadata.getString(KEY_ACCESS_TOKEN, null)?.takeIf { it.isNotBlank() }
             val legacyRefreshToken = secureMetadata.getString(KEY_REFRESH_TOKEN, null)?.takeIf { it.isNotBlank() }
@@ -230,6 +246,7 @@ class SecureCredentialStore(context: Context) {
                 .remove(KEY_USER_EMAIL)
                 .apply()
             encryptedMmkv.encode(KEY_MMKV_MIGRATION_COMPLETE, true)
+            legacyMigrationComplete = true
         }
     }
 

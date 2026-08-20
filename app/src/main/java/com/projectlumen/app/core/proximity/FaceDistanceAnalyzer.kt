@@ -114,17 +114,33 @@ class FaceDistanceAnalyzer(private val includeTopology: Boolean = false) {
                 zPx = position.z,
             )
         }.orEmpty()
-        val meshPointIndexes = meshPoints.mapTo(mutableSetOf()) { it.index }
+        val meshPointPresence = BooleanArray((meshPoints.maxOfOrNull { it.index } ?: -1) + 1)
+        meshPoints.forEach { point ->
+            if (point.index >= 0) meshPointPresence[point.index] = true
+        }
+        fun isKnownMeshPoint(index: Int): Boolean =
+            index >= 0 && index < meshPointPresence.size && meshPointPresence[index]
         val meshTriangles = mesh?.allTriangles?.mapNotNull { triangle ->
-            val indexes = triangle.allPoints.map { it.index }
-            if (indexes.size == 3 && indexes.all(meshPointIndexes::contains)) {
-                FaceMeshTriangle(
-                    firstPointIndex = indexes[0],
-                    secondPointIndex = indexes[1],
-                    thirdPointIndex = indexes[2],
-                )
-            } else {
+            val points = triangle.allPoints
+            if (points.size != 3) {
                 null
+            } else {
+                val firstIndex = points[0].index
+                val secondIndex = points[1].index
+                val thirdIndex = points[2].index
+                if (
+                    isKnownMeshPoint(firstIndex) &&
+                    isKnownMeshPoint(secondIndex) &&
+                    isKnownMeshPoint(thirdIndex)
+                ) {
+                    FaceMeshTriangle(
+                        firstPointIndex = firstIndex,
+                        secondPointIndex = secondIndex,
+                        thirdPointIndex = thirdIndex,
+                    )
+                } else {
+                    null
+                }
             }
         }.orEmpty()
         return FaceTopology(

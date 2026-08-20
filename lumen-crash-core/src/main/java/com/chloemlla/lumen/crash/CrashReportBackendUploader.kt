@@ -1,6 +1,5 @@
 package com.chloemlla.lumen.crash
 
-import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.StandardCharsets
@@ -70,9 +69,9 @@ object CrashReportBackendUploader {
             }
 
             try {
-                OutputStreamWriter(connection.outputStream, StandardCharsets.UTF_8).use { writer ->
-                    writer.write(body.toString())
-                    writer.flush()
+                connection.outputStream.use { stream ->
+                    stream.write(bodyBytes)
+                    stream.flush()
                 }
                 val status = connection.responseCode
                 status in 200..299

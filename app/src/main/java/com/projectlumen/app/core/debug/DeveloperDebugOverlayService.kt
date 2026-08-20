@@ -5,6 +5,7 @@ import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.hardware.Sensor
@@ -36,9 +37,12 @@ import kotlin.math.sqrt
 class DeveloperDebugOverlayService : Service(), SensorEventListener {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val handler = Handler(Looper.getMainLooper())
+    private val rotationMatrix = FloatArray(9)
+    private val orientationAngles = FloatArray(3)
     private lateinit var sensorManager: SensorManager
     private var overlayView: LinearLayout? = null
     private var previewImage: ImageView? = null
+    private var renderedThumbnail: Bitmap? = null
     private var sensorsRegistered = false
     private var overlayTicking = false
     private var lastRuntimeWriteAt = 0L
@@ -204,8 +208,11 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
     private fun renderOverlay() {
         val frame = DeveloperDebugFrameStore.latest()
         previewImage?.visibility = View.VISIBLE
-        if (frame?.thumbnail != null) {
-            previewImage?.setImageBitmap(frame.thumbnail)
+        val thumbnail = frame?.thumbnail
+        if (thumbnail === renderedThumbnail) return
+        renderedThumbnail = thumbnail
+        if (thumbnail != null) {
+            previewImage?.setImageBitmap(thumbnail)
         } else {
             previewImage?.setImageDrawable(null)
         }
@@ -216,25 +223,24 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         overlayView = null
         runCatching { getSystemService(WindowManager::class.java).removeView(view) }
         previewImage = null
+        renderedThumbnail = null
     }
 
     private fun handleAccelerometer(values: FloatArray) {
-        val x = values.getOrNull(0) ?: 0f
-        val y = values.getOrNull(1) ?: 0f
-        val z = values.getOrNull(2) ?: 0f
+        val x = if (values.isNotEmpty()) values[0] else 0f
+        val y = if (values.size > 1) values[1] else 0f
+        val z = if (values.size > 2) values[2] else 0f
         lastAccelerationMagnitude = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
         lastPitch = Math.toDegrees(kotlin.math.atan2((-x).toDouble(), sqrt((y * y + z * z).toDouble()))).toFloat()
         lastRoll = Math.toDegrees(kotlin.math.atan2(y.toDouble(), z.toDouble())).toFloat()
     }
 
     private fun handleRotationVector(values: FloatArray) {
-        val rotationMatrix = FloatArray(9)
-        val orientation = FloatArray(3)
         SensorManager.getRotationMatrixFromVector(rotationMatrix, values)
-        SensorManager.getOrientation(rotationMatrix, orientation)
-        lastYaw = Math.toDegrees(orientation[0].toDouble()).toFloat()
-        lastPitch = Math.toDegrees(orientation[1].toDouble()).toFloat()
-        lastRoll = Math.toDegrees(orientation[2].toDouble()).toFloat()
+        SensorManager.getOrientation(rotationMatrix, orientationAngles)
+        lastYaw = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
+        lastPitch = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
+        lastRoll = Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
     }
 
     private fun writeSensorRuntime(nowMillis: Long) {

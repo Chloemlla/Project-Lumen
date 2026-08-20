@@ -13,6 +13,12 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val crashTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+private val reportWindowsHomeRegex = Regex("""[A-Za-z]:\\Users\\[^\\\s]+""")
+private val reportLinuxHomeRegex = Regex("""/home/[^/\s]+""")
+private val reportMacHomeRegex = Regex("""/Users/[^/\s]+""")
+private val reportContentUriRegex = Regex("""content://[^\s]+""")
+private val reportFileUriRegex = Regex("""file://[^\s]+""")
+private const val REPORT_HEX_DIGITS = "0123456789abcdef"
 
 data class CrashReport(
     val reportId: String,
@@ -35,7 +41,9 @@ data class CrashReport(
     fun toClipboardText(): String {
         AuthorIntegrity.verifyOrThrow("export-clipboard")
         val author = AuthorIntegrity.verifiedAuthorBlock()
-        return buildString {
+        return buildString(
+            systemInfo.length + stackTrace.length + recentEvents.sumOf { it.length + 1 } + 512,
+        ) {
             appendLine("Report ID: $reportId")
             appendLine("Report type: ${kind.wireValue}")
             appendLine("Crash time: $crashedAtText")
@@ -240,10 +248,16 @@ data class CrashReport(
             val kindPrefix = if (kind == CrashReportKind.CRASH) "" else "${kind.wireValue}|"
             val seed = "$crashedAtMillis|$kindPrefix$exceptionType|$rootCause|" +
                 stackTrace.lineSequence().firstOrNull().orEmpty()
-            return MessageDigest.getInstance("SHA-256")
+            val digest = MessageDigest.getInstance("SHA-256")
                 .digest(seed.toByteArray(Charsets.UTF_8))
-                .joinToString(separator = "") { "%02x".format(it) }
-                .take(12)
+            val byteCount = minOf(REPORT_ID_HEX_LENGTH / 2, digest.size)
+            return buildString(byteCount * 2) {
+                for (index in 0 until byteCount) {
+                    val value = digest[index].toInt() and 0xFF
+                    append(REPORT_HEX_DIGITS[value ushr 4])
+                    append(REPORT_HEX_DIGITS[value and 0x0F])
+                }
+            }
         }
 
         private fun formatTime(millis: Long): String {
@@ -268,14 +282,15 @@ data class CrashReport(
 
         private fun sanitize(value: String): String {
             return value
-                .replace(Regex("""[A-Za-z]:\\Users\\[^\\\s]+"""), "[user-home]")
-                .replace(Regex("""/home/[^/\s]+"""), "[user-home]")
-                .replace(Regex("""/Users/[^/\s]+"""), "[user-home]")
-                .replace(Regex("""content://[^\s]+"""), "[content-uri]")
-                .replace(Regex("""file://[^\s]+"""), "[file-uri]")
+                .replace(reportWindowsHomeRegex, "[user-home]")
+                .replace(reportLinuxHomeRegex, "[user-home]")
+                .replace(reportMacHomeRegex, "[user-home]")
+                .replace(reportContentUriRegex, "[content-uri]")
+                .replace(reportFileUriRegex, "[file-uri]")
         }
 
         private const val BYTES_PER_MEBIBYTE = 1024L * 1024L
+        private const val REPORT_ID_HEX_LENGTH = 12
     }
 }
 

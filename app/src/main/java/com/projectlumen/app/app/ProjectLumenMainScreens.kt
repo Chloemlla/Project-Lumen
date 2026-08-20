@@ -198,6 +198,18 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+private val BreakStartablePhases = setOf(
+    ReminderPhase.WORKING.name,
+    ReminderPhase.PRE_ALERT.name,
+    ReminderPhase.AWAITING_ACTION.name,
+)
+
+private val BreakSkippablePhases = setOf(
+    ReminderPhase.PRE_ALERT.name,
+    ReminderPhase.AWAITING_ACTION.name,
+    ReminderPhase.RESTING.name,
+)
+
 @Composable
 internal fun HomeScreen(
     uiState: ProjectLumenUiState,
@@ -384,26 +396,21 @@ internal fun HomeScreen(
 @Composable
 internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenViewModel) {
     val runtime = uiState.runtime
-    val template = activeTemplate(uiState)
+    val template = remember(uiState.templates, uiState.settings.activeTipTemplateId) {
+        activeTemplate(uiState)
+    }
+    val countdownStyle = remember(template?.layoutJson) { templateCountdownStyle(template) }
     val reminderActive = runtime.activeEngine == ActiveEngine.REMINDER.name &&
         runtime.reminderPhase != ReminderPhase.IDLE.name
     val timerActive = runtime.activeEngine != ActiveEngine.IDLE.name
     val isResting = runtime.reminderPhase == ReminderPhase.RESTING.name
     val canStartBreak = uiState.settings.reminderEnabled &&
         reminderActive &&
-        runtime.reminderPhase in setOf(
-            ReminderPhase.WORKING.name,
-            ReminderPhase.PRE_ALERT.name,
-            ReminderPhase.AWAITING_ACTION.name,
-        )
+        runtime.reminderPhase in BreakStartablePhases
     val canSkip = !uiState.settings.disableSkip &&
         template?.showSkipButton != false &&
         reminderActive &&
-        runtime.reminderPhase in setOf(
-            ReminderPhase.PRE_ALERT.name,
-            ReminderPhase.AWAITING_ACTION.name,
-            ReminderPhase.RESTING.name,
-        )
+        runtime.reminderPhase in BreakSkippablePhases
     val runWithNotificationPermission = rememberNotificationPermissionGate()
     fun runReminderAction(action: () -> Unit) {
         if (uiState.settings.notificationEnabled) runWithNotificationPermission(action) else action()
@@ -421,7 +428,7 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
             seconds = activeTimerRemainingSeconds(runtime, uiState.nowMillis),
             progress = activeTimerProgress(runtime, uiState.nowMillis),
             fallbackText = statusLabel(runtime),
-            countdownStyle = templateCountdownStyle(template),
+            countdownStyle = countdownStyle,
         )
         ActionCard {
             SectionHeader(Icons.Outlined.Spa, R.string.quick_actions)
@@ -606,13 +613,19 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
     val context = LocalContext.current
     val shizukuState by viewModel.shizukuState.collectAsStateWithLifecycle()
     var statsWindow by rememberSaveable { mutableIntStateOf(7) }
-    val windowEyeStats = uiState.eyeStats.take(statsWindow)
-    val windowPomodoroStats = uiState.pomodoroStats.take(statsWindow)
-    val hasExportableStats = statsEnabled && (uiState.eyeStats.any {
-        it.workingSeconds > 0L || it.restSeconds > 0L || it.skipCount > 0 || it.completedBreakCount > 0
-    } || uiState.pomodoroStats.any {
-        it.completedTomatoCount > 0 || it.completedFocusSessions > 0 || it.totalBreakSeconds > 0L || it.totalFocusSeconds > 0L
-    })
+    val windowEyeStats = remember(uiState.eyeStats, statsWindow) { uiState.eyeStats.take(statsWindow) }
+    val windowPomodoroStats = remember(uiState.pomodoroStats, statsWindow) {
+        uiState.pomodoroStats.take(statsWindow)
+    }
+    val hasStatsData = remember(uiState.eyeStats, uiState.pomodoroStats) {
+        uiState.eyeStats.any {
+            it.workingSeconds > 0L || it.restSeconds > 0L || it.skipCount > 0 || it.completedBreakCount > 0
+        } || uiState.pomodoroStats.any {
+            it.completedTomatoCount > 0 || it.completedFocusSessions > 0 ||
+                it.totalBreakSeconds > 0L || it.totalFocusSeconds > 0L
+        }
+    }
+    val hasExportableStats = statsEnabled && hasStatsData
     LaunchedEffect(permissionRequirements.usageAccess) {
         viewModel.refreshDeviceInsights()
     }

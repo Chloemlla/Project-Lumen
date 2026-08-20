@@ -3,12 +3,13 @@ package com.chloemlla.lumen.crash
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
-import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.Proxy
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+
+private val pasteIdRegex = Regex("^[A-Za-z0-9_-]+$")
 
 /**
  * Uploads crash-report text to a LogPaste-compatible endpoint and returns a shareable URL.
@@ -43,7 +44,8 @@ object CrashReportPasteUploader {
 
             val endpoint = normalizeBaseUrl(baseUrl)
             val boundary = "----LumenCrashPasteBoundary${UUID.randomUUID().toString().replace("-", "")}"
-            val body = buildMultipartBody(boundary = boundary, fieldName = "_", value = payload)
+            val bodyBytes = buildMultipartBody(boundary = boundary, fieldName = "_", value = payload)
+                .toByteArray(StandardCharsets.UTF_8)
 
             val url = URL(endpoint)
             val forceDirect = runCatching { shouldSkipManualProxy?.invoke() == true }.getOrDefault(false)
@@ -66,15 +68,15 @@ object CrashReportPasteUploader {
                 setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
                 setRequestProperty(
                     "Content-Length",
-                    body.toByteArray(StandardCharsets.UTF_8).size.toString(),
+                    bodyBytes.size.toString(),
                 )
                 setRequestProperty("User-Agent", "lumen-crash-sdk")
             }
 
             try {
-                OutputStreamWriter(connection.outputStream, StandardCharsets.UTF_8).use { writer ->
-                    writer.write(body)
-                    writer.flush()
+                connection.outputStream.use { stream ->
+                    stream.write(bodyBytes)
+                    stream.flush()
                 }
 
                 val status = connection.responseCode
@@ -126,14 +128,14 @@ object CrashReportPasteUploader {
             ?.trim('/')
             ?: throw IOException("Paste upload response did not contain a paste id.")
 
-        require(id.matches(Regex("^[A-Za-z0-9_-]+$"))) {
+        require(id.matches(pasteIdRegex)) {
             "Paste upload returned an unexpected id: ${id.take(64)}"
         }
         return "${normalizeBaseUrl(baseUrl)}/$id"
     }
 
     private fun buildMultipartBody(boundary: String, fieldName: String, value: String): String {
-        return buildString {
+        return buildString(value.length + boundary.length * 2 + 160) {
             append("--").append(boundary).append("\r\n")
             append("Content-Disposition: form-data; name=\"").append(fieldName).append("\"\r\n")
             append("Content-Type: text/plain; charset=UTF-8\r\n\r\n")

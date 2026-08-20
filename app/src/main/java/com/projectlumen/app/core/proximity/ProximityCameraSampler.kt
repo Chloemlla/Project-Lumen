@@ -26,6 +26,7 @@ import android.view.Surface
 import androidx.core.content.ContextCompat
 import com.projectlumen.app.core.debug.DeveloperDebugFrameStore
 import java.io.ByteArrayOutputStream
+import java.nio.Buffer
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -34,6 +35,12 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
 class ProximityCameraSampler(private val context: Context) {
+    private val plainAnalyzer by lazy { FaceDistanceAnalyzer(includeTopology = false) }
+    private val topologyAnalyzer by lazy { FaceDistanceAnalyzer(includeTopology = true) }
+
+    private fun analyzer(includeTopology: Boolean): FaceDistanceAnalyzer =
+        if (includeTopology) topologyAnalyzer else plainAnalyzer
+
     suspend fun captureFaceDistanceSamples(
         durationMillis: Long,
         sampleIntervalMillis: Long = 900L,
@@ -70,7 +77,7 @@ class ProximityCameraSampler(private val context: Context) {
         val cameraLatencyMillis = System.currentTimeMillis() - captureStartedAt
         val bitmap = BitmapFactory.decodeByteArray(capture.bytes, 0, capture.bytes.size) ?: return null
         return try {
-            val sample = FaceDistanceAnalyzer(includeTopology = publishDebugFrame)
+            val sample = analyzer(publishDebugFrame)
                 .analyze(bitmap, capture.rotationDegrees)
                 ?.copy(cameraLatencyMillis = cameraLatencyMillis)
             if (publishDebugFrame) {
@@ -94,7 +101,7 @@ class ProximityCameraSampler(private val context: Context) {
         val cameraLatencyMillis = System.currentTimeMillis() - captureStartedAt
         val bitmap = BitmapFactory.decodeByteArray(capture.bytes, 0, capture.bytes.size) ?: return null
         return try {
-            val sample = FaceDistanceAnalyzer(includeTopology = true)
+            val sample = topologyAnalyzer
                 .analyze(bitmap, capture.rotationDegrees)
                 ?.copy(cameraLatencyMillis = cameraLatencyMillis)
             FaceAnalysisFrameCapture(
@@ -129,7 +136,7 @@ class ProximityCameraSampler(private val context: Context) {
         val bitmap = BitmapFactory.decodeByteArray(capture.bytes, 0, capture.bytes.size) ?: return null
         return try {
             val analysisStarted = System.currentTimeMillis()
-            val sample = FaceDistanceAnalyzer(includeTopology = true)
+            val sample = topologyAnalyzer
                 .analyze(bitmap, capture.rotationDegrees)
                 ?.copy(cameraLatencyMillis = cameraLatencyMillis)
             val analysisMillis = System.currentTimeMillis() - analysisStarted
@@ -574,7 +581,7 @@ class ProximityCameraSampler(private val context: Context) {
 
     private fun Image.toJpegBytes(): ByteArray {
         val nv21 = toNv21()
-        return ByteArrayOutputStream().use { output ->
+        return ByteArrayOutputStream(width * height / 4 + 1024).use { output ->
             YuvImage(nv21, ImageFormat.NV21, width, height, null)
                 .compressToJpeg(Rect(0, 0, width, height), 82, output)
             output.toByteArray()
@@ -588,11 +595,21 @@ class ProximityCameraSampler(private val context: Context) {
         val nv21 = ByteArray(ySize + chromaWidth * chromaHeight * 2)
         val yPlane = planes[0]
         val yBuffer = yPlane.buffer.duplicate()
-        for (row in 0 until height) {
-            val rowOffset = row * yPlane.rowStride
-            val outputOffset = row * width
-            for (column in 0 until width) {
-                nv21[outputOffset + column] = yBuffer.get(rowOffset + column * yPlane.pixelStride)
+        val yCursor: Buffer = yBuffer
+        val yRowStride = yPlane.rowStride
+        val yPixelStride = yPlane.pixelStride
+        if (yPixelStride == 1) {
+            for (row in 0 until height) {
+                yCursor.position(row * yRowStride)
+                yBuffer.get(nv21, row * width, width)
+            }
+        } else {
+            for (row in 0 until height) {
+                val rowOffset = row * yRowStride
+                val outputOffset = row * width
+                for (column in 0 until width) {
+                    nv21[outputOffset + column] = yBuffer.get(rowOffset + column * yPixelStride)
+                }
             }
         }
 
@@ -600,13 +617,17 @@ class ProximityCameraSampler(private val context: Context) {
         val vPlane = planes[2]
         val uBuffer = uPlane.buffer.duplicate()
         val vBuffer = vPlane.buffer.duplicate()
+        val uRowStride = uPlane.rowStride
+        val vRowStride = vPlane.rowStride
+        val uPixelStride = uPlane.pixelStride
+        val vPixelStride = vPlane.pixelStride
         for (row in 0 until chromaHeight) {
             val outputOffset = ySize + row * width
-            val uRowOffset = row * uPlane.rowStride
-            val vRowOffset = row * vPlane.rowStride
+            val uRowOffset = row * uRowStride
+            val vRowOffset = row * vRowStride
             for (column in 0 until chromaWidth) {
-                nv21[outputOffset + column * 2] = vBuffer.get(vRowOffset + column * vPlane.pixelStride)
-                nv21[outputOffset + column * 2 + 1] = uBuffer.get(uRowOffset + column * uPlane.pixelStride)
+                nv21[outputOffset + column * 2] = vBuffer.get(vRowOffset + column * vPixelStride)
+                nv21[outputOffset + column * 2 + 1] = uBuffer.get(uRowOffset + column * uPixelStride)
             }
         }
         return nv21

@@ -364,9 +364,10 @@ class DataBackupService(
 
     private suspend fun importFeatureFlags(array: JSONArray?) {
         if (array == null) return
+        val repository = featureFlagRepository()
         for (index in 0 until array.length()) {
             val flag = array.optJSONObject(index)?.toFeatureFlag() ?: continue
-            featureFlagRepository().upsert(flag)
+            repository.upsert(flag)
         }
     }
 
