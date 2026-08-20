@@ -133,7 +133,7 @@ lumen-crash/
       LumenCrash.kt                 # 公开 install / record / load / clear API
       LumenCrashConfig.kt           # 宿主配置 + CrashAppInfo
       CrashReport.kt                # 报告模型、JSON、剪贴板导出
-      CrashReportKind.kt             # crash / freeze / startup-hang 报告类型
+      CrashReportKind.kt             # crash / non-fatal / freeze / startup-hang / prior-exit 报告类型
       CrashThreadDump.kt             # 受限全线程诊断快照
       LumenCrashWatchdog.kt          # 后台 ANR 与启动看门狗
       CrashReportStore.kt           # 多路径原子持久化
@@ -744,7 +744,8 @@ LumenCrash.markStartupComplete()
 ```
 
 `CrashReport` 新增 `kind` 和 `durationMillis`。旧 SDK 写入的报告没有这些字段，读取时会按
-`CrashReportKind.CRASH`、持续时间 0 兼容处理。
+`CrashReportKind.CRASH`、持续时间 0 兼容处理。`CrashReportKind.NON_FATAL` 报告只上报、不落盘，
+因此永远不会成为待处理报告。
 
 启动时按待处理报告门禁 UI：
 
@@ -1082,6 +1083,7 @@ LumenCrash.record(throwable) // 会持久化，并触发 onCrashSaved
 | `LumenCrash.store()` | 获取 `CrashReportStore`（未安装会抛异常） | 是 |
 | `LumenCrash.recordBreadcrumb(event)` | 追加一条脱敏后的面包屑 | 是 |
 | `LumenCrash.record(throwable)` | 构建并持久化报告，触发 `onCrashSaved` | 是 |
+| `LumenCrash.recordNonFatal(throwable)` | 构建并上报 `NON_FATAL` 报告，**不写入本地存储** | 仅当前源码 / 较新 AAR |
 | `LumenCrash.loadPendingReport()` | 优先读内存启动报告，否则读磁盘（integrity fail-closed） | 是 |
 | `LumenCrash.loadPendingReportSafely()` | 宿主安全 pending 加载（失败返回 `null`） | 仅当前源码 / 较新 AAR — 若缺失，用 `runCatching { loadPendingReport() }` |
 | `LumenCrash.clearPendingReport()` | 清空磁盘存储 + 内存启动报告 | 是 |
@@ -1153,7 +1155,8 @@ fun LumenCrashReportScreen(
    - 若存在旧 handler，则继续链式调用
    - 否则可按配置结束进程（`killProcessWhenNoPreviousHandler`）
 3. `record(throwable)` 对已捕获异常走同一套构建/保存/回调路径。
-4. 下次进程启动：宿主调用 `loadPendingReport()`，并在进入正常 UI 前展示 `LumenCrashReportScreen`。
+4. `recordNonFatal(throwable)` 构建 `CrashReportKind.NON_FATAL` 报告并上报，但**不写入本地存储**：宿主已恢复的失败不会占用待处理报告槽位、不会覆盖尚未展示的真实崩溃，也不会用崩溃页拦住下一次启动。
+5. 下次进程启动：宿主调用 `loadPendingReport()`，并在进入正常 UI 前展示 `LumenCrashReportScreen`。
 
 若尚未 `install`，但异常仍进入 SDK handler 路径，报告构建会回退到包名 / `"unknown"` 应用元信息。
 

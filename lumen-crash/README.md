@@ -133,7 +133,7 @@ lumen-crash/
       LumenCrash.kt                 # public install / record / load / clear API
       LumenCrashConfig.kt           # host config + CrashAppInfo
       CrashReport.kt                # report model, JSON, clipboard export
-      CrashReportKind.kt             # crash / freeze / startup-hang report types
+      CrashReportKind.kt             # crash / non-fatal / freeze / startup-hang / prior-exit report types
       CrashThreadDump.kt             # bounded cross-thread diagnostic snapshot
       LumenCrashWatchdog.kt          # background ANR and startup watchdog
       CrashReportStore.kt           # multi-path atomic persistence
@@ -746,7 +746,8 @@ LumenCrash.markStartupComplete()
 ```
 
 `CrashReport` adds `kind` and `durationMillis`. Reports written by older SDK versions omit these
-fields and are loaded as `CrashReportKind.CRASH` with a zero duration.
+fields and are loaded as `CrashReportKind.CRASH` with a zero duration. `CrashReportKind.NON_FATAL`
+reports are uploaded but never persisted, so they never surface as a pending report.
 
 Gate startup UI on a pending report:
 
@@ -1084,6 +1085,7 @@ LumenCrash.record(throwable) // also persists + invokes onCrashSaved
 | `LumenCrash.store()` | `CrashReportStore` (throws if not installed) | Yes |
 | `LumenCrash.recordBreadcrumb(event)` | Append sanitized breadcrumb | Yes |
 | `LumenCrash.record(throwable)` | Build + persist report, invoke `onCrashSaved` | Yes |
+| `LumenCrash.recordNonFatal(throwable)` | Build + upload a `NON_FATAL` report **without** persisting it | Current source / recent AARs only |
 | `LumenCrash.loadPendingReport()` | In-memory startup report, else disk load (integrity fail-closed) | Yes |
 | `LumenCrash.loadPendingReportSafely()` | Host-safe pending load (`null` on failure) | Current source / recent AARs only — if missing, wrap `loadPendingReport` in `runCatching` |
 | `LumenCrash.clearPendingReport()` | Clear store + startup report | Yes |
@@ -1155,7 +1157,8 @@ fun LumenCrashReportScreen(
    - Chain to the previous handler when one exists
    - Otherwise optionally kill the process (`killProcessWhenNoPreviousHandler`)
 3. `record(throwable)` performs the same report build/save/hook path for handled failures.
-4. Next process start: host calls `loadPendingReport()` and shows `LumenCrashReportScreen` before normal UI.
+4. `recordNonFatal(throwable)` builds a `CrashReportKind.NON_FATAL` report and uploads it **without** writing the store, so a failure the host already recovered from never claims the pending-report slot, never overwrites an unshown crash, and never blocks the next launch with the report screen.
+5. Next process start: host calls `loadPendingReport()` and shows `LumenCrashReportScreen` before normal UI.
 
 If install has not run yet and an uncaught exception still reaches the SDK handler path, report construction falls back to package-name / `"unknown"` app metadata.
 
