@@ -638,7 +638,7 @@ internal fun SettingsScreen(
             Text(stringResource(R.string.theme), style = MaterialTheme.typography.titleSmall)
             LumenFlowRow {
                 ThemeChip(R.string.theme_system, AppThemeMode.SYSTEM, settings, viewModel, enabled = !templateAppearanceEnabled)
-                ThemeChip(R.string.theme_light, AppThemeMode.LIGHT, settings, viewModel)
+                ThemeChip(R.string.theme_light, AppThemeMode.LIGHT, settings, viewModel, enabled = !templateAppearanceEnabled)
                 ThemeChip(R.string.theme_dark, AppThemeMode.DARK, settings, viewModel, enabled = !templateAppearanceEnabled)
             }
             if (templateAppearanceEnabled) {
