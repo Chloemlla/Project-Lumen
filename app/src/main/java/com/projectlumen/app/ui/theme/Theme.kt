@@ -83,7 +83,10 @@ fun ProjectLumenTheme(
     themePaletteJson: String? = null,
     content: @Composable () -> Unit,
 ) {
-    val darkTheme = when (themeMode) {
+    val templatePaletteIsDark = remember(useDynamicColors, themePaletteJson) {
+        if (useDynamicColors) null else templatePaletteDarkness(themePaletteJson)
+    }
+    val darkTheme = templatePaletteIsDark ?: when (themeMode) {
         AppThemeMode.SYSTEM -> isSystemInDarkTheme()
         AppThemeMode.LIGHT -> false
         AppThemeMode.DARK -> true
@@ -163,7 +166,7 @@ private fun ColorScheme.applyTemplatePalette(
 
     val primarySeed = parseTemplateColor(primaryHex) ?: return this
     val backgroundSeed = parseTemplateColor(backgroundHex) ?: primarySeed
-    val darkTheme = backgroundSeed.luminance() < 0.42f
+    val darkTheme = backgroundSeed.luminance() < TEMPLATE_DARK_LUMINANCE_THRESHOLD
 
     val primary = if (darkTheme) {
         primarySeed.blend(Color.White, 0.28f)
@@ -254,6 +257,18 @@ private data class TemplatePalette(
     val bg200: Color,
     val bg300: Color,
 )
+
+private const val TEMPLATE_DARK_LUMINANCE_THRESHOLD = 0.42f
+
+/**
+ * Null when the template ships no palette; otherwise whether that palette is a dark one.
+ *
+ * A template palette pins `surface`, `background` and their content colors to fixed hex values, so
+ * the requested theme mode cannot change them — the palette itself decides light or dark, and the
+ * base scheme has to follow it for the roles the palette leaves alone (error, scrim, inverse).
+ */
+fun templatePaletteDarkness(paletteJson: String?): Boolean? =
+    parseTemplatePalette(paletteJson)?.let { it.bg100.luminance() < TEMPLATE_DARK_LUMINANCE_THRESHOLD }
 
 private fun parseTemplatePalette(json: String?): TemplatePalette? {
     if (json.isNullOrBlank()) return null

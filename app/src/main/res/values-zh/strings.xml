@@ -167,6 +167,7 @@
     <string name="use_wallpaper_colors">使用壁纸取色</string>
     <string name="wallpaper_colors_message">Android 12 及以上会使用系统壁纸调色板生成整套 Material 配色，包括底色、表面、控件和导航。</string>
     <string name="wallpaper_colors_unavailable">壁纸取色需要 Android 12 或更高版本，当前设备将使用内置 Lumen 配色。</string>
+    <string name="template_appearance_locks_theme_mode">当前模板自带固定配色，由它决定深浅，主题模式设置暂时不生效。你的选择已保留，切换模板或重新开启壁纸取色后会自动生效。</string>
     <string name="enable_reminder">启用提醒</string>
     <string name="warn_interval">提醒间隔</string>
     <string name="rest_duration">休息时长</string>

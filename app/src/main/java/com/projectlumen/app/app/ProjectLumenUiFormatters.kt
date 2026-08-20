@@ -184,6 +184,7 @@ import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import com.projectlumen.app.ui.theme.templatePaletteDarkness
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -312,6 +313,16 @@ internal fun templateCountdownStyle(template: TipTemplateEntity?): String {
 
 internal fun activeTemplate(uiState: ProjectLumenUiState): TipTemplateEntity? {
     return uiState.templates.firstOrNull { it.id == uiState.settings.activeTipTemplateId } ?: uiState.templates.firstOrNull()
+}
+
+/**
+ * True when the active template hardcodes surface colors, which makes the requested theme mode
+ * unrenderable. The stored preference is only suppressed for display while this holds — never
+ * rewritten, so it applies again as soon as the template changes.
+ */
+internal fun templateAppearanceLocksThemeMode(uiState: ProjectLumenUiState): Boolean {
+    if (uiState.settings.useDynamicColors) return false
+    return templatePaletteDarkness(activeTemplate(uiState)?.layoutJson) != null
 }
 
 internal fun planTier(settings: AppSettingsEntity): PlanTier {

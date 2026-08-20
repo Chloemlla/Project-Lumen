@@ -485,16 +485,8 @@ class ProjectLumenViewModel(
         transform: (AppSettingsEntity) -> AppSettingsEntity,
     ) {
         val current = stateStore.uiState.value.settings
-        val updated = normalizeTemplateAppearanceSettings(transform(current))
+        val updated = transform(current)
         stateStore.previewSettings(updated.copy(id = 1, updatedAt = nowMillis))
-    }
-
-    private fun normalizeTemplateAppearanceSettings(settings: AppSettingsEntity): AppSettingsEntity {
-        if (settings.useDynamicColors) return settings
-        return settings.copy(
-            themeMode = AppThemeMode.LIGHT.name,
-            useAutoDarkWindow = false,
-        )
     }
 
     private suspend fun hasExistingLocalUse(): Boolean {

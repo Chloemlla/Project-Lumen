@@ -46,9 +46,7 @@ internal class ProjectLumenSettingsFeatureEntry(
     ) {
         scope.launch {
             val current = settingsRepository.getOrDefault()
-            val updated = settingsRepository.update(nowMillis) { settings ->
-                normalizeTemplateAppearanceSettings(transform(settings))
-            }
+            val updated = settingsRepository.update(nowMillis, transform)
             val shouldRescheduleProximity = (updated.proximityMonitoringEnabled || updated.blinkMonitoringEnabled) && (
                 current.proximityCheckIntervalMinutes != updated.proximityCheckIntervalMinutes ||
                     current.proximityCaptureSeconds != updated.proximityCaptureSeconds ||
@@ -172,7 +170,7 @@ internal class ProjectLumenSettingsFeatureEntry(
     fun setThemeMode(mode: AppThemeMode, nowMillis: Long = System.currentTimeMillis()) {
         scope.launch {
             settingsRepository.update(nowMillis) {
-                normalizeTemplateAppearanceSettings(it.copy(themeMode = mode.name))
+                it.copy(themeMode = mode.name)
             }
         }
     }
@@ -227,13 +225,5 @@ internal class ProjectLumenSettingsFeatureEntry(
             shizukuNativeBrightnessPercent != updated.shizukuNativeBrightnessPercent ||
             shizukuNativeExtraDimEnabled != updated.shizukuNativeExtraDimEnabled ||
             shizukuNativeExtraDimPercent != updated.shizukuNativeExtraDimPercent
-    }
-
-    private fun normalizeTemplateAppearanceSettings(settings: AppSettingsEntity): AppSettingsEntity {
-        if (settings.useDynamicColors) return settings
-        return settings.copy(
-            themeMode = AppThemeMode.LIGHT.name,
-            useAutoDarkWindow = false,
-        )
     }
 }

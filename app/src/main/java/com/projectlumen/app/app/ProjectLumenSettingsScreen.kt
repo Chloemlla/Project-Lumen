@@ -570,7 +570,13 @@ internal fun SettingsScreen(
             viewModel.refreshShizukuState()
         }
     }
-    val templateAppearanceEnabled = !settings.useDynamicColors
+    val templateAppearanceEnabled = remember(
+        settings.useDynamicColors,
+        uiState.templates,
+        settings.activeTipTemplateId,
+    ) {
+        templateAppearanceLocksThemeMode(uiState)
+    }
     val autoDarkWindowEnabled = settings.useAutoDarkWindow && !templateAppearanceEnabled
     val sectionGroupController = rememberSettingsSectionGroupController()
     CompositionLocalProvider(LocalSettingsSectionGroup provides sectionGroupController) {
@@ -635,6 +641,13 @@ internal fun SettingsScreen(
                 ThemeChip(R.string.theme_light, AppThemeMode.LIGHT, settings, viewModel)
                 ThemeChip(R.string.theme_dark, AppThemeMode.DARK, settings, viewModel, enabled = !templateAppearanceEnabled)
             }
+            if (templateAppearanceEnabled) {
+                Text(
+                    stringResource(R.string.template_appearance_locks_theme_mode),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             SwitchRow(R.string.enable_statistics, Icons.Outlined.BarChart, settings.statsEnabled) {
                 viewModel.updateSettings { current -> current.copy(statsEnabled = it) }
             }
@@ -648,7 +661,7 @@ internal fun SettingsScreen(
             SwitchRow(
                 R.string.auto_dark_window,
                 Icons.Outlined.Style,
-                autoDarkWindowEnabled,
+                settings.useAutoDarkWindow,
                 enabled = !templateAppearanceEnabled,
             ) {
                 viewModel.updateSettings { current -> current.copy(useAutoDarkWindow = it) }
@@ -1160,17 +1173,7 @@ internal fun SettingsScreen(
         SettingsSection(R.string.section_appearance, Icons.Outlined.Style) {
             val proEnabled = planTier(settings) >= PlanTier.PRO
             SwitchRow(R.string.use_wallpaper_colors, Icons.Outlined.Style, settings.useDynamicColors) {
-                viewModel.updateSettings { current ->
-                    if (it) {
-                        current.copy(useDynamicColors = true)
-                    } else {
-                        current.copy(
-                            useDynamicColors = false,
-                            themeMode = AppThemeMode.LIGHT.name,
-                            useAutoDarkWindow = false,
-                        )
-                    }
-                }
+                viewModel.updateSettings { current -> current.copy(useDynamicColors = it) }
             }
             Text(
                 stringResource(
