@@ -1,5 +1,6 @@
 package com.projectlumen.app.core.security
 
+import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -31,6 +32,14 @@ object AppIntegrityGuard {
         if (BuildConfig.DEBUG || !BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED) return
 
         val appContext = context.applicationContext
+        // Auxiliary processes run this same Application, and CRooot's own probe process is
+        // named ":zygisk_fd_detector" — its name lands in /proc/self/cmdline, which the native
+        // hooking-artifact scan reads, so the probe reports itself as an injected environment.
+        // Only the main process holds the state this gate protects.
+        if (Application.getProcessName() != appContext.packageName) {
+            Log.i(TAG, "Skipping integrity enforcement outside the main process.")
+            return
+        }
         val javaDebugDetected = Debug.isDebuggerConnected() || Debug.waitingForDebugger()
         val nativeAllowed = NativeSecurityBridge.isNativeEnvironmentAllowedOrNull(
             packageName = appContext.packageName,
