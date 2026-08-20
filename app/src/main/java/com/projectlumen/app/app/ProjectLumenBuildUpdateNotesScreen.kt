@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -123,9 +124,9 @@ private fun BuildUpdateNotesIdentityCard(notes: BuildUpdateNotes) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors(LumenCardEmphasis.Primary),
         elevation = lumenCardElevation(),
-        border = lumenCardBorder(),
+        border = lumenCardBorder(LumenCardEmphasis.Primary),
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -158,7 +159,14 @@ private fun BuildUpdateNotesIdentityRow(
     value: String,
     monospace: Boolean = false,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
@@ -166,6 +174,7 @@ private fun BuildUpdateNotesIdentityRow(
         )
         Text(
             text = value,
+            modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontFamily = if (monospace) FontFamily.Monospace else FontFamily.Default,
             ),
@@ -213,10 +222,21 @@ private fun BuildUpdateNotesContent(notes: BuildUpdateNotes) {
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        Text(
-            text = bodyText,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = LumenCardShape,
+            colors = lumenCardColors(LumenCardEmphasis.Quiet),
+            elevation = lumenCardElevation(),
+            border = lumenCardBorder(LumenCardEmphasis.Quiet),
+        ) {
+            Text(
+                text = bodyText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

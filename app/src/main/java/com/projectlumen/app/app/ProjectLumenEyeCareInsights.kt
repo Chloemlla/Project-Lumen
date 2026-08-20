@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -238,32 +239,139 @@ internal fun EyeCareHealthReportCard(
     shizukuReady: Boolean,
 ) {
     val summary = rememberEyeCareInsightSummary(uiState, permissionRequirements, shizukuReady)
+    val hasSessionHistory = remember(uiState.eyeStats) {
+        uiState.eyeStats.any {
+            it.workingSeconds > 0L || it.restSeconds > 0L || it.completedBreakCount > 0 || it.skipCount > 0
+        }
+    }
+    val continuousGoalMinutes = uiState.dailyGoal.maxContinuousWorkMinutes
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors(LumenCardEmphasis.Primary),
         elevation = lumenCardElevation(),
-        border = lumenCardBorder(),
+        border = lumenCardBorder(LumenCardEmphasis.Primary),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.eye_care_health_report)
             RiskScoreHeader(summary)
-            MetricRow(R.string.working_time, stringResource(R.string.minutes_value, summary.workMinutes))
-            MetricRow(R.string.rest_time, stringResource(R.string.minutes_value, summary.restMinutes))
-            MetricRow(R.string.eye_care_rest_completion, stringResource(R.string.percent_value, summary.completionRate))
-            MetricRow(R.string.skip_rate, stringResource(R.string.percent_value, summary.skipRate))
-            MetricRow(R.string.max_continuous_work_goal, stringResource(R.string.minutes_value, summary.maxContinuousMinutes))
-            MetricRow(R.string.average_continuous_work, stringResource(R.string.minutes_value, summary.averageContinuousMinutes))
-            MetricRow(R.string.proximity_warnings, summary.proximityWarnings.toString())
-            MetricRow(R.string.eye_dry_warnings, summary.dryEyeWarnings.toString())
-            MetricRow(R.string.low_light_warnings, summary.lowLightWarnings.toString())
+            if (!hasSessionHistory) {
+                EmptyStateMessage(R.string.eye_care_reason_no_stats)
+            } else {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SmallMetric(R.string.working_time, stringResource(R.string.minutes_value, summary.workMinutes))
+                    SmallMetric(R.string.rest_time, stringResource(R.string.minutes_value, summary.restMinutes))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SmallMetric(
+                        R.string.eye_care_rest_completion,
+                        stringResource(R.string.percent_value, summary.completionRate),
+                    )
+                    SmallMetric(R.string.skip_rate, stringResource(R.string.percent_value, summary.skipRate))
+                }
+                SectionHeader(Icons.Outlined.Schedule, R.string.section_goals)
+                EyeCareFlaggedMetricRow(
+                    labelRes = R.string.max_continuous_work_goal,
+                    value = stringResource(R.string.minutes_value, summary.maxContinuousMinutes),
+                    valueState = if (summary.maxContinuousMinutes > continuousGoalMinutes) {
+                        EyeCareMetricState.Alert
+                    } else {
+                        EyeCareMetricState.Neutral
+                    },
+                )
+                EyeCareFlaggedMetricRow(
+                    labelRes = R.string.average_continuous_work,
+                    value = stringResource(R.string.minutes_value, summary.averageContinuousMinutes),
+                    valueState = if (summary.averageContinuousMinutes > continuousGoalMinutes) {
+                        EyeCareMetricState.Caution
+                    } else {
+                        EyeCareMetricState.Neutral
+                    },
+                )
+                SectionHeader(Icons.Outlined.WarningAmber, R.string.section_eye_protection)
+                EyeCareFlaggedMetricRow(
+                    labelRes = R.string.proximity_warnings,
+                    value = summary.proximityWarnings.toString(),
+                    valueState = eyeCareWarningState(summary.proximityWarnings),
+                )
+                EyeCareFlaggedMetricRow(
+                    labelRes = R.string.eye_dry_warnings,
+                    value = summary.dryEyeWarnings.toString(),
+                    valueState = eyeCareWarningState(summary.dryEyeWarnings),
+                )
+                EyeCareFlaggedMetricRow(
+                    labelRes = R.string.low_light_warnings,
+                    value = summary.lowLightWarnings.toString(),
+                    valueState = eyeCareWarningState(summary.lowLightWarnings),
+                )
+            }
             InsightReasonList(summary.riskReasonRes)
             InsightActionList(summary.actionRes)
         }
     }
 }
+
+/**
+ * A [MetricRow] that can also carry the value's state, so a reader sees which number is out of
+ * range without first decoding its label. Thresholds mirror the ones the risk score already uses.
+ */
+@Composable
+private fun EyeCareFlaggedMetricRow(
+    @StringRes labelRes: Int,
+    value: String,
+    valueState: EyeCareMetricState,
+) {
+    if (valueState == EyeCareMetricState.Neutral) {
+        MetricRow(labelRes, value)
+        return
+    }
+    val containerColor = if (valueState == EyeCareMetricState.Alert) {
+        MaterialTheme.colorScheme.errorContainer
+    } else {
+        MaterialTheme.colorScheme.tertiaryContainer
+    }
+    val contentColor = if (valueState == EyeCareMetricState.Alert) {
+        MaterialTheme.colorScheme.onErrorContainer
+    } else {
+        MaterialTheme.colorScheme.onTertiaryContainer
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(containerColor)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            stringResource(labelRes),
+            style = MaterialTheme.typography.bodyLarge,
+            color = contentColor,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = contentColor,
+        )
+    }
+}
+
+private enum class EyeCareMetricState {
+    Neutral,
+    Caution,
+    Alert,
+}
+
+private fun eyeCareWarningState(count: Int): EyeCareMetricState = when {
+    count >= EYE_CARE_WARNING_ALERT_COUNT -> EyeCareMetricState.Alert
+    count > 0 -> EyeCareMetricState.Caution
+    else -> EyeCareMetricState.Neutral
+}
+
+private const val EYE_CARE_WARNING_ALERT_COUNT = 2
 
 @Composable
 internal fun EyeCareActionPlanCard(
@@ -339,9 +447,9 @@ internal fun EyeCareSetupAndPrivacyCard(
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors(LumenCardEmphasis.Quiet),
         elevation = lumenCardElevation(),
-        border = lumenCardBorder(),
+        border = lumenCardBorder(LumenCardEmphasis.Quiet),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Lock, R.string.eye_care_privacy_permissions)
@@ -905,8 +1013,8 @@ private fun GuideStepLine(step: EyeCareGuideStep) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -945,33 +1053,45 @@ private fun PermissionTransparencyLine(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(LumenPreferenceShape)
+            .background(
+                if (satisfied) {
+                    lumenNestedContainerColor
+                } else {
+                    MaterialTheme.colorScheme.errorContainer
+                },
+            )
             .padding(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val contentColor = if (satisfied) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.onErrorContainer
+        }
         Icon(
             imageVector = if (satisfied) Icons.Outlined.CheckCircle else icon,
             contentDescription = null,
-            tint = if (satisfied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            tint = contentColor,
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 stringResource(titleRes),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
+                color = if (satisfied) MaterialTheme.colorScheme.onSurface else contentColor,
             )
             Text(
                 stringResource(detailRes),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (satisfied) MaterialTheme.colorScheme.onSurfaceVariant else contentColor,
             )
         }
         Text(
             stringResource(if (satisfied) R.string.eye_care_permission_ready else R.string.eye_care_permission_needs_action),
             style = MaterialTheme.typography.labelLarge,
-            color = if (satisfied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            color = contentColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -989,8 +1109,9 @@ private fun CapabilityLine(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
+            .heightIn(min = LumenMinTouchTargetHeight)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,

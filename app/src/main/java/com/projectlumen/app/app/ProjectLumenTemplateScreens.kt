@@ -144,6 +144,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -216,22 +219,34 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
         SectionHeader(Icons.Outlined.Style, R.string.template_preview)
         TemplatePreviewCard(activeTemplate)
         uiState.templates.forEach { template ->
-            val selected = template.id == uiState.settings.activeTipTemplateId
+            val isActiveTemplate = template.id == uiState.settings.activeTipTemplateId
             val locked = template.isPremium && !proEnabled
+            val templateEmphasis = when {
+                isActiveTemplate -> LumenCardEmphasis.Primary
+                locked -> LumenCardEmphasis.Quiet
+                else -> LumenCardEmphasis.Standard
+            }
             val borderColor by animateColorAsState(
-                targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                targetValue = if (isActiveTemplate) MaterialTheme.colorScheme.primary else Color.Transparent,
                 animationSpec = tween(180),
                 label = "templateBorderColor",
             )
+            val useTemplateLabel = stringResource(R.string.use_template)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = !locked && !selected) { viewModel.selectTemplate(template.id) }
-                    .border(1.dp, borderColor, LumenCardShape)
+                    .clickable(
+                        enabled = !locked && !isActiveTemplate,
+                        onClickLabel = useTemplateLabel,
+                        role = Role.Button,
+                    ) { viewModel.selectTemplate(template.id) }
+                    .semantics { selected = isActiveTemplate }
+                    .border(2.dp, borderColor, LumenCardShape)
                     .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
                 shape = LumenCardShape,
-                colors = lumenCardColors(),
+                colors = lumenCardColors(templateEmphasis),
                 elevation = lumenCardElevation(),
+                border = if (isActiveTemplate) null else lumenCardBorder(templateEmphasis),
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -240,7 +255,7 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         TemplateColorSwatch(template)
                         Spacer(Modifier.width(12.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 if (template.isPremium) {
                                     "${templateDisplayName(template)} · ${stringResource(R.string.premium_template)}"
@@ -251,10 +266,18 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                             )
                             Text(templateSubtitle(template), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                        if (isActiveTemplate) {
+                            Icon(
+                                Icons.Outlined.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
                     }
                     when {
                         locked -> StatusPill(Icons.Outlined.Lock, R.string.pro_required)
-                        selected -> StatusPill(Icons.Outlined.CheckCircle, R.string.active_template)
+                        isActiveTemplate -> StatusPill(Icons.Outlined.CheckCircle, R.string.active_template)
                         else -> FilterChip(
                             selected = false,
                             onClick = { viewModel.selectTemplate(template.id) },
@@ -279,7 +302,7 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                                 }
                             }
                         }
-                        if (selected) {
+                        if (isActiveTemplate) {
                             TemplateEditor(template, viewModel)
                         }
                     }
@@ -293,7 +316,14 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
 internal fun TemplateEditor(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
     var titleText by remember(template.id, template.updatedAt) { mutableStateOf(template.titleText) }
     var subtitleText by remember(template.id, template.updatedAt) { mutableStateOf(template.subtitleText) }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Text(stringResource(R.string.template_editor), style = MaterialTheme.typography.titleSmall)
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
@@ -342,7 +372,13 @@ internal fun CountdownStyleChip(
 
 @Composable
 internal fun SystemBackgroundPicker(template: TipTemplateEntity, viewModel: ProjectLumenViewModel) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = lumenCardColors(), elevation = lumenCardElevation()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = LumenCardShape,
+        colors = lumenCardColors(),
+        elevation = lumenCardElevation(),
+        border = lumenCardBorder(),
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Style, R.string.system_background_color)
             LumenFlowRow {

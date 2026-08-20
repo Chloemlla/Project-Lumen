@@ -15,12 +15,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Code
@@ -29,7 +29,6 @@ import androidx.compose.material.icons.outlined.VolunteerActivism
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -40,8 +39,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.projectlumen.app.R
 import com.projectlumen.app.ui.svg.DynamicColorImageVectors
 import com.projectlumen.app.ui.svg.drawablevectors.coder
@@ -89,7 +91,9 @@ internal fun ProjectLumenOpenSourceNoticeScreen(
                     .padding(horizontal = 20.dp, vertical = 16.dp),
             ) {
                 Button(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = LumenMinTouchTargetHeight),
                     onClick = onContinue,
                 ) {
                     Text(stringResource(R.string.oss_notice_continue))
@@ -124,8 +128,9 @@ internal fun ProjectLumenOpenSourceNoticeScreen(
             item {
                 Text(
                     text = stringResource(R.string.oss_notice_intro),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 22.sp,
                 )
             }
             item {
@@ -153,25 +158,15 @@ internal fun ProjectLumenOpenSourceNoticeScreen(
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.VolunteerActivism,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = stringResource(R.string.oss_notice_credits_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                    SectionHeader(
+                        Icons.Outlined.VolunteerActivism,
+                        stringResource(R.string.oss_notice_credits_title),
+                    )
                     Text(
                         text = stringResource(R.string.oss_notice_credits_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 22.sp,
                     )
                 }
             }
@@ -196,34 +191,27 @@ private fun OssNoticeSectionCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = LumenCardShape,
+        colors = lumenCardColors(LumenCardEmphasis.Quiet),
+        elevation = lumenCardElevation(),
+        border = lumenCardBorder(LumenCardEmphasis.Quiet),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+            SectionHeader(icon, title)
             Text(
                 text = body,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 22.sp,
             )
             if (actionLabel != null && onAction != null) {
                 Row(
                     modifier = Modifier
-                        .clickable(onClick = onAction)
+                        .heightIn(min = LumenMinTouchTargetHeight)
+                        .clickable(onClickLabel = actionLabel, role = Role.Button, onClick = onAction)
                         .padding(top = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -239,6 +227,7 @@ private fun OssNoticeSectionCard(
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
+                        textDecoration = TextDecoration.Underline,
                     )
                 }
             }
@@ -254,29 +243,51 @@ private fun CreditCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClickLabel = credit.name, role = Role.Button, onClick = onClick)
+                } else {
+                    Modifier
+                },
+            ),
+        shape = LumenCardShape,
+        colors = lumenCardColors(LumenCardEmphasis.Quiet),
+        elevation = lumenCardElevation(),
+        border = lumenCardBorder(LumenCardEmphasis.Quiet),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(
-                text = credit.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = credit.name,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                if (onClick != null) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
             Text(
                 text = credit.author,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
                 text = stringResource(credit.descriptionRes),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                lineHeight = 20.sp,
             )
             Text(
                 text = credit.license,

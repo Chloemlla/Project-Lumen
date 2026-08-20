@@ -1,11 +1,13 @@
 package com.projectlumen.app.app
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -34,12 +36,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.toast.LumenToastKind
 import com.projectlumen.app.core.toast.showLumenToast
@@ -57,11 +62,10 @@ internal fun LegalHubScreen(
     var showWithdrawPrivacyDialog by rememberSaveable { mutableStateOf(false) }
 
     LumenPage {
-        SectionHeader(Icons.Outlined.Gavel, R.string.legal_center_title)
-        Text(
-            text = stringResource(R.string.legal_center_intro),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        PageIntro(
+            Icons.Outlined.Gavel,
+            R.string.legal_center_title,
+            stringResource(R.string.legal_center_intro),
         )
 
         Text(
@@ -72,9 +76,9 @@ internal fun LegalHubScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = LumenCardShape,
-            colors = lumenCardColors(),
+            colors = lumenCardColors(LumenCardEmphasis.Quiet),
             elevation = lumenCardElevation(),
-            border = lumenCardBorder(),
+            border = lumenCardBorder(LumenCardEmphasis.Quiet),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -107,9 +111,9 @@ internal fun LegalHubScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = LumenCardShape,
-            colors = lumenCardColors(),
+            colors = lumenCardColors(LumenCardEmphasis.Quiet),
             elevation = lumenCardElevation(),
-            border = lumenCardBorder(),
+            border = lumenCardBorder(LumenCardEmphasis.Quiet),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -133,9 +137,9 @@ internal fun LegalHubScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = LumenCardShape,
-            colors = lumenCardColors(),
+            colors = lumenCardColors(LumenCardEmphasis.Quiet),
             elevation = lumenCardElevation(),
-            border = lumenCardBorder(),
+            border = lumenCardBorder(LumenCardEmphasis.Quiet),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -214,7 +218,7 @@ internal fun LegalDocumentScreen(
         @Suppress("DEPRECATION")
         SectionHeader(Icons.Outlined.Article, titleRes)
         val body = stringResource(bodyRes)
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             body.split('\n')
                 .filter { it.isNotBlank() }
                 .forEach { paragraph ->
@@ -222,6 +226,7 @@ internal fun LegalDocumentScreen(
                         text = paragraph,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 22.sp,
                     )
                 }
         }
@@ -231,14 +236,26 @@ internal fun LegalDocumentScreen(
 @Composable
 internal fun AppPermissionsScreen() {
     LumenPage {
-        SectionHeader(Icons.Outlined.Lock, R.string.legal_permissions_title)
-        Text(
-            text = stringResource(R.string.legal_permissions_intro),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        PageIntro(
+            Icons.Outlined.Lock,
+            R.string.legal_permissions_title,
+            stringResource(R.string.legal_permissions_intro),
         )
-        legalPermissions.forEach { entry ->
-            PermissionCard(entry)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = LumenCardShape,
+            colors = lumenCardColors(LumenCardEmphasis.Quiet),
+            elevation = lumenCardElevation(),
+            border = lumenCardBorder(LumenCardEmphasis.Quiet),
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                legalPermissions.forEach { entry ->
+                    LegalPermissionTile(entry)
+                }
+            }
         }
     }
 }
@@ -249,10 +266,12 @@ private fun LegalRow(
     @StringRes labelRes: Int,
     onClick: () -> Unit,
 ) {
+    val label = stringResource(labelRes)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .heightIn(min = LumenMinTouchTargetHeight)
+            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -264,7 +283,7 @@ private fun LegalRow(
             modifier = Modifier.size(24.dp),
         )
         Text(
-            text = stringResource(labelRes),
+            text = label,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface,
@@ -278,30 +297,27 @@ private fun LegalRow(
 }
 
 @Composable
-private fun PermissionCard(entry: PermissionEntry) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = LumenCardShape,
-        colors = lumenCardColors(),
-        elevation = lumenCardElevation(),
-        border = lumenCardBorder(),
+private fun LegalPermissionTile(entry: PermissionEntry) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = stringResource(entry.nameRes),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.Monospace,
-            )
-            Text(
-                text = stringResource(entry.descRes),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            text = stringResource(entry.nameRes),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = FontFamily.Monospace,
+        )
+        Text(
+            text = stringResource(entry.descRes),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 20.sp,
+        )
     }
 }
 

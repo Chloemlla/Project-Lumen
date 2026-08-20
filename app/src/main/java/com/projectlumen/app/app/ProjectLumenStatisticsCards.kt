@@ -205,8 +205,11 @@ internal fun TrendCard(uiState: ProjectLumenUiState) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        // Historical reference below the headline numbers — quiet, so the 7-day bars read as
+        // supporting detail rather than a second focal point.
+        colors = lumenCardColors(LumenCardEmphasis.Quiet),
         elevation = lumenCardElevation(),
+        border = lumenCardBorder(LumenCardEmphasis.Quiet),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.weekly_trend)

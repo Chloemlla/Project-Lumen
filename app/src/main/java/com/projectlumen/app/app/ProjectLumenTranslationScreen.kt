@@ -4,12 +4,14 @@ import android.content.ClipData
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -163,91 +167,116 @@ internal fun TranslationScreen() {
                 minLines = 5,
                 maxLines = 9,
             )
-            Text(stringResource(R.string.translation_source_language), style = MaterialTheme.typography.titleSmall)
-            LanguageOptionsRow(sourceLanguageOptions, sourceLang) { sourceLang = it }
-            Text(stringResource(R.string.translation_target_language), style = MaterialTheme.typography.titleSmall)
-            LanguageOptionsRow(targetLanguageOptions, targetLang) { targetLang = it }
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !translating && trimmedText.isNotBlank() && serviceEnabled,
-                onClick = ::translate,
-            ) {
-                if (translating) {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .size(18.dp),
-                        strokeWidth = 2.dp,
-                    )
-                    Text(stringResource(R.string.translation_translating))
-                } else {
-                    ButtonLabel(Icons.Outlined.Translate, R.string.translation_translate)
-                }
-            }
-            AnimatedVisibility(
-                visible = loadingConfig || !serviceEnabled,
-                enter = fadeIn(),
-                exit = fadeOut(),
-            ) {
-                StatusLine(
-                    icon = if (serviceEnabled) Icons.Outlined.Sync else Icons.Outlined.ErrorOutline,
-                    text = when {
-                        loadingConfig -> stringResource(R.string.translation_checking_service)
-                        else -> unavailableMessage
-                    },
+            TranslationLanguageGroup(
+                labelRes = R.string.translation_source_language,
+                options = sourceLanguageOptions,
+                selectedCode = sourceLang,
+            ) { sourceLang = it }
+            TranslationLanguageGroup(
+                labelRes = R.string.translation_target_language,
+                options = targetLanguageOptions,
+                selectedCode = targetLang,
+            ) { targetLang = it }
+        }
+        Button(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = LumenMinTouchTargetHeight),
+            enabled = !translating && trimmedText.isNotBlank() && serviceEnabled,
+            onClick = ::translate,
+        ) {
+            if (translating) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .size(18.dp),
+                    strokeWidth = 2.dp,
                 )
+                Text(stringResource(R.string.translation_translating))
+            } else {
+                ButtonLabel(Icons.Outlined.Translate, R.string.translation_translate)
             }
+        }
+        AnimatedVisibility(
+            visible = loadingConfig || !serviceEnabled,
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            StatusLine(
+                icon = if (serviceEnabled) Icons.Outlined.Sync else Icons.Outlined.ErrorOutline,
+                text = when {
+                    loadingConfig -> stringResource(R.string.translation_checking_service)
+                    else -> unavailableMessage
+                },
+            )
         }
         errorMessage?.let { message ->
             StatusLine(Icons.Outlined.ErrorOutline, message)
         }
         result?.let { translation ->
-            ActionCard {
-                SectionHeader(Icons.Outlined.Translate, R.string.translation_result)
-                Text(
-                    translation.translatedText,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = LumenCardShape,
+                colors = lumenCardColors(LumenCardEmphasis.Primary),
+                elevation = lumenCardElevation(),
+                border = lumenCardBorder(LumenCardEmphasis.Primary),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    SectionHeader(Icons.Outlined.Translate, R.string.translation_result)
                     Text(
-                        stringResource(
-                            R.string.translation_language_pair,
-                            translation.sourceLang,
-                            translation.targetLang,
-                        ),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        translation.translatedText,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(LumenPreferenceShape)
+                            .background(lumenNestedContainerColor)
+                            .padding(12.dp),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        softWrap = true,
                     )
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                clipboard.setClipEntry(
-                                    ClipEntry(
-                                        ClipData.newPlainText("translation", translation.translatedText),
-                                    ),
-                                )
-                            }
-                        },
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        ButtonLabel(Icons.Outlined.ContentCopy, R.string.translation_copy_result)
-                    }
-                }
-                AnimatedVisibility(visible = translation.alternatives.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Spacer(Modifier.height(2.dp))
                         Text(
-                            stringResource(R.string.translation_alternatives),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
+                            stringResource(
+                                R.string.translation_language_pair,
+                                translation.sourceLang,
+                                translation.targetLang,
+                            ),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        translation.alternatives.forEach { alternative ->
-                            StatusLine(Icons.Outlined.Info, alternative)
+                        OutlinedButton(
+                            onClick = {
+                                scope.launch {
+                                    clipboard.setClipEntry(
+                                        ClipEntry(
+                                            ClipData.newPlainText("translation", translation.translatedText),
+                                        ),
+                                    )
+                                }
+                            },
+                        ) {
+                            ButtonLabel(Icons.Outlined.ContentCopy, R.string.translation_copy_result)
+                        }
+                    }
+                    AnimatedVisibility(visible = translation.alternatives.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                stringResource(R.string.translation_alternatives),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            translation.alternatives.forEach { alternative ->
+                                StatusLine(Icons.Outlined.Info, alternative)
+                            }
                         }
                     }
                 }
@@ -260,6 +289,26 @@ internal fun TranslationScreen() {
         ) {
             ButtonLabel(Icons.Outlined.Sync, R.string.translation_refresh_service)
         }
+    }
+}
+
+@Composable
+private fun TranslationLanguageGroup(
+    labelRes: Int,
+    options: List<TranslationLanguageOption>,
+    selectedCode: String,
+    onSelected: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(stringResource(labelRes), style = MaterialTheme.typography.titleSmall)
+        LanguageOptionsRow(options, selectedCode, onSelected)
     }
 }
 

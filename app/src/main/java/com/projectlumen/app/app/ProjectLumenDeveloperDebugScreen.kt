@@ -11,6 +11,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.outlined.Sensors
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -58,6 +61,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -236,6 +240,10 @@ internal fun DeveloperDebugScreen(
             Button(
                 onClick = viewModel::simulateLowMemory,
                 modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
             ) {
                 DeveloperButtonLabel(Icons.Outlined.Memory, R.string.developer_simulate_low_memory)
             }
@@ -343,6 +351,9 @@ internal fun DeveloperDebugScreen(
                 onClick = viewModel::clearApiDiagnostics,
                 enabled = apiTraces.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
             ) {
                 DeveloperButtonLabel(Icons.Outlined.DeleteSweep, R.string.developer_api_clear_logs)
             }
@@ -376,6 +387,10 @@ internal fun DeveloperDebugScreen(
             Button(
                 onClick = { onPreviewCrashReport(createDeveloperCrashPreview(context)) },
                 modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
             ) {
                 DeveloperButtonLabel(Icons.Outlined.BugReport, R.string.developer_preview_crash_page)
             }
@@ -410,9 +425,9 @@ private fun DeveloperApiTraceCard(trace: ProjectLumenApiTrace) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenPreferenceShape)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -464,11 +479,13 @@ internal fun ApiTraceLine(@StringRes labelRes: Int, value: String) {
         )
         SelectionContainer {
             Text(
-                text = smartWrapDebugText(value),
-                modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodySmall,
+                text = value.trim().ifBlank { "-" },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 color = MaterialTheme.colorScheme.onSurface,
-                softWrap = true,
+                softWrap = false,
             )
         }
     }
@@ -502,9 +519,9 @@ private fun DeveloperMetricRow(label: String, value: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenPreferenceShape)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -535,9 +552,9 @@ internal fun DeveloperNote(message: String) {
         text = message,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenPreferenceShape)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,

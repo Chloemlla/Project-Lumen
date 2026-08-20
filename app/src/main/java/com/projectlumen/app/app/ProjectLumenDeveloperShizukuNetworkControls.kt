@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -111,9 +112,9 @@ private fun DeveloperNetworkAppCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.24f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenPreferenceShape)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -140,6 +141,10 @@ private fun DeveloperNetworkAppCard(
             modifier = Modifier.fillMaxWidth(),
             enabled = record?.hasActiveNetworkRestriction != true,
             onClick = onRestrict,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            ),
         ) {
             DeveloperButtonLabel(Icons.Outlined.Lock, R.string.developer_shizuku_network_restrict)
         }
@@ -151,12 +156,21 @@ private fun DeveloperNetworkControlRecordCard(
     record: AppNetworkControlEntity,
     onRestore: () -> Unit,
 ) {
+    val restrictionActive = record.hasActiveNetworkRestriction
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, LumenCardShape)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
+            .border(
+                1.dp,
+                if (restrictionActive) {
+                    MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant
+                },
+                LumenPreferenceShape,
+            )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.86f))
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -176,7 +190,11 @@ private fun DeveloperNetworkControlRecordCard(
                 networkRecordStatusLabel(record),
             ),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (restrictionActive) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
             softWrap = true,
         )
         Text(
@@ -190,7 +208,7 @@ private fun DeveloperNetworkControlRecordCard(
         }
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
-            enabled = record.hasActiveNetworkRestriction,
+            enabled = restrictionActive,
             onClick = onRestore,
         ) {
             DeveloperButtonLabel(Icons.Outlined.Sync, R.string.developer_shizuku_network_restore)

@@ -65,6 +65,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -147,6 +148,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -312,11 +314,11 @@ internal fun AboutHeroCard(versionLabel: String, onVersionClick: () -> Unit) {
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
             shape = LumenCardShape,
-            colors = lumenCardColors(),
+            colors = lumenCardColors(LumenCardEmphasis.Quiet),
             elevation = lumenCardElevation(),
-            border = lumenCardBorder(),
+            border = lumenCardBorder(LumenCardEmphasis.Quiet),
         ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Info, R.string.app_name)
             Image(
                 imageVector = DynamicColorImageVectors.coder(),
@@ -327,17 +329,42 @@ internal fun AboutHeroCard(versionLabel: String, onVersionClick: () -> Unit) {
                     .aspectRatio(16f / 9f),
             )
             Text(
-                versionLabel,
-                modifier = Modifier.clickable(onClick = onVersionClick),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
                 stringResource(R.string.about_body),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            AboutVersionRow(versionLabel = versionLabel, onClick = onVersionClick)
         }
+    }
+}
+
+/** Version metadata reads as a label/value pair; repeated taps unlock developer mode. */
+@Composable
+private fun AboutVersionRow(versionLabel: String, onClick: () -> Unit) {
+    val label = stringResource(R.string.build_update_notes_version_label)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
+            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick)
+            .heightIn(min = LumenMinTouchTargetHeight)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            versionLabel,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.End,
+        )
     }
 }
 
@@ -346,24 +373,39 @@ internal fun AboutLinksCard(
     viewModel: ProjectLumenViewModel,
     openLegal: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = LumenCardShape, colors = lumenCardColors(), elevation = lumenCardElevation(), border = lumenCardBorder()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = LumenCardShape,
+        colors = lumenCardColors(LumenCardEmphasis.Quiet),
+        elevation = lumenCardElevation(),
+        border = lumenCardBorder(LumenCardEmphasis.Quiet),
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.Gavel, R.string.legal_center_title)
-            OutlinedButton(onClick = openLegal) {
-                Icon(Icons.Outlined.Gavel, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.legal_center_title))
+            OutlinedButton(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = LumenMinTouchTargetHeight),
+                onClick = openLegal,
+            ) {
+                ButtonLabel(Icons.Outlined.Gavel, R.string.legal_center_title)
             }
             SectionHeader(Icons.Outlined.Code, R.string.about_links)
-            OutlinedButton(onClick = viewModel::reopenOssNotice) {
-                Icon(Icons.Outlined.Gavel, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.oss_notice_reopen))
+            OutlinedButton(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = LumenMinTouchTargetHeight),
+                onClick = viewModel::reopenOssNotice,
+            ) {
+                ButtonLabel(Icons.Outlined.Gavel, R.string.oss_notice_reopen)
             }
-            OutlinedButton(onClick = viewModel::reopenBuildUpdateNotes) {
-                Icon(Icons.Outlined.NewReleases, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.build_update_notes_reopen))
+            OutlinedButton(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = LumenMinTouchTargetHeight),
+                onClick = viewModel::reopenBuildUpdateNotes,
+            ) {
+                ButtonLabel(Icons.Outlined.NewReleases, R.string.build_update_notes_reopen)
             }
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_source_code, PROJECT_LUMEN_REPO_URL, viewModel)
             ConfirmExternalLinkButton(Icons.Outlined.Code, R.string.about_latest_release, PROJECT_LUMEN_RELEASES_URL, viewModel)
@@ -374,10 +416,19 @@ internal fun AboutLinksCard(
 @Composable
 internal fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: Int, url: String, viewModel: ProjectLumenViewModel) {
     var pendingUrl by remember { mutableStateOf<String?>(null) }
-    OutlinedButton(onClick = { pendingUrl = url }) {
-        Icon(icon, contentDescription = null)
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(labelRes))
+    OutlinedButton(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = LumenMinTouchTargetHeight),
+        onClick = { pendingUrl = url },
+    ) {
+        ButtonLabel(icon, labelRes)
+        Spacer(Modifier.weight(1f))
+        Icon(
+            Icons.AutoMirrored.Outlined.OpenInNew,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+        )
     }
     pendingUrl?.let { targetUrl ->
         AlertDialog(
@@ -385,7 +436,7 @@ internal fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: I
             title = { Text(stringResource(R.string.about_external_link_prompt_title)) },
             text = { Text(stringResource(R.string.about_external_link_prompt_message)) },
             confirmButton = {
-                OutlinedButton(onClick = {
+                Button(onClick = {
                     pendingUrl = null
                     viewModel.navigateWebPage(targetUrl)
                 }) {
@@ -616,7 +667,7 @@ internal fun UpdateDialog(
             title = { Text(stringResource(R.string.about_external_link_prompt_title)) },
             text = { Text(stringResource(R.string.about_external_link_prompt_message)) },
             confirmButton = {
-                OutlinedButton(onClick = {
+                Button(onClick = {
                     pendingReleaseUrl = null
                     viewModel.navigateWebPage(url)
                 }) {

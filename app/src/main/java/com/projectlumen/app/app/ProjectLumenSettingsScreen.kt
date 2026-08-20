@@ -592,6 +592,26 @@ internal fun SettingsScreen(
             onApplyRecommended = { applyRecommendedEyeCareSettings(viewModel) },
             onExportReport = viewModel::shareMonthlyReportPdf,
         )
+        EyeCareGrowthCapabilityCard(
+            uiState = uiState,
+            remoteState = remoteState,
+            cloudCapabilityVisible = backendFeaturesVisible,
+            onOpenTemplates = openTemplates,
+            onConfigureReports = { scrollToGrowthTarget(GrowthConfigTarget.REPORTS) },
+            onConfigureCloud = { scrollToGrowthTarget(GrowthConfigTarget.CLOUD) },
+            onConfigureFamilyMode = { scrollToGrowthTarget(GrowthConfigTarget.FAMILY) },
+            onConfigureGuidance = { scrollToGrowthTarget(GrowthConfigTarget.GUIDANCE) },
+            onSyncCloud = viewModel::syncRemoteNow,
+            onApplyFamilyMode = {
+                markGrowthApplyStarted(GrowthConfigTarget.FAMILY)
+                applyFamilyEyeCareMode(viewModel)
+            },
+            onApplyGuidance = {
+                markGrowthApplyStarted(GrowthConfigTarget.GUIDANCE)
+                applyPersonalizedEyeCareGuidance(viewModel, uiState)
+            },
+            onExportReport = viewModel::shareMonthlyReportPdf,
+        )
         SettingsScrollAnchors(
             targets = GeneralGrowthAnchors,
             scrollState = settingsScrollState,
@@ -697,6 +717,70 @@ internal fun SettingsScreen(
         }
         }
         }
+        SettingsSection(R.string.section_reminder, Icons.Outlined.Spa) {
+            SwitchRow(R.string.enable_reminder, Icons.Outlined.Spa, settings.reminderEnabled) {
+                viewModel.setReminderEnabled(it)
+            }
+            NumberSlider(R.string.warn_interval, Icons.Outlined.Schedule, settings.warnIntervalMinutes, 5f..120f, 22, stringResource(R.string.minutes_value, settings.warnIntervalMinutes)) {
+                viewModel.updateSettings { current -> current.copy(warnIntervalMinutes = it) }
+            }
+            NumberSlider(R.string.rest_duration, Icons.Outlined.Spa, settings.restDurationSeconds, 10f..300f, 28, stringResource(R.string.seconds_value, settings.restDurationSeconds)) {
+                viewModel.updateSettings { current -> current.copy(restDurationSeconds = it) }
+            }
+            SwitchRow(R.string.ask_before_break, Icons.Outlined.NotificationsActive, settings.askBeforeBreak) {
+                viewModel.updateSettings { current -> current.copy(askBeforeBreak = it) }
+            }
+            SwitchRow(R.string.disable_skip, Icons.Outlined.SkipNext, settings.disableSkip) {
+                viewModel.updateSettings { current -> current.copy(disableSkip = it) }
+            }
+        }
+        SettingsSection(R.string.section_pre_alert, Icons.Outlined.Schedule, initiallyExpanded = false) {
+            SwitchRow(R.string.enable_pre_alert, Icons.Outlined.Schedule, settings.preAlertEnabled) {
+                viewModel.updateSettings { current -> current.copy(preAlertEnabled = it) }
+            }
+            NumberSlider(R.string.pre_alert_seconds, Icons.Outlined.Schedule, settings.preAlertSeconds, 10f..300f, 28, stringResource(R.string.seconds_value, settings.preAlertSeconds)) {
+                viewModel.updateSettings { current -> current.copy(preAlertSeconds = it) }
+            }
+        }
+        SettingsSection(R.string.section_pomodoro, Icons.Outlined.LocalCafe) {
+            SwitchRow(R.string.enable_pomodoro, Icons.Outlined.LocalCafe, settings.pomodoroEnabled) {
+                viewModel.setPomodoroEnabled(it)
+            }
+            NumberSlider(R.string.pomodoro_work, Icons.Outlined.LocalCafe, settings.pomodoroWorkMinutes, 5f..60f, 10, minutesLabel(settings.pomodoroWorkMinutes)) {
+                viewModel.updateSettings { current -> current.copy(pomodoroWorkMinutes = it) }
+            }
+            NumberSlider(R.string.pomodoro_short_break, Icons.Outlined.Spa, settings.pomodoroShortBreakMinutes, 3f..20f, 16, minutesLabel(settings.pomodoroShortBreakMinutes)) {
+                viewModel.updateSettings { current -> current.copy(pomodoroShortBreakMinutes = it) }
+            }
+            NumberSlider(R.string.pomodoro_long_break, Icons.Outlined.Spa, settings.pomodoroLongBreakMinutes, 5f..45f, 39, minutesLabel(settings.pomodoroLongBreakMinutes)) {
+                viewModel.updateSettings { current -> current.copy(pomodoroLongBreakMinutes = it) }
+            }
+        }
+        SettingsSection(R.string.section_quiet_hours, Icons.Outlined.Schedule, initiallyExpanded = false) {
+            SwitchRow(R.string.quiet_hours, Icons.Outlined.Schedule, settings.quietHoursEnabled) {
+                viewModel.updateSettings { current -> current.copy(quietHoursEnabled = it) }
+            }
+            AnimatedVisibility(
+                visible = settings.quietHoursEnabled,
+                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
+                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
+                    NumberSlider(R.string.quiet_start, Icons.Outlined.Schedule, settings.quietStartMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietStartMinute)) {
+                        viewModel.updateSettings { current -> current.copy(quietStartMinute = snapTimeMinute(it)) }
+                    }
+                    NumberSlider(R.string.quiet_end, Icons.Outlined.Schedule, settings.quietEndMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietEndMinute)) {
+                        viewModel.updateSettings { current -> current.copy(quietEndMinute = snapTimeMinute(it)) }
+                    }
+                    Text(stringResource(R.string.quiet_mode), style = MaterialTheme.typography.titleSmall)
+                    LumenFlowRow {
+                        QuietModeChip(R.string.quiet_mode_pause_timer, QuietMode.PAUSE_TIMER, settings, viewModel)
+                        QuietModeChip(R.string.quiet_mode_silent_notifications, QuietMode.SILENT_NOTIFICATIONS, settings, viewModel)
+                        QuietModeChip(R.string.quiet_mode_record_only, QuietMode.RECORD_ONLY, settings, viewModel)
+                    }
+                }
+            }
+        }
         SettingsSection(R.string.section_goals, Icons.Outlined.CheckCircle, initiallyExpanded = false) {
             NumberSlider(R.string.daily_rest_goal, Icons.Outlined.Spa, uiState.dailyGoal.restBreakGoal, 1f..20f, 18, "${uiState.dailyGoal.restBreakGoal}") {
                 viewModel.updateDailyGoal { current -> current.copy(restBreakGoal = it) }
@@ -709,65 +793,6 @@ internal fun SettingsScreen(
             }
             NumberSlider(R.string.weekly_active_days_goal, Icons.Outlined.CheckCircle, uiState.dailyGoal.weeklyActiveDaysGoal, 1f..7f, 5, "${uiState.dailyGoal.weeklyActiveDaysGoal}") {
                 viewModel.updateDailyGoal { current -> current.copy(weeklyActiveDaysGoal = it) }
-            }
-        }
-        SettingsSection(R.string.section_data, Icons.Outlined.FileDownload) {
-            LumenFlowRow {
-                Button(onClick = viewModel::shareBackup) {
-                    ButtonLabel(Icons.Outlined.FileDownload, R.string.backup_export)
-                }
-                OutlinedButton(onClick = { backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) {
-                    ButtonLabel(Icons.AutoMirrored.Outlined.OpenInNew, R.string.backup_import)
-                }
-            }
-        }
-        if (backendFeaturesVisible) {
-            SettingsScrollAnchor(
-                target = GrowthConfigTarget.CLOUD,
-                scrollState = settingsScrollState,
-                anchorPositions = growthAnchorPositions,
-            ) {
-                RemoteCloudAccountCard(
-                    state = remoteState,
-                    cloudSyncAllowed = cloudSyncAllowed,
-                    onCheckHealth = viewModel::checkRemoteHealth,
-                    onStartEmailLogin = viewModel::startRemoteEmailLogin,
-                    onVerifyEmailLogin = viewModel::verifyRemoteEmailLogin,
-                    onRefreshAccount = viewModel::refreshRemoteAccount,
-                    onSyncNow = viewModel::syncRemoteNow,
-                    onUploadBackup = viewModel::uploadCloudBackup,
-                    onRestoreBackup = viewModel::restoreLatestCloudBackup,
-                    onSignOut = viewModel::signOutRemote,
-                )
-            }
-        }
-        EyeCareGrowthCapabilityCard(
-            uiState = uiState,
-            remoteState = remoteState,
-            cloudCapabilityVisible = backendFeaturesVisible,
-            onOpenTemplates = openTemplates,
-            onConfigureReports = { scrollToGrowthTarget(GrowthConfigTarget.REPORTS) },
-            onConfigureCloud = { scrollToGrowthTarget(GrowthConfigTarget.CLOUD) },
-            onConfigureFamilyMode = { scrollToGrowthTarget(GrowthConfigTarget.FAMILY) },
-            onConfigureGuidance = { scrollToGrowthTarget(GrowthConfigTarget.GUIDANCE) },
-            onSyncCloud = viewModel::syncRemoteNow,
-            onApplyFamilyMode = {
-                markGrowthApplyStarted(GrowthConfigTarget.FAMILY)
-                applyFamilyEyeCareMode(viewModel)
-            },
-            onApplyGuidance = {
-                markGrowthApplyStarted(GrowthConfigTarget.GUIDANCE)
-                applyPersonalizedEyeCareGuidance(viewModel, uiState)
-            },
-            onExportReport = viewModel::shareMonthlyReportPdf,
-        )
-        SettingsSection(R.string.about_update_status, Icons.Outlined.Sync, initiallyExpanded = false) {
-            if (checkingUpdate) {
-                StatusLine(Icons.Outlined.Sync, stringResource(R.string.about_update_checking))
-            } else {
-                OutlinedButton(onClick = onManualUpdateCheck) {
-                    ButtonLabel(Icons.Outlined.Sync, R.string.about_check_updates)
-                }
             }
         }
         SettingsScrollAnchors(
@@ -844,40 +869,6 @@ internal fun SettingsScreen(
                 }
             }
         }
-        }
-        SettingsScrollAnchor(
-            target = PermissionSetupTarget.KEEP_ALIVE,
-            scrollState = settingsScrollState,
-            anchorPositions = permissionAnchorPositions,
-        ) {
-        SettingsSection(
-            R.string.section_keep_alive,
-            Icons.Outlined.Schedule,
-            initiallyExpanded = false,
-            forceExpanded = activePermissionSetupTarget == PermissionSetupTarget.KEEP_ALIVE,
-        ) {
-            SwitchRow(R.string.enable_keep_alive, Icons.Outlined.Schedule, settings.keepAliveEnabled) {
-                viewModel.setKeepAliveEnabled(it)
-            }
-        }
-        }
-        SettingsScrollAnchors(
-            targets = if (backendFeaturesVisible) {
-                DiagnosticsAndShizukuPermissionAnchors
-            } else {
-                ShizukuPermissionAnchors
-            },
-            scrollState = settingsScrollState,
-            anchorPositions = permissionAnchorPositions,
-        ) {
-        ShizukuAdvancedSettingsSection(
-            settings = settings,
-            state = shizukuState,
-            viewModel = viewModel,
-            backendFeaturesVisible = backendFeaturesVisible,
-            forceExpanded = activePermissionSetupTarget == PermissionSetupTarget.SHIZUKU ||
-                (backendFeaturesVisible && activePermissionSetupTarget == PermissionSetupTarget.DIAGNOSTICS),
-        )
         }
         SettingsScrollAnchor(
             target = GrowthConfigTarget.FAMILY,
@@ -1224,69 +1215,78 @@ internal fun SettingsScreen(
                 }
             }
         }
-        SettingsSection(R.string.section_reminder, Icons.Outlined.Spa) {
-            SwitchRow(R.string.enable_reminder, Icons.Outlined.Spa, settings.reminderEnabled) {
-                viewModel.setReminderEnabled(it)
-            }
-            NumberSlider(R.string.warn_interval, Icons.Outlined.Schedule, settings.warnIntervalMinutes, 5f..120f, 22, stringResource(R.string.minutes_value, settings.warnIntervalMinutes)) {
-                viewModel.updateSettings { current -> current.copy(warnIntervalMinutes = it) }
-            }
-            NumberSlider(R.string.rest_duration, Icons.Outlined.Spa, settings.restDurationSeconds, 10f..300f, 28, stringResource(R.string.seconds_value, settings.restDurationSeconds)) {
-                viewModel.updateSettings { current -> current.copy(restDurationSeconds = it) }
-            }
-            SwitchRow(R.string.ask_before_break, Icons.Outlined.NotificationsActive, settings.askBeforeBreak) {
-                viewModel.updateSettings { current -> current.copy(askBeforeBreak = it) }
-            }
-            SwitchRow(R.string.disable_skip, Icons.Outlined.SkipNext, settings.disableSkip) {
-                viewModel.updateSettings { current -> current.copy(disableSkip = it) }
-            }
-        }
-        SettingsSection(R.string.section_quiet_hours, Icons.Outlined.Schedule, initiallyExpanded = false) {
-            SwitchRow(R.string.quiet_hours, Icons.Outlined.Schedule, settings.quietHoursEnabled) {
-                viewModel.updateSettings { current -> current.copy(quietHoursEnabled = it) }
-            }
-            AnimatedVisibility(
-                visible = settings.quietHoursEnabled,
-                enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
-                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
-                    NumberSlider(R.string.quiet_start, Icons.Outlined.Schedule, settings.quietStartMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietStartMinute)) {
-                        viewModel.updateSettings { current -> current.copy(quietStartMinute = snapTimeMinute(it)) }
-                    }
-                    NumberSlider(R.string.quiet_end, Icons.Outlined.Schedule, settings.quietEndMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietEndMinute)) {
-                        viewModel.updateSettings { current -> current.copy(quietEndMinute = snapTimeMinute(it)) }
-                    }
-                    Text(stringResource(R.string.quiet_mode), style = MaterialTheme.typography.titleSmall)
-                    LumenFlowRow {
-                        QuietModeChip(R.string.quiet_mode_pause_timer, QuietMode.PAUSE_TIMER, settings, viewModel)
-                        QuietModeChip(R.string.quiet_mode_silent_notifications, QuietMode.SILENT_NOTIFICATIONS, settings, viewModel)
-                        QuietModeChip(R.string.quiet_mode_record_only, QuietMode.RECORD_ONLY, settings, viewModel)
-                    }
+        SettingsSection(R.string.section_data, Icons.Outlined.FileDownload) {
+            LumenFlowRow {
+                Button(onClick = viewModel::shareBackup) {
+                    ButtonLabel(Icons.Outlined.FileDownload, R.string.backup_export)
+                }
+                OutlinedButton(onClick = { backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) {
+                    ButtonLabel(Icons.AutoMirrored.Outlined.OpenInNew, R.string.backup_import)
                 }
             }
         }
-        SettingsSection(R.string.section_pre_alert, Icons.Outlined.Schedule, initiallyExpanded = false) {
-            SwitchRow(R.string.enable_pre_alert, Icons.Outlined.Schedule, settings.preAlertEnabled) {
-                viewModel.updateSettings { current -> current.copy(preAlertEnabled = it) }
-            }
-            NumberSlider(R.string.pre_alert_seconds, Icons.Outlined.Schedule, settings.preAlertSeconds, 10f..300f, 28, stringResource(R.string.seconds_value, settings.preAlertSeconds)) {
-                viewModel.updateSettings { current -> current.copy(preAlertSeconds = it) }
+        if (backendFeaturesVisible) {
+            SettingsScrollAnchor(
+                target = GrowthConfigTarget.CLOUD,
+                scrollState = settingsScrollState,
+                anchorPositions = growthAnchorPositions,
+            ) {
+                RemoteCloudAccountCard(
+                    state = remoteState,
+                    cloudSyncAllowed = cloudSyncAllowed,
+                    onCheckHealth = viewModel::checkRemoteHealth,
+                    onStartEmailLogin = viewModel::startRemoteEmailLogin,
+                    onVerifyEmailLogin = viewModel::verifyRemoteEmailLogin,
+                    onRefreshAccount = viewModel::refreshRemoteAccount,
+                    onSyncNow = viewModel::syncRemoteNow,
+                    onUploadBackup = viewModel::uploadCloudBackup,
+                    onRestoreBackup = viewModel::restoreLatestCloudBackup,
+                    onSignOut = viewModel::signOutRemote,
+                )
             }
         }
-        SettingsSection(R.string.section_pomodoro, Icons.Outlined.LocalCafe) {
-            SwitchRow(R.string.enable_pomodoro, Icons.Outlined.LocalCafe, settings.pomodoroEnabled) {
-                viewModel.setPomodoroEnabled(it)
+        SettingsSection(R.string.about_update_status, Icons.Outlined.Sync, initiallyExpanded = false) {
+            if (checkingUpdate) {
+                StatusLine(Icons.Outlined.Sync, stringResource(R.string.about_update_checking))
+            } else {
+                OutlinedButton(onClick = onManualUpdateCheck) {
+                    ButtonLabel(Icons.Outlined.Sync, R.string.about_check_updates)
+                }
             }
-            NumberSlider(R.string.pomodoro_work, Icons.Outlined.LocalCafe, settings.pomodoroWorkMinutes, 5f..60f, 10, minutesLabel(settings.pomodoroWorkMinutes)) {
-                viewModel.updateSettings { current -> current.copy(pomodoroWorkMinutes = it) }
+        }
+        SettingsScrollAnchor(
+            target = PermissionSetupTarget.KEEP_ALIVE,
+            scrollState = settingsScrollState,
+            anchorPositions = permissionAnchorPositions,
+        ) {
+        SettingsSection(
+            R.string.section_keep_alive,
+            Icons.Outlined.Schedule,
+            initiallyExpanded = false,
+            forceExpanded = activePermissionSetupTarget == PermissionSetupTarget.KEEP_ALIVE,
+        ) {
+            SwitchRow(R.string.enable_keep_alive, Icons.Outlined.Schedule, settings.keepAliveEnabled) {
+                viewModel.setKeepAliveEnabled(it)
             }
-            NumberSlider(R.string.pomodoro_short_break, Icons.Outlined.Spa, settings.pomodoroShortBreakMinutes, 3f..20f, 16, minutesLabel(settings.pomodoroShortBreakMinutes)) {
-                viewModel.updateSettings { current -> current.copy(pomodoroShortBreakMinutes = it) }
-            }
-            NumberSlider(R.string.pomodoro_long_break, Icons.Outlined.Spa, settings.pomodoroLongBreakMinutes, 5f..45f, 39, minutesLabel(settings.pomodoroLongBreakMinutes)) {
-                viewModel.updateSettings { current -> current.copy(pomodoroLongBreakMinutes = it) }
-            }
+        }
+        }
+        SettingsScrollAnchors(
+            targets = if (backendFeaturesVisible) {
+                DiagnosticsAndShizukuPermissionAnchors
+            } else {
+                ShizukuPermissionAnchors
+            },
+            scrollState = settingsScrollState,
+            anchorPositions = permissionAnchorPositions,
+        ) {
+        ShizukuAdvancedSettingsSection(
+            settings = settings,
+            state = shizukuState,
+            viewModel = viewModel,
+            backendFeaturesVisible = backendFeaturesVisible,
+            forceExpanded = activePermissionSetupTarget == PermissionSetupTarget.SHIZUKU ||
+                (backendFeaturesVisible && activePermissionSetupTarget == PermissionSetupTarget.DIAGNOSTICS),
+        )
         }
         if (settings.developerModeEnabled) {
             SettingsSection(R.string.nav_developer, Icons.Outlined.Code, initiallyExpanded = false) {

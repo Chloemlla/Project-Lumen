@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -126,6 +127,7 @@ internal fun SettingsPrivacyPermissionCenter(
                 detailRes = R.string.device_insights_usage_access_detail,
                 target = PermissionSetupTarget.USAGE_ACCESS,
                 ready = !permissionRequirements.usageAccess,
+                sensitive = true,
                 activeTarget = activeTarget,
                 onConfigureTarget = onConfigureTarget,
                 onTargetCheckedChange = onTargetCheckedChange,
@@ -138,6 +140,7 @@ internal fun SettingsPrivacyPermissionCenter(
                     target = PermissionSetupTarget.DIAGNOSTICS,
                     switchChecked = settings.diagnosticTelemetryUploadEnabled,
                     ready = true,
+                    sensitive = true,
                     activeTarget = activeTarget,
                     onConfigureTarget = onConfigureTarget,
                     onTargetCheckedChange = onTargetCheckedChange,
@@ -194,6 +197,7 @@ internal fun SettingsPrivacyPermissionCenter(
                 target = PermissionSetupTarget.DISTANCE_CAMERA,
                 switchChecked = settings.proximityMonitoringEnabled,
                 ready = !permissionRequirements.camera,
+                sensitive = true,
                 activeTarget = activeTarget,
                 onConfigureTarget = onConfigureTarget,
                 onTargetCheckedChange = onTargetCheckedChange,
@@ -205,6 +209,7 @@ internal fun SettingsPrivacyPermissionCenter(
                 target = PermissionSetupTarget.BLINK_CAMERA,
                 switchChecked = settings.blinkMonitoringEnabled,
                 ready = !permissionRequirements.camera,
+                sensitive = true,
                 activeTarget = activeTarget,
                 onConfigureTarget = onConfigureTarget,
                 onTargetCheckedChange = onTargetCheckedChange,
@@ -238,6 +243,7 @@ internal fun SettingsPrivacyPermissionCenter(
                 target = PermissionSetupTarget.OVERLAY,
                 switchChecked = settings.globalOverlayEnabled,
                 ready = !permissionRequirements.overlay,
+                sensitive = true,
                 activeTarget = activeTarget,
                 onConfigureTarget = onConfigureTarget,
                 onTargetCheckedChange = onTargetCheckedChange,
@@ -249,6 +255,7 @@ internal fun SettingsPrivacyPermissionCenter(
                 target = PermissionSetupTarget.SHIZUKU,
                 switchChecked = settings.shizukuAdvancedModeEnabled,
                 ready = shizukuReady,
+                sensitive = true,
                 activeTarget = activeTarget,
                 onConfigureTarget = onConfigureTarget,
                 onTargetCheckedChange = onTargetCheckedChange,
@@ -278,33 +285,35 @@ private fun PermissionControlTileItem(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val actionNeeded = tile.checked && !tile.ready
-    val statusRes = when {
-        !tile.checked -> R.string.settings_permission_off
-        actionNeeded -> R.string.settings_permission_action_needed
-        else -> R.string.settings_permission_ready
+    val tone = when {
+        !tile.checked -> PrivacyPermissionTone.Off
+        actionNeeded -> PrivacyPermissionTone.Attention
+        else -> PrivacyPermissionTone.Ready
     }
-    val tileColor = when {
-        actionNeeded -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f)
-        tile.checked -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)
-        else -> MaterialTheme.colorScheme.surfaceContainerLow
+    val statusRes = when (tone) {
+        PrivacyPermissionTone.Off -> R.string.settings_permission_off
+        PrivacyPermissionTone.Attention -> R.string.settings_permission_action_needed
+        PrivacyPermissionTone.Ready -> R.string.settings_permission_ready
     }
-    val borderColor = when {
-        actionNeeded -> MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
-        tile.checked -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-        else -> Color.Transparent
+    val tileColor = when (tone) {
+        PrivacyPermissionTone.Attention -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.42f)
+        PrivacyPermissionTone.Ready -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.58f)
+        PrivacyPermissionTone.Off -> lumenNestedContainerColor
     }
-    val iconTint = when {
-        actionNeeded -> MaterialTheme.colorScheme.error
-        tile.checked -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    val borderColor = when (tone) {
+        PrivacyPermissionTone.Attention -> MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
+        PrivacyPermissionTone.Ready -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+        PrivacyPermissionTone.Off -> Color.Transparent
     }
+    val statusColor = privacyPermissionStatusColor(tone)
 
     Column(
         modifier = Modifier
             .widthIn(min = 158.dp)
-            .clip(LumenCardShape)
+            .heightIn(min = LumenMinTouchTargetHeight)
+            .clip(LumenPreferenceShape)
             .background(tileColor)
-            .border(if (borderColor == Color.Transparent) 0.dp else 1.dp, borderColor, LumenCardShape)
+            .border(if (borderColor == Color.Transparent) 0.dp else 1.dp, borderColor, LumenPreferenceShape)
             .toggleable(
                 value = tile.checked,
                 role = Role.Switch,
@@ -319,7 +328,7 @@ private fun PermissionControlTileItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PermissionIcon(tile.icon, iconTint)
+            PrivacyPermissionChip(tile.icon, tone)
             Switch(
                 checked = tile.checked,
                 onCheckedChange = null,
@@ -342,7 +351,7 @@ private fun PermissionControlTileItem(
         Text(
             stringResource(statusRes),
             style = MaterialTheme.typography.labelLarge,
-            color = iconTint,
+            color = statusColor,
         )
     }
 }
@@ -356,33 +365,47 @@ private fun PrivacyPermissionRow(
     switchChecked: Boolean? = null,
     featureEnabled: Boolean = switchChecked ?: true,
     ready: Boolean,
+    sensitive: Boolean = false,
     activeTarget: PermissionSetupTarget?,
     onConfigureTarget: (PermissionSetupTarget) -> Unit,
     onTargetCheckedChange: (PermissionSetupTarget, Boolean) -> Unit,
 ) {
     val active = activeTarget == target
     val actionNeeded = featureEnabled && !ready
-    val statusRes = when {
-        !featureEnabled -> R.string.settings_permission_off
-        actionNeeded -> R.string.settings_permission_action_needed
-        else -> R.string.settings_permission_ready
+    val tone = when {
+        !featureEnabled -> PrivacyPermissionTone.Off
+        actionNeeded -> PrivacyPermissionTone.Attention
+        else -> PrivacyPermissionTone.Ready
     }
-    val statusColor = when {
-        actionNeeded -> MaterialTheme.colorScheme.error
-        featureEnabled -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    val statusRes = when (tone) {
+        PrivacyPermissionTone.Off -> R.string.settings_permission_off
+        PrivacyPermissionTone.Attention -> R.string.settings_permission_action_needed
+        PrivacyPermissionTone.Ready -> R.string.settings_permission_ready
+    }
+    val statusColor = privacyPermissionStatusColor(tone)
+    // A camera, overlay or Shizuku grant must not look like an ordinary toggle, so a live
+    // sensitive capability keeps a tertiary tint while an unmet one escalates to error.
+    val rowColor = when {
+        active -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
+        tone == PrivacyPermissionTone.Attention -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.38f)
+        sensitive && featureEnabled -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.34f)
+        else -> lumenNestedContainerColor
+    }
+    val rowBorderColor = when {
+        tone == PrivacyPermissionTone.Attention -> MaterialTheme.colorScheme.error.copy(alpha = 0.42f)
+        sensitive -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.32f)
+        else -> Color.Transparent
     }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(
-                if (active) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerLow
-                },
+            .clip(LumenPreferenceShape)
+            .background(rowColor)
+            .border(
+                if (rowBorderColor == Color.Transparent) 0.dp else 1.dp,
+                rowBorderColor,
+                LumenPreferenceShape,
             )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(12.dp),
@@ -393,7 +416,7 @@ private fun PrivacyPermissionRow(
             horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PermissionIcon(icon)
+            PrivacyPermissionChip(icon, tone)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(titleRes),
@@ -480,24 +503,45 @@ private fun PrivacyReadinessBadge(
     )
 }
 
-@Composable
-private fun PermissionIcon(icon: ImageVector) {
-    PermissionIcon(icon, MaterialTheme.colorScheme.onPrimaryContainer)
+/** Whether a permission row/tile is satisfied, waiting on the user, or switched off. */
+private enum class PrivacyPermissionTone {
+    Ready,
+    Attention,
+    Off,
 }
 
 @Composable
-private fun PermissionIcon(icon: ImageVector, tint: androidx.compose.ui.graphics.Color) {
+private fun privacyPermissionStatusColor(tone: PrivacyPermissionTone): Color = when (tone) {
+    PrivacyPermissionTone.Ready -> MaterialTheme.colorScheme.primary
+    PrivacyPermissionTone.Attention -> MaterialTheme.colorScheme.error
+    PrivacyPermissionTone.Off -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+// Keeps LumenIconChip's 36dp/LumenIconChipShape geometry but swaps in the semantic
+// container pair, so a badge carries the permission's state instead of only its topic.
+@Composable
+private fun PrivacyPermissionChip(icon: ImageVector, tone: PrivacyPermissionTone) {
+    val containerColor = when (tone) {
+        PrivacyPermissionTone.Ready -> MaterialTheme.colorScheme.primaryContainer
+        PrivacyPermissionTone.Attention -> MaterialTheme.colorScheme.errorContainer
+        PrivacyPermissionTone.Off -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val contentColor = when (tone) {
+        PrivacyPermissionTone.Ready -> MaterialTheme.colorScheme.onPrimaryContainer
+        PrivacyPermissionTone.Attention -> MaterialTheme.colorScheme.onErrorContainer
+        PrivacyPermissionTone.Off -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Box(
         modifier = Modifier
             .size(36.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
+            .clip(LumenIconChipShape)
+            .background(containerColor),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             icon,
             contentDescription = null,
-            tint = tint,
+            tint = contentColor,
             modifier = Modifier.size(20.dp),
         )
     }

@@ -6,8 +6,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Info
@@ -21,10 +26,15 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,10 +58,10 @@ internal fun ShizukuAdvancedSettingsSection(
         initiallyExpanded = false,
         forceExpanded = forceExpanded,
     ) {
-        Text(
+        ShizukuNotice(
+            Icons.Outlined.Lock,
             stringResource(R.string.shizuku_advanced_summary),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            ShizukuNoticeTone.Elevated,
         )
         ShizukuStatusSummary(settings, state)
         SwitchRow(R.string.enable_shizuku_advanced_mode, Icons.Outlined.Lock, settings.shizukuAdvancedModeEnabled) { enabled ->
@@ -84,12 +94,16 @@ internal fun ShizukuAdvancedSettingsSection(
 
 @Composable
 private fun ShizukuStatusSummary(settings: AppSettingsEntity, state: ShizukuCapabilityState) {
-    StatusLine(Icons.Outlined.Lock, shizukuStatusLabel(state))
+    ShizukuAuthorizationBanner(state)
     if (state.lastCheckedAt > 0L) {
         StatusLine(Icons.Outlined.Info, shizukuStatusDetailLabel(state))
     }
     if (state.lastError.isNotBlank()) {
-        StatusLine(Icons.Outlined.WarningAmber, stringResource(R.string.shizuku_last_error, state.lastError))
+        ShizukuNotice(
+            Icons.Outlined.WarningAmber,
+            stringResource(R.string.shizuku_last_error, state.lastError),
+            ShizukuNoticeTone.Critical,
+        )
     }
     if (state.foregroundPackage.isNotBlank()) {
         StatusLine(Icons.Outlined.PhotoCamera, shizukuForegroundLabel(state))
@@ -183,7 +197,11 @@ private fun ShizukuDiagnosticUploadSettings(
                 if (enabled) viewModel.requestShizukuAuthorization()
             }
             if (settings.shizukuAppInventoryUploadEnabled && !state.ready) {
-                StatusLine(Icons.Outlined.Lock, stringResource(R.string.shizuku_app_inventory_authorization_needed))
+                ShizukuNotice(
+                    Icons.Outlined.Lock,
+                    stringResource(R.string.shizuku_app_inventory_authorization_needed),
+                    ShizukuNoticeTone.Attention,
+                )
             }
             Text(
                 stringResource(R.string.diagnostic_security_policy),
@@ -390,6 +408,89 @@ private fun ShizukuGroupTitle(labelRes: Int) {
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurface,
     )
+}
+
+/**
+ * How loudly a Shizuku notice should read: [Elevated] for the privilege this section grants,
+ * [Attention] for something the user still has to do, [Critical] for a failure.
+ */
+private enum class ShizukuNoticeTone {
+    Elevated,
+    Attention,
+    Critical,
+}
+
+@Composable
+private fun ShizukuNotice(icon: ImageVector, text: String, tone: ShizukuNoticeTone) {
+    val containerColor = when (tone) {
+        ShizukuNoticeTone.Elevated -> MaterialTheme.colorScheme.tertiaryContainer
+        ShizukuNoticeTone.Attention -> MaterialTheme.colorScheme.secondaryContainer
+        ShizukuNoticeTone.Critical -> MaterialTheme.colorScheme.errorContainer
+    }
+    val contentColor = when (tone) {
+        ShizukuNoticeTone.Elevated -> MaterialTheme.colorScheme.onTertiaryContainer
+        ShizukuNoticeTone.Attention -> MaterialTheme.colorScheme.onSecondaryContainer
+        ShizukuNoticeTone.Critical -> MaterialTheme.colorScheme.onErrorContainer
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(containerColor)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(20.dp))
+        Text(
+            text,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = contentColor,
+        )
+    }
+}
+
+@Composable
+private fun ShizukuAuthorizationBanner(state: ShizukuCapabilityState) {
+    val containerColor = if (state.ready) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.secondaryContainer
+    }
+    val contentColor = if (state.ready) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(containerColor)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            if (state.ready) Icons.Outlined.CheckCircle else Icons.Outlined.WarningAmber,
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(20.dp),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                stringResource(R.string.shizuku_status),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = contentColor,
+            )
+            Text(
+                shizukuStatusLabel(state),
+                style = MaterialTheme.typography.bodyMedium,
+                color = contentColor,
+            )
+        }
+    }
 }
 
 private fun applyShizukuCorePreset(viewModel: ProjectLumenViewModel) {

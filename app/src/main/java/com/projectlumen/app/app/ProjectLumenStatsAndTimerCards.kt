@@ -204,8 +204,11 @@ internal fun TodayStatsCard(stat: DailyEyeStatsEntity?) {
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        // Today's numbers are the headline of both Home and Statistics — the one Primary card
+        // on each of those pages.
+        colors = lumenCardColors(LumenCardEmphasis.Primary),
         elevation = lumenCardElevation(),
+        border = lumenCardBorder(LumenCardEmphasis.Primary),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.today_summary)
@@ -326,8 +329,10 @@ internal fun TimerCard(
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        // The running countdown is why the Break and Pomodoro pages exist — their one Primary card.
+        colors = lumenCardColors(LumenCardEmphasis.Primary),
         elevation = lumenCardElevation(),
+        border = lumenCardBorder(LumenCardEmphasis.Primary),
     ) {
         Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(

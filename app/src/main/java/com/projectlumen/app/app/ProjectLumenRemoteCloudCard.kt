@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +33,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 internal fun RemoteCloudAccountCard(
@@ -115,9 +119,10 @@ internal fun RemoteCloudAccountCard(
                 MetricRow(R.string.remote_cloud_required_tier, stringResource(R.string.remote_cloud_commercial_plus))
                 MetricRow(R.string.remote_cloud_entitlements, state.entitlementCount.toString())
                 MetricRow(R.string.remote_cloud_sync_cursor, state.syncCursor.toString())
-                if (state.latestBackupUploadedAt > 0L) {
-                    MetricRow(R.string.remote_cloud_latest_backup, state.latestBackupUploadedAt.toString())
-                }
+                MetricRow(
+                    R.string.remote_cloud_latest_backup,
+                    remoteCloudBackupLabel(state.latestBackupUploadedAt),
+                )
                 if (!cloudSyncAllowed) {
                     StatusLine(Icons.Outlined.Lock, stringResource(R.string.remote_cloud_commercial_required))
                 }
@@ -126,7 +131,7 @@ internal fun RemoteCloudAccountCard(
                 StatusLine(Icons.Outlined.CheckCircle, state.lastOperation)
             }
             if (state.errorMessage.isNotBlank()) {
-                StatusLine(Icons.Outlined.Lock, state.errorMessage)
+                StatusLine(Icons.Outlined.WarningAmber, state.errorMessage)
             }
 
             AnimatedVisibility(visible = !state.signedIn) {
@@ -204,3 +209,14 @@ internal fun RemoteCloudAccountCard(
             }
     }
 }
+
+@Composable
+private fun remoteCloudBackupLabel(uploadedAtMillis: Long): String {
+    if (uploadedAtMillis <= 0L) return stringResource(R.string.not_set)
+    return Instant.ofEpochMilli(uploadedAtMillis)
+        .atZone(ZoneId.systemDefault())
+        .format(REMOTE_CLOUD_BACKUP_FORMATTER)
+}
+
+private val REMOTE_CLOUD_BACKUP_FORMATTER: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")

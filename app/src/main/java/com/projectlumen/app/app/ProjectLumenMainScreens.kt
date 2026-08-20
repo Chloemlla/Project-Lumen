@@ -265,11 +265,8 @@ internal fun HomeScreen(
     }
 
     LumenPage {
-        PageIntro(
-            icon = Icons.Outlined.Home,
-            titleRes = R.string.home_title,
-            message = stringResource(R.string.home_subtitle),
-        )
+        // No page intro: the top bar already names this screen, and the live runtime state is
+        // what the user opened Home for — an intro banner would push it below the fold.
         StateCard(uiState.runtime, uiState.nowMillis)
         TodayStatsCard(uiState.eyeStats.firstOrNull())
         GoalProgressCard(uiState)
@@ -630,11 +627,15 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
         viewModel.refreshDeviceInsights()
     }
     LumenPage {
-        PageIntro(
-            icon = Icons.Outlined.BarChart,
-            titleRes = R.string.statistics_title,
-            message = stringResource(if (statsEnabled) R.string.statistics_subtitle else R.string.statistics_disabled),
-        )
+        // The enabled-state intro only restated the top-bar title; keep the banner for the
+        // paused case, where it is the one place that explains why the numbers are empty.
+        if (!statsEnabled) {
+            PageIntro(
+                icon = Icons.Outlined.BarChart,
+                titleRes = R.string.statistics_title,
+                message = stringResource(R.string.statistics_disabled),
+            )
+        }
         EyeCareHealthReportCard(uiState, permissionRequirements, shizukuState.ready)
         DeviceUsageAndPowerInsightsCard(
             state = uiState.deviceInsights,
@@ -663,7 +664,11 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
             shape = LumenCardShape,
-            colors = lumenCardColors(),
+            // Footnote for a different feature on an eye-care page: quiet it so the eye-care
+            // cards above keep the page's attention.
+            colors = lumenCardColors(LumenCardEmphasis.Quiet),
+            elevation = lumenCardElevation(),
+            border = lumenCardBorder(LumenCardEmphasis.Quiet),
         ) {
             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionHeader(Icons.Outlined.LocalCafe, R.string.section_pomodoro)

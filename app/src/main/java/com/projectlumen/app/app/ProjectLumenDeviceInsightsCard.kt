@@ -1,13 +1,16 @@
 package com.projectlumen.app.app
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
@@ -59,19 +62,23 @@ internal fun DeviceUsageAndPowerInsightsCard(
             .fillMaxWidth()
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors(LumenCardEmphasis.Quiet),
         elevation = lumenCardElevation(),
-        border = lumenCardBorder(),
+        border = lumenCardBorder(LumenCardEmphasis.Quiet),
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SectionHeader(Icons.Outlined.Apps, R.string.device_insights_title)
+                // SectionHeader fills its width, so it needs a weighted slot of its own or the
+                // progress indicator beside it is measured with no room left.
+                Box(modifier = Modifier.weight(1f)) {
+                    SectionHeader(Icons.Outlined.Apps, R.string.device_insights_title)
+                }
                 if (state.isRefreshing || state.availability == DeviceUsageAvailability.LOADING) {
-                    CircularProgressIndicator(modifier = Modifier.padding(start = 8.dp))
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
                 }
             }
             Text(
@@ -82,11 +89,7 @@ internal fun DeviceUsageAndPowerInsightsCard(
             UsageAvailabilityContent(state, onOpenUsageAccess)
             DevicePowerContent(state)
             if (state.recommendations.isNotEmpty()) {
-                Text(
-                    stringResource(R.string.device_insights_recommendations),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                SectionHeader(Icons.Outlined.CheckCircle, R.string.device_insights_recommendations)
                 state.recommendations.forEach { recommendation ->
                     RecommendationLine(recommendation)
                 }
@@ -137,10 +140,7 @@ private fun UsageAvailabilityContent(
                 ButtonLabel(Icons.AutoMirrored.Outlined.OpenInNew, R.string.device_insights_grant_access)
             }
         }
-        DeviceUsageAvailability.EMPTY -> StatusLine(
-            Icons.Outlined.Info,
-            stringResource(R.string.device_insights_empty),
-        )
+        DeviceUsageAvailability.EMPTY -> EmptyStateMessage(R.string.device_insights_empty)
         DeviceUsageAvailability.RESTRICTED -> StatusLine(
             Icons.Outlined.WarningAmber,
             stringResource(R.string.device_insights_restricted),
@@ -160,12 +160,19 @@ private fun UsageAvailabilityContent(
                     },
                 )
             }
-            MetricRow(
-                R.string.device_insights_late_night,
-                if (usage.quality == UsageDataQuality.EVENT_TIMELINE) {
+            DeviceInsightsMetricRow(
+                labelRes = R.string.device_insights_late_night,
+                value = if (usage.quality == UsageDataQuality.EVENT_TIMELINE) {
                     durationLabel(usage.lateNightForegroundMillis)
                 } else {
                     stringResource(R.string.device_insights_not_available_short)
+                },
+                valueState = if (usage.quality == UsageDataQuality.EVENT_TIMELINE &&
+                    durationMinutes(usage.lateNightForegroundMillis) >= DEVICE_INSIGHTS_LATE_NIGHT_CAUTION_MINUTES
+                ) {
+                    DeviceInsightsValueState.Caution
+                } else {
+                    DeviceInsightsValueState.Neutral
                 },
             )
             MetricRow(
@@ -179,12 +186,10 @@ private fun UsageAvailabilityContent(
             if (usage.quality == UsageDataQuality.AGGREGATED_FALLBACK) {
                 StatusLine(Icons.Outlined.Info, stringResource(R.string.device_insights_aggregate_fallback))
             }
-            if (usage.topApps.isNotEmpty()) {
-                Text(
-                    stringResource(R.string.device_insights_top_apps),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            if (usage.topApps.isEmpty()) {
+                EmptyStateMessage(R.string.device_insights_empty)
+            } else {
+                SectionHeader(Icons.Outlined.Schedule, R.string.device_insights_top_apps)
                 val maximum = usage.topApps.maxOf(AppUsageSummary::foregroundMillis).coerceAtLeast(1L)
                 usage.topApps.forEach { app -> UsageAppRow(app, maximum) }
             }
@@ -195,45 +200,120 @@ private fun UsageAvailabilityContent(
 @Composable
 private fun DevicePowerContent(state: DeviceInsightsState) {
     val power = state.power
-    Text(
-        stringResource(R.string.device_insights_power_context),
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-    )
-    MetricRow(
-        R.string.device_insights_battery_level,
-        power.levelPercent?.let { stringResource(R.string.percent_value, it) }
+    val levelPercent = power.levelPercent
+    val temperatureCelsius = power.temperatureCelsius
+    SectionHeader(Icons.Outlined.BatteryStd, R.string.device_insights_power_context)
+    DeviceInsightsMetricRow(
+        labelRes = R.string.device_insights_battery_level,
+        value = levelPercent?.let { stringResource(R.string.percent_value, it) }
             ?: stringResource(R.string.device_insights_not_available_short),
+        valueState = when {
+            levelPercent == null -> DeviceInsightsValueState.Neutral
+            levelPercent <= DEVICE_INSIGHTS_BATTERY_ALERT_PERCENT -> DeviceInsightsValueState.Alert
+            levelPercent <= DEVICE_INSIGHTS_BATTERY_CAUTION_PERCENT -> DeviceInsightsValueState.Caution
+            else -> DeviceInsightsValueState.Neutral
+        },
     )
     MetricRow(R.string.device_insights_charge_state, chargeStateLabel(power.chargeState))
-    MetricRow(
-        R.string.device_insights_temperature,
-        power.temperatureCelsius?.let { stringResource(R.string.device_insights_temperature_value, it) }
+    DeviceInsightsMetricRow(
+        labelRes = R.string.device_insights_temperature,
+        value = temperatureCelsius?.let { stringResource(R.string.device_insights_temperature_value, it) }
             ?: stringResource(R.string.device_insights_not_available_short),
+        valueState = when {
+            temperatureCelsius == null -> DeviceInsightsValueState.Neutral
+            temperatureCelsius >= DEVICE_INSIGHTS_TEMPERATURE_ALERT_CELSIUS -> DeviceInsightsValueState.Alert
+            temperatureCelsius >= DEVICE_INSIGHTS_TEMPERATURE_CAUTION_CELSIUS -> DeviceInsightsValueState.Caution
+            else -> DeviceInsightsValueState.Neutral
+        },
     )
-    MetricRow(
-        R.string.device_insights_power_saver,
-        stringResource(if (power.powerSaveMode) R.string.device_insights_on else R.string.device_insights_off),
+    DeviceInsightsMetricRow(
+        labelRes = R.string.device_insights_power_saver,
+        value = stringResource(if (power.powerSaveMode) R.string.device_insights_on else R.string.device_insights_off),
+        valueState = if (power.powerSaveMode) DeviceInsightsValueState.Caution else DeviceInsightsValueState.Neutral,
     )
-    MetricRow(
-        R.string.device_insights_background_policy,
-        stringResource(
+    DeviceInsightsMetricRow(
+        labelRes = R.string.device_insights_background_policy,
+        value = stringResource(
             when {
                 power.appBackgroundRestricted -> R.string.device_insights_background_restricted
                 power.batteryOptimizationExempt -> R.string.device_insights_background_unrestricted
                 else -> R.string.device_insights_background_optimized
             },
         ),
+        valueState = if (power.appBackgroundRestricted) {
+            DeviceInsightsValueState.Alert
+        } else {
+            DeviceInsightsValueState.Neutral
+        },
     )
 }
+
+/**
+ * A [MetricRow] that can also carry the value's state. Reminder delivery depends on battery
+ * and background policy, so a reader must be able to see "this one is out of range" without
+ * decoding the label first.
+ */
+@Composable
+private fun DeviceInsightsMetricRow(
+    @StringRes labelRes: Int,
+    value: String,
+    valueState: DeviceInsightsValueState,
+) {
+    if (valueState == DeviceInsightsValueState.Neutral) {
+        MetricRow(labelRes, value)
+        return
+    }
+    val containerColor = if (valueState == DeviceInsightsValueState.Alert) {
+        MaterialTheme.colorScheme.errorContainer
+    } else {
+        MaterialTheme.colorScheme.tertiaryContainer
+    }
+    val contentColor = if (valueState == DeviceInsightsValueState.Alert) {
+        MaterialTheme.colorScheme.onErrorContainer
+    } else {
+        MaterialTheme.colorScheme.onTertiaryContainer
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(containerColor)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            stringResource(labelRes),
+            style = MaterialTheme.typography.bodyLarge,
+            color = contentColor,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = contentColor,
+        )
+    }
+}
+
+private enum class DeviceInsightsValueState {
+    Neutral,
+    Caution,
+    Alert,
+}
+
+private const val DEVICE_INSIGHTS_BATTERY_ALERT_PERCENT = 15
+private const val DEVICE_INSIGHTS_BATTERY_CAUTION_PERCENT = 30
+private const val DEVICE_INSIGHTS_TEMPERATURE_ALERT_CELSIUS = 43f
+private const val DEVICE_INSIGHTS_TEMPERATURE_CAUTION_CELSIUS = 40f
+private const val DEVICE_INSIGHTS_LATE_NIGHT_CAUTION_MINUTES = 30
 
 @Composable
 private fun UsageAppRow(app: AppUsageSummary, maximumMillis: Long) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(LumenCardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .clip(LumenPreferenceShape)
+            .background(lumenNestedContainerColor)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {

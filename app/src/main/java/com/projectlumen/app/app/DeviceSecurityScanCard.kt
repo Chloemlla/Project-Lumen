@@ -1,13 +1,13 @@
 package com.projectlumen.app.app
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -55,13 +56,11 @@ internal fun DeviceSecurityScanCard(
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
+        modifier = modifier.fillMaxWidth(),
         shape = LumenCardShape,
-        colors = lumenCardColors(),
+        colors = lumenCardColors(LumenCardEmphasis.Quiet),
         elevation = lumenCardElevation(),
-        border = lumenCardBorder(),
+        border = lumenCardBorder(LumenCardEmphasis.Quiet),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -97,10 +96,10 @@ internal fun DeviceSecurityScanCard(
                     SecurityResultSummary(scanState.assessment)
                 }
                 is DeviceSecurityScanState.Failed -> {
-                    Text(
+                    DeviceSecurityNotice(
+                        icon = Icons.Outlined.Report,
                         text = "Scan failed: ${scanState.errorMessage}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
+                        severity = DeviceSecuritySeverity.Critical,
                     )
                 }
             }
@@ -124,13 +123,13 @@ private fun SecurityResultSummary(assessment: DeviceSecurityScanner.SecurityAsse
         label = stringResource(R.string.developer_crooot_root_status),
         value = if (assessment.rooted) "ROOTED" else "Clean",
         icon = if (assessment.rooted) Icons.Outlined.Report else Icons.Outlined.CheckCircle,
-        valueColor = if (assessment.rooted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        severity = if (assessment.rooted) DeviceSecuritySeverity.Critical else DeviceSecuritySeverity.Ok,
     )
     SecurityLine(
         label = stringResource(R.string.developer_crooot_suspicious_indicators),
         value = if (assessment.suspicious) "Found" else "None",
         icon = if (assessment.suspicious) Icons.Outlined.WarningAmber else Icons.Outlined.CheckCircle,
-        valueColor = if (assessment.suspicious) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        severity = if (assessment.suspicious) DeviceSecuritySeverity.Warning else DeviceSecuritySeverity.Ok,
     )
     SecurityLine(
         label = stringResource(R.string.developer_crooot_hardware_integrity),
@@ -144,10 +143,10 @@ private fun SecurityResultSummary(assessment: DeviceSecurityScanner.SecurityAsse
             false -> Icons.Outlined.Report
             null -> Icons.Outlined.WarningAmber
         },
-        valueColor = when (assessment.hardwareIntegrityOk) {
-            true -> MaterialTheme.colorScheme.primary
-            false -> MaterialTheme.colorScheme.error
-            null -> MaterialTheme.colorScheme.tertiary
+        severity = when (assessment.hardwareIntegrityOk) {
+            true -> DeviceSecuritySeverity.Ok
+            false -> DeviceSecuritySeverity.Critical
+            null -> DeviceSecuritySeverity.Unknown
         },
     )
     SecurityLine(
@@ -162,10 +161,10 @@ private fun SecurityResultSummary(assessment: DeviceSecurityScanner.SecurityAsse
             false -> Icons.Outlined.WarningAmber
             null -> Icons.Outlined.WarningAmber
         },
-        valueColor = when (assessment.selinuxEnforcing) {
-            true -> MaterialTheme.colorScheme.primary
-            false -> MaterialTheme.colorScheme.error
-            null -> MaterialTheme.colorScheme.tertiary
+        severity = when (assessment.selinuxEnforcing) {
+            true -> DeviceSecuritySeverity.Ok
+            false -> DeviceSecuritySeverity.Warning
+            null -> DeviceSecuritySeverity.Unknown
         },
     )
     SecurityLine(
@@ -180,18 +179,29 @@ private fun SecurityResultSummary(assessment: DeviceSecurityScanner.SecurityAsse
             false -> Icons.Outlined.Report
             null -> Icons.Outlined.WarningAmber
         },
-        valueColor = when (assessment.teeAttestationOk) {
-            true -> MaterialTheme.colorScheme.primary
-            false -> MaterialTheme.colorScheme.error
-            null -> MaterialTheme.colorScheme.tertiary
+        severity = when (assessment.teeAttestationOk) {
+            true -> DeviceSecuritySeverity.Ok
+            false -> DeviceSecuritySeverity.Critical
+            null -> DeviceSecuritySeverity.Unknown
         },
     )
-    Text(
-        text = assessment.summary,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 4.dp),
-    )
+    val compromised = assessment.rooted ||
+        assessment.hardwareIntegrityOk == false ||
+        assessment.teeAttestationOk == false
+    if (compromised) {
+        DeviceSecurityNotice(
+            icon = Icons.Outlined.Report,
+            text = assessment.summary,
+            severity = DeviceSecuritySeverity.Critical,
+        )
+    } else {
+        Text(
+            text = assessment.summary,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
     if (assessment.rawResult != null) {
         CroootDetailedReport(assessment.rawResult)
     }
@@ -225,9 +235,11 @@ private fun CroootDetailedReport(result: com.chloemlla.crooot.CRoootScanResult) 
                 text = report,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(LumenPreferenceShape)
+                    .background(lumenNestedContainerColor)
                     .heightIn(max = 520.dp)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 8.dp),
+                    .padding(12.dp),
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -237,20 +249,82 @@ private fun CroootDetailedReport(result: com.chloemlla.crooot.CRoootScanResult) 
     }
 }
 
+/** How a single scan finding should read: benign, unverified, worth attention, or a failure. */
+private enum class DeviceSecuritySeverity {
+    Ok,
+    Unknown,
+    Warning,
+    Critical,
+}
+
+@Composable
+private fun deviceSecurityAccentColor(severity: DeviceSecuritySeverity): Color = when (severity) {
+    DeviceSecuritySeverity.Ok -> MaterialTheme.colorScheme.primary
+    DeviceSecuritySeverity.Unknown -> MaterialTheme.colorScheme.tertiary
+    DeviceSecuritySeverity.Warning -> MaterialTheme.colorScheme.secondary
+    DeviceSecuritySeverity.Critical -> MaterialTheme.colorScheme.error
+}
+
+@Composable
+private fun deviceSecurityContainerColor(severity: DeviceSecuritySeverity): Color = when (severity) {
+    DeviceSecuritySeverity.Ok, DeviceSecuritySeverity.Unknown -> lumenNestedContainerColor
+    DeviceSecuritySeverity.Warning -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+    DeviceSecuritySeverity.Critical -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+}
+
+@Composable
+private fun DeviceSecurityNotice(
+    icon: ImageVector,
+    text: String,
+    severity: DeviceSecuritySeverity,
+) {
+    val containerColor = when (severity) {
+        DeviceSecuritySeverity.Critical -> MaterialTheme.colorScheme.errorContainer
+        DeviceSecuritySeverity.Warning -> MaterialTheme.colorScheme.secondaryContainer
+        else -> lumenNestedContainerColor
+    }
+    val contentColor = when (severity) {
+        DeviceSecuritySeverity.Critical -> MaterialTheme.colorScheme.onErrorContainer
+        DeviceSecuritySeverity.Warning -> MaterialTheme.colorScheme.onSecondaryContainer
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(containerColor)
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(20.dp))
+        Text(
+            text = text,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = contentColor,
+        )
+    }
+}
+
 @Composable
 private fun SecurityLine(
     label: String,
     value: String,
     icon: ImageVector,
-    valueColor: Color,
+    severity: DeviceSecuritySeverity,
 ) {
+    val accentColor = deviceSecurityAccentColor(severity)
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LumenPreferenceShape)
+            .background(deviceSecurityContainerColor(severity))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(icon, contentDescription = null, tint = valueColor, modifier = Modifier.padding(end = 4.dp))
+            Icon(icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(20.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
@@ -261,7 +335,7 @@ private fun SecurityLine(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
-            color = valueColor,
+            color = accentColor,
         )
     }
 }
