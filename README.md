@@ -10,8 +10,8 @@ The current Kotlin and Jetpack Compose client (v1.0.1, `com.chloemlla.projectlum
 - **On-device goals, templates, runtime state, and trend statistics**, plus CSV/PNG/PDF sharing and JSON backup/restore.
 - **Permission-gated proximity and blink monitoring** with the front camera and ML Kit, ambient-light warnings, brightness assistance, and full-screen rest overlays.
 - **Optional Shizuku enhancements** for system-aware eye-care controls and app network policy management.
-- **Material 3 UI**, dynamic color, light/dark themes, system/Chinese/English language modes, onboarding, and a privacy/permission center.
-- **Local device-usage and power insights**, verified per-ABI update downloads, and integrated Lumen Crash reporting.
+- **Material 3 UI** with dynamic color, light/dark themes (a tip template that ships its own palette decides light or dark and pauses the theme-mode setting without discarding it), system/Chinese/English language modes, onboarding, and a privacy/permission center.
+- **Local device-usage and power insights**, verified per-ABI update downloads, and integrated Lumen Crash reporting for both fatal crashes and handled failures.
 - **Optional translation, account, entitlement, cloud sync, cloud backup, telemetry**, and controlled AIDL/Intent integrations.
 
 The app targets SDK 37 with a minimum SDK of 29, uses a Java/Kotlin 21 toolchain, and follows a single-Activity Compose architecture with manual dependency injection. See the [client capability inventory](docs/CLIENT_EXISTING_FEATURES.md) for the detailed implementation map.
@@ -32,7 +32,7 @@ The app targets SDK 37 with a minimum SDK of 29, uses a Java/Kotlin 21 toolchain
 
 ## Build and verification
 
-Repository policy requires all actual builds and tests to run in GitHub Actions. Do **not** run Gradle, Cargo, npm build, lint, render, or test commands on the local workstation.
+Repository policy requires all actual builds and tests to run in GitHub Actions. Do **not** run Gradle, npm build, lint, render, or test commands on the local workstation.
 
 - [`build.yml`](.github/workflows/build.yml) builds the Android release artifacts and Baseline Profile, and runs Android unit tests and lint.
 - [`release.yml`](.github/workflows/release.yml) verifies and publishes tagged Android APK releases with checksums and a release manifest.
