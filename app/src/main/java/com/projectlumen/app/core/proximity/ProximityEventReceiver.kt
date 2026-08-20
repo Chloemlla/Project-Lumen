@@ -44,7 +44,7 @@ class ProximityEventReceiver : BroadcastReceiver() {
                 if (!ProximityTriggerGate(app).canRun(settings)) return@launch
                 ProximityDetectionWorker.enqueueNext(app, delaySeconds = 0)
             } catch (throwable: Throwable) {
-                app?.recordCrash(throwable)
+                app?.recordHandledFailure(throwable)
             } finally {
                 pendingResult.finish()
             }

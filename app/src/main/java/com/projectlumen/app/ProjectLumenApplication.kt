@@ -152,7 +152,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
             runCatching { AppIntegrityGuard.enforce(this) }
                 .onFailure { throwable ->
                     Log.e(TAG, "App integrity enforcement failed", throwable)
-                    recordCrash(throwable)
+                    recordHandledFailure(throwable)
                 }
             deviceSecurityGate.startStartupScan(applicationScope)
             runCatching { notifications.ensureChannels() }
@@ -207,7 +207,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     private fun initializeMmkvOrRecordCrash() {
         runCatching { ProjectLumenMmkv.initialize(this) }
             .onSuccess { CrashBreadcrumbs.record("MMKV initialized") }
-            .onFailure(::recordCrash)
+            .onFailure(::recordHandledFailure)
     }
 
     /**
@@ -251,11 +251,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
      */
     fun recordCrash(throwable: Throwable): CrashReport? {
         if (throwable is BackendCommunicationBlockedException) {
-            runCatching {
-                CrashBreadcrumbs.record(
-                    "Backend request suppressed capability=${throwable.capability.name.lowercase()} reason=${throwable.reasonCode}",
-                )
-            }
+            recordSuppressedBackendRequest(throwable)
             return null
         }
         return runCatching { LumenCrash.record(throwable) }
@@ -263,8 +259,30 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
             .getOrNull()
     }
 
+    /**
+     * Records a failure the caller already caught and recovered from. The report never claims the
+     * pending-report slot, so a handled failure cannot block the next launch with the crash screen.
+     */
+    fun recordHandledFailure(throwable: Throwable): CrashReport? {
+        if (throwable is BackendCommunicationBlockedException) {
+            recordSuppressedBackendRequest(throwable)
+            return null
+        }
+        return runCatching { LumenCrash.recordNonFatal(throwable) }
+            .onFailure { Log.e(TAG, "Failed to record handled failure", it) }
+            .getOrNull()
+    }
+
+    private fun recordSuppressedBackendRequest(throwable: BackendCommunicationBlockedException) {
+        runCatching {
+            CrashBreadcrumbs.record(
+                "Backend request suppressed capability=${throwable.capability.name.lowercase()} reason=${throwable.reasonCode}",
+            )
+        }
+    }
+
     override fun recordForegroundServiceFailure(throwable: Throwable) {
-        recordCrash(throwable)
+        recordHandledFailure(throwable)
     }
 
     fun clearStartupCrashReport() {

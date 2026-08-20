@@ -31,7 +31,7 @@ class LightMonitorService : Service(), SensorEventListener {
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
             runCatching { application as? ProjectLumenApplication }
                 .getOrNull()
-                ?.recordCrash(throwable)
+                ?.recordHandledFailure(throwable)
         },
     )
     private lateinit var sensorManager: SensorManager
@@ -138,7 +138,7 @@ class LightMonitorService : Service(), SensorEventListener {
         }
         if (shouldWarn) {
             runCatching { app.telemetry.uploadCurrentSnapshot(force = true) }
-                .onFailure(app::recordCrash)
+                .onFailure(app::recordHandledFailure)
         }
     }
 
@@ -163,7 +163,7 @@ class LightMonitorService : Service(), SensorEventListener {
         runCatching {
             Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
             Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, brightness)
-        }.onFailure(app::recordCrash)
+        }.onFailure(app::recordHandledFailure)
     }
 
     private fun extraDimPercentForAutoBrightness(percent: Int, settings: AppSettingsEntity): Int {

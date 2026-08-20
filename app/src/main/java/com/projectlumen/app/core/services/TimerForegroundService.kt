@@ -48,7 +48,7 @@ class TimerForegroundService : LifecycleService() {
     private val pomodoroEngine = PomodoroEngine()
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
-            if (::app.isInitialized) app.recordCrash(throwable)
+            if (::app.isInitialized) app.recordHandledFailure(throwable)
         },
     )
     @Volatile private var loopStarted = false

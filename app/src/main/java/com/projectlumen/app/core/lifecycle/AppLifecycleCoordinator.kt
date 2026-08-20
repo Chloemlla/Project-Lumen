@@ -27,7 +27,7 @@ class AppLifecycleCoordinator(
 ) : DefaultLifecycleObserver {
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
-            app.recordCrash(throwable)
+            app.recordHandledFailure(throwable)
         },
     )
     private val settingsRepository = app.settingsRepository()
@@ -138,7 +138,7 @@ class AppLifecycleCoordinator(
                 securityEvidence = app.deviceSecurityGate.backendEvidence(),
             )
         }.onFailure { throwable ->
-            if (throwable !is BackendCommunicationBlockedException) app.recordCrash(throwable)
+            if (throwable !is BackendCommunicationBlockedException) app.recordHandledFailure(throwable)
         }
     }
 
@@ -160,7 +160,7 @@ class AppLifecycleCoordinator(
                 deviceInstallationId = deviceInstallationId,
             ).also(app.secureCredentials::save).accessToken
         }.getOrElse { throwable ->
-            if (throwable !is BackendCommunicationBlockedException) app.recordCrash(throwable)
+            if (throwable !is BackendCommunicationBlockedException) app.recordHandledFailure(throwable)
             null
         }
     }

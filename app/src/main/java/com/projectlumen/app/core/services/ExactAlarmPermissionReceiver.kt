@@ -28,7 +28,7 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
                     app.startTimerService()
                 }
             }
-                .onFailure { throwable -> app?.recordCrash(throwable) }
+                .onFailure { throwable -> app?.recordHandledFailure(throwable) }
             pendingResult.finish()
         }
     }

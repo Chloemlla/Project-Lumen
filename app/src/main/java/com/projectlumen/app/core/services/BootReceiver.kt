@@ -25,7 +25,7 @@ class BootReceiver : BroadcastReceiver() {
             runCatching {
                 app ?: return@runCatching
                 restoreScheduledWork(app)
-            }.onFailure { throwable -> app?.recordCrash(throwable) }
+            }.onFailure { throwable -> app?.recordHandledFailure(throwable) }
             pendingResult.finish()
         }
     }

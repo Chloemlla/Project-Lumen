@@ -35,7 +35,7 @@ class ProximityDetectionService : Service() {
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
             runCatching { application as? ProjectLumenApplication }
                 .getOrNull()
-                ?.recordCrash(throwable)
+                ?.recordHandledFailure(throwable)
         },
     )
 
@@ -56,7 +56,7 @@ class ProximityDetectionService : Service() {
         scope.launch {
             runCatching { runDetection(app, calibrate) }
                 .onFailure { throwable ->
-                    app.recordCrash(throwable)
+                    app.recordHandledFailure(throwable)
                     clearActiveState(app)
                 }
             stopSelf(startId)
@@ -245,10 +245,10 @@ class ProximityDetectionService : Service() {
                 averageBlinksPerMinute = blinkState.averageBlinksPerMinute,
                 force = calibrate || shouldWarn || blinkState.shouldWarn,
             )
-        }.onFailure(app::recordCrash)
+        }.onFailure(app::recordHandledFailure)
         runCatching {
             uploadFaceAnalysisFrameIfEnabled(app, latestSettings)
-        }.onFailure(app::recordCrash)
+        }.onFailure(app::recordHandledFailure)
     }
 
     private suspend fun uploadFaceAnalysisFrameIfEnabled(
