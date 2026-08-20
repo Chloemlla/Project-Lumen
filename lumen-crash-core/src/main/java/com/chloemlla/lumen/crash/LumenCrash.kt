@@ -130,6 +130,28 @@ object LumenCrash {
     }
 
     /**
+     * Records a throwable the host already caught and recovered from.
+     *
+     * Unlike [record], the report never claims the pending-report slot, so it neither blocks the
+     * next launch with the crash screen nor hides a real crash that is still waiting to be shown.
+     * The report is still uploaded to the backend and returned for host-side diagnostics.
+     */
+    fun recordNonFatal(throwable: Throwable): CrashReport {
+        AuthorIntegrity.verifyOrThrow("record-non-fatal")
+        val config = installedConfig.get()
+            ?: throw IllegalStateException("LumenCrash.install() must be called before recordNonFatal().")
+        val appInfo = config.toAppInfo()
+        CrashBreadcrumbs.record("Handled failure captured: ${throwable::class.java.name}")
+        val report = runCatching {
+            CrashReport.fromThrowable(throwable, appInfo, CrashReportKind.NON_FATAL)
+        }.getOrElse {
+            CrashReport.fromThrowableFallback(throwable, it, appInfo, CrashReportKind.NON_FATAL)
+        }
+        submitBackendUpload(report, config)
+        return report
+    }
+
+    /**
      * Marks the first usable host frame as rendered and stops the optional startup timer.
      * Hosts that enable [LumenCrashConfig.startupHangWatchdogEnabled] should call this from
      * their first-frame callback, not from an early Application lifecycle method.

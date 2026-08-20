@@ -23,4 +23,10 @@ class CrashReportKindTest {
         assertEquals("prior_exit", CrashReportKind.PRIOR_EXIT.wireValue)
         assertEquals(CrashReportKind.PRIOR_EXIT, CrashReportKind.fromWireValue("prior_exit"))
     }
+
+    @Test
+    fun nonFatalKindUsesStableWireValueAndRoundTrips() {
+        assertEquals("non_fatal", CrashReportKind.NON_FATAL.wireValue)
+        assertEquals(CrashReportKind.NON_FATAL, CrashReportKind.fromWireValue("non_fatal"))
+    }
 }

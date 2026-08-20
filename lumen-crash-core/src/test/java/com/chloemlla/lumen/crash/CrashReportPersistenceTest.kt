@@ -135,6 +135,15 @@ class CrashReportPersistenceTest {
     }
 
     @Test
+    fun nonFatalReportRoundTripsAndLabelsItselfAsHandled() {
+        val report = sampleReport().copy(kind = CrashReportKind.NON_FATAL, durationMillis = 0L)
+
+        assertEquals(report, crashReportFromJson(report.toJson()))
+        assertEquals("non_fatal", report.toJson().getString("kind"))
+        assertTrue(report.toClipboardText().contains("Report type: non_fatal"))
+    }
+
+    @Test
     fun processExitReasonNamesMatchApplicationExitInfoConstants() {
         assertEquals("REASON_CRASH_NATIVE", processExitReasonName(13))
         assertEquals("REASON_ANR", processExitReasonName(10))

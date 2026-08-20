@@ -73,7 +73,11 @@ data class CrashReport(
     }
 
     companion object {
-        fun fromThrowable(throwable: Throwable, appInfo: CrashAppInfo): CrashReport {
+        fun fromThrowable(
+            throwable: Throwable,
+            appInfo: CrashAppInfo,
+            kind: CrashReportKind = CrashReportKind.CRASH,
+        ): CrashReport {
             AuthorIntegrity.verifyOrThrow("from-throwable")
             val author = AuthorIntegrity.verifiedAuthorBlock()
             val root = throwable.rootCause()
@@ -82,7 +86,7 @@ data class CrashReport(
             val exceptionType = throwable::class.java.name
             val rootCause = sanitize(root.message?.takeIf { it.isNotBlank() } ?: root::class.java.name)
             return CrashReport(
-                reportId = reportId(nowMillis, exceptionType, rootCause, stackTrace),
+                reportId = reportId(nowMillis, exceptionType, rootCause, stackTrace, kind),
                 crashedAtMillis = nowMillis,
                 crashedAtText = formatTime(nowMillis),
                 exceptionType = exceptionType,
@@ -95,6 +99,7 @@ data class CrashReport(
                 authorName = author.authorName,
                 authorUrl = author.authorUrl,
                 authorFingerprint = author.authorFingerprint,
+                kind = kind,
             )
         }
 
@@ -102,6 +107,7 @@ data class CrashReport(
             throwable: Throwable,
             reportFailure: Throwable,
             appInfo: CrashAppInfo,
+            kind: CrashReportKind = CrashReportKind.CRASH,
         ): CrashReport {
             AuthorIntegrity.verifyOrThrow("from-throwable-fallback")
             val author = AuthorIntegrity.verifiedAuthorBlock()
@@ -112,7 +118,7 @@ data class CrashReport(
                 throwable.message?.takeIf { it.isNotBlank() } ?: throwable::class.java.name,
             )
             return CrashReport(
-                reportId = reportId(nowMillis, exceptionType, rootCause, stackTrace),
+                reportId = reportId(nowMillis, exceptionType, rootCause, stackTrace, kind),
                 crashedAtMillis = nowMillis,
                 crashedAtText = formatTime(nowMillis),
                 exceptionType = exceptionType,
@@ -126,6 +132,7 @@ data class CrashReport(
                 authorName = author.authorName,
                 authorUrl = author.authorUrl,
                 authorFingerprint = author.authorFingerprint,
+                kind = kind,
             )
         }
 
@@ -136,7 +143,9 @@ data class CrashReport(
             threadDump: String,
             appInfo: CrashAppInfo,
         ): CrashReport {
-            require(kind != CrashReportKind.CRASH) { "Watchdog reports must not use CRASH kind." }
+            require(kind != CrashReportKind.CRASH && kind != CrashReportKind.NON_FATAL) {
+                "Watchdog reports must describe an unresponsive main thread."
+            }
             AuthorIntegrity.verifyOrThrow("from-watchdog")
             val author = AuthorIntegrity.verifiedAuthorBlock()
             val nowMillis = System.currentTimeMillis()
@@ -145,7 +154,8 @@ data class CrashReport(
                 CrashReportKind.ANR -> "android.app.ApplicationNotResponding"
                 CrashReportKind.STARTUP_HANG -> "com.chloemlla.lumen.crash.StartupHang"
                 CrashReportKind.FREEZE -> "com.chloemlla.lumen.crash.MainThreadFreeze"
-                CrashReportKind.CRASH -> error("Unreachable crash watchdog kind")
+                CrashReportKind.CRASH,
+                CrashReportKind.NON_FATAL,
                 CrashReportKind.PRIOR_EXIT -> error("Unreachable crash watchdog kind")
             }
             val rootCause = when (kind) {
@@ -153,7 +163,8 @@ data class CrashReport(
                     "Main thread did not process a heartbeat for $duration ms"
                 CrashReportKind.STARTUP_HANG ->
                     "Application did not report its first rendered frame within $duration ms"
-                CrashReportKind.CRASH -> error("Unreachable crash watchdog kind")
+                CrashReportKind.CRASH,
+                CrashReportKind.NON_FATAL,
                 CrashReportKind.PRIOR_EXIT -> error("Unreachable crash watchdog kind")
             }
             val stackTrace = sanitize(threadDump).ifBlank { "<thread dump unavailable>" }
