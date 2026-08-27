@@ -1,6 +1,7 @@
 package com.chloemlla.lumen.crash
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.Application
 import android.os.Bundle
 import android.os.Handler
@@ -22,6 +23,10 @@ import java.util.concurrent.atomic.AtomicLong
  * heartbeats, so a watchdog that reports in that state produces false positives. The
  * heartbeat baseline is therefore refreshed in the background, and a freeze is only emitted
  * for a foreground main thread that stays silent past the timeout for two consecutive checks.
+ *
+ * Startup detection is gated the same way: only a process the user is waiting on owes a first
+ * frame, so a launch that is not user-visible when the timeout expires is retired rather than
+ * reported.
  */
 internal class LumenCrashWatchdog(
     private val application: Application,
@@ -111,11 +116,19 @@ internal class LumenCrashWatchdog(
             val startupPending = config.startupHangWatchdogEnabled && !startupComplete.get()
 
             if (startupPending &&
-                !startupReported.get() &&
                 now - startedAtMillis >= startupTimeoutMillis &&
                 startupReported.compareAndSet(false, true)
             ) {
-                emit(CrashReportKind.STARTUP_HANG, now - startedAtMillis)
+                if (isUserVisibleLaunch()) {
+                    emit(CrashReportKind.STARTUP_HANG, now - startedAtMillis)
+                } else {
+                    // Nobody was waiting for a frame: the process was started for a content
+                    // provider, broadcast or job, or the user walked away mid cold start.
+                    // Ageing past the timeout says nothing about the host here, so hand the
+                    // rest of the process lifetime to the freeze detector instead.
+                    startupComplete.set(true)
+                    CrashBreadcrumbs.record("Startup watchdog skipped: process not user-visible")
+                }
             }
 
             // A startup report is more useful than a duplicate generic freeze report while the
@@ -154,6 +167,22 @@ internal class LumenCrashWatchdog(
                 return
             }
         }
+    }
+
+    /**
+     * True when the user is actually waiting on this process to draw. A process started for a
+     * content provider, broadcast or job is never expected to render a frame, and neither is a
+     * launch the user abandoned, so [ActivityManager.getMyMemoryState] decides the cases where
+     * no activity ever reached onResume (an [Application.onCreate] that never returns still
+     * hosts the top activity record and reports IMPORTANCE_FOREGROUND).
+     */
+    private fun isUserVisibleLaunch(): Boolean {
+        if (isForeground) return true
+        return runCatching {
+            val state = ActivityManager.RunningAppProcessInfo()
+            ActivityManager.getMyMemoryState(state)
+            state.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
+        }.getOrDefault(false)
     }
 
     private fun emit(kind: CrashReportKind, durationMillis: Long) {
