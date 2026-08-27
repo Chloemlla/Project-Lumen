@@ -1296,7 +1296,22 @@ LumenCrashConfig(
 )
 ```
 
-上报逻辑**刻意不在 SDK 范围内**。Project Lumen 通过 `onCrashSaved` / 继续时的钩子调度遥测上传，网络策略仍由应用侧掌控。
+除该宿主钩子外，SDK 默认会把每份已持久化的报告上传到 Lumen 崩溃后端（`crashReportBackendEnabled`，
+`POST {baseUrl}/api/crash-sdk/v1/crash-report`）。上传是 best-effort，绝不干扰崩溃页：
+
+- `CrashReportBackendUploader.upload(...)` 返回 `CrashUploadOutcome`：`ACCEPTED`（已入库，或后端按
+  `reportId` 判定为重复）、`REJECTED`（载荷被拒，`HTTP 4xx`）、`RETRYABLE`（单设备每小时配额
+  `HTTP 429`、服务端失败或无网络）。
+- 结果为 `RETRYABLE` 时会释放进程内去重标记，下一次 `loadPendingReport()` 会重新提交同一份报告，而不是
+  在本进程生命周期内直接丢弃。
+- 后端保存 `systemInfo` 但没有 `exitReason` 字段，因此 `PRIOR_EXIT` 报告的退出原因会以首行
+  `Exit reason:` 折叠进上传的系统信息；本地保存的报告保持原样。
+- 报告默认使用 `CrashDeviceId.resolve(context)` 标记设备（宿主提供 `deviceInstallationIdProvider` 时以宿主为准）。
+  该 ID 为 `SHA-256(SSAID | 宿主包名 | 稳定 Build 特征)` 截断到 32 位十六进制：同一台设备在重装、清数据、
+  系统升级后仍得到同一个 ID；原始 SSAID 不会离开设备，同一设备上的两个宿主应用也不会共用同一个 ID。
+  无可用 SSAID 的设备回退到持久化的随机 UUID。
+
+若网络策略必须留在应用侧，仍可继续用 `onCrashSaved` / 继续时的钩子自行调度上传。
 
 ## 作者保护
 
@@ -1729,7 +1744,7 @@ if (!opened) {
 
 ### 职责边界
 
-- 上传/遥测留在宿主（`onCrashSaved` / continue 钩子）。SDK 不提供崩溃后端。
+- 报告入库在 Lumen 后端，SDK 只提供 best-effort 客户端（`CrashReportBackendUploader`）；额外的宿主遥测仍留在宿主（`onCrashSaved` / continue 钩子）。
 - 抽离到本模块后，不要再在宿主重写一套 crash 核心克隆（如 `core/crash`、替代 `LumenCrashReportScreen` 的自定义崩溃页）。
 
 ### 稳妥生产路径

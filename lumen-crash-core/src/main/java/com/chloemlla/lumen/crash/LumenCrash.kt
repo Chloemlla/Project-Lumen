@@ -306,7 +306,9 @@ object LumenCrash {
      * The SDK uploads by default even without a configured token or device-ID
      * provider: the report is sent anonymously and tagged with the SDK's own
      * persistent per-install device ID. Guards against duplicate submissions
-     * within one process by tracking [reportId] in [uploadedReportIds]. All
+     * within one process by tracking [reportId] in [uploadedReportIds]; the guard
+     * is released again when the backend reports a retryable outcome, so a
+     * throttled or offline report is not lost for the rest of the process. All
      * failures are silently caught so the caller (crash handler / cold-start
      * loader) is never disrupted.
      */
@@ -324,7 +326,7 @@ object LumenCrash {
 
         runCatching {
             executor().submit {
-                runCatching {
+                val outcome = runCatching {
                     val deviceId = config.deviceInstallationIdProvider?.invoke()
                         ?.takeIf { it.isNotBlank() }
                         ?: CrashDeviceId.resolve(context)
@@ -336,6 +338,11 @@ object LumenCrash {
                         accessToken = config.crashReportAccessToken,
                         baseUrl = config.crashReportBackendBaseUrl,
                     )
+                }.getOrDefault(CrashUploadOutcome.RETRYABLE)
+                if (outcome == CrashUploadOutcome.RETRYABLE) {
+                    // Quota, server-side failure, or no network: release the in-process guard so
+                    // the next loadPendingReport() can submit the same report again.
+                    uploadedReportIds.remove(report.reportId)
                 }
             }
         }

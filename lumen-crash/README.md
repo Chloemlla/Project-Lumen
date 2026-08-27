@@ -1298,7 +1298,26 @@ LumenCrashConfig(
 )
 ```
 
-Upload is intentionally **out of scope** for the SDK. Project Lumen uses `onCrashSaved` / continue-time hooks to schedule telemetry upload while keeping network policy in the app.
+Besides that host hook, the SDK uploads every persisted report to the Lumen crash backend by default
+(`crashReportBackendEnabled`, `POST {baseUrl}/api/crash-sdk/v1/crash-report`). The upload is
+best-effort and never disturbs the crash UI:
+
+- `CrashReportBackendUploader.upload(...)` returns a `CrashUploadOutcome`: `ACCEPTED` (stored, or
+  already stored — the backend de-duplicates by `reportId`), `REJECTED` (payload refused, `HTTP 4xx`),
+  or `RETRYABLE` (per-device hourly quota `HTTP 429`, server-side failure, or no network).
+- A `RETRYABLE` outcome releases the in-process de-duplication guard, so the next
+  `loadPendingReport()` submits the same report again instead of dropping it for the process lifetime.
+- The backend stores `systemInfo` but has no `exitReason` field, so a `PRIOR_EXIT` report's kill
+  reason is folded into the uploaded system info as a leading `Exit reason:` line. The locally stored
+  report is left untouched.
+- Reports are tagged with `CrashDeviceId.resolve(context)` unless the host supplies
+  `deviceInstallationIdProvider`. That ID is `SHA-256(SSAID | hostPackage | stable Build traits)`
+  truncated to 32 hex characters, so the same device resolves to the same ID across reinstalls, data
+  wipes, and OS updates, while the raw SSAID never leaves the device and two apps on one device never
+  share an ID. Devices without a usable SSAID fall back to a persisted random UUID.
+
+Host-side upload scheduling stays available through `onCrashSaved` / continue-time hooks when network
+policy has to live in the app.
 
 ## Author protection
 
@@ -1729,7 +1748,9 @@ Also:
 
 ### Responsibility boundary
 
-- Upload/telemetry stays in the host (`onCrashSaved` / continue-time hooks). The SDK does not ship a crash backend.
+- Report ingest lives in the Lumen backend; the SDK only ships the best-effort client
+  (`CrashReportBackendUploader`). Extra host-side telemetry stays in the host (`onCrashSaved` /
+  continue-time hooks).
 - Do not reintroduce host-local crash core clones (`core/crash`, custom crash screens that replace `LumenCrashReportScreen`) after extracting to this module.
 
 ### Safe production path
