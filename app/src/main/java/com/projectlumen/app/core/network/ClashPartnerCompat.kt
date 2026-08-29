@@ -16,7 +16,7 @@ import androidx.core.content.getSystemService
 import java.util.concurrent.CopyOnWriteArrayList
 
 /** CMFA 授予的 `partnerStatus` 读取层级，对应 provider 的 `accessTier` 字段。 */
-internal enum class ClashAccess { Unavailable, Denied, Basic, Full }
+enum class ClashAccess { Unavailable, Denied, Basic, Full }
 
 /**
  * 读出 CMFA 授予的层级。apiVersion 3 起 `accessTier` 明确回传 `denied`/`basic`/`full`；
