@@ -99,6 +99,14 @@ Keep all secret values out of source and documentation; rotate them through the 
 
 A parallel 11-track audit of the Android client, the crash SDK, and CI completed in August 2026 raised 229 findings. The itemized [audit checklist](docs/audit/2026-08-31/AUDIT-CHECKLIST.md) tracks 195 of 230 items as fixed or verified closed — including every P0 — and gives a per-item rationale for the remainder. User-visible outcomes include more consistent reminder and statistics accounting, a fail-closed signing and update trust chain, privacy-hardened crash reporting, and CI that verifies tests and lint before any release artifact is signed.
 
+## Branch status (September 2026)
+
+Merge assessment of the three non-`main` branches, recorded pending final disposition:
+
+- **`feat/prior-exit-capture`** — merged into `main`. It carried a single crash-SDK Aura integration reference document.
+- **`codex/native-client-security-hardening`** — not merged. Its work (request-signing gate, update trust chain, build-update notes, ABI checks) is already implemented in `main` through the audit fixes; the branch is an older parallel implementation. Kept for reference.
+- **`origin/ui`** — not merged. Most of its fixes (freeze-watchdog gating, runtime/statistics serialization, proximity analysis, UI polish) overlap fixes already in `main`; its distinctive liquid-glass theme UI may be ported separately as a feature. Kept for reference.
+
 ## Contributing
 
 Before changing code or documentation, read [`AGENTS.md`](AGENTS.md). Keep changes focused, preserve module boundaries, document permission or data-flow changes, and let the matching GitHub workflow perform the required verification. Pull requests should explain the user-visible behavior, affected modules, and workflow evidence.
