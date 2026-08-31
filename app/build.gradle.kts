@@ -146,10 +146,14 @@ android {
     }
 
     // Release intent has to be derived from the requested tasks because these values are resolved
-    // during configuration, before any variant exists.
+    // during configuration, before any variant exists. Only app-targeting tasks (fully-qualified
+    // :app:* or a bare task name, which Gradle applies to every project incl. :app) hit the
+    // signing-cert hard gate; the SDK release workflow builds :lumen-crash* modules and must not
+    // be blocked by an app-only secret check.
     val projectLumenIsReleaseBuild = gradle.startParameter.taskNames.any { taskName ->
         val normalized = taskName.lowercase()
-        normalized.contains("release") || normalized.contains("bundle")
+        val targetsApp = !normalized.contains(':') || normalized.startsWith(":app")
+        (normalized.contains("release") || normalized.contains("bundle")) && targetsApp
     }
     val projectLumenAllowInsecureRelease = projectLumenBooleanFlag(
         providers.gradleProperty("projectLumenAllowInsecureRelease").orNull,
