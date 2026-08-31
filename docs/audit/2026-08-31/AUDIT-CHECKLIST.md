@@ -111,6 +111,7 @@
 - [x] **G10-04** · G 安全 · 请求签名密钥有硬编码字面量兜底，secret 缺失时静默出一个"密钥公开可读"的 release 包
       - 位置：`app/build.gradle.kts:113-119（兜底值）、:171-180（编译进 .so 的 CMake define）、:154（完整性开关随 cert 为空而关闭）；对照 :138-143（证书固定的 require 硬校验）`
       - 详情：[G10-build-ci-tests.md:87](G10-build-ci-tests.md)
+      - 处置：已修：secret 缺失即 `require` 硬失败；`PROJECT_LUMEN_REQUEST_SIGNING_SECRET` / `PROJECT_LUMEN_RELEASE_CERT_SHA256` 是 release 构建的硬性前置。硬门仅对 app 目标任务生效（`gradle.startParameter.taskNames` 含 release/bundle 且目标为 `:app` 或裸任务名），`:lumen-crash*` 的 SDK release 构建不再被 app-only secret 检查误伤——修复后 SDK release 工作流已在真实 CI 全绿验证（Assemble release AAR 真跑通过）。
 - [x] **G10-05** · G 安全 / D 生命周期与框架约束 · Shizuku UserService 的无参构造无 keep 规则，release 下按应用网络管控整体失效
       - 位置：`app/proguard-rules.pro（**无**任何覆盖 ShizukuShellUserService 的规则；:14-21 只覆盖 extends android.app.Service，:47-50 只覆盖 NativeSecurityBridge 与 native <methods>…`
       - 详情：[G10-build-ci-tests.md:125](G10-build-ci-tests.md)
