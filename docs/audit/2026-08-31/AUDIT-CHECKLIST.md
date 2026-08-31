@@ -254,7 +254,7 @@
       - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/FaceDistanceAnalyzer.kt:157-162（调用点 :44、:105）`
       - 详情：[G04-sensing-overlay-B.md:171](G04-sensing-overlay-B.md)
 - [ ] **G04B-10** · A 架构（算法与采样不匹配） · 眨眼采样率约 0.5Hz，远低于眨眼时长 → `blinkCount` 恒为 0，干眼提醒系统性误报
-      - 处置：跳过：同 G04-05，眨眼采样率重设计属产品决策。
+      - 处置：跳过：与 G04-05 同一根因——`sampleIntervalMillis = 900L`、单帧预算 ≤1500ms，物理上观测不到约 300ms 的一次眨眼。采样节奏与功耗取舍需重新设计，属产品决策，本轮不改。
       - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityCameraSampler.kt:44-65（sampleIntervalMillis = 900L，单帧预算 ≤1500ms）；ProximityDetectionServ…`
       - 详情：[G04-sensing-overlay-B.md:201](G04-sensing-overlay-B.md)
 - [x] **G04B-11** · E 韧性 / D 生命周期 · Worker 自续链在"相机前台不可用"时直接断掉，周期检测永久停止
@@ -822,8 +822,8 @@
 - [x] **G10-16** · A 架构与设计 · CodeQL 未覆盖 C/C++，且只扫 `main` 分支，而 `build.yml` 从任意分支发版
       - 位置：`.github/workflows/codeql.yml:36-40（语言矩阵）、:5-9（分支限定）、:89-94（死分支）、:22（超时）、:102-104（构建步骤）`
       - 详情：[G10-build-ci-tests.md:380](G10-build-ci-tests.md)
-- [ ] **G10-17** · A 架构与设计 / G 安全 · 仓库里提交了约 14 MB 的陈旧源码归档（`Project-Lumen.zip` / `*.7z`）
-      - 处置：跳过：需 git 写操作（`git rm` 约 14 MB 陈旧归档），协调者提交时处理。
+- [x] **G10-17** · A 架构与设计 / G 安全 · 仓库里提交了约 14 MB 的陈旧源码归档（`Project-Lumen.zip` / `*.7z`）
+      - 处置：已修：两个归档已 `git rm`（提交 0fa9bf1，跟踪状态解除，`git ls-files` 复核零命中），`.gitignore` 追加 `*.zip` / `*.7z` 防回潮。
       - 位置：`仓库根 Project-Lumen.zip（596,686 字节，334 个条目，**已被 git 跟踪**）、Project-Lumen-flutter-2026.6.28.7z（13,893,454 字节，**已被 git 跟踪**）`
       - 详情：[G10-build-ci-tests.md:399](G10-build-ci-tests.md)
 - [ ] **G10-18** · H 编译与结构 · 高风险模块的单测覆盖盲区（并发、时间边界、持久化顺序、请求签名）
@@ -881,6 +881,54 @@
       - 处置：已修：CrashBreadcrumbs 改 ReentrantLock，snapshot() 用 tryLock(50ms) 超时返回 UNAVAILABLE_MARKER，watchdog 不再无限期阻塞。
       - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/CrashBreadcrumbs.kt:18-32；lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/LumenCrash…`
       - 详情：[G11-lumen-crash-sdk.md:271](G11-lumen-crash-sdk.md)
+
+---
+
+## 未修复项逐条理由（35 条）
+
+> **跳过** = 本轮明确不改（含"属产品决策 / 证据不足 / 跨组阻塞 / 风险收益不划算"）；**部分修** = 已改一部分，剩余留专项。
+> 每条完整"位置"与"处置"以条目内为准，此处为集中索引。G10-17（14MB 陈旧归档）已于提交 0fa9bf1 `git rm` 解除跟踪并勾选，故未修复项由 36 条减为 35 条。
+
+### 部分修（10 条）— 已改一部分，剩余留专项
+
+- **G01-04** · ViewModel 构造在主线程做 Keystore / EncryptedSharedPreferences IO — Application 后台协程预热已做，主线程改读已初始化 lazy。主方案（profile 延后到达）需给 `ProjectLumenFirstOpenGateEntry` 等加「未决」态，属别组文件；只改 ViewModel 会让老用户每次冷启动闪一下开源声明页。
+- **G01-10** · 设置的乐观预览没有失效与回滚 — `previewSettings` 在 `!isReady` 时直接返回。预览失败清除需 `ProjectLumenSettingsFeatureEntry.updateSettings` 的 try/finally 回调（别组）。
+- **G01-14** · MMKV 初始化失败被静默吞掉 — 新增 `ProjectLumenApplication.localStorageAvailable`，存储不可用时五个 `start*` 不再启动服务，避免每秒抛异常。未完：`uiState.storageUnavailable` + 专门错误页（UI 组 + 字符串）、时钟跳过（RuntimeFeatureEntry）。
+- **G01-19** · `SettingsRepository` / `RuntimeRepository` 被三处各自 new 且 update 无锁 — 改为 `by lazy` 单例，**函数签名不变**，别组调用点零改动。未完：其余每次裸 new 的仓库构造点。
+- **G05-16** · `ProjectLumenApiClient` 覆盖 11 个能力域的上帝类 — `SilentVisionPolicy` / `LifecycleLockPolicy` 三份解析复制已合并为共享 `toSilentVisionPolicy()` / `toLifecycleLockPolicy()`。上帝类拆分属大规模重构，修复窗口内风险/收益不划算，留专项。
+- **G07-05** · `SettingsScreen` 是 1070 行单 Composable — reminder/pre-alert/pomodoro/quiet-hours/goals 抽到 `ProjectLumenSettingsTimingSections.kt`，sound/appearance 抽到 `ProjectLumenSettingsPresentationSections.kt`（SettingsScreen 1339→1121 行）。controller 拆分需跨组签名，留专项。
+- **G07-09** · 隐私中心同一批权限渲染两遍 + `shizukuNativeBrightness` 判定三份副本 — 三份副本已收拢为 `usesShizukuNativeBrightness` 单一来源。磁贴+长条双渲染保留（`BackendFeatureVisibilityTest` 断言依赖），留专项。
+- **G08-08** · 权限透明度卡与系统背景选择器从未被组合（出厂即不可达） — `EyeCareSetupAndPrivacyCard` 已接入设置页隐私区块（透明度卡 + 7 条权限说明可达）。`SystemBackgroundPicker` 接线需跨组（TemplateScreens seed / TemplatesFeatureEntry+ViewModel），留专项。
+- **G11-09** · 崩溃报告优先写 app 外部存储（API 26~28 上其它应用可读） — `load()` 不再 mkdirs。`save()` 仍优先 `getExternalFilesDir`，`READ_EXTERNAL_STORAGE` 风险未彻底消除，留专项。
+- **G11-13** · 关键路径零测试（watchdog 不可单测、CI 不跑 sample R8） — watchdog 判定抽成 `WatchdogDecisions` 纯函数并新增 `WatchdogDecisionsTest`。CI 仍不跑 sample `assembleRelease`，后半留专项。
+
+### 跳过（25 条）— 本轮明确不改
+
+- **G01-02** · 服务命令 lambda 启动失败静默丢弃 — 完整修要改构造签名 + 首页降级横幅 + 字符串资源（全在别组），只改 Application/ViewModel 一侧结果送不到 UI。
+- **G01-05** · 1 Hz 时钟循环无异常隔离、无退出条件 — 真正的 tick 异常隔离在 `ProjectLumenRuntimeFeatureEntry.startClock`（别组）；ViewModel 层 `runCatching` 删除反而让 `launch` 异常直接冒泡出 ViewModel 构造。
+- **G01-06** · `AWAITING_ACTION` 自锁，提醒功能永久停止（未修，产品行为需确认） — 自锁是引擎的显式等待语义，自动推进（超时进入休息/重新提醒）需定义宽限策略与文案，属产品决策。
+- **G01-16** · Compose 层直接强转 Application 组装 UpdateChecker 绕过 ViewModel — 需新建 `ProjectLumenUpdateFeatureEntry`（`*FeatureEntry` 属别组）；且必须同步改 `BackendCommunicationArchitectureTest` 断言（它要求 `ProjectLumenApp.kt` 包含 `application.apiClient`）。
+- **G01-18** · `ProjectLumenUiState` 直接以 Room 实体为字段类型 — `RuntimeSnapshot` 重构横跨多个屏幕文件，报告本身建议单独排一次提交。
+- **G03-12** · `NotificationService` 895 行上帝类 — 大规模重构，修复窗口内风险/收益不划算；本组只修了其中的具体缺陷点（渠道、Live Update 去重等），结构拆分留专项。
+- **G03-14** · 所有精确闹钟用 `setExactAndAllowWhileIdle`（Doze 下被节流，⚠需确认） — 计时器精度必须用精确闹钟，Doze 节流由 `TimerReconciliationWorker` / `BootReceiver` 的 WorkManager 对账兜底；改成 `setExact` 会牺牲保活精度。
+- **G04-05** · 眨眼采样率物理上观测不到一次眨眼，干眼告警恒定误报 — 需重新设计采样节奏与功耗取舍，属产品决策。
+- **G04B-10** · 与 G04-05 同一根因（采样间隔 900ms、单帧预算 ≤1500ms，观测不到约 300ms 的眨眼） — 采样节奏与功耗取舍需重新设计，属产品决策。
+- **G04B-18** · `ProximityTriggerGate` 只在开发者模式生效，普通用户无静止/防抖门禁、距离判定无滞回 — 给普通用户开启门禁 + 加滞回区间需定新默认值并改用户可见行为，属产品决策。
+- **G09-06** · `LocaleController` 双机制并存（系统"应用语言"被应用自存值覆盖） — 删 `LocaleController.wrap()`（`core/i18n`）并改 `ProjectLumenApp.kt:168-273`，属组装/状态组文件。
+- **G09-07** · 6 文件复制粘贴同一份 ~195 行 import 块 — 跨文件机械改写 + `app/src/test` 有源码文本断言用例且文件 CRLF，风险/收益不划算。
+- **G09-16** · 隐私同意真相源就是"引导流程完成时间"，而引导页有直接记同意的"跳过"按钮 — 改动需 `SecureCredentialStore` / `DeviceInstallProfile`（G06 组）+ 数据迁移。
+- **G10-03** · `versionCode` 取自 `GITHUB_RUN_NUMBER`，两个工作流各自独立计数 — 改动有降版风险，正确修法（统一版本真相源）在转交清单。
+- **G10-06** · `settings.gradle.kts` 明文 HTTP + 硬编码凭据第三方 Maven 仓库，无 group 限定 — 本机无法确认 `crooot-sdk` 是否有传递依赖只在 ITGSA nexus 上；删仓库块可能让依赖解析整体失败。
+- **G10-11** · Manifest 完全没有 `<queries>`，用 `QUERY_ALL_PACKAGES` 兜包可见性 — Manifest 非 build 组；`QUERY_ALL_PACKAGES` 兜包可见性是功能有效的取舍。
+- **G10-14** · `applicationId` 3 个独立真相源 — 收敛涉及 `baselineprofile/**`，改动会威胁 release 必经的 baseline-profile 步。
+- **G10-15** · `minSdk 29` 下 4 个 `styles.xml` 变体中的 `Theme.ProjectLumen` 永不生效 — 属清理项，动 `res/**` 非 build 组。
+- **G10-18** · 高风险模块单测覆盖盲区（并发、时间边界、持久化顺序、请求签名） — 新增行为测试会引用正被 11 个 agent 重写的生产类，修复窗口结束后再补。
+- **G10-20** · `android:intentMatchingFlags="enforceIntentFilter"` 与两个无 intent-filter 的 receiver 可能冲突（⚠需确认） — 改动会改变可见行为，证据不足。
+- **G11-05** · core 清单无条件合并 `INTERNET` 并默认上报崩溃报告 + 跨重装设备 ID 到作者后端 — 合并 INTERNET 为上传崩溃报告所需（注释即策略），删除会破坏 core 宿主上报；合规缓解靠配置关闭上传 + 载荷脱敏，保持现状。
+- **G11-10** · `LumenCrashReportScreen.kt` 1485 行，全仓最大文件 — 拆分需跨文件重构 + UI 契约，留专项（与 G05-16 同策略）。
+- **G11-11** · consumer ProGuard 整包 `-keep` 关掉下游对 SDK 的 R8 + 注入全局 `-keepattributes` — 整包豁免是安全默认；收窄需真实 R8 验证环境（G11-13 已点出 CI 不跑 sample R8），留专项。
+- **G11-12** · 发布元数据（Compose 依赖 `api` 暴露但 BOM 仅 `implementation`、`material-icons-extended` 强推下游、core 声明未用 `core-ktx`） — 纯发布契约问题，改动需配合下游验证，留专项。
+- **G11-14** · 发布纪律（推 main 即发版但无 API 兼容校验、版本恒为 `0.1.0-<sha>`） — 涉及发布流水线与下游 CLens 消费契约，留专项。
 
 ---
 
