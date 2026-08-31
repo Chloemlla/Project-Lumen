@@ -1190,7 +1190,7 @@ JSON includes: report id, timestamps, exception/root cause, thread/process, syst
 - Snapshot is embedded into new `CrashReport.recentEvents`
 - UI shows the last 12 events
 
-Sanitization redacts local user-home paths plus `content://` / `file://` URIs. The same rules are applied to stack/root-cause text when building reports.
+Sanitization redacts local user-home paths plus `content://` / `file://` URIs, and masks bearer tokens and credential-looking parameters (`token`, `key`, `secret`, and similar). The same rules are applied to stack/root-cause text when building reports.
 
 ## Adaptive UI
 
@@ -1267,7 +1267,7 @@ Config:
 | `pasteUploadEnabled` | `true` | Disable to hide the upload-link share option |
 | `pasteUploadBaseUrl` | `https://paste.gentoo.zip` | Must be HTTPS; trailing slash is ignored |
 
-On success the SDK copies the link to the clipboard and shows a dialog with Copy / Open / Share actions. Upload is best-effort: network, integrity, or endpoint failures only toast an error and leave text/file share available; they must not process-kill the crash UI. Library manifest merges `INTERNET` permission into hosts.
+On success the SDK copies the link to the clipboard and shows a dialog with Copy / Open / Share actions. Upload is best-effort: network, integrity, or endpoint failures only toast an error and leave text/file share available; they must not process-kill the crash UI. Redirects are followed manually and only to HTTPS — never downgraded to `http`. Library manifest merges `INTERNET` permission into hosts.
 
 ## Host product copy
 

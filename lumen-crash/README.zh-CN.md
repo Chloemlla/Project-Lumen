@@ -1188,7 +1188,7 @@ JSON 包含：报告 ID、时间戳、异常/根因、线程/进程、系统信�
 - 快照会写入新的 `CrashReport.recentEvents`
 - UI 默认展示最近 12 条
 
-脱敏会屏蔽本机 user-home 路径以及 `content://` / `file://` URI。构建报告时，堆栈/根因文本也会应用同样规则。
+脱敏会屏蔽本机 user-home 路径以及 `content://` / `file://` URI，并遮蔽 Bearer token 与形似凭据的参数（`token`、`key`、`secret` 等）。构建报告时，堆栈/根因文本也会应用同样规则。
 
 ## 自适应 UI
 
@@ -1265,7 +1265,7 @@ POST multipart/form-data 字段 "_"  ->  https://paste.gentoo.zip
 | `pasteUploadEnabled` | `true` | 设为 `false` 可隐藏“上传并分享链接”选项 |
 | `pasteUploadBaseUrl` | `https://paste.gentoo.zip` | 必须 HTTPS；尾部 `/` 会被忽略 |
 
-上传成功后 SDK 会把链接复制到剪贴板，并弹出包含 复制 / 打开 / 分享 操作的对话框。上传是 best-effort：网络、完整性校验或端点失败只会 Toast 报错，文本/文件分享仍可用，且不得因上传失败导致崩溃页进程退出。库 manifest 会向宿主合并 `INTERNET` 权限。
+上传成功后 SDK 会把链接复制到剪贴板，并弹出包含 复制 / 打开 / 分享 操作的对话框。上传是 best-effort：网络、完整性校验或端点失败只会 Toast 报错，文本/文件分享仍可用，且不得因上传失败导致崩溃页进程退出。重定向由 SDK 手动跟随且仅允许 HTTPS——绝不降级到 `http`。库 manifest 会向宿主合并 `INTERNET` 权限。
 
 ## 宿主产品文案
 

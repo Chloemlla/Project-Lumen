@@ -11,7 +11,7 @@ The current Kotlin and Jetpack Compose client (v1.0.1, `com.chloemlla.projectlum
 - **Permission-gated proximity and blink monitoring** with the front camera and ML Kit, ambient-light warnings, brightness assistance, and full-screen rest overlays.
 - **Optional Shizuku enhancements** for system-aware eye-care controls and app network policy management.
 - **Material 3 UI** with dynamic color, light/dark themes (a tip template that ships its own palette decides light or dark and pauses the theme-mode setting without discarding it), system/Chinese/English language modes, onboarding, and a privacy/permission center.
-- **Local device-usage and power insights**, verified per-ABI update downloads, and integrated Lumen Crash reporting for both fatal crashes and handled failures.
+- **Local device-usage and power insights**, signature-verified, origin-restricted per-ABI update downloads, and integrated Lumen Crash reporting for both fatal crashes and handled failures.
 - **Optional translation, account, entitlement, cloud sync, cloud backup, telemetry**, and controlled AIDL/Intent integrations.
 
 The app targets SDK 37 with a minimum SDK of 29, uses a Java/Kotlin 21 toolchain, and follows a single-Activity Compose architecture with manual dependency injection. See the [client capability inventory](docs/CLIENT_EXISTING_FEATURES.md) for the detailed implementation map.
@@ -34,7 +34,7 @@ The app targets SDK 37 with a minimum SDK of 29, uses a Java/Kotlin 21 toolchain
 
 Repository policy requires all actual builds and tests to run in GitHub Actions. Do **not** run Gradle, npm build, lint, render, or test commands on the local workstation.
 
-- [`build.yml`](.github/workflows/build.yml) builds the Android release artifacts and Baseline Profile, and runs Android unit tests and lint.
+- [`build.yml`](.github/workflows/build.yml) builds the Android release artifacts and Baseline Profile, and runs Android unit tests and lint. Release builds fail closed when the signing secret or release certificate SHA-256 is missing; unit tests and lint run before signing.
 - [`release.yml`](.github/workflows/release.yml) verifies and publishes tagged Android APK releases with checksums and a release manifest.
 - [`lumen-crash-sdk-release.yml`](.github/workflows/lumen-crash-sdk-release.yml) verifies and publishes the Lumen Crash AARs.
 - [`lumen-ui-tuner.yml`](.github/workflows/lumen-ui-tuner.yml) builds and deploys the UI token tuner tool.
@@ -73,11 +73,13 @@ The 13 non-signing secrets above can also be stored in the **Project Lumen** sec
 
 Keep all secret values out of source and documentation; rotate them through the GitHub UI or the Happy-TTS env-manager.
 
+`PROJECT_LUMEN_REQUEST_SIGNING_SECRET` and `PROJECT_LUMEN_RELEASE_CERT_SHA256` are hard requirements for release builds — a missing value fails the build instead of silently falling back to a known constant. Local diagnostics can opt out explicitly with `-PprojectLumenAllowInsecureRelease=true`.
+
 ## Security and privacy
 
 - **Core settings, runtime state, goals, templates, and statistics** are stored on-device with Room/MMKV-backed repositories. Account credentials are handled through encrypted credential storage.
 - **Camera, usage access, notifications, exact alarms, overlays, system brightness, and Shizuku** capabilities are surfaced as feature-specific permission controls rather than assumed access.
-- **Connected features** use HTTPS. The client also contains request signing, optional certificate pinning, app-integrity checks, release SHA-256 verification, and signature checks for external app callers.
+- **Connected features** use HTTPS. The client also contains request signing (a hard requirement for release builds), optional certificate pinning, app-integrity checks, release SHA-256 verification, and signature checks for external app callers. Crash reports are redacted before leaving the device and uploaded over HTTPS-only redirects; handled failures are reported without interrupting the UI.
 - **Translation, account, cloud, telemetry, and update** features communicate with external services. Review their settings and data flow before enabling or changing them.
 - **Keep signing credentials, access tokens, API secrets, and production security material** in GitHub Actions secrets or protected deployment configuration; do not add new secret values to source or documentation.
 
@@ -92,6 +94,10 @@ Keep all secret values out of source and documentation; rotate them through the 
 - [UI/UX review (August 2026)](docs/uiux-review-2026-08-01.md)
 - [Product animation guide](docs/REMOTION_ANDROID_PRODUCT_ANIMATION_GUIDE.md)
 - [Lumen Crash SDK guide](lumen-crash/README.md) · [中文](lumen-crash/README.zh-CN.md)
+
+## August 2026 architecture and code audit
+
+A parallel 11-track audit of the Android client, the crash SDK, and CI completed in August 2026 raised 229 findings. The itemized [audit checklist](docs/audit/2026-08-31/AUDIT-CHECKLIST.md) tracks 195 of 230 items as fixed or verified closed — including every P0 — and gives a per-item rationale for the remainder. User-visible outcomes include more consistent reminder and statistics accounting, a fail-closed signing and update trust chain, privacy-hardened crash reporting, and CI that verifies tests and lint before any release artifact is signed.
 
 ## Contributing
 
