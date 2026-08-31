@@ -21,14 +21,19 @@ enum class ClashAccess { Unavailable, Denied, Basic, Full }
 /**
  * 读出 CMFA 授予的层级。apiVersion 3 起 `accessTier` 明确回传 `denied`/`basic`/`full`；
  * 更早的 CMFA 不带该字段，但那时能读到内容就等于拿到了全部字段，所以按 [ClashAccess.Full] 处理。
+ * 带了 `accessTier` 却不是已知层级时按 [ClashAccess.Denied] 处理——未来新增的受限档不能当成完整授权。
  */
-internal fun parseClashAccess(values: Map<String, Any?>): ClashAccess =
-    when (values["accessTier"] as? String) {
-        "denied" -> ClashAccess.Denied
+internal fun parseClashAccess(values: Map<String, Any?>): ClashAccess {
+    val tier = values["accessTier"] as? String
+        ?: return if (values.isEmpty()) ClashAccess.Unavailable else ClashAccess.Full
+    return when (tier) {
         "basic" -> ClashAccess.Basic
         "full" -> ClashAccess.Full
-        else -> if (values.isEmpty()) ClashAccess.Unavailable else ClashAccess.Full
+        else -> ClashAccess.Denied
     }
+}
+
+private val KNOWN_ACCESS_TIERS = setOf("denied", "basic", "full")
 
 /**
  * 把 CMFA 的机器可读 `deniedReason` 翻成用户能照着做的一句中文。
@@ -39,6 +44,7 @@ internal fun describeDeniedReason(reason: String?): String = when (reason) {
     "signer_unverified" -> "Clash 未登记 Project-Lumen 的签名证书，只开放基础状态；在「伙伴应用」里允许即可读取完整状态"
     "not_partner" -> "Clash 没把 Project-Lumen 认成伙伴应用，请更新 Clash 到支持伙伴配对的版本"
     "no_signature" -> "Clash 读不到 Project-Lumen 的签名信息，无法完成配对"
+    "unknown_tier" -> "Clash 回传了本版本不认识的授权层级，已按最小权限处理；升级 Project-Lumen 后即可恢复"
     null -> "Clash 未说明原因"
     else -> "Clash 返回原因：$reason"
 }
@@ -344,29 +350,43 @@ object ClashPartnerCompat {
 
     private fun queryPartnerStatus(context: Context): PartnerRead {
         val resolver = context.contentResolver
+        val packageManager = context.packageManager
         for ((pkg, uri) in partnerStatusUris) {
+            // Authority 是先装者胜的:任何应用都能占住 "<pkg>.status",所以先反查归属包。
+            val authority = uri.authority ?: continue
+            val provider = runCatching {
+                packageManager.resolveContentProvider(authority, 0)
+            }.getOrNull() ?: continue
+            if (provider.packageName != pkg) continue
             val bundle =
                 runCatching {
                     resolver.call(uri, METHOD_PARTNER_STATUS, null, null)
                 }.getOrNull() ?: continue
-            val values = mapOf(
-                "accessTier" to bundle.getString("accessTier"),
-                "deniedReason" to bundle.getString("deniedReason"),
-                "running" to bundle.getBoolean("running", false),
-                "vpnRunning" to bundle.getBoolean("vpnRunning", false),
-                "partnerAppAutoAdapt" to
+            // 只在 provider 真的回传了 accessTier 时放进 map:缺字段(老 CMFA)与
+            // 未知层级必须区分开,否则 fail-open 成 Full。
+            val tier = bundle.getString("accessTier")
+            val values = buildMap<String, Any?> {
+                if (tier != null) put("accessTier", tier)
+                put("deniedReason", bundle.getString("deniedReason"))
+                put("running", bundle.getBoolean("running", false))
+                put("vpnRunning", bundle.getBoolean("vpnRunning", false))
+                put(
+                    "partnerAppAutoAdapt",
                     bundle.getBoolean(
                         "partnerAppAutoAdapt",
                         bundle.getBoolean("piliPlusAutoAdapt", true),
                     ),
-                "piliPlusAutoAdapt" to bundle.getBoolean("piliPlusAutoAdapt", true),
-                "name" to bundle.getString("name"),
-                "package" to (bundle.getString("package") ?: pkg),
-            )
+                )
+                put("piliPlusAutoAdapt", bundle.getBoolean("piliPlusAutoAdapt", true))
+                put("name", bundle.getString("name"))
+                put("package", bundle.getString("package") ?: pkg)
+            }
             val access = parseClashAccess(values)
+            val deniedReason = bundle.getString("deniedReason")
+                ?: "unknown_tier".takeIf { tier != null && tier !in KNOWN_ACCESS_TIERS }
             return PartnerRead(
                 access = access,
-                deniedReason = values["deniedReason"] as? String,
+                deniedReason = deniedReason,
                 values = values.takeIf { access != ClashAccess.Denied },
             )
         }

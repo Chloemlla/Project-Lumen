@@ -71,7 +71,7 @@ internal fun DeviceSecurityScanCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                InlineHeader(Icons.Outlined.Security, "Device Security Scan")
+                InlineHeader(Icons.Outlined.Security, stringResource(R.string.developer_crooot_scan_title))
                 if (scanState is DeviceSecurityScanState.Running) {
                     CircularProgressIndicator(modifier = Modifier.padding(start = 8.dp))
                 }
@@ -80,14 +80,14 @@ internal fun DeviceSecurityScanCard(
             when (scanState) {
                 is DeviceSecurityScanState.Idle -> {
                     Text(
-                        text = "Tap \"Scan Now\" to check device security status including root detection, hardware integrity, and TEE attestation.",
+                        text = stringResource(R.string.developer_crooot_scan_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 is DeviceSecurityScanState.Running -> {
                     Text(
-                        text = "Scanning device security… This may take up to 60 seconds.",
+                        text = stringResource(R.string.developer_crooot_scanning),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -98,7 +98,7 @@ internal fun DeviceSecurityScanCard(
                 is DeviceSecurityScanState.Failed -> {
                     DeviceSecurityNotice(
                         icon = Icons.Outlined.Report,
-                        text = "Scan failed: ${scanState.errorMessage}",
+                        text = stringResource(R.string.developer_crooot_scan_failed, scanState.errorMessage),
                         severity = DeviceSecuritySeverity.Critical,
                     )
                 }
@@ -110,7 +110,13 @@ internal fun DeviceSecurityScanCard(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    if (scanState is DeviceSecurityScanState.Complete) "Scan Again" else "Scan Now",
+                    stringResource(
+                        if (scanState is DeviceSecurityScanState.Complete) {
+                            R.string.developer_crooot_scan_again
+                        } else {
+                            R.string.developer_crooot_scan_now
+                        },
+                    ),
                 )
             }
         }
@@ -121,22 +127,30 @@ internal fun DeviceSecurityScanCard(
 private fun SecurityResultSummary(assessment: DeviceSecurityScanner.SecurityAssessment) {
     SecurityLine(
         label = stringResource(R.string.developer_crooot_root_status),
-        value = if (assessment.rooted) "ROOTED" else "Clean",
+        value = if (assessment.rooted) {
+            stringResource(R.string.developer_crooot_value_rooted)
+        } else {
+            stringResource(R.string.developer_crooot_value_clean)
+        },
         icon = if (assessment.rooted) Icons.Outlined.Report else Icons.Outlined.CheckCircle,
         severity = if (assessment.rooted) DeviceSecuritySeverity.Critical else DeviceSecuritySeverity.Ok,
     )
     SecurityLine(
         label = stringResource(R.string.developer_crooot_suspicious_indicators),
-        value = if (assessment.suspicious) "Found" else "None",
+        value = if (assessment.suspicious) {
+            stringResource(R.string.developer_crooot_value_found)
+        } else {
+            stringResource(R.string.developer_crooot_value_none)
+        },
         icon = if (assessment.suspicious) Icons.Outlined.WarningAmber else Icons.Outlined.CheckCircle,
         severity = if (assessment.suspicious) DeviceSecuritySeverity.Warning else DeviceSecuritySeverity.Ok,
     )
     SecurityLine(
         label = stringResource(R.string.developer_crooot_hardware_integrity),
         value = when (assessment.hardwareIntegrityOk) {
-            true -> "OK"
-            false -> "Compromised"
-            null -> "Not checked"
+            true -> stringResource(R.string.developer_crooot_value_ok)
+            false -> stringResource(R.string.developer_crooot_value_compromised)
+            null -> stringResource(R.string.developer_crooot_value_not_checked)
         },
         icon = when (assessment.hardwareIntegrityOk) {
             true -> Icons.Outlined.CheckCircle
@@ -152,9 +166,9 @@ private fun SecurityResultSummary(assessment: DeviceSecurityScanner.SecurityAsse
     SecurityLine(
         label = stringResource(R.string.developer_crooot_selinux),
         value = when (assessment.selinuxEnforcing) {
-            true -> "Enforcing ✓"
-            false -> "Permissive ⚠"
-            null -> "Unknown"
+            true -> stringResource(R.string.developer_crooot_value_enforcing)
+            false -> stringResource(R.string.developer_crooot_value_permissive)
+            null -> stringResource(R.string.developer_crooot_value_unknown)
         },
         icon = when (assessment.selinuxEnforcing) {
             true -> Icons.Outlined.CheckCircle
@@ -170,9 +184,9 @@ private fun SecurityResultSummary(assessment: DeviceSecurityScanner.SecurityAsse
     SecurityLine(
         label = stringResource(R.string.developer_crooot_tee_attestation),
         value = when (assessment.teeAttestationOk) {
-            true -> "Verified"
-            false -> "Failed"
-            null -> "Not checked"
+            true -> stringResource(R.string.developer_crooot_value_verified)
+            false -> stringResource(R.string.developer_crooot_value_failed)
+            null -> stringResource(R.string.developer_crooot_value_not_checked)
         },
         icon = when (assessment.teeAttestationOk) {
             true -> Icons.Outlined.CheckCircle

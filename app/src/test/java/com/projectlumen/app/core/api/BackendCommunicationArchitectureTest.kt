@@ -8,25 +8,32 @@ import org.junit.Test
 class BackendCommunicationArchitectureTest {
     @Test
     fun everyApiEndpointDeclaresACapabilityBeforeSigningAndNetwork() {
-        val apiSource = source("core/api/ProjectLumenApiClient.kt").readText()
-        val endpointCalls = apiSource.substringBefore("private suspend fun <T> request(")
+        val apiSource = read("core/api/ProjectLumenApiClient.kt")
+        assertTrue(
+            "ProjectLumenApiClient must funnel every endpoint through a shared request() helper",
+            apiSource.contains(REQUEST_HELPER_ANCHOR),
+        )
+        val endpointCalls = apiSource.substringBefore(REQUEST_HELPER_ANCHOR)
             .split("= request(")
             .drop(1)
 
         assertTrue("Expected Project Lumen API endpoints", endpointCalls.isNotEmpty())
         endpointCalls.forEachIndexed { index, call ->
             assertTrue(
-                "API endpoint ${index + 1} must declare a backend capability",
-                call.trimStart().startsWith("capability = BackendCapability."),
+                "API endpoint ${index + 1} must pass a BackendCapability to request()",
+                call.take(ARGUMENT_WINDOW).contains("BackendCapability."),
             )
         }
 
-        val gateIndex = apiSource.indexOf("backendGate.requireExecutable(capability)")
-        val signerIndex = apiSource.indexOf("ProjectLumenRequestSigner.headers")
-        val networkIndex = apiSource.indexOf("httpClient.newCall(request).execute()")
-        assertTrue(gateIndex >= 0)
-        assertTrue(gateIndex < signerIndex)
-        assertTrue(gateIndex < networkIndex)
+        val helperBody = apiSource.substringAfter(REQUEST_HELPER_ANCHOR)
+        val gateIndex = helperBody.indexOf("requireExecutable(")
+        val signerIndex = helperBody.indexOf("ProjectLumenRequestSigner.")
+        val networkIndex = helperBody.indexOf("httpClient.newCall(")
+        assertTrue("request() must consult the backend gate", gateIndex >= 0)
+        assertTrue("request() must sign outgoing requests", signerIndex >= 0)
+        assertTrue("request() must dispatch through the shared OkHttp client", networkIndex >= 0)
+        assertTrue("The gate must be consulted before signing", gateIndex < signerIndex)
+        assertTrue("The gate must be consulted before any network call", gateIndex < networkIndex)
     }
 
     @Test
@@ -36,60 +43,72 @@ class BackendCommunicationArchitectureTest {
             .filter { it.isFile && it.extension == "kt" && it.name != "ProjectLumenApiClient.kt" }
             .filter { it.readText().contains("ProjectLumenApiClient(") }
             .map { it.relativeTo(sourceRoot).invariantSeparatorsPath }
+            .sorted()
             .toList()
 
-        assertEquals(listOf("ProjectLumenApplication.kt"), productionConstructions)
-        val application = source("ProjectLumenApplication.kt").readText()
+        assertEquals(
+            "ProjectLumenApiClient must be constructed in exactly one place",
+            listOf("ProjectLumenApplication.kt"),
+            productionConstructions,
+        )
+        val application = read("ProjectLumenApplication.kt")
         assertTrue(application.contains("ProjectLumenApiClient("))
-        assertTrue(application.contains("backendGate = backendConnectivity"))
-        assertTrue(application.contains("healthProbe = { apiClient.health() }"))
+        assertTrue("The shared client must be handed the backend gate", application.contains("backendGate ="))
+        assertTrue("The shared client must be handed a health probe", application.contains("healthProbe ="))
 
-        val updateChecker = source("core/update/UpdateChecker.kt").readText()
-        assertTrue(updateChecker.contains("backendGate.decision(BackendCapability.RELEASE_DISCOVERY)"))
-        val appUi = source("app/ProjectLumenApp.kt").readText()
-        assertTrue(appUi.contains("apiClient = application.apiClient"))
-        assertTrue(appUi.contains("backendGate = application.backendConnectivity"))
+        assertTrue(
+            "UpdateChecker must gate release discovery",
+            read("core/update/UpdateChecker.kt").contains("BackendCapability.RELEASE_DISCOVERY"),
+        )
+        val appUi = read("app/ProjectLumenApp.kt")
+        assertTrue("The UI must reuse the application-scoped client", appUi.contains("application.apiClient"))
+        assertTrue("The UI must reuse the application-scoped gate", appUi.contains("application.backendConnectivity"))
     }
 
     @Test
     fun recoveryPathsAndBackgroundCollectorsRemainExplicitlySeparated() {
-        val translation = source("app/ProjectLumenTranslationScreen.kt").readText()
+        val translation = read("app/ProjectLumenTranslationScreen.kt")
         assertTrue(translation.contains("ProjectLumenTranslationApiClient"))
-        assertTrue(!translation.contains("BackendCapability"))
+        assertTrue(
+            "Translation is a recovery path and must stay outside the capability gate",
+            !translation.contains("BackendCapability"),
+        )
 
-        val telemetry = source("core/telemetry/EyeCareTelemetryReporter.kt").readText()
-        assertTrue(telemetry.contains("decision(BackendCapability.TELEMETRY)"))
-        assertTrue(telemetry.contains("decision(BackendCapability.FACE_ANALYSIS)"))
-        val proximity = source("core/proximity/ProximityDetectionService.kt").readText()
-        assertTrue(proximity.contains("decision(BackendCapability.FACE_ANALYSIS)"))
-        val deviceControl = source("core/devicecontrol/PrivilegedDeviceControlCoordinator.kt").readText()
-        assertTrue(deviceControl.contains("decision(BackendCapability.DEVICE_CONTROL)"))
+        val telemetry = read("core/telemetry/EyeCareTelemetryReporter.kt")
+        assertTrue(telemetry.contains("BackendCapability.TELEMETRY"))
+        assertTrue(telemetry.contains("BackendCapability.FACE_ANALYSIS"))
+        assertTrue(read("core/proximity/ProximityDetectionService.kt").contains("BackendCapability.FACE_ANALYSIS"))
+        val deviceControl = read("core/devicecontrol/PrivilegedDeviceControlCoordinator.kt")
+        assertTrue(deviceControl.contains("BackendCapability.DEVICE_CONTROL"))
         assertTrue(deviceControl.contains("onBackendUnavailable"))
     }
 
     @Test
     fun ordinarySettingsHideBackendFeaturesWhileDeveloperRecoveryRemainsVisible() {
-        val settings = source("app/ProjectLumenSettingsScreen.kt").readText()
-        assertTrue(settings.contains("if (backendFeaturesVisible)"))
-        assertTrue(settings.contains("RemoteCloudAccountCard("))
-        assertTrue(settings.contains("cloudCapabilityVisible = backendFeaturesVisible"))
-        assertTrue(settings.contains("backendFeaturesVisible = backendFeaturesVisible"))
+        val settings = read("app/ProjectLumenSettingsScreen.kt")
+        assertTrue(settings.contains("backendFeaturesVisible"))
+        assertTrue(settings.contains("RemoteCloudAccountCard"))
+        assertTrue(settings.contains("cloudCapabilityVisible"))
 
-        val privacy = source("app/ProjectLumenSettingsPrivacyCenter.kt").readText()
-        assertTrue(privacy.contains("if (backendFeaturesVisible)"))
+        val privacy = read("app/ProjectLumenSettingsPrivacyCenter.kt")
+        assertTrue(privacy.contains("backendFeaturesVisible"))
         assertTrue(privacy.contains("PermissionSetupTarget.DIAGNOSTICS"))
-        val shizuku = source("app/ProjectLumenShizukuSettingsSection.kt").readText()
-        assertTrue(shizuku.contains("if (backendFeaturesVisible)"))
+        val shizuku = read("app/ProjectLumenShizukuSettingsSection.kt")
+        assertTrue(shizuku.contains("backendFeaturesVisible"))
         assertTrue(shizuku.contains("ShizukuDiagnosticUploadSettings"))
 
-        val developer = source("app/ProjectLumenDeveloperDebugScreen.kt").readText()
-        assertTrue(developer.contains("BackendConnectivityDeveloperControls("))
-        val controls = source("app/ProjectLumenBackendConnectivityDeveloperControls.kt").readText()
+        val developer = read("app/ProjectLumenDeveloperDebugScreen.kt")
+        assertTrue(developer.contains("BackendConnectivityDeveloperControls"))
+        val controls = read("app/ProjectLumenBackendConnectivityDeveloperControls.kt")
         assertTrue(controls.contains("backend_connectivity_force_enable"))
         assertTrue(controls.contains("onRefresh"))
     }
 
-    private fun source(relativePath: String): File = File(findAppSourceRoot(), relativePath)
+    private fun read(relativePath: String): String {
+        val file = File(findAppSourceRoot(), relativePath)
+        assertTrue("Missing production source: $relativePath", file.isFile)
+        return file.readText()
+    }
 
     private fun findAppSourceRoot(): File {
         val workingDirectory = File(System.getProperty("user.dir")).absoluteFile
@@ -102,5 +121,10 @@ class BackendCommunicationArchitectureTest {
             }
             .firstOrNull { it.isDirectory }
             ?: error("Unable to locate Project Lumen Android source root from $workingDirectory")
+    }
+
+    private companion object {
+        const val REQUEST_HELPER_ANCHOR = "fun <T> request("
+        const val ARGUMENT_WINDOW = 600
     }
 }

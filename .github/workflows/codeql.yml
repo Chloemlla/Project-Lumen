@@ -19,7 +19,7 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     permissions:
       actions: read
@@ -36,6 +36,8 @@ jobs:
         include:
           - language: java-kotlin
             build-mode: manual
+          - language: c-cpp
+            build-mode: manual
           - language: actions
             build-mode: default
 
@@ -44,50 +46,47 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up Java 21
-        if: matrix.language == 'java-kotlin'
+        if: matrix.build-mode == 'manual'
         uses: actions/setup-java@v5
         with:
           distribution: zulu
           java-version: "21"
 
       - name: Accept Android SDK licenses
-        if: matrix.language == 'java-kotlin'
+        if: matrix.build-mode == 'manual'
         run: |
+          NDK_VERSION="$(sed -n 's/^projectLumenNdkVersion=//p' gradle.properties | tail -n 1 | tr -d '[:space:]')"
+          CMAKE_VERSION="$(sed -n 's/^projectLumenCmakeVersion=//p' gradle.properties | tail -n 1 | tr -d '[:space:]')"
+          if [ -z "$NDK_VERSION" ] || [ -z "$CMAKE_VERSION" ]; then
+            echo "::error::projectLumenNdkVersion and projectLumenCmakeVersion must be set in gradle.properties."
+            exit 1
+          fi
           SDK_MANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -f "$SDK_MANAGER" ]; then
             SDK_MANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
           fi
-          if [ -f "$SDK_MANAGER" ]; then
-            echo "Accepting Android SDK licenses via $SDK_MANAGER"
-            yes | "$SDK_MANAGER" --licenses 2>&1 || true
-            "$SDK_MANAGER" --install "ndk;30.0.15729638" 2>&1 || true
-          else
-            echo "sdkmanager not found at $ANDROID_HOME; trying PATH"
-            yes | sdkmanager --licenses 2>&1 || true
-            sdkmanager --install "ndk;30.0.15729638" 2>&1 || true
+          if [ ! -f "$SDK_MANAGER" ]; then
+            SDK_MANAGER="$(command -v sdkmanager || true)"
           fi
+          if [ -z "$SDK_MANAGER" ]; then
+            echo "::warning::sdkmanager was not found; the Android Gradle Plugin will download the toolchain itself."
+            exit 0
+          fi
+          echo "Accepting Android SDK licenses via $SDK_MANAGER"
+          yes | "$SDK_MANAGER" --licenses 2>&1 || true
+          # AGP downloads these itself when missing, so a transient install failure must not fail the job.
+          "$SDK_MANAGER" --install "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}" 2>&1 || true
 
       - name: Set up Gradle
-        if: matrix.language == 'java-kotlin'
+        if: matrix.build-mode == 'manual'
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.5.1"
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-cleanup: on-success
 
-      # - name: Set up Android native toolchain
-      #   if: matrix.language == 'java-kotlin'
-      #   uses: ./.github/actions/setup-android-native-toolchain
-
       - name: Initialize CodeQL for compiled code
         if: matrix.build-mode == 'manual'
-        uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
-
-      - name: Initialize CodeQL without build
-        if: matrix.build-mode == 'none'
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
@@ -100,7 +99,7 @@ jobs:
           languages: ${{ matrix.language }}
 
       - name: Build Android app for CodeQL
-        if: matrix.language == 'java-kotlin'
+        if: matrix.build-mode == 'manual'
         run: gradle assembleDebug --no-daemon --warning-mode all
 
       - name: Perform CodeQL analysis

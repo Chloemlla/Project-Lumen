@@ -5,7 +5,6 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -28,6 +27,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.StringRes
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -35,12 +35,30 @@ import androidx.core.graphics.ColorUtils
 import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.services.NotificationChannels
+import com.projectlumen.app.ui.theme.LumenCoral
+import com.projectlumen.app.ui.theme.LumenCoralDark
+import com.projectlumen.app.ui.theme.LumenIndigo
+import com.projectlumen.app.ui.theme.LumenIndigoDark
+import com.projectlumen.app.ui.theme.LumenOutlineVariant
+import com.projectlumen.app.ui.theme.LumenOutlineVariantDark
+import com.projectlumen.app.ui.theme.LumenSurface
+import com.projectlumen.app.ui.theme.LumenSurfaceContainerDark
+import com.projectlumen.app.ui.theme.LumenSurfaceDark
+import com.projectlumen.app.ui.theme.LumenTeal
+import com.projectlumen.app.ui.theme.LumenTealDark
 import java.lang.ref.WeakReference
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 private const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIFICATIONS"
+
+// The toast is a View-layer overlay, so it cannot read MaterialTheme; it mirrors the Compose
+// brand palette instead of keeping a second set of hex literals. The two soft steps below have
+// no counterpart in the Compose ladder and stay local.
+private val TOAST_SURFACE_SOFT_LIGHT = 0xFFF0F4F1.toInt()
+private val TOAST_BODY_LIGHT = 0xFF263331.toInt()
+private val TOAST_BODY_DARK = 0xFFE7EFEC.toInt()
 
 enum class LumenToastKind(
     val glyph: String,
@@ -50,26 +68,26 @@ enum class LumenToastKind(
 ) {
     INFO(
         glyph = "i",
-        accentColorLight = Color.parseColor("#126B66"),
-        accentColorDark = Color.parseColor("#8ED6D1"),
+        accentColorLight = LumenTeal.toArgb(),
+        accentColorDark = LumenTealDark.toArgb(),
         titleRes = R.string.toast_title_info,
     ),
     WARNING(
         glyph = "!",
-        accentColorLight = Color.parseColor("#B85C38"),
-        accentColorDark = Color.parseColor("#FFB59A"),
+        accentColorLight = LumenCoral.toArgb(),
+        accentColorDark = LumenCoralDark.toArgb(),
         titleRes = R.string.toast_title_warning,
     ),
     TIMER(
         glyph = "T",
-        accentColorLight = Color.parseColor("#525DAA"),
-        accentColorDark = Color.parseColor("#C2C6FF"),
+        accentColorLight = LumenIndigo.toArgb(),
+        accentColorDark = LumenIndigoDark.toArgb(),
         titleRes = R.string.toast_title_timer,
     ),
     SUCCESS(
         glyph = "OK",
-        accentColorLight = Color.parseColor("#126B66"),
-        accentColorDark = Color.parseColor("#8ED6D1"),
+        accentColorLight = LumenTeal.toArgb(),
+        accentColorDark = LumenTealDark.toArgb(),
         titleRes = R.string.toast_title_success,
     );
 
@@ -87,7 +105,7 @@ object LumenToast {
     private const val SHORT_DURATION_MILLIS = 2_600L
     private const val LONG_DURATION_MILLIS = 4_200L
 
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private var currentActivity = WeakReference<Activity?>(null)
     @Volatile private var foreground = false
     private var foregroundView: View? = null
@@ -132,7 +150,7 @@ object LumenToast {
         val appContext = context.applicationContext
         val duration = if (long) LONG_DURATION_MILLIS else SHORT_DURATION_MILLIS
         mainHandler.post {
-            dismissRunnable?.let(mainHandler::removeCallbacks)
+            dismissCurrentImmediately()
             val activity = currentActivity.get()
             when {
                 foreground && activity != null && !activity.isFinishing && !activity.isDestroyed -> {
@@ -162,6 +180,23 @@ object LumenToast {
         }
     }
 
+    /**
+     * Only one toast is on screen at a time, so a new one takes the slot down first — including the
+     * view attached to a now-backgrounded Activity, whose scheduled removal was just cancelled.
+     */
+    private fun dismissCurrentImmediately() {
+        dismissRunnable?.let(mainHandler::removeCallbacks)
+        dismissRunnable = null
+        foregroundView?.let { view ->
+            runCatching { (view.parent as? ViewGroup)?.removeView(view) }
+        }
+        foregroundView = null
+        overlayView?.let { view ->
+            runCatching { view.context.getSystemService(WindowManager::class.java)?.removeView(view) }
+        }
+        overlayView = null
+    }
+
     private fun showInActivity(
         activity: Activity,
         message: CharSequence,
@@ -171,13 +206,6 @@ object LumenToast {
     ) {
         val root = activity.window.decorView as? ViewGroup
             ?: return showFallbackNotification(activity, message, kind)
-        foregroundView?.let { runCatching { root.removeView(it) } }
-        overlayView?.let {
-            runCatching {
-                activity.applicationContext.getSystemService(WindowManager::class.java)?.removeView(it)
-            }
-            overlayView = null
-        }
 
         val metrics = ToastLayoutMetrics.from(activity)
         val view = createToastView(activity, message, kind, trailingIcon, metrics)
@@ -207,8 +235,6 @@ object LumenToast {
         trailingIcon: Boolean,
     ) {
         val windowManager = context.getSystemService(WindowManager::class.java) ?: return
-        overlayView?.let { runCatching { windowManager.removeView(it) } }
-        foregroundView = null
 
         val metrics = ToastLayoutMetrics.from(context)
         val view = createToastView(context, message, kind, trailingIcon, metrics)
@@ -275,11 +301,11 @@ object LumenToast {
     ): View {
         val darkTheme = metrics.darkTheme
         val accent = kind.accentColor(darkTheme)
-        val surface = if (darkTheme) Color.parseColor("#1A211E") else Color.parseColor("#FFFCFA")
-        val surfaceSoft = if (darkTheme) Color.parseColor("#111815") else Color.parseColor("#F0F4F1")
-        val outline = if (darkTheme) Color.parseColor("#404B47") else Color.parseColor("#C4CECA")
+        val surface = if (darkTheme) LumenSurfaceContainerDark.toArgb() else LumenSurface.toArgb()
+        val surfaceSoft = if (darkTheme) LumenSurfaceDark.toArgb() else TOAST_SURFACE_SOFT_LIGHT
+        val outline = if (darkTheme) LumenOutlineVariantDark.toArgb() else LumenOutlineVariant.toArgb()
         val titleColor = accent
-        val bodyColor = if (darkTheme) Color.parseColor("#E7EFEC") else Color.parseColor("#263331")
+        val bodyColor = if (darkTheme) TOAST_BODY_DARK else TOAST_BODY_LIGHT
         val chipFill = ColorUtils.setAlphaComponent(accent, if (darkTheme) 48 else 28)
         val chipStroke = ColorUtils.setAlphaComponent(accent, if (darkTheme) 120 else 80)
 

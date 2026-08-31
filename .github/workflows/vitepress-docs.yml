@@ -7,18 +7,20 @@ on:
     paths:
       - ".github/workflows/vitepress-docs.yml"
       - "docs/**"
+      # Audit reports live in the repository but are excluded from the published site,
+      # so they can never change its output.
+      - "!docs/audit/**"
   pull_request:
     branches:
       - "**"
     paths:
       - ".github/workflows/vitepress-docs.yml"
       - "docs/**"
+      - "!docs/audit/**"
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: vitepress-docs-${{ github.ref }}

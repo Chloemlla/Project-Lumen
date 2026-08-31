@@ -42,7 +42,7 @@ class ProximityEventReceiver : BroadcastReceiver() {
                 if (!shouldRunEventSample(app)) return@launch
                 if (app.shizuku.shouldDeferSampling(settings)) return@launch
                 if (!ProximityTriggerGate(app).canRun(settings)) return@launch
-                ProximityDetectionWorker.enqueueNext(app, delaySeconds = 0)
+                ProximityDetectionWorker.enqueueEventSample(app)
             } catch (throwable: Throwable) {
                 app?.recordHandledFailure(throwable)
             } finally {
@@ -54,7 +54,6 @@ class ProximityEventReceiver : BroadcastReceiver() {
     companion object {
         private val triggerActions = setOf(
             Intent.ACTION_USER_PRESENT,
-            Intent.ACTION_CONFIGURATION_CHANGED,
         )
         private const val STORE_ID = "proximity_event_state"
         private const val KEY_LAST_TRIGGER_AT = "last_trigger_at"
@@ -62,15 +61,21 @@ class ProximityEventReceiver : BroadcastReceiver() {
         private const val MIN_EVENT_TRIGGER_INTERVAL_MS = 60_000L
         private val legacyLastTriggerAtKey = longPreferencesKey(KEY_LAST_TRIGGER_AT)
         private val migrationLock = Mutex()
+        private val triggerThrottleLock = Mutex()
 
         private suspend fun shouldRunEventSample(context: Context): Boolean {
-            val now = System.currentTimeMillis()
             val store = ProjectLumenMmkv.mmkvWithId(STORE_ID)
             migrateLegacyEventState(context.applicationContext, store)
-            val lastTriggerAt = store.decodeLong(KEY_LAST_TRIGGER_AT, 0L)
-            if (now - lastTriggerAt < MIN_EVENT_TRIGGER_INTERVAL_MS) return false
-            store.encode(KEY_LAST_TRIGGER_AT, now)
-            return true
+            return triggerThrottleLock.withLock {
+                val now = System.currentTimeMillis()
+                val lastTriggerAt = store.decodeLong(KEY_LAST_TRIGGER_AT, 0L)
+                if (now - lastTriggerAt < MIN_EVENT_TRIGGER_INTERVAL_MS) {
+                    false
+                } else {
+                    store.encode(KEY_LAST_TRIGGER_AT, now)
+                    true
+                }
+            }
         }
 
         private suspend fun migrateLegacyEventState(context: Context, store: MMKV) {

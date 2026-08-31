@@ -41,11 +41,29 @@ internal object CroootReportFormatter {
         if (output.length >= MAX_REPORT_LENGTH) return
         val prefix = indent(depth)
         if (label != null) output.append(prefix).append(label).append(": ")
-
+        if (value == null) {
+            output.appendLine("null")
+            return
+        }
+        if (value is Enum<*>) {
+            output.appendLine(value.name)
+            return
+        }
+        if (value is String || value is Number || value is Boolean || value is Char) {
+            output.appendLine(value.toString())
+            return
+        }
+        // Depth and cycle guards apply to every container type, not just reflected objects:
+        // a self-referential map/list would otherwise recurse without bound.
+        if (depth >= MAX_DEPTH) {
+            output.appendLine("<max depth>")
+            return
+        }
+        if (!visited.add(value)) {
+            output.appendLine("<cycle>")
+            return
+        }
         when (value) {
-            null -> output.appendLine("null")
-            is String, is Number, is Boolean, is Char -> output.appendLine(value.toString())
-            is Enum<*> -> output.appendLine(value.name)
             is Map<*, *> -> appendMap(output, value, depth, visited)
             is Iterable<*> -> appendIterable(output, value, depth, visited)
             else -> {
@@ -64,15 +82,6 @@ internal object CroootReportFormatter {
         depth: Int,
         visited: MutableSet<Any>,
     ) {
-        if (depth >= MAX_DEPTH) {
-            output.appendLine("<max depth>")
-            return
-        }
-        if (!visited.add(value)) {
-            output.appendLine("<cycle>")
-            return
-        }
-
         output.appendLine(value.javaClass.simpleName.ifBlank { value.javaClass.name })
         val fields = allInstanceFields(value.javaClass)
         if (fields.isEmpty()) {

@@ -12,14 +12,22 @@ internal data class LumenUiTokens(
     val page: LumenPageTokens = LumenPageTokens(),
 ) {
     companion object {
+        // The asset ships inside the APK and never changes at runtime, so parse it once per
+        // process instead of once per composition that asks for it.
+        @Volatile
+        private var cached: LumenUiTokens? = null
+
         fun load(context: Context): LumenUiTokens {
-            return runCatching {
+            cached?.let { return it }
+            val tokens = runCatching {
                 context.assets.open("lumen-ui-tokens.json").bufferedReader(Charsets.UTF_8).use { reader ->
                     fromJson(JSONObject(reader.readText()))
                 }
             }.getOrElse {
                 LumenUiTokens()
             }
+            cached = tokens
+            return tokens
         }
 
         private fun fromJson(json: JSONObject): LumenUiTokens {

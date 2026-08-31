@@ -45,13 +45,16 @@ class DeviceSecurityScanner(private val context: Context) {
         val selinuxEnforcing: Boolean?,
         /** `true` when TEE attestation completed without failure. */
         val teeAttestationOk: Boolean?,
-        /** Human-readable summary for diagnostics. */
-        val summary: String,
+        /** Pre-formatted summary for scans that had no raw result (timeout/failure). */
+        private val summaryOverride: String?,
         /** Raw CRooot result, or null if the scan failed or timed out. */
         val rawResult: CRoootScanResult?,
         /** Error message if the scan failed. */
         val errorMessage: String?,
     ) {
+        /** Human-readable summary for diagnostics, formatted on first access only. */
+        val summary: String by lazy { summaryOverride ?: rawResult?.let(CroootReportFormatter::format) ?: "" }
+
         companion object {
             internal fun timeout() = SecurityAssessment(
                 completed = false,
@@ -60,7 +63,7 @@ class DeviceSecurityScanner(private val context: Context) {
                 hardwareIntegrityOk = null,
                 selinuxEnforcing = null,
                 teeAttestationOk = null,
-                summary = "CRooot scan timed out.",
+                summaryOverride = "CRooot scan timed out.",
                 rawResult = null,
                 errorMessage = "Scan timed out.",
             )
@@ -72,7 +75,7 @@ class DeviceSecurityScanner(private val context: Context) {
                 hardwareIntegrityOk = null,
                 selinuxEnforcing = null,
                 teeAttestationOk = null,
-                summary = "CRooot scan failed: ${cause.message ?: cause::class.java.simpleName}",
+                summaryOverride = "CRooot scan failed: ${cause.message ?: cause::class.java.simpleName}",
                 rawResult = null,
                 errorMessage = cause.message ?: cause::class.java.simpleName,
             )
@@ -157,7 +160,7 @@ class DeviceSecurityScanner(private val context: Context) {
                 }
                 else -> false
             },
-            summary = CroootReportFormatter.format(result),
+            summaryOverride = null,
             rawResult = result,
             errorMessage = null,
         )

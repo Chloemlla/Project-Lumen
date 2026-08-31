@@ -5,7 +5,10 @@ object NotificationIds {
     const val PRE_ALERT = 1001
     const val BREAK_DUE = 1002
     const val BREAK_DONE = 1003
+    const val START_BREAK_ACTION = 1012
+    const val SKIP_BREAK_ACTION = 1013
     const val POMODORO = 2001
+    const val UPDATE_AVAILABLE = 3001
     const val STOP_TIMER_ACTION = 9010
     const val PROXIMITY_FOREGROUND = 9101
     const val PROXIMITY_WARNING = 9102

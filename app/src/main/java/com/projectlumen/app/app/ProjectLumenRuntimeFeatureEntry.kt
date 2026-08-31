@@ -13,10 +13,14 @@ import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
 import com.projectlumen.app.core.services.AuraAudioService
 import com.projectlumen.app.core.services.NotificationService
+import com.projectlumen.app.core.services.RuntimeAdvanceGate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal class ProjectLumenRuntimeFeatureEntry(
     private val scope: CoroutineScope,
@@ -28,6 +32,7 @@ internal class ProjectLumenRuntimeFeatureEntry(
     private val startTimerService: () -> Unit,
     private val stopTimerService: () -> Unit,
     private val uploadTelemetrySnapshot: suspend () -> Unit,
+    private val recordHandledFailure: (Throwable) -> Unit,
 ) {
     private val reminderEngine = ReminderEngine()
     private val pomodoroEngine = PomodoroEngine()
@@ -37,8 +42,25 @@ internal class ProjectLumenRuntimeFeatureEntry(
             while (true) {
                 val current = System.currentTimeMillis()
                 now.value = current
-                advanceDuePhases(current)
-                delay(1_000)
+                // One failing tick must not end the loop: every timer in the app is driven from here.
+                val active = runCatching { advanceDuePhases(current) }
+                    .onFailure { throwable ->
+                        if (throwable is CancellationException) throw throwable
+                        recordHandledFailure(throwable)
+                    }
+                    .getOrDefault(true)
+                if (active) {
+                    delay(ACTIVE_TICK_MILLIS)
+                } else {
+                    // Nothing can come due while every engine is idle, so wait for one to start
+                    // instead of re-reading settings and runtime once a second. The timeout is the
+                    // safety net for a runtime write this process did not observe.
+                    withTimeoutOrNull(IDLE_TICK_MILLIS) {
+                        runtimeRepository.observe().first { state ->
+                            state != null && state.activeEngine != ActiveEngine.IDLE.name
+                        }
+                    }
+                }
             }
         }
     }
@@ -48,33 +70,47 @@ internal class ProjectLumenRuntimeFeatureEntry(
             val settings = settingsRepository.getOrDefault()
             if (!settings.reminderEnabled) return@launch
             val nowMillis = System.currentTimeMillis()
-            val state = reminderEngine.newWorkingState(settings, nowMillis)
-            runtimeRepository.upsert(state)
+            val state = runtimeRepository.update { reminderEngine.newWorkingState(settings, nowMillis) }
             refreshActiveNotifications(settings, state)
         }
     }
 
     fun pauseReminder() {
         scope.launch {
-            val state = runtimeRepository.getOrDefault()
-            if (state.activeEngine != ActiveEngine.REMINDER.name || state.reminderPhase == ReminderPhase.IDLE.name) return@launch
+            val nowMillis = System.currentTimeMillis()
+            // Branch check and engine call both run inside the repository lock: a row read outside it
+            // would overwrite the phase the 1 Hz tick advanced in the meantime.
+            var pausedState: RuntimeStateEntity? = null
+            runtimeRepository.update { current ->
+                if (current.activeEngine != ActiveEngine.REMINDER.name ||
+                    current.reminderPhase == ReminderPhase.IDLE.name
+                ) {
+                    return@update current
+                }
+                reminderEngine.pause(current, nowMillis).also { pausedState = it }
+            }
+            val paused = pausedState ?: return@launch
             notifications.cancelAllScheduled()
             stopTimerService()
-            val nextState = reminderEngine.pause(state, System.currentTimeMillis())
-            runtimeRepository.upsert(nextState)
-            refreshActiveNotifications(settingsRepository.getOrDefault(), nextState)
+            refreshActiveNotifications(settingsRepository.getOrDefault(), paused)
         }
     }
 
     fun pauseForOneHour() {
         scope.launch {
-            val state = runtimeRepository.getOrDefault()
-            if (state.activeEngine != ActiveEngine.REMINDER.name || state.reminderPhase == ReminderPhase.IDLE.name) return@launch
             val nowMillis = System.currentTimeMillis()
+            var pausedState: RuntimeStateEntity? = null
+            runtimeRepository.update { current ->
+                if (current.activeEngine != ActiveEngine.REMINDER.name ||
+                    current.reminderPhase == ReminderPhase.IDLE.name
+                ) {
+                    return@update current
+                }
+                reminderEngine.pauseForOneHour(current, nowMillis).also { pausedState = it }
+            }
+            val paused = pausedState ?: return@launch
             notifications.cancelAllScheduled()
-            val nextState = reminderEngine.pauseForOneHour(state, nowMillis)
-            runtimeRepository.upsert(nextState)
-            refreshActiveNotifications(settingsRepository.getOrDefault(), nextState)
+            refreshActiveNotifications(settingsRepository.getOrDefault(), paused)
         }
     }
 
@@ -83,8 +119,7 @@ internal class ProjectLumenRuntimeFeatureEntry(
             val settings = settingsRepository.getOrDefault()
             if (!settings.reminderEnabled) return@launch
             val nowMillis = System.currentTimeMillis()
-            val state = reminderEngine.newWorkingState(settings, nowMillis)
-            runtimeRepository.upsert(state)
+            val state = runtimeRepository.update { reminderEngine.newWorkingState(settings, nowMillis) }
             refreshActiveNotifications(settings, state)
         }
     }
@@ -99,21 +134,22 @@ internal class ProjectLumenRuntimeFeatureEntry(
         scope.launch {
             val settings = settingsRepository.getOrDefault()
             if (!settings.reminderEnabled) return@launch
-            val state = runtimeRepository.getOrDefault()
-            if (state.activeEngine == ActiveEngine.POMODORO.name) {
-                return@launch
-            }
             val nowMillis = System.currentTimeMillis()
-            val breakSourceState = if (
-                state.activeEngine == ActiveEngine.REMINDER.name &&
-                state.reminderPhase in reminderBreakStartPhases
-            ) {
-                state
-            } else {
-                reminderEngine.newWorkingState(settings, nowMillis)
+            applyTransition(settings, nowMillis) { current ->
+                if (current.activeEngine == ActiveEngine.POMODORO.name) {
+                    null
+                } else {
+                    val breakSourceState = if (
+                        current.activeEngine == ActiveEngine.REMINDER.name &&
+                        current.reminderPhase in reminderBreakStartPhases
+                    ) {
+                        current
+                    } else {
+                        reminderEngine.newWorkingState(settings, nowMillis)
+                    }
+                    reminderEngine.startBreak(settings, breakSourceState, nowMillis)
+                }
             }
-            val transition = reminderEngine.startBreak(settings, breakSourceState, nowMillis)
-            applyTransition(settings, nowMillis, transition)
         }
     }
 
@@ -121,10 +157,10 @@ internal class ProjectLumenRuntimeFeatureEntry(
         scope.launch {
             val settings = settingsRepository.getOrDefault()
             if (!settings.reminderEnabled) return@launch
-            val state = runtimeRepository.getOrDefault()
             val nowMillis = System.currentTimeMillis()
-            val transition = reminderEngine.skipBreak(settings, state, nowMillis)
-            applyTransition(settings, nowMillis, transition)
+            applyTransition(settings, nowMillis) { current ->
+                reminderEngine.skipBreak(settings, current, nowMillis)
+            }
         }
     }
 
@@ -133,19 +169,28 @@ internal class ProjectLumenRuntimeFeatureEntry(
             val settings = settingsRepository.getOrDefault()
             if (!settings.pomodoroEnabled) return@launch
             val nowMillis = System.currentTimeMillis()
-            val transition = pomodoroEngine.start(settings, nowMillis)
-            applyTransition(settings, nowMillis, transition)
+            applyTransition(settings, nowMillis) { pomodoroEngine.start(settings, nowMillis) }
         }
     }
 
     fun stopPomodoro() {
         scope.launch {
             val settings = settingsRepository.getOrDefault()
-            val state = runtimeRepository.getOrDefault()
             val nowMillis = System.currentTimeMillis()
-            val transition = pomodoroEngine.stop(state, nowMillis)
-            statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, transition.pomodoroStatsDelta)
-            runtimeRepository.upsert(transition.nextRuntime)
+            // stop() derives its restart counter from the stored row, so it has to read it under the lock.
+            RuntimeAdvanceGate.withAdvanceLock {
+                var transition: RuntimeTransition? = null
+                runtimeRepository.update { current ->
+                    pomodoroEngine.stop(current, nowMillis).also { transition = it }.nextRuntime
+                }
+                transition?.let { applied ->
+                    statisticsRepository.applyPomodoroDelta(
+                        settings.statsEnabled,
+                        nowMillis,
+                        applied.pomodoroStatsDelta,
+                    )
+                }
+            }
             notifications.cancelAllScheduled()
             notifications.cancelOngoingStatus()
             stopTimerService()
@@ -171,10 +216,10 @@ internal class ProjectLumenRuntimeFeatureEntry(
     }
 
     suspend fun applySettingsToActiveRuntime(settings: AppSettingsEntity, nowMillis: Long) {
-        val state = runtimeRepository.get() ?: return
-        val adjustedState = adjustRuntimeForSettings(state, settings, nowMillis)
-        if (adjustedState != state) {
-            runtimeRepository.upsert(adjustedState)
+        // No stored row means no active runtime to adjust; update() would materialise a default one.
+        if (runtimeRepository.get() == null) return
+        val adjustedState = runtimeRepository.update { current ->
+            adjustRuntimeForSettings(current, settings, nowMillis)
         }
         advanceDuePhases(nowMillis)
         refreshActiveNotifications(settings, runtimeRepository.get() ?: adjustedState)
@@ -198,27 +243,56 @@ internal class ProjectLumenRuntimeFeatureEntry(
         }
     }
 
-    private suspend fun advanceDuePhases(nowMillis: Long) {
-        val settings = settingsRepository.get() ?: return
-        val state = runtimeRepository.get() ?: return
-        val transition = when (state.activeEngine) {
+    private suspend fun advanceDuePhases(nowMillis: Long): Boolean {
+        // Runtime state comes from MMKV, settings from Room plus DataStore: reading the cheap one
+        // first keeps the idle tick off the database entirely.
+        val state = runtimeRepository.get() ?: return false
+        if (state.activeEngine != ActiveEngine.REMINDER.name && state.activeEngine != ActiveEngine.POMODORO.name) {
+            return false
+        }
+        val settings = settingsRepository.get() ?: return false
+        // Unlocked probe: taking the write lock every second just to store the same row back would
+        // turn the tick into a 1 Hz MMKV write. The authoritative recompute happens under the lock.
+        if (dueTransition(settings, state, nowMillis) == null) return true
+        applyTransition(settings, nowMillis) { current -> dueTransition(settings, current, nowMillis) }
+        return true
+    }
+
+    private fun dueTransition(
+        settings: AppSettingsEntity,
+        state: RuntimeStateEntity,
+        nowMillis: Long,
+    ): RuntimeTransition? {
+        return when (state.activeEngine) {
             ActiveEngine.REMINDER.name -> reminderEngine.advance(settings, state, nowMillis)
             ActiveEngine.POMODORO.name -> pomodoroEngine.advance(settings, state, nowMillis)
             else -> null
-        } ?: return
-        applyTransition(settings, nowMillis, transition)
+        }
     }
 
+    // computeTransition runs inside the repository lock so the engine sees the row that is actually
+    // stored; returning null leaves it untouched.
     private suspend fun applyTransition(
         settings: AppSettingsEntity,
         nowMillis: Long,
-        transition: RuntimeTransition,
+        computeTransition: (RuntimeStateEntity) -> RuntimeTransition?,
     ) {
-        statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, transition.eyeStatsDelta)
-        statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, transition.pomodoroStatsDelta)
-        runtimeRepository.upsert(transition.nextRuntime)
-        playAudioEvent(transition.audioEvent)
-        refreshActiveNotifications(settings, transition.nextRuntime)
+        // Same gate the timer service and the alarm receiver hold, so two peers cannot advance and
+        // count the same due phase.
+        val applied = RuntimeAdvanceGate.withAdvanceLock {
+            var transition: RuntimeTransition? = null
+            runtimeRepository.update { current ->
+                val next = computeTransition(current)
+                transition = next
+                next?.nextRuntime ?: current
+            }
+            transition?.also { next ->
+                statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, next.eyeStatsDelta)
+                statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, next.pomodoroStatsDelta)
+            }
+        } ?: return
+        playAudioEvent(applied.audioEvent)
+        refreshActiveNotifications(settings, applied.nextRuntime)
         uploadTelemetrySnapshot()
     }
 
@@ -242,6 +316,9 @@ internal class ProjectLumenRuntimeFeatureEntry(
     }
 
     private companion object {
+        private const val ACTIVE_TICK_MILLIS = 1_000L
+        private const val IDLE_TICK_MILLIS = 30_000L
+
         private val reminderBreakStartPhases = setOf(
             ReminderPhase.WORKING.name,
             ReminderPhase.PRE_ALERT.name,

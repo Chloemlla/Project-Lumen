@@ -10,6 +10,7 @@ import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.proximity.ProximityCameraForegroundEligibility
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 
 class ShizukuResilienceWorker(
     appContext: Context,
@@ -17,6 +18,18 @@ class ShizukuResilienceWorker(
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
         val app = applicationContext as ProjectLumenApplication
+        return try {
+            resilience(app)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            app.recordHandledFailure(throwable)
+            // Retry instead of failing: a failed run would end the self-renewing watchdog chain.
+            Result.retry()
+        }
+    }
+
+    private suspend fun resilience(app: ProjectLumenApplication): Result {
         val settings = app.settingsRepository().get()
             ?: return Result.success()
         val shouldRun = settings.shizukuAdvancedModeEnabled &&
@@ -38,10 +51,15 @@ class ShizukuResilienceWorker(
         }
 
         if (settings.shizukuServiceRecoveryEnabled) {
-            val runtime = app.runtimeRepository().get()
-            if (settings.keepAliveEnabled && runtime != null && runtime.activeEngine != ActiveEngine.IDLE.name) {
+            val runtime = AlarmReceiver.reconcileNow(
+                app = app,
+                notifications = app.notifications,
+                settings = settings,
+                nowMillis = System.currentTimeMillis(),
+                capStatsDelta = true,
+            )
+            if (settings.keepAliveEnabled && runtime.activeEngine != ActiveEngine.IDLE.name) {
                 app.startTimerService()
-                app.notifications.syncRuntimeAlarms(settings, runtime)
                 if (settings.notificationEnabled) {
                     app.notifications.showOngoingStatus(runtime)
                 }

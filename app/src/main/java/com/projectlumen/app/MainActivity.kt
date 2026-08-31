@@ -21,6 +21,7 @@ import com.chloemlla.lumen.crash.CrashBreadcrumbs
 import com.chloemlla.lumen.crash.LumenCrash
 import com.chloemlla.lumen.crash.ui.LumenCrashGate
 import com.projectlumen.app.core.enums.AppThemeMode
+import com.projectlumen.app.core.security.DeviceSecurityScanner
 import com.projectlumen.app.core.update.BuildUpdateNotesLoader
 import com.projectlumen.app.openapi.LumenOpenIntents
 import com.projectlumen.app.openapi.LumenOpenLaunchRequest
@@ -42,9 +43,14 @@ open class MainActivity : ComponentActivity() {
             enableEdgeToEdge()
             handleOpenIntent(intent)
             val app = application as ProjectLumenApplication
+            // Loaded once here: the getter can reinstall the SDK and touches disk, neither of
+            // which belongs in a composition that re-runs on every Open API intent.
+            val storedCrashReport = runCatching {
+                if (LumenCrash.isInstalled()) app.crashReports.load() else null
+            }.getOrNull()
             val initialStartupReport = app.startupCrashReport
                 ?: LumenCrash.loadPendingReportSafely()
-                    ?: runCatching { if (LumenCrash.isInstalled()) app.crashReports.load() else null }.getOrNull()
+                ?: storedCrashReport
             val initialViewModel = if (initialStartupReport == null) {
                 createProjectLumenViewModel(app)
             } else {
@@ -74,9 +80,7 @@ open class MainActivity : ComponentActivity() {
                         } else {
                             ProjectLumenApp(
                                 viewModel = viewModel,
-                                crashReport = runCatching {
-                                    if (LumenCrash.isInstalled()) app.crashReports.load() else null
-                                }.getOrNull(),
+                                crashReport = storedCrashReport,
                                 openLaunchRequest = openLaunchRequest.value,
                             )
                         }
@@ -131,7 +135,9 @@ open class MainActivity : ComponentActivity() {
                             simulateDeveloperLowMemory = app::simulateDeveloperLowMemory,
                             nativeProtectionSummary = app::nativeProtectionSummary,
                             uploadTelemetrySnapshot = { app.telemetry.uploadCurrentSnapshot(force = true) },
-                            recordCrashReport = app::recordCrash,
+                            recordHandledFailure = { throwable -> app.recordHandledFailure(throwable) },
+                            securityEvidence = { app.deviceSecurityGate.backendEvidence() },
+                            runDeviceSecurityScan = { DeviceSecurityScanner(app).fullScan() },
                         ) as T
                     }
                 },
@@ -150,7 +156,7 @@ open class MainActivity : ComponentActivity() {
     }
 
     private fun handleOpenIntent(intent: Intent?) {
-        val request = LumenOpenIntents.parseLaunchRequest(intent, callingPackage) ?: return
+        val request = LumenOpenIntents.parseLaunchRequest(intent, callingPackage ?: referrer?.host) ?: return
         runCatching { CrashBreadcrumbs.record("Open API launch target=${request.target}") }
         openLaunchRequest.value = request
         val app = application as ProjectLumenApplication

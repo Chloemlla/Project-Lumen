@@ -6,7 +6,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Handler
-import android.os.Looper
+import android.os.HandlerThread
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -52,8 +52,12 @@ internal class ProximityTriggerGate(private val context: Context) {
 
                 override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
             }
+            // Sensor callbacks arrive at high rate; keep them off the main looper.
+            val thread = HandlerThread("ProjectLumenProximityTriggerGate").apply { start() }
+            val handler = Handler(thread.looper)
             fun finish() {
                 manager.unregisterListener(listener)
+                thread.quitSafely()
                 if (continuation.isActive) {
                     continuation.resume(
                         MotionSample(
@@ -63,15 +67,19 @@ internal class ProximityTriggerGate(private val context: Context) {
                     )
                 }
             }
-            val handler = Handler(Looper.getMainLooper())
+            val finishRunnable = Runnable { finish() }
             if (accelerometer != null) {
                 manager.registerListener(listener, accelerometer, SensorManager.SENSOR_DELAY_GAME, handler)
             }
             if (gyroscope != null) {
                 manager.registerListener(listener, gyroscope, SensorManager.SENSOR_DELAY_GAME, handler)
             }
-            handler.postDelayed(::finish, 650L)
-            continuation.invokeOnCancellation { manager.unregisterListener(listener) }
+            handler.postDelayed(finishRunnable, 650L)
+            continuation.invokeOnCancellation {
+                handler.removeCallbacks(finishRunnable)
+                manager.unregisterListener(listener)
+                thread.quitSafely()
+            }
         }
     }
 

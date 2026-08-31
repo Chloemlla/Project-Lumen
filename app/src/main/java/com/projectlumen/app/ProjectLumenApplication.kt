@@ -111,11 +111,28 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     val deviceInsights: DeviceInsightsRepository by lazy {
         DeviceInsightsRepository(AndroidDeviceInsightDataSource(this))
     }
+    // Every caller reads and writes the same process-wide stores, so handing out a fresh repository
+    // per call only hid that fact.
+    private val settingsRepositoryInstance: SettingsRepository by lazy {
+        SettingsRepository(
+            database.appSettingsDao(),
+            eyeCarePreferences,
+            { secureCredentials.deviceInstallationId() },
+        )
+    }
+    private val runtimeRepositoryInstance: RuntimeRepository by lazy {
+        RuntimeRepository(database.runtimeStateDao())
+    }
     private val lifecycleCoordinator: AppLifecycleCoordinator by lazy { AppLifecycleCoordinator(this) }
     val deviceControl: PrivilegedDeviceControlCoordinator by lazy { PrivilegedDeviceControlCoordinator(this) }
     private val crashReportUploadInFlight = AtomicBoolean(false)
     @Volatile
     private var crashReportUploadsReady = false
+
+    /** False once MMKV initialization failed: local runtime state cannot be persisted at all. */
+    @Volatile
+    var localStorageAvailable: Boolean = true
+        private set
     val startupCrashReport: CrashReport?
         get() = runCatching { LumenCrash.startupCrashReport }.getOrNull()
 
@@ -130,9 +147,10 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     override fun onCreate() {
         super.onCreate()
         appContext = this
-        ClashPartnerCompat.start(this)
-        // Keep paste-upload HttpURLConnection off stacked system proxies while
-        // Clash VPN process binding is active (module-safe hook, no hard dep).
+        // ClashPartnerCompat.start does cross-process ContentProvider queries + process VPN
+        // binding — moved to the IO startup work below, never on the cold-start main thread.
+        // Keep paste-upload HttpURLConnection off stacked system proxies while Clash VPN
+        // process binding is active (module-safe hook, no hard dep).
         runCatching {
             CrashReportPasteUploader.shouldSkipManualProxy = {
                 ClashPartnerCompat.shouldSkipManualProxy()
@@ -144,17 +162,8 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
                 installLumenCrashSdk()
                 CrashBreadcrumbs.record("Application.onCreate")
             }.onFailure { Log.e(TAG, "LumenCrash install failed in onCreate", it) }
-            runCatching { recordRecentProcessExitReason() }
             initializeMmkvOrRecordCrash()
-            runCatching { MemoryHealthMonitor.sample(this) }
-            // Integrity remains enforced for real release builds that configure the cert fingerprint,
-            // but must not process-kill managed-emulator boots when the native bridge fails.
-            runCatching { AppIntegrityGuard.enforce(this) }
-                .onFailure { throwable ->
-                    Log.e(TAG, "App integrity enforcement failed", throwable)
-                    recordHandledFailure(throwable)
-                }
-            deviceSecurityGate.startStartupScan(applicationScope)
+            startBackgroundStartupWork()
             runCatching { notifications.ensureChannels() }
             runCatching { LumenToast.install(this) }
             runCatching { backendConnectivity.start() }
@@ -172,8 +181,40 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     override fun onTrimMemory(level: Int) {
-        MemoryHealthMonitor.recordTrim(this, level)
         super.onTrimMemory(level)
+        // Debug.getMemoryInfo walks /proc/self/smaps; the main thread must not pay for it while
+        // the system is already under memory pressure.
+        applicationScope.launch {
+            runCatching { MemoryHealthMonitor.recordTrim(this@ProjectLumenApplication, level) }
+        }
+    }
+
+    /**
+     * Cold-start work that does not gate the first frame: binder queries, /proc sampling, the
+     * Keystore-backed credential stores and the native integrity/CRooot scans.
+     */
+    private fun startBackgroundStartupWork() {
+        applicationScope.launch {
+            // Clash VPN binding must run before OkHttp clients are built so the first client
+            // picks up the matching skip-proxy decision; here it also runs off the main thread
+            // (cross-process ContentProvider query + process network binding).
+            runCatching { ClashPartnerCompat.start(this@ProjectLumenApplication) }
+            // Warm the Keystore/EncryptedSharedPreferences lazies before the ViewModel reads them
+            // on the main thread, so that read finds an initialized store instead of building one.
+            runCatching { secureCredentials.installProfile() }
+            runCatching { secureCredentials.deviceInstallationId() }
+            runCatching { recordRecentProcessExitReason() }
+            runCatching { MemoryHealthMonitor.sample(this@ProjectLumenApplication) }
+            // Integrity remains enforced for real release builds that configure the cert fingerprint,
+            // but must not process-kill managed-emulator boots when the native bridge fails.
+            runCatching { AppIntegrityGuard.enforce(this@ProjectLumenApplication) }
+                .onFailure { throwable ->
+                    Log.e(TAG, "App integrity enforcement failed", throwable)
+                    recordHandledFailure(throwable)
+                }
+            runCatching { deviceSecurityGate.startStartupScan(applicationScope) }
+                .onFailure { Log.e(TAG, "Device security startup scan failed to start", it) }
+        }
     }
 
     private fun installLumenCrashSdk() {
@@ -207,7 +248,12 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     private fun initializeMmkvOrRecordCrash() {
         runCatching { ProjectLumenMmkv.initialize(this) }
             .onSuccess { CrashBreadcrumbs.record("MMKV initialized") }
-            .onFailure(::recordHandledFailure)
+            .onFailure { throwable ->
+                // Every later MMKV access throws, so services that persist runtime state would only
+                // produce an exception storm; remember the outcome instead of retrying blindly.
+                localStorageAvailable = false
+                recordHandledFailure(throwable)
+            }
     }
 
     /**
@@ -339,34 +385,33 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     fun startTimerService() {
+        // The reconciliation net is plain WorkManager bookkeeping, not a foreground service, so it
+        // must be enqueued even when the security gate refuses the service start below.
+        TimerReconciliationWorker.enqueue(this)
+        if (refuseWithoutLocalStorage("timer service")) return
         if (!deviceSecurityGate.isServiceAllowed()) {
             Log.w(TAG, "Timer service refused by device security gate")
             return
         }
-        // Enqueue the reconciliation safety net first so it survives even when the
-        // foreground-service start below is refused (background start on Android 12+).
-        TimerReconciliationWorker.enqueue(this)
         ForegroundServiceController.start(
             context = this,
             intent = Intent(this, TimerForegroundService::class.java),
         )
     }
 
-    fun settingsRepository(): SettingsRepository {
-        return SettingsRepository(
-            database.appSettingsDao(),
-            eyeCarePreferences,
-            { secureCredentials.deviceInstallationId() },
-        )
+    private fun refuseWithoutLocalStorage(what: String): Boolean {
+        if (localStorageAvailable) return false
+        Log.w(TAG, "Local storage unavailable; skipping $what")
+        return true
     }
+
+    fun settingsRepository(): SettingsRepository = settingsRepositoryInstance
 
     fun nativeProtectionSummary(): String {
         return AppIntegrityGuard.nativeProtectionSummary(this)
     }
 
-    fun runtimeRepository(): RuntimeRepository {
-        return RuntimeRepository(database.runtimeStateDao())
-    }
+    fun runtimeRepository(): RuntimeRepository = runtimeRepositoryInstance
 
     fun stopTimerService() {
         stopService(Intent(this, TimerForegroundService::class.java))
@@ -374,6 +419,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     fun scheduleProximityMonitoring() {
+        if (refuseWithoutLocalStorage("proximity monitoring")) return
         if (!deviceSecurityGate.isServiceAllowed()) return
         ProximityDetectionWorker.enqueueNext(this)
     }
@@ -387,6 +433,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     fun startLightMonitoring() {
+        if (refuseWithoutLocalStorage("light monitoring")) return
         if (!deviceSecurityGate.isServiceAllowed()) return
         LightMonitorService.start(this)
     }
@@ -396,6 +443,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     fun startDeveloperDebugService() {
+        if (refuseWithoutLocalStorage("developer debug overlay")) return
         if (!deviceSecurityGate.isServiceAllowed()) return
         DeveloperDebugOverlayService.start(this)
     }
@@ -409,6 +457,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     fun startShizukuResilience() {
+        if (refuseWithoutLocalStorage("Shizuku resilience worker")) return
         if (!deviceSecurityGate.isServiceAllowed()) return
         ShizukuResilienceWorker.enqueue(this)
     }

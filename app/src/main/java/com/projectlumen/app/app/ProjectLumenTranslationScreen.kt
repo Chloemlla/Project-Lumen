@@ -41,7 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -73,10 +72,9 @@ private val targetLanguageOptions = listOf(
 
 @Composable
 internal fun TranslationScreen() {
-    val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
-    val api = remember(context) { ProjectLumenTranslationApiClient(context.applicationContext) }
+    val api = remember { ProjectLumenTranslationApiClient() }
     var sourceText by rememberSaveable { mutableStateOf("") }
     var sourceLang by rememberSaveable { mutableStateOf("auto") }
     var targetLang by rememberSaveable { mutableStateOf("ZH") }
@@ -86,7 +84,6 @@ internal fun TranslationScreen() {
     var loadingConfig by remember { mutableStateOf(false) }
     var translating by remember { mutableStateOf(false) }
     val blankTextMessage = stringResource(R.string.translation_error_blank_text)
-    val textTooLongMessage = stringResource(R.string.translation_error_text_too_long)
     val unavailableMessage = stringResource(R.string.translation_service_unavailable)
     val genericError = stringResource(R.string.translation_failed)
     val trimmedText = sourceText.trim()
@@ -107,10 +104,6 @@ internal fun TranslationScreen() {
         when {
             trimmedText.isBlank() -> {
                 errorMessage = blankTextMessage
-                return
-            }
-            trimmedText.length > 5000 -> {
-                errorMessage = textTooLongMessage
                 return
             }
             !serviceEnabled -> {
@@ -157,13 +150,21 @@ internal fun TranslationScreen() {
                 modifier = Modifier.fillMaxWidth(),
                 value = sourceText,
                 onValueChange = {
-                    sourceText = it.take(5000)
-                    if (errorMessage == blankTextMessage || errorMessage == textTooLongMessage) {
+                    sourceText = it.take(TRANSLATION_MAX_INPUT_CHARS)
+                    if (errorMessage == blankTextMessage) {
                         errorMessage = null
                     }
                 },
                 label = { Text(stringResource(R.string.translation_text_label)) },
-                supportingText = { Text(stringResource(R.string.translation_character_count, sourceText.length, 5000)) },
+                supportingText = {
+                    Text(
+                        stringResource(
+                            R.string.translation_character_count,
+                            sourceText.length,
+                            TRANSLATION_MAX_INPUT_CHARS,
+                        ),
+                    )
+                },
                 minLines = 5,
                 maxLines = 9,
             )

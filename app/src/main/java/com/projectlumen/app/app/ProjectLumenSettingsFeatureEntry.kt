@@ -8,7 +8,6 @@ import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.repositories.DailyGoalsRepository
 import com.projectlumen.app.core.repositories.RuntimeRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
-import com.projectlumen.app.core.services.NotificationService
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -19,7 +18,6 @@ internal class ProjectLumenSettingsFeatureEntry(
     private val runtimeRepository: RuntimeRepository,
     private val dailyGoalsRepository: DailyGoalsRepository,
     private val runtimeEntry: ProjectLumenRuntimeFeatureEntry,
-    private val notifications: NotificationService,
     private val stopTimerService: () -> Unit,
     private val scheduleProximityMonitoring: () -> Unit,
     private val cancelProximityMonitoring: () -> Unit,
@@ -45,8 +43,14 @@ internal class ProjectLumenSettingsFeatureEntry(
         nowMillis: Long = System.currentTimeMillis(),
     ) {
         scope.launch {
-            val current = settingsRepository.getOrDefault()
-            val updated = settingsRepository.update(nowMillis, transform)
+            // The diff baseline must be the very snapshot the write is built from; reading it
+            // separately lets a concurrent update slip in and hide a real change.
+            var previous: AppSettingsEntity? = null
+            val updated = settingsRepository.update(nowMillis) { current ->
+                previous = current
+                transform(current)
+            }
+            val current = previous ?: updated
             val shouldRescheduleProximity = (updated.proximityMonitoringEnabled || updated.blinkMonitoringEnabled) && (
                 current.proximityCheckIntervalMinutes != updated.proximityCheckIntervalMinutes ||
                     current.proximityCaptureSeconds != updated.proximityCaptureSeconds ||
@@ -119,14 +123,13 @@ internal class ProjectLumenSettingsFeatureEntry(
                 } else {
                     cancelProximityMonitoring()
                 }
-                val state = runtimeRepository.getOrDefault()
-                runtimeRepository.upsert(
+                runtimeRepository.update { state ->
                     state.copy(
                         proximityMonitoringActive = false,
                         proximityTooClose = false,
-                        updatedAt = System.currentTimeMillis(),
-                    ),
-                )
+                        updatedAt = nowMillis,
+                    )
+                }
             }
         }
     }

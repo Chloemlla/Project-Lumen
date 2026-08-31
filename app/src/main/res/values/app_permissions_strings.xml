@@ -6,6 +6,8 @@
     <string name="legal_permission_camera_desc">Used on-device for distance-to-screen and blink/dry-eye detection. Frames are processed locally and are never saved or uploaded.</string>
     <string name="legal_permission_notifications_name">android.permission.POST_NOTIFICATIONS</string>
     <string name="legal_permission_notifications_desc">Remind you to rest, show Pomodoro status, and surface alerts.</string>
+    <string name="legal_permission_promoted_notifications_name">android.permission.POST_PROMOTED_NOTIFICATIONS</string>
+    <string name="legal_permission_promoted_notifications_desc">Keep the rest countdown visible as a live notification on newer Android versions.</string>
     <string name="legal_permission_exact_alarm_name">android.permission.SCHEDULE_EXACT_ALARM</string>
     <string name="legal_permission_exact_alarm_desc">Fire rest and Pomodoro reminders at the exact scheduled time.</string>
     <string name="legal_permission_full_screen_intent_name">android.permission.USE_FULL_SCREEN_INTENT</string>
@@ -20,6 +22,10 @@
     <string name="legal_permission_boot_desc">Restore your scheduled reminders after the device restarts.</string>
     <string name="legal_permission_foreground_service_name">android.permission.FOREGROUND_SERVICE</string>
     <string name="legal_permission_foreground_service_desc">Keep timers, camera, and light monitoring running reliably in the background while in use.</string>
+    <string name="legal_permission_foreground_service_special_use_name">android.permission.FOREGROUND_SERVICE_SPECIAL_USE</string>
+    <string name="legal_permission_foreground_service_special_use_desc">Declares the timer service type required so rest scheduling keeps running while the app is in the background.</string>
+    <string name="legal_permission_foreground_service_camera_name">android.permission.FOREGROUND_SERVICE_CAMERA</string>
+    <string name="legal_permission_foreground_service_camera_desc">Declares the camera service type used by on-device distance and blink detection.</string>
     <string name="legal_permission_internet_name">android.permission.INTERNET</string>
     <string name="legal_permission_internet_desc">Check for updates and, only if you enable them, upload optional diagnostics or sync your cloud account.</string>
     <string name="legal_permission_network_state_name">android.permission.ACCESS_NETWORK_STATE</string>
@@ -30,8 +36,6 @@
     <string name="legal_permission_biometric_desc">Optional; protect sensitive settings with the device lock or biometric.</string>
     <string name="legal_permission_install_packages_name">android.permission.REQUEST_INSTALL_PACKAGES</string>
     <string name="legal_permission_install_packages_desc">Install the update APK you download from the official release page.</string>
-    <string name="legal_permission_vibrate_name">android.permission.VIBRATE</string>
-    <string name="legal_permission_vibrate_desc">Vibrate when a rest reminder fires.</string>
     <string name="legal_permission_query_all_packages_name">android.permission.QUERY_ALL_PACKAGES</string>
     <string name="legal_permission_query_all_packages_desc">Optional; list installed apps so per-app network control via Shizuku can work.</string>
     <string name="legal_permission_open_api_access_name">com.project.lumen.permission.ACCESS_LUMEN_CORE</string>

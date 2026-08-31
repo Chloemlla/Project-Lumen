@@ -26,6 +26,9 @@ export default defineConfig({
   description: "Project Lumen 护眼、专注、统计和远端能力文档中心",
   lang: "zh-CN",
   base: basePath,
+  // Audit reports name exact vulnerability locations; they stay in the repository but must
+  // never become pages of the published site.
+  srcExclude: ["audit/**"],
   cleanUrls: true,
   lastUpdated: true,
   markdown: {

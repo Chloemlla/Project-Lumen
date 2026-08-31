@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +20,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
@@ -46,16 +51,22 @@ internal fun ShizukuNetworkControlsSection(
     val normalizedQuery = query.trim()
     val recordsByPackage = records.associateBy { it.packageName }
     val activeRecords = records.filter { it.hasActiveNetworkRestriction }
+    val matchesQuery = { packageName: String, uid: Int ->
+        normalizedQuery.isBlank() ||
+            packageName.contains(normalizedQuery, ignoreCase = true) ||
+            uid.toString().contains(normalizedQuery)
+    }
+    val filteredRecords = records.filter { matchesQuery(it.packageName, it.uid) }
+    // Restore is only reachable from a rendered card, so a live restriction must never be
+    // truncated away; only already-restored history is capped.
+    val visibleRecords = filteredRecords.filter { it.hasActiveNetworkRestriction } +
+        filteredRecords.filterNot { it.hasActiveNetworkRestriction }.take(MAX_NETWORK_RECORD_CARDS)
     val filteredApps = networkApps
-        .filter { app ->
-            normalizedQuery.isBlank() ||
-                app.packageName.contains(normalizedQuery, ignoreCase = true) ||
-                app.uid.toString().contains(normalizedQuery)
-        }
+        .filter { app -> matchesQuery(app.packageName, app.uid) }
         .take(MAX_NETWORK_APP_CARDS)
     SettingsSection(R.string.developer_section_shizuku_network_controls, Icons.Outlined.Lock) {
         DeveloperNote(stringResource(R.string.developer_shizuku_network_boundary))
-        DeveloperMetricRow(R.string.shizuku_status, developerShizukuStatusLabel(shizukuState))
+        DeveloperMetricRow(R.string.shizuku_status, shizukuStatusLabel(shizukuState))
         DeveloperMetricRow(
             R.string.developer_shizuku_network_apps_count,
             stringResource(
@@ -82,10 +93,10 @@ internal fun ShizukuNetworkControlsSection(
             label = { Text(stringResource(R.string.developer_shizuku_network_search_label)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
         )
-        if (records.isEmpty()) {
+        if (filteredRecords.isEmpty()) {
             DeveloperNote(stringResource(R.string.developer_shizuku_network_no_records))
         } else {
-            records.take(MAX_NETWORK_RECORD_CARDS).forEach { record ->
+            visibleRecords.forEach { record ->
                 DeveloperNetworkControlRecordCard(record = record, onRestore = { onRestore(record) })
             }
         }
@@ -109,6 +120,42 @@ private fun DeveloperNetworkAppCard(
     record: AppNetworkControlEntity?,
     onRestrict: () -> Unit,
 ) {
+    var showRestrictConfirmation by remember { mutableStateOf(false) }
+    if (showRestrictConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showRestrictConfirmation = false },
+            title = { Text(stringResource(R.string.developer_shizuku_network_restrict)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.developer_shizuku_network_app_detail,
+                        app.uid,
+                        networkAppTypeLabel(app.appType),
+                        app.packageName,
+                    ) + "\n\n" + stringResource(R.string.developer_shizuku_network_boundary),
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showRestrictConfirmation = false
+                        onRestrict()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    ),
+                ) {
+                    Text(stringResource(R.string.developer_shizuku_network_restrict))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showRestrictConfirmation = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -140,7 +187,7 @@ private fun DeveloperNetworkAppCard(
         Button(
             modifier = Modifier.fillMaxWidth(),
             enabled = record?.hasActiveNetworkRestriction != true,
-            onClick = onRestrict,
+            onClick = { showRestrictConfirmation = true },
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -217,16 +264,6 @@ private fun DeveloperNetworkControlRecordCard(
 }
 
 @Composable
-internal fun developerShizukuStatusLabel(state: ShizukuCapabilityState): String {
-    return when {
-        state.ready -> stringResource(R.string.shizuku_status_ready)
-        !state.binderAvailable -> stringResource(R.string.shizuku_status_no_service)
-        !state.permissionGranted -> stringResource(R.string.shizuku_status_permission_needed)
-        else -> stringResource(R.string.shizuku_status_unavailable)
-    }
-}
-
-@Composable
 private fun networkAppTypeLabel(appType: String): String {
     return when (appType) {
         ShizukuNetworkAppTypes.SYSTEM -> stringResource(R.string.developer_shizuku_network_system_app)
@@ -266,6 +303,8 @@ private fun networkGuardStatusLabel(record: AppNetworkControlEntity): String {
             stringResource(R.string.developer_shizuku_network_delegated_guard_cleared)
         DelegatedNetworkGuardDisplayStatus.UNSUPPORTED ->
             stringResource(R.string.developer_shizuku_network_delegated_guard_unsupported)
+        DelegatedNetworkGuardDisplayStatus.FAILED ->
+            stringResource(R.string.developer_shizuku_network_delegated_guard_failed)
         DelegatedNetworkGuardDisplayStatus.NOT_ATTEMPTED ->
             stringResource(R.string.developer_shizuku_network_delegated_guard_not_attempted)
     }

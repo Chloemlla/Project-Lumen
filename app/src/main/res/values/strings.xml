@@ -49,7 +49,6 @@
     <string name="translation_checking_service">Checking translation service…</string>
     <string name="translation_service_unavailable">Translation service is not configured or temporarily unavailable.</string>
     <string name="translation_error_blank_text">Enter text before translating.</string>
-    <string name="translation_error_text_too_long">Text must be 5000 characters or fewer.</string>
     <string name="translation_failed">Translation failed.</string>
     <string name="translation_result">Result</string>
     <string name="translation_copy_result">Copy</string>
@@ -212,6 +211,15 @@
     <string name="enable_shizuku_app_inventory_upload">Include Shizuku user app inventory</string>
     <string name="shizuku_app_inventory_authorization_needed">App inventory requires Shizuku to be running and authorized.</string>
     <string name="diagnostic_security_policy">Security policy: requests are signed, authenticated, rate-limited by the backend, and oversized diagnostics are rejected.</string>
+    <string name="remote_analysis_consent_title">Remote eye-care analysis</string>
+    <string name="remote_analysis_consent_summary">Camera frames from distance and blink monitoring are processed on this device by default. Frames are uploaded to the Project Lumen server for analysis only after you explicitly allow it, and only while the feature is running.</string>
+    <string name="remote_analysis_consent_granted_at">Authorized since %1$s</string>
+    <string name="remote_analysis_consent_not_granted">Not authorized — frames stay on this device</string>
+    <string name="remote_analysis_consent_review">Review and authorize</string>
+    <string name="remote_analysis_consent_revoke">Revoke authorization</string>
+    <string name="remote_analysis_consent_dialog_title">Allow remote frame analysis?</string>
+    <string name="remote_analysis_consent_dialog_message">When authorized, camera frames captured while distance or blink monitoring is running may be uploaded to the Project Lumen server for analysis. This stays active until you revoke it here.</string>
+    <string name="remote_analysis_consent_allow">Allow uploads</string>
     <string name="shizuku_authorize">Authorize Shizuku</string>
     <string name="shizuku_refresh_status">Refresh status</string>
     <string name="shizuku_status">Shizuku status</string>
@@ -387,6 +395,7 @@
     <string name="template_orange_flat_shadow_subtitle">A flat orange palette with warm focus emphasis.</string>
     <string name="system_background_color">System background color</string>
     <string name="choose_template_image">Choose image</string>
+    <string name="template_image_target_lost">Could not tell which template the image was for. Please pick it again.</string>
     <string name="system_color_primary">Primary</string>
     <string name="system_color_secondary">Secondary</string>
     <string name="system_color_tertiary">Tertiary</string>
@@ -445,6 +454,8 @@
     <string name="backup_import_title">Import backup?</string>
     <string name="backup_import_message">Settings will be overwritten. Statistics will be merged by date.</string>
     <string name="backup_import_confirm">Import</string>
+    <string name="backup_import_failed">Backup import failed: %1$s</string>
+    <string name="backup_import_dismiss">Dismiss</string>
     <string name="backup_schema_version">Schema</string>
     <string name="backup_templates_count">Templates</string>
     <string name="backup_eye_days_count">Eye stat days</string>
@@ -529,6 +540,24 @@
     <string name="developer_crooot_tee_attestation">TEE attestation</string>
     <string name="developer_crooot_show_report">Show detailed CRooot report</string>
     <string name="developer_crooot_hide_report">Hide detailed CRooot report</string>
+    <string name="developer_crooot_scan_title">Device Security Scan</string>
+    <string name="developer_crooot_scan_hint">Tap \"Scan Now\" to check device security status including root detection, hardware integrity, and TEE attestation.</string>
+    <string name="developer_crooot_scanning">Scanning device security… This may take up to 60 seconds.</string>
+    <string name="developer_crooot_scan_failed">Scan failed: %1$s</string>
+    <string name="developer_crooot_scan_now">Scan Now</string>
+    <string name="developer_crooot_scan_again">Scan Again</string>
+    <string name="developer_crooot_value_rooted">ROOTED</string>
+    <string name="developer_crooot_value_clean">Clean</string>
+    <string name="developer_crooot_value_found">Found</string>
+    <string name="developer_crooot_value_none">None</string>
+    <string name="developer_crooot_value_ok">OK</string>
+    <string name="developer_crooot_value_compromised">Compromised</string>
+    <string name="developer_crooot_value_not_checked">Not checked</string>
+    <string name="developer_crooot_value_enforcing">Enforcing ✓</string>
+    <string name="developer_crooot_value_permissive">Permissive ⚠</string>
+    <string name="developer_crooot_value_unknown">Unknown</string>
+    <string name="developer_crooot_value_verified">Verified</string>
+    <string name="developer_crooot_value_failed">Failed</string>
     <string name="developer_overlay_enabled">Realtime floating debug window</string>
     <string name="developer_preview_enabled">Low-res sample preview</string>
     <string name="developer_ai_inference">AI inference</string>
@@ -587,6 +616,7 @@
     <string name="developer_shizuku_network_delegated_guard_cleared">delegated guard cleared</string>
     <string name="developer_shizuku_network_delegated_guard_unsupported">delegated guard unsupported</string>
     <string name="developer_shizuku_network_delegated_guard_not_attempted">delegated guard not attempted</string>
+    <string name="developer_shizuku_network_delegated_guard_failed">delegated guard attempt failed</string>
     <string name="developer_shizuku_network_guard_status">%1$s · %2$s</string>
     <string name="developer_shizuku_network_last_error">Network policy error</string>
     <string name="developer_security_api_base">Backend API base URL</string>
@@ -715,6 +745,9 @@
     <string name="eye_care_capability_review">Review</string>
     <string name="eye_care_apply_family_profile">Apply family profile</string>
     <string name="eye_care_apply_local_guidance">Apply local guidance</string>
+    <string name="eye_care_apply_confirm_title">Overwrite current settings?</string>
+    <string name="eye_care_apply_family_confirm_message">The family profile overwrites your reminder interval (15 min), rest length (30 s), quiet hours (21:00-07:00), turns skipping breaks off and auto brightness off, and tightens the daily goals. Your current values cannot be restored afterwards.</string>
+    <string name="eye_care_apply_guidance_confirm_message">Local guidance rewrites your reminder interval, rest length, pre-alert and monitoring thresholds from the last 14 days of statistics. Your current values cannot be restored afterwards.</string>
     <string name="eye_care_guide_title">Eye-care guided setup</string>
     <string name="eye_care_guide_message">Follow this checklist to turn the existing protection features into a working daily eye-care loop.</string>
     <string name="eye_care_guide_step_recommended">Apply the baseline protection profile</string>
@@ -834,6 +867,8 @@
     <string name="credit_mlkit_desc">On-device face and mesh detection for distance and blink sensing</string>
     <string name="credit_constraintlayout_desc">Constraint-based layout helpers for Compose screens</string>
     <string name="credit_material_icons_desc">Extended Material icon set used throughout the interface</string>
+    <string name="credit_jetbrains_mono_desc">Monospaced typeface; a Latin subset ships inside the APK and sets every text style</string>
+    <string name="credit_crooot_sdk_desc">Device root and integrity scanning behind the security gate</string>
     <string name="credit_undraw_desc">Open-source illustration library; empty and about screens use theme-aware undraw vectors</string>
 
     <string name="device_insights_title">Device usage and power context</string>

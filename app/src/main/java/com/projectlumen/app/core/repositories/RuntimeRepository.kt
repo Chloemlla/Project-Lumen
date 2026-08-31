@@ -1,5 +1,6 @@
 package com.projectlumen.app.core.repositories
 
+import android.util.Log
 import com.projectlumen.app.core.database.daos.RuntimeStateDao
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
@@ -22,11 +23,16 @@ class RuntimeRepository(private val dao: RuntimeStateDao) {
     suspend fun getOrDefault(): RuntimeStateEntity = get() ?: RuntimeStateEntity()
 
     suspend fun ensureDefault() {
-        if (get() == null) upsert(RuntimeStateEntity())
+        RuntimeStateMmkvStore.ensureDefault(dao)
     }
 
     suspend fun upsert(state: RuntimeStateEntity): RuntimeStateEntity {
         return RuntimeStateMmkvStore.upsert(dao, state.copy(id = 1))
+    }
+
+    // 读改写的唯一安全入口：transform 必须是纯函数，锁不可重入。
+    suspend fun update(transform: (RuntimeStateEntity) -> RuntimeStateEntity): RuntimeStateEntity {
+        return RuntimeStateMmkvStore.update(dao) { transform(it).copy(id = 1) }
     }
 
     suspend fun reset(nowMillis: Long): RuntimeStateEntity {
@@ -35,12 +41,18 @@ class RuntimeRepository(private val dao: RuntimeStateDao) {
 }
 
 private object RuntimeStateMmkvStore {
+    private const val TAG = "RuntimeStateStore"
     private const val STORE_ID = "runtime_state"
+    private const val MIGRATION_STORE_ID = "runtime_state_migration"
     private const val KEY_STATE_JSON = "state_json"
     private const val KEY_MMKV_MIGRATION_COMPLETE = "__mmkv_migration_complete"
 
     private val migrationLock = Mutex()
+    private val writeMutex = Mutex()
     private val mmkv by lazy { ProjectLumenMmkv.multiProcessMmkvWithId(STORE_ID) }
+
+    // 迁移标记与状态本体分文件存放：状态文件被 CRC 截断时不会被判成"未迁移"而从陈旧 Room 快照复活。
+    private val migrationMmkv by lazy { ProjectLumenMmkv.multiProcessMmkvWithId(MIGRATION_STORE_ID) }
     private val state by lazy { MutableStateFlow(readFromMmkv()) }
 
     @Volatile
@@ -62,27 +74,46 @@ private object RuntimeStateMmkvStore {
         return readFromMmkv().also { state.value = it }
     }
 
+    suspend fun ensureDefault(dao: RuntimeStateDao) {
+        ensureMigrated(dao)
+        writeMutex.withLock {
+            if (readFromMmkv() == null) writeToMmkv(RuntimeStateEntity())
+        }
+    }
+
     suspend fun upsert(dao: RuntimeStateDao, runtime: RuntimeStateEntity): RuntimeStateEntity {
         ensureMigrated(dao)
-        writeToMmkv(runtime)
+        writeMutex.withLock { writeToMmkv(runtime) }
         return runtime
+    }
+
+    suspend fun update(
+        dao: RuntimeStateDao,
+        transform: (RuntimeStateEntity) -> RuntimeStateEntity,
+    ): RuntimeStateEntity {
+        ensureMigrated(dao)
+        return writeMutex.withLock {
+            val next = transform(readFromMmkv() ?: RuntimeStateEntity())
+            writeToMmkv(next)
+            next
+        }
     }
 
     private suspend fun ensureMigrated(dao: RuntimeStateDao) {
         if (migrationComplete) return
-        if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
+        if (migrationMmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
             migrationComplete = true
             return
         }
         migrationLock.withLock {
-            if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
+            if (migrationMmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
                 migrationComplete = true
                 return
             }
             if (!mmkv.containsKey(KEY_STATE_JSON)) {
                 dao.get()?.let(::writeToMmkv)
             }
-            mmkv.encode(KEY_MMKV_MIGRATION_COMPLETE, true)
+            migrationMmkv.encode(KEY_MMKV_MIGRATION_COMPLETE, true)
             migrationComplete = true
             state.value = readFromMmkv()
         }
@@ -91,7 +122,9 @@ private object RuntimeStateMmkvStore {
     private fun readFromMmkv(): RuntimeStateEntity? {
         val json = mmkv.decodeString(KEY_STATE_JSON)?.takeIf { it.isNotBlank() } ?: return null
         parsedCache?.let { cached -> if (cached.first == json) return cached.second }
-        val runtime = runCatching { JSONObject(json).toRuntimeState() }.getOrNull() ?: return null
+        val runtime = runCatching { JSONObject(json).toRuntimeState() }
+            .onFailure { throwable -> Log.w(TAG, "Discarding unparsable runtime state snapshot.", throwable) }
+            .getOrNull() ?: return null
         parsedCache = json to runtime
         return runtime
     }

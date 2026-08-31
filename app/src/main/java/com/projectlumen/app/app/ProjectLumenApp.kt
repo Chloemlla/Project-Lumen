@@ -7,7 +7,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -47,12 +46,12 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -146,16 +145,22 @@ fun ProjectLumenApp(
         runCatching { AppThemeMode.valueOf(uiState.settings.themeMode) }
             .getOrDefault(AppThemeMode.SYSTEM)
     }
-    val autoDarkActive = remember(
-        uiState.nowMillis / 60_000L,
+    // Derived so that the 1 Hz clock only re-runs this composable when the window actually flips.
+    val autoDarkActive by remember(
+        uiState.clock,
         uiState.settings.autoDarkStartMinute,
         uiState.settings.autoDarkEndMinute,
     ) {
-        isAutoDarkActive(
-            nowMillis = uiState.nowMillis,
-            startMinute = uiState.settings.autoDarkStartMinute,
-            endMinute = uiState.settings.autoDarkEndMinute,
-        )
+        val clock = uiState.clock
+        val startMinute = uiState.settings.autoDarkStartMinute
+        val endMinute = uiState.settings.autoDarkEndMinute
+        derivedStateOf {
+            isAutoDarkActive(
+                nowMillis = clock.nowMillis,
+                startMinute = startMinute,
+                endMinute = endMinute,
+            )
+        }
     }
     // A template palette overrides light/dark inside ProjectLumenTheme, so no suppression here.
     val themeMode = if (uiState.settings.useAutoDarkWindow && autoDarkActive) {
@@ -187,12 +192,6 @@ fun ProjectLumenApp(
     val checkingUpdate = updateDialogState is UpdateDialogState.Checking
     var activeCrashReport by remember(crashReport) { mutableStateOf(crashReport) }
     var activeCrashReportClearsStore by remember(crashReport) { mutableStateOf(crashReport != null) }
-
-    LaunchedEffect(uiState.crashReport?.crashedAtMillis) {
-        val report = uiState.crashReport ?: return@LaunchedEffect
-        activeCrashReportClearsStore = true
-        activeCrashReport = report
-    }
 
     fun triggerUpdateCheck(manual: Boolean) {
         coroutineScope.launch {
@@ -276,7 +275,10 @@ fun ProjectLumenApp(
         }
     }
 
-    LaunchedEffect(uiState.settings.languageCode) {
+    LaunchedEffect(uiState.isReady, uiState.settings.languageCode) {
+        // Applying the default "system" locale before Room answers would clear and re-apply the
+        // user's language on every cold start, which the framework answers with a restart.
+        if (!uiState.isReady) return@LaunchedEffect
         LocaleController.apply(uiState.settings.languageCode)
     }
     LaunchedEffect(viewModel) {
@@ -310,7 +312,6 @@ fun ProjectLumenApp(
                     report = report,
                     onContinue = {
                         activeCrashReport = null
-                        viewModel.clearCrashReport()
                     },
                     clearStoredReportOnContinue = activeCrashReportClearsStore,
                     onClearStoredReport = {

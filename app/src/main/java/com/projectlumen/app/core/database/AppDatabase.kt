@@ -85,7 +85,7 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE app_settings ADD COLUMN proximityMonitoringEnabled INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE app_settings ADD COLUMN proximityBaselineEyeDistancePx REAL NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE app_settings ADD COLUMN proximityDistanceMultiplierPercent INTEGER NOT NULL DEFAULT 130")
-                db.execSQL("ALTER TABLE app_settings ADD COLUMN proximityCheckIntervalMinutes INTEGER NOT NULL DEFAULT 5")
+                db.execSQL("ALTER TABLE app_settings ADD COLUMN proximityCheckIntervalMinutes INTEGER NOT NULL DEFAULT 3")
                 db.execSQL("ALTER TABLE app_settings ADD COLUMN proximityCaptureSeconds INTEGER NOT NULL DEFAULT 2")
                 db.execSQL("ALTER TABLE app_settings ADD COLUMN proximityFaceThresholdPercent INTEGER NOT NULL DEFAULT 38")
                 db.execSQL("ALTER TABLE app_settings ADD COLUMN proximityAlertCooldownSeconds INTEGER NOT NULL DEFAULT 120")

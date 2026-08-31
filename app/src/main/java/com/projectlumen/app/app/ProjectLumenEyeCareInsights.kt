@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material.icons.outlined.Style
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -36,7 +37,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,6 +84,80 @@ private data class EyeCareGuideStep(
     val complete: Boolean,
 )
 
+// One aggregation and one set of thresholds for every eye-care card, so two cards on the same
+// screen cannot reach opposite conclusions about the same numbers.
+internal const val EYE_CARE_SKIP_RATE_HIGH = 40
+internal const val EYE_CARE_WARNING_ALERT_COUNT = 2
+private const val EYE_CARE_INSIGHT_WINDOW_DAYS = 14
+
+internal data class EyeCareStatsAggregate(
+    val stats: List<DailyEyeStatsEntity>,
+    val completionRate: Int,
+    val skipRate: Int,
+    val maxContinuousMinutes: Int,
+    val averageContinuousMinutes: Int,
+    val workMinutes: Int,
+    val restMinutes: Int,
+    val proximityWarnings: Int,
+    val dryEyeWarnings: Int,
+    val lowLightWarnings: Int,
+)
+
+internal fun eyeCareStatsAggregate(eyeStats: List<DailyEyeStatsEntity>): EyeCareStatsAggregate {
+    val recent = eyeStats.take(EYE_CARE_INSIGHT_WINDOW_DAYS)
+    val completedBreaks = recent.sumOf { it.completedBreakCount }
+    val skips = recent.sumOf { it.skipCount }
+    val totalBreakDecisions = completedBreaks + skips
+    return EyeCareStatsAggregate(
+        stats = recent,
+        completionRate = if (totalBreakDecisions > 0) {
+            (completedBreaks * 100) / totalBreakDecisions
+        } else {
+            100
+        }.coerceIn(0, 100),
+        skipRate = if (totalBreakDecisions > 0) {
+            (skips * 100) / totalBreakDecisions
+        } else {
+            0
+        }.coerceIn(0, 100),
+        maxContinuousMinutes = ((recent.maxOfOrNull { it.maxContinuousWorkSeconds } ?: 0L) / 60L).toInt(),
+        averageContinuousMinutes = recent
+            .filter { it.maxContinuousWorkSeconds > 0L }
+            .map { it.maxContinuousWorkSeconds / 60L }
+            .average()
+            .takeIf { !it.isNaN() }
+            ?.roundToInt()
+            ?: 0,
+        workMinutes = (recent.sumOf { it.workingSeconds } / 60L).toInt(),
+        restMinutes = (recent.sumOf { it.restSeconds } / 60L).toInt(),
+        proximityWarnings = recent.sumOf { it.proximityWarningCount },
+        dryEyeWarnings = recent.sumOf { it.eyeDryWarningCount },
+        lowLightWarnings = recent.sumOf { it.lowLightWarningCount },
+    )
+}
+
+internal fun hasStatsHistory(uiState: ProjectLumenUiState): Boolean {
+    return uiState.eyeStats.any {
+        it.workingSeconds > 0L || it.restSeconds > 0L || it.skipCount > 0 || it.completedBreakCount > 0
+    } || uiState.pomodoroStats.any {
+        it.completedTomatoCount > 0 || it.completedFocusSessions > 0 ||
+            it.totalBreakSeconds > 0L || it.totalFocusSeconds > 0L
+    }
+}
+
+internal fun canExportStats(uiState: ProjectLumenUiState): Boolean {
+    return uiState.settings.statsEnabled && hasStatsHistory(uiState)
+}
+
+@Composable
+private fun rememberCanExportStats(uiState: ProjectLumenUiState): Boolean = remember(
+    uiState.settings.statsEnabled,
+    uiState.eyeStats,
+    uiState.pomodoroStats,
+) {
+    canExportStats(uiState)
+}
+
 @Composable
 internal fun EyeCareGuidedSetupCard(
     uiState: ProjectLumenUiState,
@@ -93,6 +172,7 @@ internal fun EyeCareGuidedSetupCard(
 ) {
     val summary = rememberEyeCareInsightSummary(uiState, permissionRequirements, shizukuReady)
     val recommendedFeedback = rememberRecommendedEyeCareApplyFeedback(onApplyRecommended)
+    val exportEnabled = rememberCanExportStats(uiState)
     val distanceCalibrated = uiState.settings.proximityBaselineEyeDistancePx > 0f ||
         uiState.settings.proximityBaselineFaceWidthPercent > 0
     val missingRuntimePermission = summary.missingSetupCount > 0
@@ -169,7 +249,7 @@ internal fun EyeCareGuidedSetupCard(
                 OutlinedButton(onClick = onStartReminder, enabled = canStartReminder) {
                     ButtonLabel(Icons.Outlined.Schedule, R.string.eye_care_guide_start_session)
                 }
-                OutlinedButton(onClick = onExportReport) {
+                OutlinedButton(onClick = onExportReport, enabled = exportEnabled) {
                     ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)
                 }
             }
@@ -371,8 +451,6 @@ private fun eyeCareWarningState(count: Int): EyeCareMetricState = when {
     else -> EyeCareMetricState.Neutral
 }
 
-private const val EYE_CARE_WARNING_ALERT_COUNT = 2
-
 @Composable
 internal fun EyeCareActionPlanCard(
     uiState: ProjectLumenUiState,
@@ -383,6 +461,7 @@ internal fun EyeCareActionPlanCard(
 ) {
     val summary = rememberEyeCareInsightSummary(uiState, permissionRequirements, shizukuReady)
     val recommendedFeedback = rememberRecommendedEyeCareApplyFeedback(onApplyRecommended)
+    val exportEnabled = rememberCanExportStats(uiState)
     SettingsSection(
         titleRes = R.string.eye_care_action_plan,
         icon = Icons.Outlined.CheckCircle,
@@ -404,7 +483,7 @@ internal fun EyeCareActionPlanCard(
             Button(onClick = recommendedFeedback.onApply) {
                 ButtonLabel(Icons.Outlined.CheckCircle, R.string.eye_care_apply_recommended)
             }
-            OutlinedButton(onClick = onExportReport) {
+            OutlinedButton(onClick = onExportReport, enabled = exportEnabled) {
                 ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)
             }
         }
@@ -532,6 +611,8 @@ internal fun EyeCareGrowthCapabilityCard(
     val cloudSyncReady = remoteState.signedIn && cloudSyncAllowed
     val familyModeReady = isFamilyEyeCareModeActive(uiState)
     val aiGuidanceReady = uiState.settings.statsEnabled && uiState.settings.reminderEnabled
+    val exportEnabled = rememberCanExportStats(uiState)
+    var pendingApply by rememberSaveable { mutableStateOf<EyeCareBulkApplyTarget?>(null) }
     val capabilitySummary = growthCapabilitySummary(
         proTemplatesReady = proEnabled && hasPremiumTemplates,
         advancedReportsReady = advancedReportsReady,
@@ -613,14 +694,20 @@ internal fun EyeCareGrowthCapabilityCard(
                 OutlinedButton(onClick = onOpenTemplates) {
                     ButtonLabel(Icons.Outlined.Style, R.string.nav_templates)
                 }
-                OutlinedButton(onClick = if (advancedReportsReady) onExportReport else onConfigureReports) {
+                OutlinedButton(
+                    onClick = if (advancedReportsReady) onExportReport else onConfigureReports,
+                    enabled = !advancedReportsReady || exportEnabled,
+                ) {
                     ButtonLabel(
                         Icons.Outlined.BarChart,
                         if (advancedReportsReady) R.string.eye_care_growth_advanced_reports else R.string.eye_care_capability_enable,
                     )
                 }
                 if (cloudCapabilityVisible) {
-                    OutlinedButton(onClick = if (cloudSyncReady) onSyncCloud else onConfigureCloud) {
+                    OutlinedButton(
+                        onClick = if (cloudSyncReady) onSyncCloud else onConfigureCloud,
+                        enabled = !remoteState.busy,
+                    ) {
                         ButtonLabel(
                             Icons.Outlined.Sync,
                             when {
@@ -631,14 +718,68 @@ internal fun EyeCareGrowthCapabilityCard(
                         )
                     }
                 }
-                Button(onClick = onApplyFamilyMode) {
+                Button(onClick = { pendingApply = EyeCareBulkApplyTarget.FamilyProfile }) {
                     ButtonLabel(Icons.Outlined.Lock, R.string.eye_care_apply_family_profile)
                 }
-                Button(onClick = onApplyGuidance) {
+                Button(onClick = { pendingApply = EyeCareBulkApplyTarget.PersonalizedGuidance }) {
                     ButtonLabel(Icons.Outlined.Info, R.string.eye_care_apply_local_guidance)
                 }
             }
+            if (cloudCapabilityVisible && remoteState.busy) {
+                StatusLine(Icons.Outlined.Sync, stringResource(R.string.remote_cloud_busy))
+            }
     }
+    val target = pendingApply
+    if (target != null) {
+        EyeCareBulkApplyConfirmDialog(
+            target = target,
+            onDismiss = { pendingApply = null },
+            onConfirm = {
+                pendingApply = null
+                when (target) {
+                    EyeCareBulkApplyTarget.FamilyProfile -> onApplyFamilyMode()
+                    EyeCareBulkApplyTarget.PersonalizedGuidance -> onApplyGuidance()
+                }
+            },
+        )
+    }
+}
+
+private enum class EyeCareBulkApplyTarget {
+    FamilyProfile,
+    PersonalizedGuidance,
+}
+
+@Composable
+private fun EyeCareBulkApplyConfirmDialog(
+    target: EyeCareBulkApplyTarget,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val messageRes = when (target) {
+        EyeCareBulkApplyTarget.FamilyProfile -> R.string.eye_care_apply_family_confirm_message
+        EyeCareBulkApplyTarget.PersonalizedGuidance -> R.string.eye_care_apply_guidance_confirm_message
+    }
+    val confirmRes = when (target) {
+        EyeCareBulkApplyTarget.FamilyProfile -> R.string.eye_care_apply_family_profile
+        EyeCareBulkApplyTarget.PersonalizedGuidance -> R.string.eye_care_apply_local_guidance
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.WarningAmber, contentDescription = null) },
+        title = { Text(stringResource(R.string.eye_care_apply_confirm_title)) },
+        text = { Text(stringResource(messageRes)) },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(stringResource(confirmRes))
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text(stringResource(R.string.generic_cancel))
+            }
+        },
+    )
 }
 
 internal fun applyRecommendedEyeCareSettings(viewModel: ProjectLumenViewModel) {
@@ -694,19 +835,12 @@ internal fun applyPersonalizedEyeCareGuidance(
     viewModel: ProjectLumenViewModel,
     uiState: ProjectLumenUiState,
 ) {
-    val recentEyeStats = uiState.eyeStats.take(14)
-    val completedBreaks = recentEyeStats.sumOf { it.completedBreakCount }
-    val skips = recentEyeStats.sumOf { it.skipCount }
-    val totalBreakDecisions = completedBreaks + skips
-    val skipRate = if (totalBreakDecisions > 0) {
-        (skips * 100) / totalBreakDecisions
-    } else {
-        0
-    }.coerceIn(0, 100)
-    val maxContinuousMinutes = ((recentEyeStats.maxOfOrNull { it.maxContinuousWorkSeconds } ?: 0L) / 60L).toInt()
-    val proximityWarnings = recentEyeStats.sumOf { it.proximityWarningCount }
-    val dryEyeWarnings = recentEyeStats.sumOf { it.eyeDryWarningCount }
-    val lowLightWarnings = recentEyeStats.sumOf { it.lowLightWarningCount }
+    val aggregate = eyeCareStatsAggregate(uiState.eyeStats)
+    val skipRate = aggregate.skipRate
+    val maxContinuousMinutes = aggregate.maxContinuousMinutes
+    val proximityWarnings = aggregate.proximityWarnings
+    val dryEyeWarnings = aggregate.dryEyeWarnings
+    val lowLightWarnings = aggregate.lowLightWarnings
     val goalContinuousMinutes = uiState.dailyGoal.maxContinuousWorkMinutes.coerceIn(15, 120)
 
     viewModel.updateSettings { current ->
@@ -715,7 +849,7 @@ internal fun applyPersonalizedEyeCareGuidance(
             maxContinuousMinutes > goalContinuousMinutes -> (goalContinuousMinutes - 5).coerceIn(10, 60)
             else -> current.warnIntervalMinutes.coerceIn(15, 45)
         }
-        val suggestedRestSeconds = if (skipRate >= 40) {
+        val suggestedRestSeconds = if (skipRate >= EYE_CARE_SKIP_RATE_HIGH) {
             current.restDurationSeconds.coerceIn(15, 20)
         } else {
             current.restDurationSeconds.coerceAtLeast(20)
@@ -728,8 +862,8 @@ internal fun applyPersonalizedEyeCareGuidance(
             notificationEnabled = true,
             keepAliveEnabled = true,
             preAlertEnabled = true,
-            preAlertSeconds = if (skipRate >= 40) 45 else current.preAlertSeconds.coerceAtLeast(60),
-            askBeforeBreak = skipRate < 40,
+            preAlertSeconds = if (skipRate >= EYE_CARE_SKIP_RATE_HIGH) 45 else current.preAlertSeconds.coerceAtLeast(60),
+            askBeforeBreak = skipRate < EYE_CARE_SKIP_RATE_HIGH,
             disableSkip = false,
             proximityMonitoringEnabled = current.proximityMonitoringEnabled || proximityWarnings > 0,
             proximityCheckIntervalMinutes = if (proximityWarnings > 0) {
@@ -784,33 +918,17 @@ private fun eyeCareInsightSummary(
     permissionRequirements: PermissionRequirements,
     shizukuReady: Boolean,
 ): EyeCareInsightSummary {
-    val recentEyeStats = uiState.eyeStats.take(14)
-    val completedBreaks = recentEyeStats.sumOf { it.completedBreakCount }
-    val skips = recentEyeStats.sumOf { it.skipCount }
-    val totalBreakDecisions = completedBreaks + skips
-    val completionRate = if (totalBreakDecisions > 0) {
-        (completedBreaks * 100) / totalBreakDecisions
-    } else {
-        100
-    }.coerceIn(0, 100)
-    val skipRate = if (totalBreakDecisions > 0) {
-        (skips * 100) / totalBreakDecisions
-    } else {
-        0
-    }.coerceIn(0, 100)
-    val maxContinuousMinutes = ((recentEyeStats.maxOfOrNull { it.maxContinuousWorkSeconds } ?: 0L) / 60L).toInt()
-    val averageContinuousMinutes = recentEyeStats
-        .filter { it.maxContinuousWorkSeconds > 0L }
-        .map { it.maxContinuousWorkSeconds / 60L }
-        .average()
-        .takeIf { !it.isNaN() }
-        ?.roundToInt()
-        ?: 0
-    val workMinutes = (recentEyeStats.sumOf { it.workingSeconds } / 60L).toInt()
-    val restMinutes = (recentEyeStats.sumOf { it.restSeconds } / 60L).toInt()
-    val proximityWarnings = recentEyeStats.sumOf { it.proximityWarningCount }
-    val dryEyeWarnings = recentEyeStats.sumOf { it.eyeDryWarningCount }
-    val lowLightWarnings = recentEyeStats.sumOf { it.lowLightWarningCount }
+    val aggregate = eyeCareStatsAggregate(uiState.eyeStats)
+    val recentEyeStats = aggregate.stats
+    val completionRate = aggregate.completionRate
+    val skipRate = aggregate.skipRate
+    val maxContinuousMinutes = aggregate.maxContinuousMinutes
+    val averageContinuousMinutes = aggregate.averageContinuousMinutes
+    val workMinutes = aggregate.workMinutes
+    val restMinutes = aggregate.restMinutes
+    val proximityWarnings = aggregate.proximityWarnings
+    val dryEyeWarnings = aggregate.dryEyeWarnings
+    val lowLightWarnings = aggregate.lowLightWarnings
     val riskScore = calculateRiskScore(
         stats = recentEyeStats,
         completionRate = completionRate,
@@ -846,15 +964,17 @@ private fun eyeCareInsightSummary(
             uiState.settings.proximityBaselineEyeDistancePx <= 0f &&
             uiState.settings.proximityBaselineFaceWidthPercent <= 0,
     ).count { it }
+    // A pending setup item must never read as a full score: the card shows both numbers side by
+    // side, and 100% next to "1 item left" tells the user to stop configuring.
     val configurationScore = (100 - missingSetupCount * 12 + activeProtectionCount * 3)
-        .coerceIn(0, 100)
+        .coerceIn(0, if (missingSetupCount > 0) 99 - missingSetupCount * 4 else 100)
     val riskReasons = buildList {
         if (recentEyeStats.isEmpty() || workMinutes == 0) add(R.string.eye_care_reason_no_stats)
-        if (skipRate >= 40) add(R.string.eye_care_reason_skipped_breaks)
+        if (skipRate >= EYE_CARE_SKIP_RATE_HIGH) add(R.string.eye_care_reason_skipped_breaks)
         if (maxContinuousMinutes > uiState.dailyGoal.maxContinuousWorkMinutes) add(R.string.eye_care_reason_long_work)
-        if (proximityWarnings >= 2) add(R.string.eye_care_reason_distance)
-        if (dryEyeWarnings >= 2) add(R.string.eye_care_reason_dry_eye)
-        if (lowLightWarnings >= 2) add(R.string.eye_care_reason_low_light)
+        if (proximityWarnings >= EYE_CARE_WARNING_ALERT_COUNT) add(R.string.eye_care_reason_distance)
+        if (dryEyeWarnings >= EYE_CARE_WARNING_ALERT_COUNT) add(R.string.eye_care_reason_dry_eye)
+        if (lowLightWarnings >= EYE_CARE_WARNING_ALERT_COUNT) add(R.string.eye_care_reason_low_light)
         if (missingSetupCount > 0) add(R.string.eye_care_reason_setup_missing)
         if (isEmpty()) add(R.string.eye_care_reason_stable)
     }
@@ -866,11 +986,11 @@ private fun eyeCareInsightSummary(
         ) {
             add(R.string.eye_care_action_calibrate_distance)
         }
-        if (skipRate >= 40) add(R.string.eye_care_action_reduce_friction)
+        if (skipRate >= EYE_CARE_SKIP_RATE_HIGH) add(R.string.eye_care_action_reduce_friction)
         if (maxContinuousMinutes > uiState.dailyGoal.maxContinuousWorkMinutes) add(R.string.eye_care_action_tighten_interval)
-        if (proximityWarnings >= 2) add(R.string.eye_care_action_increase_distance)
-        if (dryEyeWarnings >= 2) add(R.string.eye_care_action_blink_pause)
-        if (lowLightWarnings >= 2) add(R.string.eye_care_action_room_light)
+        if (proximityWarnings >= EYE_CARE_WARNING_ALERT_COUNT) add(R.string.eye_care_action_increase_distance)
+        if (dryEyeWarnings >= EYE_CARE_WARNING_ALERT_COUNT) add(R.string.eye_care_action_blink_pause)
+        if (lowLightWarnings >= EYE_CARE_WARNING_ALERT_COUNT) add(R.string.eye_care_action_room_light)
         if (isEmpty()) add(R.string.eye_care_action_keep_current)
     }
     val (labelRes, messageRes) = when {

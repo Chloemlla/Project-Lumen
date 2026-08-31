@@ -28,19 +28,27 @@ jobs:
 
       - name: Accept Android SDK licenses
         run: |
+          NDK_VERSION="$(sed -n 's/^projectLumenNdkVersion=//p' gradle.properties | tail -n 1 | tr -d '[:space:]')"
+          CMAKE_VERSION="$(sed -n 's/^projectLumenCmakeVersion=//p' gradle.properties | tail -n 1 | tr -d '[:space:]')"
+          if [ -z "$NDK_VERSION" ] || [ -z "$CMAKE_VERSION" ]; then
+            echo "::error::projectLumenNdkVersion and projectLumenCmakeVersion must be set in gradle.properties."
+            exit 1
+          fi
           SDK_MANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -f "$SDK_MANAGER" ]; then
             SDK_MANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
           fi
-          if [ -f "$SDK_MANAGER" ]; then
-            echo "Accepting Android SDK licenses via $SDK_MANAGER"
-            yes | "$SDK_MANAGER" --licenses 2>&1 || true
-            "$SDK_MANAGER" --install "ndk;30.0.15729638" 2>&1 || true
-          else
-            echo "sdkmanager not found at $ANDROID_HOME; trying PATH"
-            yes | sdkmanager --licenses 2>&1 || true
-            sdkmanager --install "ndk;30.0.15729638" 2>&1 || true
+          if [ ! -f "$SDK_MANAGER" ]; then
+            SDK_MANAGER="$(command -v sdkmanager || true)"
           fi
+          if [ -z "$SDK_MANAGER" ]; then
+            echo "::warning::sdkmanager was not found; the Android Gradle Plugin will download the toolchain itself."
+            exit 0
+          fi
+          echo "Accepting Android SDK licenses via $SDK_MANAGER"
+          yes | "$SDK_MANAGER" --licenses 2>&1 || true
+          # AGP downloads these itself when missing, so a transient install failure must not fail the job.
+          "$SDK_MANAGER" --install "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}" 2>&1 || true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -48,9 +56,6 @@ jobs:
           gradle-version: "9.5.1"
           cache-read-only: false
           cache-cleanup: on-success
-
-      # - name: Set up Android native toolchain
-      #   uses: ./.github/actions/setup-android-native-toolchain
 
       - name: Read app version
         run: |
@@ -157,6 +162,12 @@ jobs:
           echo "=== Keystore alias validation ==="
           cat /tmp/keystore-alias.txt
 
+          CERT_SHA256="$(keytool -exportcert -alias "$KEY_ALIAS" -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" 2>/dev/null | openssl dgst -sha256 -hex | awk '{print toupper($2)}')"
+          CERT_SHA256_COLON="$(printf '%s' "$CERT_SHA256" | sed 's/../&:/g; s/:$//')"
+          echo "Release cert SHA-256: $CERT_SHA256"
+          echo "Release cert SHA-256 (colon): $CERT_SHA256_COLON"
+          echo "PROJECT_LUMEN_RELEASE_CERT_SHA256=${CERT_SHA256}" >> "$GITHUB_ENV"
+
           printf 'PROJECT_LUMEN_STORE_FILE=%s\n' "$KEYSTORE_PATH" >> gradle.properties
           printf 'PROJECT_LUMEN_STORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD" >> gradle.properties
           printf 'PROJECT_LUMEN_KEY_ALIAS=%s\n' "$KEY_ALIAS" >> gradle.properties
@@ -178,7 +189,7 @@ jobs:
           PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS: ${{ secrets.PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS }}
           PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN: ${{ secrets.PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN }}
           PROJECT_LUMEN_REQUEST_SIGNING_SECRET: ${{ secrets.PROJECT_LUMEN_REQUEST_SIGNING_SECRET }}
-          PROJECT_LUMEN_RELEASE_CERT_SHA256: ${{ secrets.PROJECT_LUMEN_RELEASE_CERT_SHA256 }}
+          PROJECT_LUMEN_RELEASE_CERT_SHA256: ${{ secrets.PROJECT_LUMEN_RELEASE_CERT_SHA256 || env.PROJECT_LUMEN_RELEASE_CERT_SHA256 }}
           PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256: ${{ secrets.PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256 }}
         run: |
           set -euo pipefail
@@ -194,8 +205,16 @@ jobs:
           fi
           gradle :app:assembleRelease --no-daemon --warning-mode all
 
-      # - name: Verify 16 KB native library alignment
-      #   run: python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*.apk
+      - name: Verify 16 KB native library alignment
+        run: python3 scripts/verify_android_16kb_alignment.py app/build/outputs/apk/release/*.apk
+
+      - name: Upload release mapping
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-lumen-release-mapping
+          path: app/build/outputs/mapping/**
+          retention-days: 14
 
       - name: Prepare release assets
         run: |

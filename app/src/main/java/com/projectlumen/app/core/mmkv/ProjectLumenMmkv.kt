@@ -7,6 +7,8 @@ import java.io.File
 object ProjectLumenMmkv {
     @Volatile
     private var initialized = false
+
+    @Volatile
     private var initializationFailure: Throwable? = null
 
     @Synchronized

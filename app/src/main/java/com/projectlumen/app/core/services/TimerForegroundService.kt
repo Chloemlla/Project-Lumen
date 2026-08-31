@@ -24,10 +24,12 @@ import com.projectlumen.app.core.runtime.PomodoroEngine
 import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
 import com.projectlumen.app.core.time.QuietHours
+import com.projectlumen.app.core.time.MAX_SINGLE_ELAPSED_SECONDS
 import com.projectlumen.app.core.time.coerceElapsedSecondsSince
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
@@ -51,7 +53,7 @@ class TimerForegroundService : LifecycleService() {
             if (::app.isInitialized) app.recordHandledFailure(throwable)
         },
     )
-    @Volatile private var loopStarted = false
+    @Volatile private var loopJob: Job? = null
     private var screenReceiverRegistered = false
     private val powerManager by lazy { getSystemService(PowerManager::class.java) }
     private val screenReceiver = object : BroadcastReceiver() {
@@ -67,7 +69,7 @@ class TimerForegroundService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         app = application as ProjectLumenApplication
-        notifications = NotificationService(this)
+        notifications = app.notifications
         settingsRepository = app.settingsRepository()
         runtimeRepository = app.runtimeRepository()
         statisticsRepository = StatisticsRepository(
@@ -94,48 +96,65 @@ class TimerForegroundService : LifecycleService() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-        if (!loopStarted) {
-            loopStarted = true
-            scope.launch { runTimerLoop() }
+        if (loopJob?.isActive != true) {
+            loopJob = scope.launch { runTimerLoop() }
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
         unregisterScreenReceiver()
+        loopJob = null
         scope.cancel()
         super.onDestroy()
     }
 
     private suspend fun runTimerLoop() {
         tickingFlow().collect { nowMillis ->
-            val settings = settingsRepository.getOrDefault()
-            val runtime = runtimeRepository.getOrDefault()
-            if (!settings.keepAliveEnabled || runtime.activeEngine == ActiveEngine.IDLE.name) {
+            // Serialised against the alarm receiver so a due phase is never advanced twice and a
+            // tick write never rolls back a transition the receiver just persisted.
+            val stillRunning = RuntimeAdvanceGate.withAdvanceLock { processTick(nowMillis) }
+            if (!stillRunning) {
+                // Only request the stop; onDestroy owns cancelling the scope, so a restart that
+                // reuses this instance can start a fresh loop.
                 stopSelf()
-                scope.cancel()
-                return@collect
             }
-            val interactive = isDeviceInteractive()
-            val screenAdjustedState = adjustForScreenState(runtime, nowMillis, interactive)
-            if (screenAdjustedState != runtime) {
-                runtimeRepository.upsert(screenAdjustedState)
-                if (interactive) {
-                    refreshRuntimeNotifications(settings, screenAdjustedState)
-                } else {
-                    notifications.cancelAllScheduled()
-                }
-            }
-            if (!interactive) {
-                return@collect
-            }
-            val tickedState = recordIncrementalEyeStats(settings, screenAdjustedState, nowMillis)
-            // Refresh Live Update progress/chip; NotificationService dedupes identical payloads.
-            if (settings.notificationEnabled || settings.keepAliveEnabled) {
-                notifications.showOngoingStatus(tickedState)
-            }
-            advanceDuePhases(settings, tickedState, nowMillis)
         }
+    }
+
+    private suspend fun processTick(nowMillis: Long): Boolean {
+        val settings = settingsRepository.getOrDefault()
+        if (!settings.keepAliveEnabled) return false
+        val interactive = isDeviceInteractive()
+        var idle = false
+        var screenStateChanged = false
+        val screenAdjustedState = runtimeRepository.update { current ->
+            if (current.activeEngine == ActiveEngine.IDLE.name) {
+                idle = true
+                return@update current
+            }
+            val adjusted = adjustForScreenState(current, nowMillis, interactive)
+            screenStateChanged = adjusted != current
+            adjusted
+        }
+        if (idle) return false
+        if (screenStateChanged) {
+            if (interactive) {
+                refreshRuntimeNotifications(settings, screenAdjustedState)
+            } else {
+                notifications.cancelAllScheduled()
+            }
+        }
+        if (!interactive) {
+            return true
+        }
+        val tickedState = recordIncrementalEyeStats(settings, nowMillis)
+        // Refresh Live Update progress/chip; NotificationService dedupes identical payloads.
+        if (settings.notificationEnabled || settings.keepAliveEnabled) {
+            notifications.showOngoingStatus(tickedState)
+        }
+        advanceDuePhases(settings, nowMillis)
+        return true
     }
 
     private fun tickingFlow() = flow {
@@ -152,14 +171,21 @@ class TimerForegroundService : LifecycleService() {
     }
 
     private suspend fun handleScreenStateChange() {
+        RuntimeAdvanceGate.withAdvanceLock { applyScreenStateChange() }
+    }
+
+    private suspend fun applyScreenStateChange() {
         val settings = settingsRepository.getOrDefault()
-        val runtime = runtimeRepository.getOrDefault()
-        if (runtime.activeEngine == ActiveEngine.IDLE.name) return
         val interactive = isDeviceInteractive()
         val nowMillis = System.currentTimeMillis()
-        val adjustedState = adjustForScreenState(runtime, nowMillis, interactive)
-        if (adjustedState == runtime) return
-        runtimeRepository.upsert(adjustedState)
+        var changed = false
+        val adjustedState = runtimeRepository.update { current ->
+            if (current.activeEngine == ActiveEngine.IDLE.name) return@update current
+            val adjusted = adjustForScreenState(current, nowMillis, interactive)
+            changed = adjusted != current
+            adjusted
+        }
+        if (!changed) return
         if (interactive) {
             refreshRuntimeNotifications(settings, adjustedState)
         } else {
@@ -169,83 +195,96 @@ class TimerForegroundService : LifecycleService() {
 
     private suspend fun recordIncrementalEyeStats(
         settings: AppSettingsEntity,
-        state: RuntimeStateEntity,
         nowMillis: Long,
     ): RuntimeStateEntity {
-        if (!settings.statsEnabled || state.activeEngine != ActiveEngine.REMINDER.name) return state
-        if (QuietHours.isPauseTimerActive(settings, nowMillis) && state.reminderPhase in activeWorkPhases) {
-            val workEndAt = QuietHours.activeStartMillis(settings, nowMillis).coerceAtMost(nowMillis)
-            val seconds = workEndAt.coerceElapsedSecondsSince(max(state.reminderStartedAt, state.lastStatsTickAt))
-            if (seconds > 0L) {
-                val continuousSeconds = workEndAt.coerceElapsedSecondsSince(state.reminderStartedAt)
-                statisticsRepository.updateEyeStats(settings.statsEnabled, nowMillis) {
-                    it.copy(
-                        workingSeconds = it.workingSeconds + seconds,
-                        maxContinuousWorkSeconds = max(it.maxContinuousWorkSeconds, continuousSeconds),
+        // The stats increment is derived from the row read under the repository lock; only the
+        // statistics write itself (suspending) happens afterwards.
+        var pending: PendingEyeTick? = null
+        val next = runtimeRepository.update { state ->
+            pending = null
+            if (!settings.statsEnabled || state.activeEngine != ActiveEngine.REMINDER.name) {
+                return@update state
+            }
+            if (QuietHours.isPauseTimerActive(settings, nowMillis) && state.reminderPhase in activeWorkPhases) {
+                val workEndAt = QuietHours.activeStartMillis(settings, nowMillis).coerceAtMost(nowMillis)
+                val seconds = workEndAt.coerceElapsedSecondsSince(max(state.reminderStartedAt, state.lastStatsTickAt))
+                if (seconds > 0L) {
+                    pending = PendingEyeTick(
+                        workingSeconds = seconds,
+                        continuousWorkSeconds = workEndAt.coerceElapsedSecondsSince(state.reminderStartedAt),
                     )
                 }
+                // Park the cursor at now: carrying the remainder would bill the whole quiet window
+                // as work on the first tick after quiet hours end.
+                return@update state.copy(lastStatsTickAt = nowMillis, updatedAt = nowMillis)
             }
-            return state.copy(lastStatsTickAt = nowMillis, updatedAt = nowMillis).also {
-                runtimeRepository.upsert(it)
+            when (state.reminderPhase) {
+                ReminderPhase.WORKING.name,
+                ReminderPhase.PRE_ALERT.name,
+                ReminderPhase.AWAITING_ACTION.name -> {
+                    val base = max(state.reminderStartedAt, state.lastStatsTickAt)
+                    val seconds = nowMillis.coerceElapsedSecondsSince(base)
+                    if (seconds <= 0L) return@update state
+                    // A single tick delta this large is a wall-clock change or the loop sleeping
+                    // through the phase; the time is not verifiable as work, so bill nothing and
+                    // drop the anomaly instead of writing a huge daily total.
+                    if (seconds > MAX_SINGLE_ELAPSED_SECONDS) {
+                        return@update state.copy(lastStatsTickAt = nowMillis, updatedAt = nowMillis)
+                    }
+                    pending = PendingEyeTick(
+                        workingSeconds = seconds,
+                        continuousWorkSeconds = nowMillis.coerceElapsedSecondsSince(state.reminderStartedAt),
+                    )
+                    // Carry the sub-second remainder: jumping the cursor to now would drop it every tick.
+                    state.copy(lastStatsTickAt = base + seconds * 1_000L, updatedAt = nowMillis)
+                }
+                ReminderPhase.RESTING.name -> {
+                    val base = max(state.breakStartedAt, state.lastStatsTickAt)
+                    val seconds = nowMillis.coerceElapsedSecondsSince(base)
+                    if (seconds <= 0L) return@update state
+                    if (seconds > MAX_SINGLE_ELAPSED_SECONDS) {
+                        return@update state.copy(lastStatsTickAt = nowMillis, updatedAt = nowMillis)
+                    }
+                    pending = PendingEyeTick(restSeconds = seconds)
+                    state.copy(lastStatsTickAt = base + seconds * 1_000L, updatedAt = nowMillis)
+                }
+                else -> state
             }
         }
-        return when (state.reminderPhase) {
-            ReminderPhase.WORKING.name,
-            ReminderPhase.PRE_ALERT.name,
-            ReminderPhase.AWAITING_ACTION.name -> {
-                val seconds = nowMillis.coerceElapsedSecondsSince(max(state.reminderStartedAt, state.lastStatsTickAt))
-                if (seconds > 0L) {
-                    val continuousSeconds = nowMillis.coerceElapsedSecondsSince(state.reminderStartedAt)
-                    statisticsRepository.updateEyeStats(settings.statsEnabled, nowMillis) {
-                        it.copy(
-                            workingSeconds = it.workingSeconds + seconds,
-                            maxContinuousWorkSeconds = max(it.maxContinuousWorkSeconds, continuousSeconds),
-                        )
-                    }
-                }
-                state.copy(lastStatsTickAt = nowMillis, updatedAt = nowMillis).also {
-                    runtimeRepository.upsert(it)
-                }
+        pending?.let { tick ->
+            statisticsRepository.updateEyeStats(settings.statsEnabled, nowMillis) {
+                it.copy(
+                    workingSeconds = it.workingSeconds + tick.workingSeconds,
+                    restSeconds = it.restSeconds + tick.restSeconds,
+                    maxContinuousWorkSeconds = max(it.maxContinuousWorkSeconds, tick.continuousWorkSeconds),
+                )
             }
-            ReminderPhase.RESTING.name -> {
-                val seconds = nowMillis.coerceElapsedSecondsSince(max(state.breakStartedAt, state.lastStatsTickAt))
-                if (seconds > 0L) {
-                    statisticsRepository.updateEyeStats(settings.statsEnabled, nowMillis) {
-                        it.copy(restSeconds = it.restSeconds + seconds)
-                    }
-                }
-                state.copy(lastStatsTickAt = nowMillis, updatedAt = nowMillis).also {
-                    runtimeRepository.upsert(it)
-                }
-            }
-            else -> state
         }
+        return next
     }
 
     private suspend fun advanceDuePhases(
         settings: AppSettingsEntity,
-        state: RuntimeStateEntity,
         nowMillis: Long,
     ) {
-        val transition = when (state.activeEngine) {
-            ActiveEngine.REMINDER.name -> reminderEngine.advance(settings, state, nowMillis)
-            ActiveEngine.POMODORO.name -> pomodoroEngine.advance(settings, state, nowMillis)
-            else -> null
-        } ?: return
-        applyTransition(settings, nowMillis, transition)
-    }
-
-    private suspend fun applyTransition(
-        settings: AppSettingsEntity,
-        nowMillis: Long,
-        transition: RuntimeTransition,
-    ) {
-        statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, transition.eyeStatsDelta)
-        statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, transition.pomodoroStatsDelta)
-        runtimeRepository.upsert(transition.nextRuntime)
-        playAudioEvent(transition.audioEvent)
-        showBlockingOverlayIfNeeded(settings, transition.nextRuntime)
-        refreshRuntimeNotifications(settings, transition.nextRuntime)
+        // The engine runs inside the repository lock: computing a whole snapshot outside it would
+        // overwrite fields a concurrent writer (alarm receiver, sensors) just persisted.
+        var transition: RuntimeTransition? = null
+        runtimeRepository.update { current ->
+            val computed = when (current.activeEngine) {
+                ActiveEngine.REMINDER.name -> reminderEngine.advance(settings, current, nowMillis)
+                ActiveEngine.POMODORO.name -> pomodoroEngine.advance(settings, current, nowMillis)
+                else -> null
+            } ?: return@update current
+            transition = computed
+            computed.nextRuntime
+        }
+        val applied = transition ?: return
+        statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, applied.eyeStatsDelta)
+        statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, applied.pomodoroStatsDelta)
+        playAudioEvent(applied.audioEvent)
+        showBlockingOverlayIfNeeded(settings, applied.nextRuntime)
+        refreshRuntimeNotifications(settings, applied.nextRuntime)
     }
 
     private fun showBlockingOverlayIfNeeded(settings: AppSettingsEntity, state: RuntimeStateEntity) {
@@ -369,6 +408,12 @@ class TimerForegroundService : LifecycleService() {
     private fun Long.shiftedBy(deltaMillis: Long): Long {
         return if (this > 0L) this + deltaMillis else this
     }
+
+    private data class PendingEyeTick(
+        val workingSeconds: Long = 0L,
+        val restSeconds: Long = 0L,
+        val continuousWorkSeconds: Long = 0L,
+    )
 
     private companion object {
         private val activeWorkPhases = setOf(

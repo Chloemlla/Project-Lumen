@@ -49,7 +49,6 @@
     <string name="translation_checking_service">正在检查翻译服务…</string>
     <string name="translation_service_unavailable">翻译服务未配置或暂时不可用。</string>
     <string name="translation_error_blank_text">请输入文本后再翻译。</string>
-    <string name="translation_error_text_too_long">文本不能超过 5000 个字符。</string>
     <string name="translation_failed">翻译失败。</string>
     <string name="translation_result">译文</string>
     <string name="translation_copy_result">复制</string>
@@ -212,6 +211,15 @@
     <string name="enable_shizuku_app_inventory_upload">附带 Shizuku 用户应用清单</string>
     <string name="shizuku_app_inventory_authorization_needed">应用清单需要 Shizuku 正在运行且已授权。</string>
     <string name="diagnostic_security_policy">安全策略：请求会签名并鉴权，后端会限流，超大的诊断负载会被拒绝。</string>
+    <string name="remote_analysis_consent_title">远程护眼分析</string>
+    <string name="remote_analysis_consent_summary">距离与眨眼监测的摄像头画面默认只在本机处理。只有在你明确允许后，监测运行期间的画面帧才会上传到 Project Lumen 服务器用于分析。</string>
+    <string name="remote_analysis_consent_granted_at">已授权，自 %1$s 起生效</string>
+    <string name="remote_analysis_consent_not_granted">未授权 —— 画面帧仅在本机处理</string>
+    <string name="remote_analysis_consent_review">查看并授权</string>
+    <string name="remote_analysis_consent_revoke">撤销授权</string>
+    <string name="remote_analysis_consent_dialog_title">允许远程分析画面帧？</string>
+    <string name="remote_analysis_consent_dialog_message">授权后，距离或眨眼监测运行期间捕获的画面帧可能上传到 Project Lumen 服务器用于分析。此授权持续生效，直到你在这里撤销。</string>
+    <string name="remote_analysis_consent_allow">允许上传</string>
     <string name="shizuku_authorize">授权 Shizuku</string>
     <string name="shizuku_refresh_status">刷新状态</string>
     <string name="shizuku_status">Shizuku 状态</string>
@@ -387,6 +395,7 @@
     <string name="template_orange_flat_shadow_subtitle">带暖色专注感的扁平橙色板。</string>
     <string name="system_background_color">系统背景色</string>
     <string name="choose_template_image">选择图片</string>
+    <string name="template_image_target_lost">无法确定这张图片要用于哪个模板，请重新选择。</string>
     <string name="system_color_primary">主色</string>
     <string name="system_color_secondary">辅色</string>
     <string name="system_color_tertiary">强调色</string>
@@ -445,6 +454,8 @@
     <string name="backup_import_title">导入备份？</string>
     <string name="backup_import_message">设置将被覆盖，统计会按日期合并。</string>
     <string name="backup_import_confirm">导入</string>
+    <string name="backup_import_failed">备份导入失败：%1$s</string>
+    <string name="backup_import_dismiss">关闭</string>
     <string name="backup_schema_version">结构版本</string>
     <string name="backup_templates_count">模板数量</string>
     <string name="backup_eye_days_count">用眼统计天数</string>
@@ -528,6 +539,24 @@
     <string name="developer_crooot_tee_attestation">TEE 证明</string>
     <string name="developer_crooot_show_report">显示详细 CRooot 报告</string>
     <string name="developer_crooot_hide_report">隐藏详细 CRooot 报告</string>
+    <string name="developer_crooot_scan_title">设备安全扫描</string>
+    <string name="developer_crooot_scan_hint">点击“Scan Now”检查设备安全状态，包括 Root 检测、硬件完整性与 TEE 证明。</string>
+    <string name="developer_crooot_scanning">正在扫描设备安全…最多可能需要 60 秒。</string>
+    <string name="developer_crooot_scan_failed">扫描失败：%1$s</string>
+    <string name="developer_crooot_scan_now">开始扫描</string>
+    <string name="developer_crooot_scan_again">重新扫描</string>
+    <string name="developer_crooot_value_rooted">已 ROOT</string>
+    <string name="developer_crooot_value_clean">干净</string>
+    <string name="developer_crooot_value_found">发现</string>
+    <string name="developer_crooot_value_none">无</string>
+    <string name="developer_crooot_value_ok">正常</string>
+    <string name="developer_crooot_value_compromised">已受损</string>
+    <string name="developer_crooot_value_not_checked">未检查</string>
+    <string name="developer_crooot_value_enforcing">强制 ✓</string>
+    <string name="developer_crooot_value_permissive">宽容 ⚠</string>
+    <string name="developer_crooot_value_unknown">未知</string>
+    <string name="developer_crooot_value_verified">已验证</string>
+    <string name="developer_crooot_value_failed">失败</string>
     <string name="developer_overlay_enabled">实时悬浮调试小窗</string>
     <string name="developer_preview_enabled">低分辨率抽样预览</string>
     <string name="developer_ai_inference">AI 推理耗时</string>
@@ -586,6 +615,7 @@
     <string name="developer_shizuku_network_delegated_guard_cleared">委托联网加固已清除</string>
     <string name="developer_shizuku_network_delegated_guard_unsupported">委托联网加固不受支持</string>
     <string name="developer_shizuku_network_delegated_guard_not_attempted">未尝试委托联网加固</string>
+    <string name="developer_shizuku_network_delegated_guard_failed">委托联网加固本次调用失败</string>
     <string name="developer_shizuku_network_guard_status">%1$s · %2$s</string>
     <string name="developer_shizuku_network_last_error">网络策略错误</string>
     <string name="developer_security_api_base">后端 API 基础地址</string>
@@ -714,6 +744,9 @@
     <string name="eye_care_capability_review">查看</string>
     <string name="eye_care_apply_family_profile">应用家庭方案</string>
     <string name="eye_care_apply_local_guidance">应用本地建议</string>
+    <string name="eye_care_apply_confirm_title">覆盖当前设置？</string>
+    <string name="eye_care_apply_family_confirm_message">家庭方案会把提醒间隔改为 15 分钟、休息时长改为 30 秒、免打扰时段改为 21:00-07:00，并关闭跳过休息与自动亮度，同时收紧每日目标。原有数值在应用后无法恢复。</string>
+    <string name="eye_care_apply_guidance_confirm_message">本地建议会依据最近 14 天的统计重写提醒间隔、休息时长、预提醒与各项监测阈值。原有数值在应用后无法恢复。</string>
     <string name="eye_care_guide_title">护眼新手引导</string>
     <string name="eye_care_guide_message">按这个清单把现有防护能力串成每天可运行的护眼闭环。</string>
     <string name="eye_care_guide_step_recommended">应用基础防护方案</string>
@@ -833,6 +866,8 @@
     <string name="credit_mlkit_desc">用于距离与眨眼感知的端侧人脸/网格检测</string>
     <string name="credit_constraintlayout_desc">Compose 页面使用的约束布局辅助库</string>
     <string name="credit_material_icons_desc">界面中使用的 Material 扩展图标集</string>
+    <string name="credit_jetbrains_mono_desc">等宽字体；APK 内置其拉丁子集，全应用文本样式均使用它</string>
+    <string name="credit_crooot_sdk_desc">安全门禁背后的设备 Root 与完整性扫描</string>
     <string name="credit_undraw_desc">开源插画库；空状态与关于页使用随主题色变化的 undraw 矢量插画</string>
 
     <string name="device_insights_title">设备使用与电源洞察</string>

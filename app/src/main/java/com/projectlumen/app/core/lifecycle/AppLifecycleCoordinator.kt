@@ -18,6 +18,7 @@ import com.projectlumen.app.core.services.BootReceiver
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -33,10 +34,18 @@ class AppLifecycleCoordinator(
     private val settingsRepository = app.settingsRepository()
     private val runtimeRepository = app.runtimeRepository()
 
+    @Volatile
+    private var foregroundJob: Job? = null
+
+    @Volatile
+    private var nextDeviceRegistrationAtMillis = 0L
+
     override fun onStart(owner: LifecycleOwner) {
         app.backendConnectivity.onForeground()
         app.scheduleStoredCrashReportUpload()
-        scope.launch {
+        // Lock/unlock bursts must not stack half-finished resume passes on top of each other.
+        foregroundJob?.cancel()
+        foregroundJob = scope.launch {
             app.deviceInsights.refresh()
             // Android 15 force-stop cancels pending intents; if we detect a force-stop start,
             // rebuild alarms/workers before normal foreground resume work.
@@ -46,19 +55,20 @@ class AppLifecycleCoordinator(
             }
             val nowMillis = System.currentTimeMillis()
             val settings = settingsRepository.getOrDefault()
-            val runtime = runtimeRepository.getOrDefault()
-            registerDeviceAsset(settings)
             val shouldResumePausedTime = !settings.keepAliveEnabled
-            val foregroundRuntime = runtime.resumeAfterBackgroundPause(
-                nowMillis = nowMillis,
-                shouldResumePausedTime = shouldResumePausedTime,
-            )
-            val persistedRuntime = foregroundRuntime.copy(
-                lastForegroundAt = nowMillis,
-                lastBackgroundAt = if (shouldResumePausedTime) 0L else foregroundRuntime.lastBackgroundAt,
-                updatedAt = nowMillis,
-            )
-            runtimeRepository.upsert(persistedRuntime)
+            // Atomic read-modify-write: the 1 Hz clock writes the same record, and a snapshot taken
+            // here would roll a phase transition back.
+            val persistedRuntime = runtimeRepository.update { runtime ->
+                val foregroundRuntime = runtime.resumeAfterBackgroundPause(
+                    nowMillis = nowMillis,
+                    shouldResumePausedTime = shouldResumePausedTime,
+                )
+                foregroundRuntime.copy(
+                    lastForegroundAt = nowMillis,
+                    lastBackgroundAt = if (shouldResumePausedTime) 0L else foregroundRuntime.lastBackgroundAt,
+                    updatedAt = nowMillis,
+                )
+            }
             app.notifications.syncRuntimeAlarms(settings, persistedRuntime)
             if (settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled) {
                 runCatching { app.scheduleProximityMonitoring() }
@@ -79,11 +89,13 @@ class AppLifecycleCoordinator(
                 runCatching { app.startShizukuResilience() }
                     .onFailure { Log.w(TAG, "startShizukuResilience failed", it) }
             }
-            if (foregroundRuntime.activeEngine != ActiveEngine.IDLE.name && settings.keepAliveEnabled) {
+            if (persistedRuntime.activeEngine != ActiveEngine.IDLE.name && settings.keepAliveEnabled) {
                 runCatching { app.startTimerService() }
                     .onFailure { Log.w(TAG, "startTimerService failed", it) }
             }
         }
+        // Registration can block on a slow network, so it never shares the resume coroutine.
+        scope.launch { registerDeviceAsset(settingsRepository.getOrDefault()) }
     }
 
     override fun onStop(owner: LifecycleOwner) {
@@ -91,22 +103,21 @@ class AppLifecycleCoordinator(
         scope.launch {
             val nowMillis = System.currentTimeMillis()
             val settings = settingsRepository.getOrDefault()
-            val runtime = runtimeRepository.getOrDefault()
             val lifecycleLock = app.deviceControl.currentPolicy.lifecycleLock
             // Keepalive is only user-setting driven; server policy may not force sticky residency.
             val enforceKeepalive = settings.keepAliveEnabled
             if (!enforceKeepalive) {
-                runtimeRepository.upsert(
+                runtimeRepository.update { runtime ->
                     runtime.copy(
                         lastBackgroundAt = nowMillis,
                         updatedAt = nowMillis,
-                    ),
-                )
+                    )
+                }
                 app.notifications.cancelAllScheduled()
                 app.notifications.cancelOngoingStatus()
                 app.stopTimerService()
             } else {
-                runtimeRepository.upsert(runtime.copy(updatedAt = nowMillis))
+                runtimeRepository.update { runtime -> runtime.copy(updatedAt = nowMillis) }
             }
             if (lifecycleLock.enabled && lifecycleLock.reportEvents) {
                 app.deviceControl.onUserStopIntercepted("process_background")
@@ -122,10 +133,14 @@ class AppLifecycleCoordinator(
 
     private suspend fun registerDeviceAsset(settings: AppSettingsEntity) {
         if (!app.backendConnectivity.decision(BackendCapability.DEVICE_REGISTRATION).executable) return
+        val nowMillis = System.currentTimeMillis()
+        if (nowMillis < nextDeviceRegistrationAtMillis) return
         val deviceInstallationId = app.secureCredentials
             .deviceInstallationId()
             .takeIf { it.isNotBlank() }
             ?: return
+        // Reserved before the request so a burst of foreground events cannot stack retries.
+        nextDeviceRegistrationAtMillis = nowMillis + REGISTRATION_RETRY_MILLIS
         val accessToken = accessTokenForDeviceRegistration(deviceInstallationId) ?: return
         runCatching {
             app.apiClient.registerDevice(
@@ -137,6 +152,8 @@ class AppLifecycleCoordinator(
                 localSecurityConfig = localSecurityConfig(settings),
                 securityEvidence = app.deviceSecurityGate.backendEvidence(),
             )
+        }.onSuccess {
+            nextDeviceRegistrationAtMillis = nowMillis + REGISTRATION_INTERVAL_MILLIS
         }.onFailure { throwable ->
             if (throwable !is BackendCommunicationBlockedException) app.recordHandledFailure(throwable)
         }
@@ -259,5 +276,7 @@ class AppLifecycleCoordinator(
     private companion object {
         private const val TAG = "AppLifecycle"
         private const val TOKEN_REFRESH_MARGIN_MILLIS = 60_000L
+        private const val REGISTRATION_INTERVAL_MILLIS = 6L * 60L * 60L * 1_000L
+        private const val REGISTRATION_RETRY_MILLIS = 5L * 60L * 1_000L
     }
 }

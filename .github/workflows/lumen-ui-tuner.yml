@@ -30,7 +30,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   packages: read
 
 concurrency:
@@ -47,8 +47,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          token: ${{ secrets.USER_PAT || github.token }}
-          fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -58,32 +57,8 @@ jobs:
       - name: Install tuner dependencies and build
         working-directory: tools/lumen-ui-tuner
         run: |
-          npm install
+          npm ci
           npm run build
-
-      - name: Commit generated tuner lockfile
-        if: github.event_name != 'pull_request'
-        env:
-          BRANCH_NAME: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add tools/lumen-ui-tuner/package-lock.json
-          git diff --cached --quiet && echo "No lockfile changes to commit" && exit 0
-          git commit -m "chore: update UI tuner npm lockfile"
-          for attempt in 1 2 3; do
-            git fetch origin "+refs/heads/$BRANCH_NAME:refs/remotes/origin/$BRANCH_NAME"
-            if git rebase "origin/$BRANCH_NAME" && git push origin "HEAD:refs/heads/$BRANCH_NAME"; then
-              exit 0
-            fi
-            git rebase --abort || true
-            if [ "$attempt" -lt 3 ]; then
-              sleep 5
-            fi
-          done
-          echo "Failed to push lockfile update after rebasing onto origin/$BRANCH_NAME" >&2
-          exit 1
 
       - name: Upload tuner dist
         uses: actions/upload-artifact@v4
@@ -104,9 +79,6 @@ jobs:
           gradle-version: "9.5.1"
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-cleanup: on-success
-
-      # - name: Set up Android native toolchain
-      #   uses: ./.github/actions/setup-android-native-toolchain
 
       - name: Read app version
         run: |

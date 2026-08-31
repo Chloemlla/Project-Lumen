@@ -3,11 +3,9 @@ package com.projectlumen.app.app
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
-import com.chloemlla.lumen.crash.CrashReport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -16,14 +14,13 @@ import kotlinx.coroutines.flow.stateIn
 internal class ProjectLumenStateStore(
     repositories: ProjectLumenRepositories,
     scope: CoroutineScope,
-    now: StateFlow<Long>,
-    private val recordCrashReport: (Throwable) -> CrashReport?,
+    private val clock: LumenUiClock,
+    private val recordHandledFailure: (Throwable) -> Unit,
 ) {
     private val settingsPreview = MutableStateFlow<AppSettingsEntity?>(null)
-    private val crashReport = MutableStateFlow<CrashReport?>(null)
     private val settingsState = combine(
         repositories.settings.observe().catch { throwable ->
-            recordCrash(throwable)
+            recordHandledFailure(throwable)
             emit(null)
         }.distinctUntilChanged(),
         settingsPreview,
@@ -37,19 +34,19 @@ internal class ProjectLumenStateStore(
     private val baseDataState = combine(
         settingsState,
         repositories.runtime.observe().catch { throwable ->
-            recordCrash(throwable)
+            recordHandledFailure(throwable)
             emit(null)
         }.distinctUntilChanged(),
         repositories.statistics.observeEyeStats().catch { throwable ->
-            recordCrash(throwable)
+            recordHandledFailure(throwable)
             emit(emptyList())
         }.distinctUntilChanged(),
         repositories.statistics.observePomodoroStats().catch { throwable ->
-            recordCrash(throwable)
+            recordHandledFailure(throwable)
             emit(emptyList())
         }.distinctUntilChanged(),
         repositories.tipTemplates.observeAll().catch { throwable ->
-            recordCrash(throwable)
+            recordHandledFailure(throwable)
             emit(emptyList())
         }.distinctUntilChanged(),
     ) { settingsState, runtime, eyeStats, pomodoroStats, templates ->
@@ -59,6 +56,7 @@ internal class ProjectLumenStateStore(
             eyeStats = eyeStats,
             pomodoroStats = pomodoroStats,
             templates = templates,
+            clock = clock,
             isReady = settingsState.persistedReady && runtime != null,
         )
     }
@@ -66,15 +64,15 @@ internal class ProjectLumenStateStore(
     private val dataState = combine(
         baseDataState,
         repositories.dailyGoals.observe().catch { throwable ->
-            recordCrash(throwable)
+            recordHandledFailure(throwable)
             emit(null)
         }.distinctUntilChanged(),
         repositories.entitlements.observeAll().catch { throwable ->
-            recordCrash(throwable)
+            recordHandledFailure(throwable)
             emit(emptyList())
         }.distinctUntilChanged(),
         repositories.reminderPlans.observeActive().catch { throwable ->
-            recordCrash(throwable)
+            recordHandledFailure(throwable)
             emit(emptyList())
         }.distinctUntilChanged(),
         repositories.deviceInsights.observe(),
@@ -88,24 +86,14 @@ internal class ProjectLumenStateStore(
         )
     }
 
-    val uiState = combine(dataState, now, crashReport) { state, nowMillis, report ->
-        state.copy(nowMillis = nowMillis, crashReport = report)
-    }.stateIn(
+    val uiState = dataState.stateIn(
         scope = scope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = ProjectLumenUiState(),
+        initialValue = ProjectLumenUiState(clock = clock),
     )
 
     fun previewSettings(settings: AppSettingsEntity) {
         settingsPreview.value = settings
-    }
-
-    fun recordCrash(throwable: Throwable) {
-        crashReport.value = recordCrashReport(throwable)
-    }
-
-    fun clearCrashReport() {
-        crashReport.value = null
     }
 
     private fun resolveSettings(

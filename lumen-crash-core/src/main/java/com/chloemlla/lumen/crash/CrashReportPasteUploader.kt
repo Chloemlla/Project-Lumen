@@ -1,6 +1,5 @@
 package com.chloemlla.lumen.crash
 
-import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
@@ -23,9 +22,9 @@ object CrashReportPasteUploader {
 
     /**
      * Optional host hook: when it returns true, open connections with
-     * [Proxy.NO_PROXY] so a Clash VPN process-binding path does not also stack
-     * the JVM/system HTTP proxy. Set from the host app (e.g. Project Lumen
-     * ClashPartnerCompat); defaults to null / no skip.
+     * [Proxy.NO_PROXY] so a VPN process-binding path does not also stack the
+     * JVM/system HTTP proxy. Set from the host app when its current network
+     * environment requires a direct connection; defaults to null / no skip.
      */
     @Volatile
     var shouldSkipManualProxy: (() -> Boolean)? = null
@@ -47,58 +46,95 @@ object CrashReportPasteUploader {
             val bodyBytes = buildMultipartBody(boundary = boundary, fieldName = "_", value = payload)
                 .toByteArray(StandardCharsets.UTF_8)
 
-            val url = URL(endpoint)
-            val forceDirect = runCatching { shouldSkipManualProxy?.invoke() == true }.getOrDefault(false)
-            val rawConnection =
-                if (forceDirect) {
-                    // Clash VPN path: process is bound to VPN; never stack system/app proxy.
-                    url.openConnection(Proxy.NO_PROXY)
-                } else {
-                    url.openConnection()
-                }
-            val connection = (rawConnection as HttpURLConnection).apply {
-                requestMethod = "POST"
-                doInput = true
-                doOutput = true
-                useCaches = false
-                connectTimeout = connectTimeoutMillis.coerceAtLeast(1_000)
-                readTimeout = readTimeoutMillis.coerceAtLeast(1_000)
-                instanceFollowRedirects = true
-                setRequestProperty("Accept", "text/plain, */*")
-                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-                setRequestProperty(
-                    "Content-Length",
-                    bodyBytes.size.toString(),
+            val first = post(endpoint, bodyBytes, boundary, connectTimeoutMillis, readTimeoutMillis)
+            val redirectLocation = first.redirectLocation
+            val response = if (redirectLocation == null) {
+                first
+            } else {
+                // Followed manually and at most once: the platform HttpURLConnection follows an
+                // https -> http downgrade by default, which would resend the report in clear text.
+                val redirected = resolveHttpsRedirect(endpoint, redirectLocation)
+                    ?: throw IOException("Paste upload refused a non-HTTPS redirect.")
+                post(redirected, bodyBytes, boundary, connectTimeoutMillis, readTimeoutMillis)
+            }
+
+            if (response.status !in 200..299) {
+                throw IOException(
+                    "Paste upload failed with HTTP ${response.status}: ${response.body.take(200)}",
                 )
-                setRequestProperty("User-Agent", "lumen-crash-sdk")
             }
-
-            try {
-                connection.outputStream.use { stream ->
-                    stream.write(bodyBytes)
-                    stream.flush()
-                }
-
-                val status = connection.responseCode
-                val responseText = readBody(
-                    if (status in 200..299) connection.inputStream else connection.errorStream,
-                ).trim()
-
-                if (status !in 200..299) {
-                    throw IOException(
-                        "Paste upload failed with HTTP $status: ${responseText.take(200)}",
-                    )
-                }
-                resolveShareableUrl(endpoint, responseText)
-            } finally {
-                runCatching { connection.disconnect() }
-            }
+            resolveShareableUrl(endpoint, response.body)
         } catch (error: Throwable) {
             // Normalize all failures (including Error subclasses from flaky runtimes) so UI
             // callers can treat paste upload as non-fatal best-effort work.
             if (error is IOException) throw error
             throw IOException("Paste upload failed: ${error.message ?: error::class.java.simpleName}", error)
         }
+    }
+
+    private class HttpAttempt(
+        val status: Int,
+        val body: String,
+        val redirectLocation: String?,
+    )
+
+    private fun post(
+        endpoint: String,
+        bodyBytes: ByteArray,
+        boundary: String,
+        connectTimeoutMillis: Int,
+        readTimeoutMillis: Int,
+    ): HttpAttempt {
+        val url = URL(endpoint)
+        val forceDirect = runCatching { shouldSkipManualProxy?.invoke() == true }.getOrDefault(false)
+        val rawConnection =
+            if (forceDirect) {
+                // Clash VPN path: process is bound to VPN; never stack system/app proxy.
+                url.openConnection(Proxy.NO_PROXY)
+            } else {
+                url.openConnection()
+            }
+        val connection = (rawConnection as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doInput = true
+            doOutput = true
+            useCaches = false
+            connectTimeout = connectTimeoutMillis.coerceAtLeast(1_000)
+            readTimeout = readTimeoutMillis.coerceAtLeast(1_000)
+            instanceFollowRedirects = false
+            setRequestProperty("Accept", "text/plain, */*")
+            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            setRequestProperty(
+                "Content-Length",
+                bodyBytes.size.toString(),
+            )
+            setRequestProperty("User-Agent", "lumen-crash-sdk")
+        }
+
+        try {
+            connection.outputStream.use { stream ->
+                stream.write(bodyBytes)
+                stream.flush()
+            }
+
+            val status = connection.responseCode
+            val responseText = readBody(
+                if (status in 200..299) connection.inputStream else connection.errorStream,
+            ).trim()
+            val location = if (status in 300..399) {
+                connection.getHeaderField("Location")?.takeIf { it.isNotBlank() }
+            } else {
+                null
+            }
+            return HttpAttempt(status, responseText, location)
+        } finally {
+            runCatching { connection.disconnect() }
+        }
+    }
+
+    private fun resolveHttpsRedirect(currentUrl: String, location: String): String? {
+        val resolved = runCatching { URL(URL(currentUrl), location).toString() }.getOrNull() ?: return null
+        return resolved.takeIf { it.startsWith("https://", ignoreCase = true) }
     }
 
     internal fun normalizeBaseUrl(baseUrl: String): String {
@@ -146,8 +182,20 @@ object CrashReportPasteUploader {
 
     private fun readBody(stream: java.io.InputStream?): String {
         if (stream == null) return ""
-        return BufferedReader(InputStreamReader(stream, StandardCharsets.UTF_8)).use { reader ->
-            reader.readText()
+        return InputStreamReader(stream, StandardCharsets.UTF_8).use { reader ->
+            val buffer = CharArray(READ_CHUNK_CHARS)
+            val text = StringBuilder()
+            // The response only carries a paste id or URL, so a larger body is never useful.
+            while (text.length < MAX_RESPONSE_CHARS) {
+                val limit = minOf(buffer.size, MAX_RESPONSE_CHARS - text.length)
+                val read = reader.read(buffer, 0, limit)
+                if (read <= 0) break
+                text.append(buffer, 0, read)
+            }
+            text.toString()
         }
     }
+
+    private const val MAX_RESPONSE_CHARS = 64 * 1024
+    private const val READ_CHUNK_CHARS = 4 * 1024
 }

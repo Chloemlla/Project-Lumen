@@ -18,6 +18,9 @@ private val reportLinuxHomeRegex = Regex("""/home/[^/\s]+""")
 private val reportMacHomeRegex = Regex("""/Users/[^/\s]+""")
 private val reportContentUriRegex = Regex("""content://[^\s]+""")
 private val reportFileUriRegex = Regex("""file://[^\s]+""")
+private val reportBearerTokenRegex = Regex("""(?i)Bearer\s+[A-Za-z0-9._~+/=-]{8,}""")
+private val reportSecretParamRegex =
+    Regex("""(?i)\b(token|key|secret|password|passwd|auth|signature)=[^&\s"']+""")
 private const val REPORT_HEX_DIGITS = "0123456789abcdef"
 
 data class CrashReport(
@@ -298,6 +301,8 @@ data class CrashReport(
                 .replace(reportMacHomeRegex, "[user-home]")
                 .replace(reportContentUriRegex, "[content-uri]")
                 .replace(reportFileUriRegex, "[file-uri]")
+                .replace(reportBearerTokenRegex, "Bearer [redacted]")
+                .replace(reportSecretParamRegex, "$1=[redacted]")
         }
 
         private const val BYTES_PER_MEBIBYTE = 1024L * 1024L

@@ -2,6 +2,7 @@ package com.projectlumen.app.ui.svg.drawablevectors
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType.Companion.NonZero
 import androidx.compose.ui.graphics.SolidColor
@@ -16,7 +17,10 @@ import com.projectlumen.app.ui.theme.LocalFixedColorRoles
 
 @Composable
 fun DynamicColorImageVectors.coder(): ImageVector {
-    return Builder(
+    val lumenColorScheme = MaterialTheme.colorScheme
+    val lumenFixedColors = LocalFixedColorRoles.current
+    return remember(lumenColorScheme, lumenFixedColors) {
+        Builder(
             name = "Coder",
             defaultWidth = 717.67004.dp,
             defaultHeight = 453.96432.dp,
@@ -66,7 +70,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -89,7 +93,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                fill = SolidColor(lumenColorScheme.surfaceContainerHighest),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -110,7 +114,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                fill = SolidColor(lumenColorScheme.surfaceContainerHighest),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -176,7 +180,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surface),
+                fill = SolidColor(lumenColorScheme.surface),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -233,7 +237,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -253,7 +257,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -273,7 +277,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -293,7 +297,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -313,7 +317,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -333,7 +337,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -353,7 +357,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -373,7 +377,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -393,7 +397,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -413,7 +417,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -433,7 +437,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -453,7 +457,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -473,7 +477,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -493,7 +497,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -513,7 +517,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -533,7 +537,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -553,7 +557,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -573,7 +577,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -593,7 +597,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -613,7 +617,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -633,7 +637,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -653,7 +657,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -673,7 +677,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -693,7 +697,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -713,7 +717,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -733,7 +737,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -753,7 +757,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -773,7 +777,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -793,7 +797,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -813,7 +817,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -833,7 +837,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -853,7 +857,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -873,7 +877,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -893,7 +897,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1078,7 +1082,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(LocalFixedColorRoles.current.tertiaryFixedDim),
+                fill = SolidColor(lumenFixedColors.tertiaryFixedDim),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1199,7 +1203,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1235,7 +1239,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1251,7 +1255,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1267,7 +1271,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1283,7 +1287,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1299,7 +1303,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1315,7 +1319,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1331,7 +1335,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1352,7 +1356,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1373,7 +1377,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1389,7 +1393,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1410,7 +1414,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1431,7 +1435,7 @@ fun DynamicColorImageVectors.coder(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -1448,4 +1452,5 @@ fun DynamicColorImageVectors.coder(): ImageVector {
             }
         }
         .build()
+    }
 }

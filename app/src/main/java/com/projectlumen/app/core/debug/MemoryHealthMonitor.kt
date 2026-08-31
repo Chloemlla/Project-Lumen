@@ -6,6 +6,7 @@ import android.os.Debug
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.updateAndGet
 
 data class MemoryHealthSnapshot(
     val sampledAtMillis: Long = 0L,
@@ -25,6 +26,7 @@ object MemoryHealthMonitor {
     private val _snapshot = MutableStateFlow(MemoryHealthSnapshot())
     val snapshot: StateFlow<MemoryHealthSnapshot> = _snapshot.asStateFlow()
 
+    // Debug.getMemoryInfo 会遍历 /proc/self/smaps，必须在后台线程调用。
     fun sample(context: Context, nowMillis: Long = System.currentTimeMillis()): MemoryHealthSnapshot {
         return capture(context, nowMillis, trimLevel = null)
     }
@@ -44,22 +46,21 @@ object MemoryHealthMonitor {
         val systemMemory = ActivityManager.MemoryInfo()
         context.getSystemService(ActivityManager::class.java)?.getMemoryInfo(systemMemory)
 
-        val previous = _snapshot.value
-        val snapshot = MemoryHealthSnapshot(
-            sampledAtMillis = nowMillis,
-            totalPssKb = processMemory.totalPss,
-            javaHeapKb = processMemory.statKb("summary.java-heap").ifZero(processMemory.dalvikPss),
-            nativeHeapKb = processMemory.statKb("summary.native-heap").ifZero(processMemory.nativePss),
-            graphicsKb = processMemory.statKb("summary.graphics"),
-            systemAvailKb = systemMemory.availMem / BYTES_PER_KB,
-            systemTotalKb = systemMemory.totalMem / BYTES_PER_KB,
-            systemThresholdKb = systemMemory.threshold / BYTES_PER_KB,
-            systemLowMemory = systemMemory.lowMemory,
-            lastTrimLevel = trimLevel ?: previous.lastTrimLevel,
-            lastTrimAtMillis = if (trimLevel != null) nowMillis else previous.lastTrimAtMillis,
-        )
-        _snapshot.value = snapshot
-        return snapshot
+        return _snapshot.updateAndGet { previous ->
+            MemoryHealthSnapshot(
+                sampledAtMillis = nowMillis,
+                totalPssKb = processMemory.totalPss,
+                javaHeapKb = processMemory.statKb("summary.java-heap").ifZero(processMemory.dalvikPss),
+                nativeHeapKb = processMemory.statKb("summary.native-heap").ifZero(processMemory.nativePss),
+                graphicsKb = processMemory.statKb("summary.graphics"),
+                systemAvailKb = systemMemory.availMem / BYTES_PER_KB,
+                systemTotalKb = systemMemory.totalMem / BYTES_PER_KB,
+                systemThresholdKb = systemMemory.threshold / BYTES_PER_KB,
+                systemLowMemory = systemMemory.lowMemory,
+                lastTrimLevel = trimLevel ?: previous.lastTrimLevel,
+                lastTrimAtMillis = if (trimLevel != null) nowMillis else previous.lastTrimAtMillis,
+            )
+        }
     }
 
     private fun Debug.MemoryInfo.statKb(key: String): Int {

@@ -7,7 +7,10 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
+import android.net.Uri
+import android.util.Log
 import androidx.core.content.FileProvider
+import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.share.SecureShareIntents
 import androidx.core.graphics.createBitmap
 import com.projectlumen.app.R
@@ -18,54 +21,104 @@ import java.io.FileOutputStream
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
-class ExportService(private val context: Context) {
+/**
+ * Renders and shares statistics exports.
+ *
+ * Rendering a bitmap or a PDF page and writing it to disk is far too slow for the caller's thread
+ * (the entry points are invoked straight from Compose click handlers), so every export runs on
+ * [Dispatchers.IO] and only the chooser launch returns to the main thread. Exports are serialised
+ * because they all write to fixed cache file names.
+ */
+class ExportService(
+    private val context: Context,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+) {
+    private val exportLock = Mutex()
+
     fun shareCsv(eyeStats: List<DailyEyeStatsEntity>, pomodoroStats: List<DailyPomodoroStatsEntity>) {
-        val file = File(context.cacheDir, "project_lumen_stats.csv")
-        file.writeText(buildCsv(eyeStats, pomodoroStats), Charsets.UTF_8)
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        SecureShareIntents.shareStream(
-            context = context,
-            uri = uri,
-            mimeType = "text/csv",
-            subject = context.getString(R.string.export_subject),
-            chooserTitle = context.getString(R.string.export_share),
-        )
+        export {
+            val file = File(context.cacheDir, "project_lumen_stats.csv")
+            file.writeText(buildCsv(eyeStats, pomodoroStats), Charsets.UTF_8)
+            share(
+                uri = fileUri(file),
+                mimeType = "text/csv",
+                subject = context.getString(R.string.export_subject),
+            )
+        }
     }
 
     fun shareMonthlyPdf(eyeStats: List<DailyEyeStatsEntity>, pomodoroStats: List<DailyPomodoroStatsEntity>) {
-        val file = File(context.cacheDir, "project_lumen_monthly_report.pdf")
-        FileOutputStream(file).use { output ->
-            val document = buildMonthlyPdf(eyeStats, pomodoroStats)
-            try {
-                document.writeTo(output)
-            } finally {
-                document.close()
+        export {
+            val file = File(context.cacheDir, "project_lumen_monthly_report.pdf")
+            FileOutputStream(file).use { output ->
+                val document = buildMonthlyPdf(eyeStats, pomodoroStats)
+                try {
+                    document.writeTo(output)
+                } finally {
+                    document.close()
+                }
             }
+            share(
+                uri = fileUri(file),
+                mimeType = "application/pdf",
+                subject = context.getString(R.string.monthly_report_subject),
+            )
         }
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        SecureShareIntents.shareStream(
-            context = context,
-            uri = uri,
-            mimeType = "application/pdf",
-            subject = context.getString(R.string.monthly_report_subject),
-            chooserTitle = context.getString(R.string.export_share),
-        )
     }
 
     fun shareStatsImage(eyeStats: List<DailyEyeStatsEntity>, pomodoroStats: List<DailyPomodoroStatsEntity>) {
-        val file = File(context.cacheDir, "project_lumen_stats.png")
-        FileOutputStream(file).use { output ->
-            buildStatsBitmap(eyeStats, pomodoroStats).compress(Bitmap.CompressFormat.PNG, 100, output)
+        export {
+            val file = File(context.cacheDir, "project_lumen_stats.png")
+            FileOutputStream(file).use { output ->
+                val bitmap = buildStatsBitmap(eyeStats, pomodoroStats)
+                try {
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+                } finally {
+                    bitmap.recycle()
+                }
+            }
+            share(
+                uri = fileUri(file),
+                mimeType = "image/png",
+                subject = context.getString(R.string.export_subject),
+            )
         }
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        SecureShareIntents.shareStream(
-            context = context,
-            uri = uri,
-            mimeType = "image/png",
-            subject = context.getString(R.string.export_subject),
-            chooserTitle = context.getString(R.string.export_share),
-        )
+    }
+
+    private fun export(block: suspend () -> Unit) {
+        scope.launch {
+            exportLock.withLock {
+                runCatching { block() }.onFailure { throwable ->
+                    Log.e(TAG, "Statistics export failed", throwable)
+                    (context.applicationContext as? ProjectLumenApplication)?.recordHandledFailure(throwable)
+                }
+            }
+        }
+    }
+
+    private fun fileUri(file: File): Uri {
+        return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    }
+
+    private suspend fun share(uri: Uri, mimeType: String, subject: String) {
+        val chooserTitle = context.getString(R.string.export_share)
+        withContext(Dispatchers.Main) {
+            SecureShareIntents.shareStream(
+                context = context,
+                uri = uri,
+                mimeType = mimeType,
+                subject = subject,
+                chooserTitle = chooserTitle,
+            )
+        }
     }
 
     private fun buildCsv(
@@ -262,5 +315,9 @@ class ExportService(private val context: Context) {
         val radius = 12f
         canvas.drawRoundRect(RectF(x, y, x + width, y + 20f), radius, radius, trackPaint)
         canvas.drawRoundRect(RectF(x, y, x + width * progress.coerceIn(0.04f, 1f), y + 20f), radius, radius, fillPaint)
+    }
+
+    private companion object {
+        const val TAG = "ExportService"
     }
 }

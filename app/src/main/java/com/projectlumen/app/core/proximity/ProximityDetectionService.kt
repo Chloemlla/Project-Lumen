@@ -20,17 +20,22 @@ import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.debug.DeveloperDebugFrameStore
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
+import com.projectlumen.app.core.repositories.StatisticsRepository
 import com.projectlumen.app.core.services.ForegroundServiceController
-import com.projectlumen.app.core.time.todayKey
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
 class ProximityDetectionService : Service() {
+    private val detectionRunning = AtomicBoolean(false)
     private val scope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
             runCatching { application as? ProjectLumenApplication }
@@ -43,8 +48,13 @@ class ProximityDetectionService : Service() {
         val app = application as ProjectLumenApplication
         if (
             !ProximityCameraForegroundEligibility.canStartCameraForegroundService(this) ||
-            !startCameraForeground(app, startId)
+            !startCameraForeground(app)
         ) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        // A second concurrent round would evict the first client from the front camera.
+        if (!detectionRunning.compareAndSet(false, true)) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
@@ -54,25 +64,30 @@ class ProximityDetectionService : Service() {
             recordForegroundServiceStart(app, now, flags)
         }
         scope.launch {
-            runCatching { runDetection(app, calibrate) }
-                .onFailure { throwable ->
-                    app.recordHandledFailure(throwable)
-                    clearActiveState(app)
+            try {
+                runDetection(app, calibrate)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (throwable: Throwable) {
+                app.recordHandledFailure(throwable)
+                withContext(NonCancellable) { clearActiveState(app) }
+            } finally {
+                detectionRunning.set(false)
+                withContext(NonCancellable) {
+                    recordForegroundServiceStop(app, System.currentTimeMillis())
                 }
-            stopSelf(startId)
+                stopSelf(startId)
+            }
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
         val app = application as? ProjectLumenApplication
-        if (app != null) {
-            CoroutineScope(Dispatchers.IO).launch { recordForegroundServiceStop(app, System.currentTimeMillis()) }
-            app.deviceControl.onServiceDestroyed(
-                processName = packageName,
-                reason = "proximity_service_destroy",
-            )
-        }
+        app?.deviceControl?.onServiceDestroyed(
+            processName = packageName,
+            reason = "proximity_service_destroy",
+        )
         scope.cancel()
         super.onDestroy()
     }
@@ -82,13 +97,10 @@ class ProximityDetectionService : Service() {
         if (app != null) {
             scope.launch {
                 val now = System.currentTimeMillis()
-                val runtimeRepository = app.runtimeRepository()
-                runtimeRepository.get()?.let {
-                    runtimeRepository.upsert(
-                        it.copy(
-                            foregroundServiceLastTaskRemovedAt = now,
-                            updatedAt = now,
-                        ),
+                app.runtimeRepository().update {
+                    it.copy(
+                        foregroundServiceLastTaskRemovedAt = now,
+                        updatedAt = now,
                     )
                 }
             }
@@ -105,8 +117,8 @@ class ProximityDetectionService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun startCameraForeground(app: ProjectLumenApplication, startId: Int): Boolean {
-        val promoted = ForegroundServiceController.promote(
+    private fun startCameraForeground(app: ProjectLumenApplication): Boolean {
+        return ForegroundServiceController.promote(
             service = this,
             notificationId = NotificationIds.PROXIMITY_FOREGROUND,
             notificationProvider = { app.notifications.buildProximityForegroundNotification() },
@@ -117,14 +129,9 @@ class ProximityDetectionService : Service() {
             },
             eligibilityCheck = { ProximityCameraForegroundEligibility.canStartCameraForegroundService(this) },
         )
-        if (!promoted) {
-            stopSelf(startId)
-        }
-        return promoted
     }
 
     private suspend fun runDetection(app: ProjectLumenApplication, calibrate: Boolean) {
-        val runtimeRepository = app.runtimeRepository()
         val settingsRepository = app.settingsRepository()
         val settings = settingsRepository.get() ?: return
         if (!calibrate && !settings.proximityMonitoringEnabled && !settings.blinkMonitoringEnabled) return
@@ -135,8 +142,8 @@ class ProximityDetectionService : Service() {
         }
 
         val now = System.currentTimeMillis()
-        runtimeRepository.get()?.let {
-            runtimeRepository.upsert(it.copy(proximityMonitoringActive = true, updatedAt = now))
+        app.runtimeRepository().update {
+            it.copy(proximityMonitoringActive = true, updatedAt = now)
         }
 
         val captureSeconds = when {
@@ -147,7 +154,31 @@ class ProximityDetectionService : Service() {
             ).coerceIn(2, 15)
             else -> settings.proximityCaptureSeconds.coerceIn(1, 2)
         }
-        val samples = ProximityCameraSampler(this).captureFaceDistanceSamples(
+        // One sampler per round: the ML Kit detectors it owns must be closed again.
+        ProximityCameraSampler(this).use { sampler ->
+            runDetectionRound(
+                app = app,
+                sampler = sampler,
+                settings = settings,
+                calibrate = calibrate,
+                captureSeconds = captureSeconds,
+                nowMillis = now,
+            )
+        }
+    }
+
+    private suspend fun runDetectionRound(
+        app: ProjectLumenApplication,
+        sampler: ProximityCameraSampler,
+        settings: AppSettingsEntity,
+        calibrate: Boolean,
+        captureSeconds: Int,
+        nowMillis: Long,
+    ) {
+        val runtimeRepository = app.runtimeRepository()
+        val settingsRepository = app.settingsRepository()
+        val now = nowMillis
+        val samples = sampler.captureFaceDistanceSamples(
             durationMillis = captureSeconds * 1000L,
             publishDebugFrame = latestSettingsNeedsDebugFrame(settings),
         )
@@ -178,56 +209,59 @@ class ProximityDetectionService : Service() {
             previousLastWarningAt = runtime?.blinkLastWarningAt ?: 0L,
             nowMillis = now,
         )
-        if (tooClose) {
+        if (tooClose || blinkState.shouldWarn) {
             incrementEyeStats(app, now) {
                 it.copy(
                     proximityWarningCount = it.proximityWarningCount + if (shouldWarn) 1 else 0,
-                    proximityCloseSeconds = it.proximityCloseSeconds + captureSeconds,
+                    proximityCloseSeconds = it.proximityCloseSeconds + if (tooClose) captureSeconds else 0,
+                    eyeDryWarningCount = it.eyeDryWarningCount + if (blinkState.shouldWarn) 1 else 0,
                 )
-            }
-        }
-        if (blinkState.shouldWarn) {
-            incrementEyeStats(app, now) {
-                it.copy(eyeDryWarningCount = it.eyeDryWarningCount + 1)
             }
         }
         if (shouldWarn) app.notifications.showProximityWarning(ratioPercent)
         if (blinkState.shouldWarn) app.notifications.showEyeDryWarning()
-        if (latestSettings.globalOverlayEnabled && shouldWarn && ratioPercent >= latestSettings.overlayStrictDistancePercent) {
+        val showDistanceOverlay = latestSettings.globalOverlayEnabled &&
+            shouldWarn &&
+            ratioPercent >= latestSettings.overlayStrictDistancePercent
+        val showBlinkOverlay = latestSettings.globalOverlayEnabled && blinkState.shouldWarn
+        // Two back-to-back overlays would only restart the countdown and hide the first message.
+        if (showDistanceOverlay || showBlinkOverlay) {
             EyeProtectionOverlayService.show(
                 context = this,
-                title = getString(com.projectlumen.app.R.string.overlay_distance_title),
-                message = getString(com.projectlumen.app.R.string.overlay_distance_message),
-                durationSeconds = latestSettings.overlayRestDurationSeconds,
-            )
-        }
-        if (latestSettings.globalOverlayEnabled && blinkState.shouldWarn) {
-            EyeProtectionOverlayService.show(
-                context = this,
-                title = getString(com.projectlumen.app.R.string.overlay_blink_title),
-                message = getString(com.projectlumen.app.R.string.overlay_blink_message),
+                title = getString(
+                    if (showDistanceOverlay) {
+                        com.projectlumen.app.R.string.overlay_distance_title
+                    } else {
+                        com.projectlumen.app.R.string.overlay_blink_title
+                    },
+                ),
+                message = getString(
+                    if (showDistanceOverlay) {
+                        com.projectlumen.app.R.string.overlay_distance_message
+                    } else {
+                        com.projectlumen.app.R.string.overlay_blink_message
+                    },
+                ),
                 durationSeconds = latestSettings.overlayRestDurationSeconds,
             )
         }
 
-        runtimeRepository.get()?.let {
-            runtimeRepository.upsert(
-                it.copy(
-                    proximityMonitoringActive = false,
-                    proximityTooClose = tooClose,
-                    proximityLastFaceAt = if (sample != null) now else it.proximityLastFaceAt,
-                    proximityCloseStartedAt = if (tooClose && !it.proximityTooClose) now else if (tooClose) it.proximityCloseStartedAt else 0L,
-                    proximityCloseTickAt = if (tooClose) now else 0L,
-                    proximityLastWarningAt = if (shouldWarn) now else it.proximityLastWarningAt,
-                    proximityLastRatioPercent = ratioPercent,
-                    proximityDebugInferenceMillis = sample?.inferenceMillis ?: it.proximityDebugInferenceMillis,
-                    proximityDebugCameraLatencyMillis = sample?.cameraLatencyMillis ?: it.proximityDebugCameraLatencyMillis,
-                    proximityDebugFaceWidthPx = sample?.faceWidthPx ?: it.proximityDebugFaceWidthPx,
-                    blinkLastBlinkAt = blinkState.lastBlinkAt,
-                    blinkLastWarningAt = if (blinkState.shouldWarn) now else it.blinkLastWarningAt,
-                    blinkLastEyeOpenProbabilityPercent = blinkState.eyeOpenProbabilityPercent,
-                    updatedAt = now,
-                ),
+        runtimeRepository.update {
+            it.copy(
+                proximityMonitoringActive = false,
+                proximityTooClose = tooClose,
+                proximityLastFaceAt = if (sample != null) now else it.proximityLastFaceAt,
+                proximityCloseStartedAt = if (tooClose && !it.proximityTooClose) now else if (tooClose) it.proximityCloseStartedAt else 0L,
+                proximityCloseTickAt = if (tooClose) now else 0L,
+                proximityLastWarningAt = if (shouldWarn) now else it.proximityLastWarningAt,
+                proximityLastRatioPercent = ratioPercent,
+                proximityDebugInferenceMillis = sample?.inferenceMillis ?: it.proximityDebugInferenceMillis,
+                proximityDebugCameraLatencyMillis = sample?.cameraLatencyMillis ?: it.proximityDebugCameraLatencyMillis,
+                proximityDebugFaceWidthPx = sample?.faceWidthPx ?: it.proximityDebugFaceWidthPx,
+                blinkLastBlinkAt = blinkState.lastBlinkAt,
+                blinkLastWarningAt = if (blinkState.shouldWarn) now else it.blinkLastWarningAt,
+                blinkLastEyeOpenProbabilityPercent = blinkState.eyeOpenProbabilityPercent,
+                updatedAt = now,
             )
         }
         val distanceViolationTelemetry = if (tooClose) {
@@ -247,17 +281,18 @@ class ProximityDetectionService : Service() {
             )
         }.onFailure(app::recordHandledFailure)
         runCatching {
-            uploadFaceAnalysisFrameIfEnabled(app, latestSettings)
+            uploadFaceAnalysisFrameIfEnabled(app, sampler, latestSettings)
         }.onFailure(app::recordHandledFailure)
     }
 
     private suspend fun uploadFaceAnalysisFrameIfEnabled(
         app: ProjectLumenApplication,
+        sampler: ProximityCameraSampler,
         settings: AppSettingsEntity,
     ) {
         if (!settings.diagnosticTelemetryUploadEnabled || !settings.diagnosticFaceAnalysisUploadEnabled) return
         if (!app.backendConnectivity.decision(BackendCapability.FACE_ANALYSIS).executable) return
-        val capture = ProximityCameraSampler(this).captureFaceAnalysisFrame(maxDurationMillis = 2_000L) ?: return
+        val capture = sampler.captureFaceAnalysisFrame(maxDurationMillis = 2_000L) ?: return
         val deviceInstallationId = settings.deviceInstallationId.ifBlank { app.secureCredentials.deviceInstallationId() }
         if (deviceInstallationId.isBlank()) return
         app.telemetry.uploadFaceAnalysisFrame(capture.toRemoteUpload(deviceInstallationId))
@@ -273,28 +308,22 @@ class ProximityDetectionService : Service() {
         nowMillis: Long,
         flags: Int,
     ) {
-        val runtimeRepository = app.runtimeRepository()
-        runtimeRepository.get()?.let {
-            val restarted = flags and (START_FLAG_REDELIVERY or START_FLAG_RETRY) != 0
-            runtimeRepository.upsert(
-                it.copy(
-                    foregroundServiceStartedAt = nowMillis,
-                    foregroundServiceStoppedAt = 0L,
-                    foregroundServiceLastStickyRestartAt = if (restarted) nowMillis else it.foregroundServiceLastStickyRestartAt,
-                    updatedAt = nowMillis,
-                ),
+        val restarted = flags and (START_FLAG_REDELIVERY or START_FLAG_RETRY) != 0
+        app.runtimeRepository().update {
+            it.copy(
+                foregroundServiceStartedAt = nowMillis,
+                foregroundServiceStoppedAt = 0L,
+                foregroundServiceLastStickyRestartAt = if (restarted) nowMillis else it.foregroundServiceLastStickyRestartAt,
+                updatedAt = nowMillis,
             )
         }
     }
 
     private suspend fun recordForegroundServiceStop(app: ProjectLumenApplication, nowMillis: Long) {
-        val runtimeRepository = app.runtimeRepository()
-        runtimeRepository.get()?.let {
-            runtimeRepository.upsert(
-                it.copy(
-                    foregroundServiceStoppedAt = nowMillis,
-                    updatedAt = nowMillis,
-                ),
+        app.runtimeRepository().update {
+            it.copy(
+                foregroundServiceStoppedAt = nowMillis,
+                updatedAt = nowMillis,
             )
         }
     }
@@ -304,23 +333,24 @@ class ProximityDetectionService : Service() {
         nowMillis: Long,
         transform: (DailyEyeStatsEntity) -> DailyEyeStatsEntity,
     ) {
-        if (app.settingsRepository().get()?.statsEnabled == false) return
-        val date = todayKey(nowMillis)
-        val dao = app.database.dailyEyeStatsDao()
-        val current = dao.get(date) ?: DailyEyeStatsEntity(statDate = date)
-        dao.upsert(transform(current).copy(updatedAt = nowMillis))
+        val statsEnabled = app.settingsRepository().get()?.statsEnabled != false
+        StatisticsRepository(
+            app.database.dailyEyeStatsDao(),
+            app.database.dailyPomodoroStatsDao(),
+        ).updateEyeStats(
+            statsEnabled = statsEnabled,
+            nowMillis = nowMillis,
+            transform = transform,
+        )
     }
 
     private suspend fun clearActiveState(app: ProjectLumenApplication) {
         val now = System.currentTimeMillis()
-        val runtimeRepository = app.runtimeRepository()
-        runtimeRepository.get()?.let {
-            runtimeRepository.upsert(
-                it.copy(
-                    proximityMonitoringActive = false,
-                    proximityTooClose = false,
-                    updatedAt = now,
-                ),
+        app.runtimeRepository().update {
+            it.copy(
+                proximityMonitoringActive = false,
+                proximityTooClose = false,
+                updatedAt = now,
             )
         }
     }

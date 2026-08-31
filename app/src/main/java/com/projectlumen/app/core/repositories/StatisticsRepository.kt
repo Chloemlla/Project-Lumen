@@ -8,6 +8,8 @@ import com.projectlumen.app.core.runtime.EyeStatsDelta
 import com.projectlumen.app.core.runtime.PomodoroStatsDelta
 import com.projectlumen.app.core.time.todayKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.max
 
 class StatisticsRepository(
@@ -52,8 +54,10 @@ class StatisticsRepository(
     ) {
         if (!statsEnabled) return
         val date = todayKey(nowMillis)
-        val current = eyeStatsDao.get(date) ?: DailyEyeStatsEntity(statDate = date)
-        eyeStatsDao.upsert(transform(current).copy(updatedAt = nowMillis))
+        DailyStatsWriteLocks.eye.withLock {
+            val current = eyeStatsDao.get(date) ?: DailyEyeStatsEntity(statDate = date)
+            eyeStatsDao.upsert(transform(current).copy(updatedAt = nowMillis))
+        }
     }
 
     suspend fun updatePomodoroStats(
@@ -63,7 +67,15 @@ class StatisticsRepository(
     ) {
         if (!statsEnabled) return
         val date = todayKey(nowMillis)
-        val current = pomodoroStatsDao.get(date) ?: DailyPomodoroStatsEntity(statDate = date)
-        pomodoroStatsDao.upsert(transform(current).copy(updatedAt = nowMillis))
+        DailyStatsWriteLocks.pomodoro.withLock {
+            val current = pomodoroStatsDao.get(date) ?: DailyPomodoroStatsEntity(statDate = date)
+            pomodoroStatsDao.upsert(transform(current).copy(updatedAt = nowMillis))
+        }
     }
+}
+
+// 仓库在 6 处独立构造，实例级 Mutex 串行不了并发写者，锁必须挂在进程级 object 上。
+private object DailyStatsWriteLocks {
+    val eye = Mutex()
+    val pomodoro = Mutex()
 }

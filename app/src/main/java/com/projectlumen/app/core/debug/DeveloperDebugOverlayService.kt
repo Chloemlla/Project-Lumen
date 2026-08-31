@@ -26,19 +26,30 @@ import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.services.ForegroundServiceController
 import com.projectlumen.app.core.services.ForegroundServiceStartEligibility
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 class DeveloperDebugOverlayService : Service(), SensorEventListener {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
+            runCatching { application as? ProjectLumenApplication }
+                .getOrNull()
+                ?.recordHandledFailure(throwable)
+        },
+    )
     private val handler = Handler(Looper.getMainLooper())
     private val rotationMatrix = FloatArray(9)
     private val orientationAngles = FloatArray(3)
+    private val sensorSnapshot = AtomicReference(SensorSnapshot())
     private lateinit var sensorManager: SensorManager
     private var overlayView: LinearLayout? = null
     private var previewImage: ImageView? = null
@@ -46,11 +57,7 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
     private var sensorsRegistered = false
     private var overlayTicking = false
     private var lastRuntimeWriteAt = 0L
-    private var lastLux = 0f
-    private var lastPitch = 0f
-    private var lastRoll = 0f
-    private var lastYaw = 0f
-    private var lastAccelerationMagnitude = 0f
+    private var lastWrittenSensorSnapshot: SensorSnapshot? = null
     private var lastMemoryHealthSampleAt = 0L
 
     override fun onCreate() {
@@ -102,13 +109,10 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         if (app != null) {
             scope.launch {
                 val now = System.currentTimeMillis()
-                val runtimeRepository = app.runtimeRepository()
-                runtimeRepository.get()?.let {
-                    runtimeRepository.upsert(
-                        it.copy(
-                            foregroundServiceLastTaskRemovedAt = now,
-                            updatedAt = now,
-                        ),
+                app.runtimeRepository().update {
+                    it.copy(
+                        foregroundServiceLastTaskRemovedAt = now,
+                        updatedAt = now,
                     )
                 }
             }
@@ -118,7 +122,8 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
 
     @Suppress("DEPRECATION")
     override fun onTrimMemory(level: Int) {
-        MemoryHealthMonitor.recordTrim(this, level)
+        val now = System.currentTimeMillis()
+        scope.launch { MemoryHealthMonitor.recordTrim(this@DeveloperDebugOverlayService, level, now) }
         if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL) {
             DeveloperDebugFrameStore.clear()
         }
@@ -127,15 +132,19 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
 
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
-            Sensor.TYPE_LIGHT -> lastLux = event.values.firstOrNull() ?: lastLux
+            Sensor.TYPE_LIGHT -> event.values.firstOrNull()?.let { lux ->
+                sensorSnapshot.set(sensorSnapshot.get().copy(lux = lux))
+            }
             Sensor.TYPE_ACCELEROMETER -> handleAccelerometer(event.values)
             Sensor.TYPE_ROTATION_VECTOR -> handleRotationVector(event.values)
         }
         val now = System.currentTimeMillis()
-        if (now - lastRuntimeWriteAt >= 1_000L) {
-            lastRuntimeWriteAt = now
-            writeSensorRuntime(now)
-        }
+        if (now - lastRuntimeWriteAt < RUNTIME_WRITE_INTERVAL_MILLIS) return
+        val snapshot = sensorSnapshot.get()
+        if (!hasMeaningfulSensorChange(snapshot, lastWrittenSensorSnapshot)) return
+        lastRuntimeWriteAt = now
+        lastWrittenSensorSnapshot = snapshot
+        writeSensorRuntime(snapshot, now)
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -163,26 +172,29 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
                     settings.developerDebugOverlayEnabled &&
                     Settings.canDrawOverlays(this@DeveloperDebugOverlayService)
                 ) {
-                    ensureOverlay()
-                    renderOverlay()
+                    if (ensureOverlay()) renderOverlay()
                 } else {
                     removeOverlay()
+                    overlayTicking = false
+                    handler.removeCallbacksAndMessages(null)
+                    stopSelf()
                 }
             }
         }
         if (overlayTicking) {
-            handler.postDelayed(::tickOverlay, 750L)
+            handler.postDelayed(::tickOverlay, OVERLAY_TICK_INTERVAL_MILLIS)
         }
     }
 
-    private fun ensureOverlay() {
-        if (overlayView != null) return
+    private fun ensureOverlay(): Boolean {
+        if (overlayView != null) return true
+        val windowManager = getSystemService(WindowManager::class.java) ?: return false
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(6), dp(6), dp(6), dp(6))
             setBackgroundColor(Color.argb(214, 6, 10, 14))
         }
-        previewImage = ImageView(this).apply {
+        val preview = ImageView(this).apply {
             adjustViewBounds = false
             scaleType = ImageView.ScaleType.FIT_CENTER
             setBackgroundColor(Color.argb(255, 8, 12, 18))
@@ -201,8 +213,13 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
             x = dp(12)
             y = dp(72)
         }
-        getSystemService(WindowManager::class.java).addView(container, params)
+        val added = runCatching { windowManager.addView(container, params) }
+            .onFailure { (application as? ProjectLumenApplication)?.recordHandledFailure(it) }
+            .isSuccess
+        if (!added) return false
         overlayView = container
+        previewImage = preview
+        return true
     }
 
     private fun renderOverlay() {
@@ -230,33 +247,47 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         val x = if (values.isNotEmpty()) values[0] else 0f
         val y = if (values.size > 1) values[1] else 0f
         val z = if (values.size > 2) values[2] else 0f
-        lastAccelerationMagnitude = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
-        lastPitch = Math.toDegrees(kotlin.math.atan2((-x).toDouble(), sqrt((y * y + z * z).toDouble()))).toFloat()
-        lastRoll = Math.toDegrees(kotlin.math.atan2(y.toDouble(), z.toDouble())).toFloat()
+        sensorSnapshot.set(
+            sensorSnapshot.get().copy(
+                accelerationMagnitude = sqrt((x * x + y * y + z * z).toDouble()).toFloat(),
+                pitch = Math.toDegrees(kotlin.math.atan2((-x).toDouble(), sqrt((y * y + z * z).toDouble()))).toFloat(),
+                roll = Math.toDegrees(kotlin.math.atan2(y.toDouble(), z.toDouble())).toFloat(),
+            ),
+        )
     }
 
     private fun handleRotationVector(values: FloatArray) {
         SensorManager.getRotationMatrixFromVector(rotationMatrix, values)
         SensorManager.getOrientation(rotationMatrix, orientationAngles)
-        lastYaw = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
-        lastPitch = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
-        lastRoll = Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
+        sensorSnapshot.set(
+            sensorSnapshot.get().copy(
+                yaw = Math.toDegrees(orientationAngles[0].toDouble()).toFloat(),
+                pitch = Math.toDegrees(orientationAngles[1].toDouble()).toFloat(),
+                roll = Math.toDegrees(orientationAngles[2].toDouble()).toFloat(),
+            ),
+        )
     }
 
-    private fun writeSensorRuntime(nowMillis: Long) {
+    private fun hasMeaningfulSensorChange(current: SensorSnapshot, previous: SensorSnapshot?): Boolean {
+        if (previous == null) return true
+        return abs(current.lux - previous.lux) >= LUX_CHANGE_THRESHOLD ||
+            abs(current.pitch - previous.pitch) >= ANGLE_CHANGE_THRESHOLD_DEGREES ||
+            abs(current.roll - previous.roll) >= ANGLE_CHANGE_THRESHOLD_DEGREES ||
+            abs(current.yaw - previous.yaw) >= ANGLE_CHANGE_THRESHOLD_DEGREES ||
+            abs(current.accelerationMagnitude - previous.accelerationMagnitude) >= ACCELERATION_CHANGE_THRESHOLD
+    }
+
+    private fun writeSensorRuntime(snapshot: SensorSnapshot, nowMillis: Long) {
         val app = application as ProjectLumenApplication
         scope.launch {
-            val runtimeRepository = app.runtimeRepository()
-            runtimeRepository.get()?.let {
-                runtimeRepository.upsert(
-                    it.copy(
-                        ambientLastLux = lastLux,
-                        sensorPitchDegrees = lastPitch,
-                        sensorRollDegrees = lastRoll,
-                        sensorYawDegrees = lastYaw,
-                        sensorLastAccelerationMagnitude = lastAccelerationMagnitude,
-                        updatedAt = nowMillis,
-                    ),
+            app.runtimeRepository().update {
+                it.copy(
+                    ambientLastLux = snapshot.lux,
+                    sensorPitchDegrees = snapshot.pitch,
+                    sensorRollDegrees = snapshot.roll,
+                    sensorYawDegrees = snapshot.yaw,
+                    sensorLastAccelerationMagnitude = snapshot.accelerationMagnitude,
+                    updatedAt = nowMillis,
                 )
             }
         }
@@ -266,15 +297,12 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
     private fun simulateLowMemory(app: ProjectLumenApplication) {
         DeveloperDebugFrameStore.clear()
         onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
-        scope.launch {
+        scope.launch(NonCancellable) {
             val now = System.currentTimeMillis()
-            val runtimeRepository = app.runtimeRepository()
-            runtimeRepository.get()?.let {
-                runtimeRepository.upsert(
-                    it.copy(
-                        developerLastLowMemorySimulatedAt = now,
-                        updatedAt = now,
-                    ),
+            app.runtimeRepository().update {
+                it.copy(
+                    developerLastLowMemorySimulatedAt = now,
+                    updatedAt = now,
                 )
             }
         }
@@ -284,15 +312,12 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         scope.launch {
             val now = System.currentTimeMillis()
             val restarted = flags and (START_FLAG_REDELIVERY or START_FLAG_RETRY) != 0
-            val runtimeRepository = app.runtimeRepository()
-            runtimeRepository.get()?.let {
-                runtimeRepository.upsert(
-                    it.copy(
-                        foregroundServiceStartedAt = now,
-                        foregroundServiceStoppedAt = 0L,
-                        foregroundServiceLastStickyRestartAt = if (restarted) now else it.foregroundServiceLastStickyRestartAt,
-                        updatedAt = now,
-                    ),
+            app.runtimeRepository().update {
+                it.copy(
+                    foregroundServiceStartedAt = now,
+                    foregroundServiceStoppedAt = 0L,
+                    foregroundServiceLastStickyRestartAt = if (restarted) now else it.foregroundServiceLastStickyRestartAt,
+                    updatedAt = now,
                 )
             }
         }
@@ -300,15 +325,13 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
 
     private fun recordServiceStop() {
         val app = application as? ProjectLumenApplication ?: return
-        CoroutineScope(Dispatchers.IO).launch {
+        // NonCancellable：紧随其后的 scope.cancel() 不能让停止时间戳丢掉。
+        scope.launch(NonCancellable) {
             val now = System.currentTimeMillis()
-            val runtimeRepository = app.runtimeRepository()
-            runtimeRepository.get()?.let {
-                runtimeRepository.upsert(
-                    it.copy(
-                        foregroundServiceStoppedAt = now,
-                        updatedAt = now,
-                    ),
+            app.runtimeRepository().update {
+                it.copy(
+                    foregroundServiceStoppedAt = now,
+                    updatedAt = now,
                 )
             }
         }
@@ -322,12 +345,25 @@ class DeveloperDebugOverlayService : Service(), SensorEventListener {
         val now = System.currentTimeMillis()
         if (!force && now - lastMemoryHealthSampleAt < MEMORY_HEALTH_SAMPLE_INTERVAL_MILLIS) return
         lastMemoryHealthSampleAt = now
-        MemoryHealthMonitor.sample(this, now)
+        scope.launch { MemoryHealthMonitor.sample(this@DeveloperDebugOverlayService, now) }
     }
+
+    private data class SensorSnapshot(
+        val lux: Float = 0f,
+        val pitch: Float = 0f,
+        val roll: Float = 0f,
+        val yaw: Float = 0f,
+        val accelerationMagnitude: Float = 0f,
+    )
 
     companion object {
         private const val ACTION_SIMULATE_LOW_MEMORY = "com.projectlumen.app.DEVELOPER_SIMULATE_LOW_MEMORY"
         private const val MEMORY_HEALTH_SAMPLE_INTERVAL_MILLIS = 5_000L
+        private const val OVERLAY_TICK_INTERVAL_MILLIS = 2_000L
+        private const val RUNTIME_WRITE_INTERVAL_MILLIS = 2_000L
+        private const val LUX_CHANGE_THRESHOLD = 1f
+        private const val ANGLE_CHANGE_THRESHOLD_DEGREES = 1f
+        private const val ACCELERATION_CHANGE_THRESHOLD = 0.2f
 
         fun start(context: Context) {
             ForegroundServiceController.start(

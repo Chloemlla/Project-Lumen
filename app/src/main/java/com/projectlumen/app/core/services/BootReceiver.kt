@@ -3,6 +3,7 @@ package com.projectlumen.app.core.services
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.UserManager
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.enums.ActiveEngine
 import kotlinx.coroutines.CoroutineScope
@@ -19,6 +20,10 @@ import kotlinx.coroutines.launch
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (!isRecoveryAction(intent.action)) return
+        // LOCKED_BOOT_COMPLETED arrives before the first unlock, when credential-encrypted storage
+        // (Room, MMKV, DataStore) cannot be opened yet; the later BOOT_COMPLETED is the real
+        // recovery point.
+        if (!isStorageUnlocked(context)) return
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             val app = context.applicationContext as? ProjectLumenApplication
@@ -28,6 +33,10 @@ class BootReceiver : BroadcastReceiver() {
             }.onFailure { throwable -> app?.recordHandledFailure(throwable) }
             pendingResult.finish()
         }
+    }
+
+    private fun isStorageUnlocked(context: Context): Boolean {
+        return context.getSystemService(UserManager::class.java)?.isUserUnlocked != false
     }
 
     companion object {
@@ -41,7 +50,6 @@ class BootReceiver : BroadcastReceiver() {
         suspend fun restoreScheduledWork(app: ProjectLumenApplication) {
             val settingsRepository = app.settingsRepository()
             val settings = settingsRepository.get()
-            val runtime = app.runtimeRepository().get()
             if (settings?.proximityMonitoringEnabled == true || settings?.blinkMonitoringEnabled == true) {
                 app.scheduleProximityMonitoring()
             }
@@ -57,19 +65,23 @@ class BootReceiver : BroadcastReceiver() {
                     delayMinutes = if (settings.shizukuNativeEyeProtectionEnabled) 0L else 15L,
                 )
             }
-            if (settings?.keepAliveEnabled == true && runtime?.activeEngine != ActiveEngine.IDLE.name) {
+            if (settings == null) return
+            // A phase that fell due while the device was off has to be advanced before alarms are
+            // re-armed; every stored trigger time is in the past by now and would be dropped.
+            // Re-arming also matters when idle: exact-alarm permission may have changed.
+            val runtime = AlarmReceiver.reconcileNow(
+                app = app,
+                notifications = app.notifications,
+                settings = settings,
+                nowMillis = System.currentTimeMillis(),
+                capStatsDelta = true,
+            )
+            if (runtime.activeEngine == ActiveEngine.IDLE.name) return
+            if (settings.keepAliveEnabled || settings.notificationEnabled) {
                 app.startTimerService()
             }
-            if (settings != null && runtime != null && runtime.activeEngine != ActiveEngine.IDLE.name) {
-                app.notifications.syncRuntimeAlarms(settings, runtime)
-                if (settings.notificationEnabled) {
-                    app.startTimerService()
-                    app.notifications.showOngoingStatus(runtime)
-                }
-            }
-            // Even when idle, exact-alarm permission may have changed after force-stop recovery.
-            if (settings != null && runtime != null && runtime.activeEngine == ActiveEngine.IDLE.name) {
-                app.notifications.syncRuntimeAlarms(settings, runtime)
+            if (settings.notificationEnabled) {
+                app.notifications.showOngoingStatus(runtime)
             }
         }
     }

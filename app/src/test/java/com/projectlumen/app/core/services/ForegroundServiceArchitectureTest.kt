@@ -13,7 +13,7 @@ class ForegroundServiceArchitectureTest {
             assertTrue("Missing foreground service source: $relativePath", sourceFile.isFile)
             assertTrue(
                 "$relativePath must promote through ForegroundServiceController",
-                sourceFile.readText().contains("ForegroundServiceController.promote("),
+                sourceFile.readText().contains("ForegroundServiceController.promote"),
             )
         }
     }

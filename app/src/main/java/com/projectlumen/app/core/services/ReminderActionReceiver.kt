@@ -27,27 +27,34 @@ class ReminderActionReceiver : BroadcastReceiver() {
                 val db = app.database
                 val settings = app.settingsRepository().get()
                 val runtimeRepository = app.runtimeRepository()
-                val runtime = runtimeRepository.getOrDefault()
                 val statisticsRepository = StatisticsRepository(db.dailyEyeStatsDao(), db.dailyPomodoroStatsDao())
                 val reminderEngine = ReminderEngine()
                 val now = System.currentTimeMillis()
                 when (intent.action) {
                     ACTION_START_BREAK -> {
                         if (settings != null) {
-                            val transition = reminderEngine.startBreak(settings, runtime, now)
-                            applyTransition(app, runtimeRepository, statisticsRepository, settings, now, transition)
+                            // Serialised against the timer loop so the snapshot cannot go stale
+                            // between the read and the write.
+                            RuntimeAdvanceGate.withAdvanceLock {
+                                applyEngineAction(
+                                    app, runtimeRepository, statisticsRepository, settings, now,
+                                ) { current -> reminderEngine.startBreak(settings, current, now) }
+                            }
                         }
                     }
 
                     ACTION_SKIP_BREAK -> {
                         if (settings != null) {
-                            val transition = reminderEngine.skipBreak(settings, runtime, now)
-                            applyTransition(app, runtimeRepository, statisticsRepository, settings, now, transition)
+                            RuntimeAdvanceGate.withAdvanceLock {
+                                applyEngineAction(
+                                    app, runtimeRepository, statisticsRepository, settings, now,
+                                ) { current -> reminderEngine.skipBreak(settings, current, now) }
+                            }
                         }
                     }
 
                     ACTION_STOP_ALL -> {
-                        runtimeRepository.reset(now)
+                        RuntimeAdvanceGate.withAdvanceLock { runtimeRepository.reset(now) }
                         app.notifications.cancelAllScheduled()
                         app.notifications.cancelOngoingStatus()
                         context.stopService(Intent(context, TimerForegroundService::class.java))
@@ -59,18 +66,26 @@ class ReminderActionReceiver : BroadcastReceiver() {
         }
     }
 
-    private suspend fun applyTransition(
+    private suspend fun applyEngineAction(
         app: ProjectLumenApplication,
         runtimeRepository: RuntimeRepository,
         statisticsRepository: StatisticsRepository,
         settings: AppSettingsEntity,
         now: Long,
-        transition: RuntimeTransition,
+        transitionOf: (RuntimeStateEntity) -> RuntimeTransition,
     ) {
-        statisticsRepository.applyEyeDelta(settings.statsEnabled, now, transition.eyeStatsDelta)
-        runtimeRepository.upsert(transition.nextRuntime)
-        playAudioEvent(app, transition.audioEvent)
-        if (settings.globalOverlayEnabled && transition.nextRuntime.reminderPhase == ReminderPhase.RESTING.name) {
+        // The engine runs inside the repository lock so the transition is derived from the row that
+        // is about to be replaced, instead of a snapshot read before the lock was taken.
+        var transition: RuntimeTransition? = null
+        runtimeRepository.update { current ->
+            val computed = transitionOf(current)
+            transition = computed
+            computed.nextRuntime
+        }
+        val applied = transition ?: return
+        statisticsRepository.applyEyeDelta(settings.statsEnabled, now, applied.eyeStatsDelta)
+        playAudioEvent(app, applied.audioEvent)
+        if (settings.globalOverlayEnabled && applied.nextRuntime.reminderPhase == ReminderPhase.RESTING.name) {
             EyeProtectionOverlayService.show(
                 context = app,
                 title = app.getString(com.projectlumen.app.R.string.overlay_break_title),
@@ -78,7 +93,7 @@ class ReminderActionReceiver : BroadcastReceiver() {
                 durationSeconds = settings.restDurationSeconds.coerceAtLeast(settings.overlayRestDurationSeconds),
             )
         }
-        refreshAfterAction(app, settings, transition.nextRuntime)
+        refreshAfterAction(app, settings, applied.nextRuntime)
     }
 
     private fun playAudioEvent(app: ProjectLumenApplication, event: AudioEvent) {

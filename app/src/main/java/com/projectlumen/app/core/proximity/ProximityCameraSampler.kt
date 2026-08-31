@@ -24,22 +24,32 @@ import android.os.HandlerThread
 import android.util.Size
 import android.view.Surface
 import androidx.core.content.ContextCompat
+import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.debug.DeveloperDebugFrameStore
 import java.io.ByteArrayOutputStream
+import java.io.Closeable
 import java.nio.Buffer
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
-class ProximityCameraSampler(private val context: Context) {
-    private val plainAnalyzer by lazy { FaceDistanceAnalyzer(includeTopology = false) }
-    private val topologyAnalyzer by lazy { FaceDistanceAnalyzer(includeTopology = true) }
+class ProximityCameraSampler(private val context: Context) : Closeable {
+    private val plainAnalyzerLazy = lazy { FaceDistanceAnalyzer(includeTopology = false) }
+    private val topologyAnalyzerLazy = lazy { FaceDistanceAnalyzer(includeTopology = true) }
+    private val plainAnalyzer: FaceDistanceAnalyzer by plainAnalyzerLazy
+    private val topologyAnalyzer: FaceDistanceAnalyzer by topologyAnalyzerLazy
 
     private fun analyzer(includeTopology: Boolean): FaceDistanceAnalyzer =
         if (includeTopology) topologyAnalyzer else plainAnalyzer
+
+    override fun close() {
+        if (plainAnalyzerLazy.isInitialized()) runCatching { plainAnalyzer.close() }
+        if (topologyAnalyzerLazy.isInitialized()) runCatching { topologyAnalyzer.close() }
+    }
 
     suspend fun captureFaceDistanceSamples(
         durationMillis: Long,
@@ -49,11 +59,11 @@ class ProximityCameraSampler(private val context: Context) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             return emptyList()
         }
-        val deadline = System.currentTimeMillis() + durationMillis.coerceIn(750L, 15_000L)
+        val deadline = System.currentTimeMillis() + durationMillis.coerceIn(MIN_CAPTURE_BUDGET_MILLIS, 15_000L)
         val samples = mutableListOf<FaceDistanceSample>()
         do {
-            val captureBudgetMillis = (deadline - System.currentTimeMillis()).coerceAtMost(1_500L)
-            if (captureBudgetMillis < 750L) break
+            val captureBudgetMillis = (deadline - System.currentTimeMillis()).coerceAtMost(MAX_CAPTURE_BUDGET_MILLIS)
+            if (captureBudgetMillis < MIN_CAPTURE_BUDGET_MILLIS) break
             captureFaceDistance(
                 maxDurationMillis = captureBudgetMillis,
                 publishDebugFrame = publishDebugFrame,
@@ -71,57 +81,65 @@ class ProximityCameraSampler(private val context: Context) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             return null
         }
-        val timeoutMillis = maxDurationMillis.coerceIn(750L, 2_500L)
+        val timeoutMillis = maxDurationMillis.coerceIn(MIN_CAPTURE_BUDGET_MILLIS, MAX_CAPTURE_BUDGET_MILLIS)
         val captureStartedAt = System.currentTimeMillis()
         val capture = withTimeoutOrNull(timeoutMillis) { capturePreviewFrame() } ?: return null
         val cameraLatencyMillis = System.currentTimeMillis() - captureStartedAt
         val bitmap = BitmapFactory.decodeByteArray(capture.bytes, 0, capture.bytes.size) ?: return null
+        var inferenceSettled = false
         return try {
-            val sample = analyzer(publishDebugFrame)
-                .analyze(bitmap, capture.rotationDegrees)
-                ?.copy(cameraLatencyMillis = cameraLatencyMillis)
-            if (publishDebugFrame) {
-                DeveloperDebugFrameStore.publish(bitmap, sample)
+            withTimeoutOrNull(ANALYSIS_TIMEOUT_MILLIS) {
+                val analyzed = analyzer(publishDebugFrame).analyze(bitmap, capture.rotationDegrees)
+                inferenceSettled = true
+                val sample = analyzed?.copy(cameraLatencyMillis = cameraLatencyMillis)
+                if (publishDebugFrame) {
+                    DeveloperDebugFrameStore.publish(bitmap, sample)
+                }
+                sample
             }
-            sample
         } finally {
-            bitmap.recycle()
+            // A timed-out ML Kit task may still read this bitmap; leave those to the GC.
+            if (inferenceSettled) bitmap.recycle()
         }
     }
 
+    /** Returns the raw camera frame; gated on the user-facing face-analysis upload switches. */
     suspend fun captureFaceAnalysisFrame(
         maxDurationMillis: Long = 2_000L,
     ): FaceAnalysisFrameCapture? {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             return null
         }
-        val timeoutMillis = maxDurationMillis.coerceIn(750L, 2_500L)
+        if (!rawFrameCaptureAllowed()) return null
+        val timeoutMillis = maxDurationMillis.coerceIn(MIN_CAPTURE_BUDGET_MILLIS, MAX_CAPTURE_BUDGET_MILLIS)
         val captureStartedAt = System.currentTimeMillis()
         val capture = withTimeoutOrNull(timeoutMillis) { capturePreviewFrame() } ?: return null
         val cameraLatencyMillis = System.currentTimeMillis() - captureStartedAt
         val bitmap = BitmapFactory.decodeByteArray(capture.bytes, 0, capture.bytes.size) ?: return null
+        var inferenceSettled = false
         return try {
-            val sample = topologyAnalyzer
-                .analyze(bitmap, capture.rotationDegrees)
-                ?.copy(cameraLatencyMillis = cameraLatencyMillis)
-            FaceAnalysisFrameCapture(
-                capturedAtMillis = capture.capturedAtMillis,
-                frameBytes = capture.bytes,
-                width = capture.width,
-                height = capture.height,
-                rotationDegrees = capture.rotationDegrees,
-                frameConversionMillis = capture.conversionMillis,
-                sample = sample,
-            )
+            withTimeoutOrNull(ANALYSIS_TIMEOUT_MILLIS) {
+                val analyzed = topologyAnalyzer.analyze(bitmap, capture.rotationDegrees)
+                inferenceSettled = true
+                FaceAnalysisFrameCapture(
+                    capturedAtMillis = capture.capturedAtMillis,
+                    frameBytes = capture.bytes,
+                    width = capture.width,
+                    height = capture.height,
+                    rotationDegrees = capture.rotationDegrees,
+                    frameConversionMillis = capture.conversionMillis,
+                    sample = analyzed?.copy(cameraLatencyMillis = cameraLatencyMillis),
+                )
+            }
         } finally {
-            bitmap.recycle()
+            if (inferenceSettled) bitmap.recycle()
         }
     }
 
 
     /**
      * Surface-topology analysis capture: dual targets SurfaceTexture + ImageReader.
-     * Analysis runs on decoded JPEG; Surface stays attached as the camera producer consumer.
+     * Returns the raw camera frame; gated on the user-facing face-analysis upload switches.
      */
     suspend fun captureSurfaceAnalysisFrame(
         maxDurationMillis: Long = 2_000L,
@@ -129,33 +147,42 @@ class ProximityCameraSampler(private val context: Context) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             return null
         }
-        val timeoutMillis = maxDurationMillis.coerceIn(750L, 2_500L)
+        if (!rawFrameCaptureAllowed()) return null
+        val timeoutMillis = maxDurationMillis.coerceIn(MIN_CAPTURE_BUDGET_MILLIS, MAX_CAPTURE_BUDGET_MILLIS)
         val captureStartedAt = System.currentTimeMillis()
         val capture = withTimeoutOrNull(timeoutMillis) { captureSurfacePipelineFrame() } ?: return null
         val cameraLatencyMillis = System.currentTimeMillis() - captureStartedAt
         val bitmap = BitmapFactory.decodeByteArray(capture.bytes, 0, capture.bytes.size) ?: return null
+        var inferenceSettled = false
         return try {
-            val analysisStarted = System.currentTimeMillis()
-            val sample = topologyAnalyzer
-                .analyze(bitmap, capture.rotationDegrees)
-                ?.copy(cameraLatencyMillis = cameraLatencyMillis)
-            val analysisMillis = System.currentTimeMillis() - analysisStarted
-            SurfaceAnalysisFrameCapture(
-                capturedAtMillis = capture.capturedAtMillis,
-                frameBytes = capture.bytes,
-                width = capture.width,
-                height = capture.height,
-                rotationDegrees = capture.rotationDegrees,
-                frameConversionMillis = capture.conversionMillis,
-                surfaceAttachMillis = capture.surfaceAttachMillis,
-                bufferTransformMillis = capture.bufferTransformMillis + analysisMillis,
-                surfaceWidth = capture.surfaceWidth,
-                surfaceHeight = capture.surfaceHeight,
-                sample = sample,
-            )
+            withTimeoutOrNull(ANALYSIS_TIMEOUT_MILLIS) {
+                val analysisStarted = System.currentTimeMillis()
+                val analyzed = topologyAnalyzer.analyze(bitmap, capture.rotationDegrees)
+                inferenceSettled = true
+                val analysisMillis = System.currentTimeMillis() - analysisStarted
+                SurfaceAnalysisFrameCapture(
+                    capturedAtMillis = capture.capturedAtMillis,
+                    frameBytes = capture.bytes,
+                    width = capture.width,
+                    height = capture.height,
+                    rotationDegrees = capture.rotationDegrees,
+                    frameConversionMillis = capture.conversionMillis,
+                    surfaceAttachMillis = capture.surfaceAttachMillis,
+                    bufferTransformMillis = capture.bufferTransformMillis + analysisMillis,
+                    surfaceWidth = capture.surfaceWidth,
+                    surfaceHeight = capture.surfaceHeight,
+                    sample = analyzed?.copy(cameraLatencyMillis = cameraLatencyMillis),
+                )
+            }
         } finally {
-            bitmap.recycle()
+            if (inferenceSettled) bitmap.recycle()
         }
+    }
+
+    private suspend fun rawFrameCaptureAllowed(): Boolean {
+        val app = context.applicationContext as? ProjectLumenApplication ?: return false
+        val settings = app.settingsRepository().get() ?: return false
+        return settings.diagnosticTelemetryUploadEnabled && settings.diagnosticFaceAnalysisUploadEnabled
     }
 
     @SuppressLint("MissingPermission")
@@ -168,26 +195,23 @@ class ProximityCameraSampler(private val context: Context) {
         val thread = HandlerThread("ProjectLumenProximityCamera").apply { start() }
         val handler = Handler(thread.looper)
         val reader = ImageReader.newInstance(size.width, size.height, ImageFormat.YUV_420_888, 2)
+        val finished = AtomicBoolean(false)
+        val cameraDeviceRef = AtomicReference<CameraDevice?>(null)
+        val captureSessionRef = AtomicReference<CameraCaptureSession?>(null)
+
+        fun release() {
+            runCatching { captureSessionRef.getAndSet(null)?.close() }
+            runCatching { cameraDeviceRef.getAndSet(null)?.close() }
+            runCatching { reader.close() }
+            runCatching { thread.quitSafely() }
+        }
 
         return try {
             suspendCancellableCoroutine { continuation ->
-                val finished = AtomicBoolean(false)
-                var cameraDevice: CameraDevice? = null
-                var captureSession: CameraCaptureSession? = null
-
-                fun release() {
-                    runCatching { captureSession?.close() }
-                    captureSession = null
-                    runCatching { cameraDevice?.close() }
-                    cameraDevice = null
-                    runCatching { reader.close() }
-                    runCatching { thread.quitSafely() }
-                }
-
                 fun complete(result: Result<CapturedFrame?>) {
-                    if (!finished.compareAndSet(false, true)) return
+                    val firstFinish = finished.compareAndSet(false, true)
                     release()
-                    if (!continuation.isActive) return
+                    if (!firstFinish || !continuation.isActive) return
                     result.fold(
                         onSuccess = { continuation.resume(it) },
                         onFailure = { continuation.resumeWithException(it) },
@@ -195,7 +219,8 @@ class ProximityCameraSampler(private val context: Context) {
                 }
 
                 continuation.invokeOnCancellation {
-                    if (finished.compareAndSet(false, true)) release()
+                    finished.set(true)
+                    release()
                 }
 
                 reader.setOnImageAvailableListener({ availableReader ->
@@ -223,21 +248,29 @@ class ProximityCameraSampler(private val context: Context) {
                         cameraId,
                         object : CameraDevice.StateCallback() {
                             override fun onOpened(camera: CameraDevice) {
-                                cameraDevice = camera
+                                cameraDeviceRef.set(camera)
+                                // Cancellation may have released before this callback arrived.
+                                if (finished.get()) {
+                                    release()
+                                    return
+                                }
                                 runCatching {
                                     createCaptureSessionCompat(
                                         camera = camera,
                                         reader = reader,
                                         handler = handler,
                                         onConfigured = { session ->
-                                            captureSession = session
-                                            submitPreviewRequest(camera, session, handler, reader) { result ->
-                                                complete(result)
+                                            captureSessionRef.set(session)
+                                            if (finished.get()) {
+                                                release()
+                                            } else {
+                                                submitPreviewRequest(camera, session, handler, reader) { result ->
+                                                    complete(result)
+                                                }
                                             }
                                         },
                                         onConfigureFailed = { session ->
-                                            session.close()
-                                            camera.close()
+                                            captureSessionRef.set(session)
                                             complete(Result.success(null))
                                         },
                                     )
@@ -247,12 +280,12 @@ class ProximityCameraSampler(private val context: Context) {
                             }
 
                             override fun onDisconnected(camera: CameraDevice) {
-                                camera.close()
+                                cameraDeviceRef.set(camera)
                                 complete(Result.success(null))
                             }
 
                             override fun onError(camera: CameraDevice, error: Int) {
-                                camera.close()
+                                cameraDeviceRef.set(camera)
                                 complete(Result.success(null))
                             }
                         },
@@ -263,8 +296,7 @@ class ProximityCameraSampler(private val context: Context) {
                 }
             }
         } finally {
-            reader.close()
-            thread.quitSafely()
+            release()
         }
     }
 
@@ -284,29 +316,27 @@ class ProximityCameraSampler(private val context: Context) {
         }
         val previewSurface = Surface(surfaceTexture)
         val attachStarted = System.currentTimeMillis()
+        val finished = AtomicBoolean(false)
+        val cameraDeviceRef = AtomicReference<CameraDevice?>(null)
+        val captureSessionRef = AtomicReference<CameraCaptureSession?>(null)
+
+        fun release() {
+            runCatching { captureSessionRef.getAndSet(null)?.close() }
+            runCatching { cameraDeviceRef.getAndSet(null)?.close() }
+            runCatching { reader.close() }
+            runCatching { previewSurface.release() }
+            runCatching { surfaceTexture.release() }
+            runCatching { thread.quitSafely() }
+        }
 
         return try {
             suspendCancellableCoroutine { continuation ->
-                val finished = AtomicBoolean(false)
-                var cameraDevice: CameraDevice? = null
-                var captureSession: CameraCaptureSession? = null
                 val surfaceAttachMillis = System.currentTimeMillis() - attachStarted
 
-                fun release() {
-                    runCatching { captureSession?.close() }
-                    captureSession = null
-                    runCatching { cameraDevice?.close() }
-                    cameraDevice = null
-                    runCatching { reader.close() }
-                    runCatching { previewSurface.release() }
-                    runCatching { surfaceTexture.release() }
-                    runCatching { thread.quitSafely() }
-                }
-
                 fun complete(result: Result<SurfaceCapturedFrame?>) {
-                    if (!finished.compareAndSet(false, true)) return
+                    val firstFinish = finished.compareAndSet(false, true)
                     release()
-                    if (!continuation.isActive) return
+                    if (!firstFinish || !continuation.isActive) return
                     result.fold(
                         onSuccess = { continuation.resume(it) },
                         onFailure = { continuation.resumeWithException(it) },
@@ -314,15 +344,14 @@ class ProximityCameraSampler(private val context: Context) {
                 }
 
                 continuation.invokeOnCancellation {
-                    if (finished.compareAndSet(false, true)) release()
+                    finished.set(true)
+                    release()
                 }
 
                 reader.setOnImageAvailableListener({ availableReader ->
                     val image = availableReader.acquireLatestImage() ?: return@setOnImageAvailableListener
                     val result = runCatching<SurfaceCapturedFrame?> {
                         val conversionStartedAt = System.currentTimeMillis()
-                        // Keep Surface producer alive while transforming ImageReader buffer.
-                        surfaceTexture.updateTexImage()
                         val bytes = image.toJpegBytes()
                         SurfaceCapturedFrame(
                             bytes = bytes,
@@ -346,7 +375,11 @@ class ProximityCameraSampler(private val context: Context) {
                         cameraId,
                         object : CameraDevice.StateCallback() {
                             override fun onOpened(camera: CameraDevice) {
-                                cameraDevice = camera
+                                cameraDeviceRef.set(camera)
+                                if (finished.get()) {
+                                    release()
+                                    return
+                                }
                                 runCatching {
                                     createDualSurfaceSessionCompat(
                                         camera = camera,
@@ -354,34 +387,36 @@ class ProximityCameraSampler(private val context: Context) {
                                         previewSurface = previewSurface,
                                         handler = handler,
                                         onConfigured = { session ->
-                                            captureSession = session
-                                            submitSurfacePreviewRequest(
-                                                camera = camera,
-                                                session = session,
-                                                handler = handler,
-                                                reader = reader,
-                                                previewSurface = previewSurface,
-                                            ) { result -> complete(result) }
+                                            captureSessionRef.set(session)
+                                            if (finished.get()) {
+                                                release()
+                                            } else {
+                                                submitSurfacePreviewRequest(
+                                                    camera = camera,
+                                                    session = session,
+                                                    handler = handler,
+                                                    reader = reader,
+                                                    previewSurface = previewSurface,
+                                                ) { result -> complete(result) }
+                                            }
                                         },
                                         onConfigureFailed = { session ->
-                                            session.close()
-                                            camera.close()
+                                            captureSessionRef.set(session)
                                             complete(Result.success(null))
                                         },
                                     )
                                 }.onFailure {
-                                    camera.close()
                                     complete(Result.success(null))
                                 }
                             }
 
                             override fun onDisconnected(camera: CameraDevice) {
-                                camera.close()
+                                cameraDeviceRef.set(camera)
                                 complete(Result.success(null))
                             }
 
                             override fun onError(camera: CameraDevice, error: Int) {
-                                camera.close()
+                                cameraDeviceRef.set(camera)
                                 complete(Result.success(null))
                             }
                         },
@@ -392,7 +427,7 @@ class ProximityCameraSampler(private val context: Context) {
                 }
             }
         } finally {
-            // release handled in complete path; keep finally no-op when suspended.
+            release()
         }
     }
 
@@ -654,6 +689,13 @@ class ProximityCameraSampler(private val context: Context) {
         val surfaceWidth: Int,
         val surfaceHeight: Int,
     )
+
+    private companion object {
+        // Cold-starting the front camera plus session configuration routinely needs ~2s.
+        const val MIN_CAPTURE_BUDGET_MILLIS = 2_000L
+        const val MAX_CAPTURE_BUDGET_MILLIS = 2_500L
+        const val ANALYSIS_TIMEOUT_MILLIS = 2_500L
+    }
 }
 
 data class SurfaceAnalysisFrameCapture(

@@ -49,6 +49,24 @@
     native <methods>;
 }
 
+# Shizuku instantiates the user service reflectively inside its own shell process, so the
+# no-arg constructor has no reachable call site in this APK and R8 would otherwise remove it.
+-keep class com.projectlumen.app.core.shizuku.ShizukuShellUserService {
+    <init>();
+    boolean onTransact(int, android.os.Parcel, android.os.Parcel, int);
+}
+
+# ML Kit/Firebase component discovery reflects each registrar's no-arg constructor by name.
+# Keeping only the class name is not enough: R8 still strips the unreferenced constructor.
+-keep class * implements com.google.firebase.components.ComponentRegistrar {
+    <init>();
+}
+-keep class com.google.mlkit.common.internal.MlKitComponentDiscoveryService {
+    <init>();
+}
+-keep class com.google.firebase.components.ComponentRegistrar { *; }
+-dontwarn com.google.firebase.components.**
+
 # Public AIDL and Open API entry points must keep stable names for third-party callers.
 -keep class com.project.lumen.open.** { *; }
 -keep interface com.project.lumen.open.** { *; }
@@ -118,4 +136,3 @@
 -overloadaggressively
 -obfuscationdictionary obfuscation-dictionary.txt
 -repackageclasses
--printmapping mapping.txt

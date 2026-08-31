@@ -38,7 +38,6 @@ import com.projectlumen.app.core.api.SensorDisturbanceTelemetry
 import com.projectlumen.app.core.api.TipTemplateTelemetry
 import com.projectlumen.app.core.api.UserConfigurationTelemetry
 import com.chloemlla.lumen.crash.CrashReport
-import com.chloemlla.lumen.crash.CrashReportStore
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
@@ -56,8 +55,13 @@ import com.projectlumen.app.core.shizuku.ShizukuInstalledApp
 import com.projectlumen.app.core.time.todayKey
 import com.projectlumen.app.openapi.LumenOpenContracts
 import com.projectlumen.app.openapi.sanitizeLumenOpenSourceApp
+import com.projectlumen.app.core.api.BackendRetryPolicy
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -73,6 +77,12 @@ class EyeCareTelemetryReporter(
     },
 ) {
     private val lastUploadAt = AtomicLong(0L)
+    private val consecutiveUploadFailures = AtomicInteger(0)
+    private val uploadBlockedUntil = AtomicLong(0L)
+
+    @Volatile
+    private var cachedFrontCameraResolution: String? = null
+
     private val settingsRepository by lazy {
         SettingsRepository(database.appSettingsDao(), EyeCarePreferencesDataStore(context))
     }
@@ -83,14 +93,18 @@ class EyeCareTelemetryReporter(
         force: Boolean = false,
         sourceApp: String = LumenOpenContracts.SOURCE_APP_PROJECT_LUMEN,
     ): RemoteTelemetryUploadResult? {
-        return runCatching {
+        return try {
             uploadCurrentSnapshotUnchecked(
                 distanceViolation = distanceViolation,
                 averageBlinksPerMinute = averageBlinksPerMinute,
                 force = force,
                 sourceApp = sourceApp,
             )
-        }.getOrNull()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     suspend fun uploadCrashReport(
@@ -98,23 +112,31 @@ class EyeCareTelemetryReporter(
         force: Boolean = true,
         sourceApp: String = LumenOpenContracts.SOURCE_APP_PROJECT_LUMEN,
     ): RemoteTelemetryUploadResult? {
-        return runCatching {
+        return try {
             uploadCrashReportUnchecked(
                 report = report,
                 force = force,
                 sourceApp = sourceApp,
             )
-        }.getOrNull()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     suspend fun uploadFaceAnalysisFrame(
         upload: RemoteFaceAnalysisFrameUpload,
     ): RemoteFaceAnalysisFrameUploadResult? {
         if (!backendGate.decision(BackendCapability.FACE_ANALYSIS).executable) return null
-        return runCatching {
+        return try {
             val accessToken = accessTokenProvider()?.trim()?.takeIf { it.isNotBlank() } ?: return null
             apiClient.uploadFaceAnalysisFrame(accessToken, upload)
-        }.getOrNull()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     private suspend fun uploadCurrentSnapshotUnchecked(
@@ -122,13 +144,13 @@ class EyeCareTelemetryReporter(
         averageBlinksPerMinute: Double? = null,
         force: Boolean = false,
         sourceApp: String = LumenOpenContracts.SOURCE_APP_PROJECT_LUMEN,
-    ): RemoteTelemetryUploadResult? {
-        if (!backendGate.decision(BackendCapability.TELEMETRY).executable) return null
-        val accessToken = accessTokenProvider()?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    ): RemoteTelemetryUploadResult? = withContext(Dispatchers.IO) {
+        if (!backendGate.decision(BackendCapability.TELEMETRY).executable) return@withContext null
+        val accessToken = accessTokenProvider()?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext null
         val nowMillis = System.currentTimeMillis()
-        if (!force && nowMillis - lastUploadAt.get() < MIN_UPLOAD_INTERVAL_MILLIS) return null
-        val settings = settingsRepository.get() ?: return null
-        if (!settings.statsEnabled && !settings.diagnosticTelemetryUploadEnabled) return null
+        if (!force && !mayUploadNow(nowMillis)) return@withContext null
+        val settings = settingsRepository.get() ?: return@withContext null
+        if (!settings.statsEnabled && !settings.diagnosticTelemetryUploadEnabled) return@withContext null
         val runtime = RuntimeRepository(database.runtimeStateDao()).getOrDefault()
         val statDate = todayKey(nowMillis)
         val stats = if (settings.statsEnabled) {
@@ -174,22 +196,24 @@ class EyeCareTelemetryReporter(
             pomodoroProductivity = pomodoroStats?.toPomodoroProductivity(),
             userConfiguration = buildUserConfiguration(settings, dailyGoal, reminderPlans, tipTemplates),
         )
-        return apiClient.uploadTelemetry(accessToken, upload)
-            .also { lastUploadAt.set(nowMillis) }
+        sendTelemetry(accessToken, upload, nowMillis)
     }
 
     private suspend fun uploadCrashReportUnchecked(
         report: CrashReport,
         force: Boolean = true,
         sourceApp: String = LumenOpenContracts.SOURCE_APP_PROJECT_LUMEN,
-    ): RemoteTelemetryUploadResult? {
-        if (!backendGate.decision(BackendCapability.TELEMETRY).executable) return null
-        val accessToken = accessTokenProvider()?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    ): RemoteTelemetryUploadResult? = withContext(Dispatchers.IO) {
+        if (!backendGate.decision(BackendCapability.TELEMETRY).executable) return@withContext null
+        val accessToken = accessTokenProvider()?.trim()?.takeIf { it.isNotBlank() } ?: return@withContext null
         val nowMillis = System.currentTimeMillis()
-        if (!force && nowMillis - lastUploadAt.get() < MIN_UPLOAD_INTERVAL_MILLIS) return null
-        val settings = settingsRepository.get() ?: return null
-        if (!settings.diagnosticTelemetryUploadEnabled || !settings.diagnosticCrashReportUploadEnabled) return null
-        val deviceInstallationId = settings.deviceInstallationId.trim().takeIf { it.isNotBlank() } ?: return null
+        if (!force && !mayUploadNow(nowMillis)) return@withContext null
+        val settings = settingsRepository.get() ?: return@withContext null
+        if (!settings.diagnosticTelemetryUploadEnabled || !settings.diagnosticCrashReportUploadEnabled) {
+            return@withContext null
+        }
+        val deviceInstallationId = settings.deviceInstallationId.trim().takeIf { it.isNotBlank() }
+            ?: return@withContext null
         val upload = RemoteTelemetryUpload(
             deviceInstallationId = deviceInstallationId,
             sourceApp = sanitizeLumenOpenSourceApp(sourceApp),
@@ -208,8 +232,33 @@ class EyeCareTelemetryReporter(
             pomodoroProductivity = null,
             userConfiguration = null,
         )
-        return apiClient.uploadTelemetry(accessToken, upload)
-            .also { lastUploadAt.set(nowMillis) }
+        sendTelemetry(accessToken, upload, nowMillis)
+    }
+
+    /** Throttle keys off the attempt, not the success, so a failing backend is not hammered. */
+    private fun mayUploadNow(nowMillis: Long): Boolean {
+        if (nowMillis - lastUploadAt.get() < MIN_UPLOAD_INTERVAL_MILLIS) return false
+        return nowMillis >= uploadBlockedUntil.get()
+    }
+
+    private suspend fun sendTelemetry(
+        accessToken: String,
+        upload: RemoteTelemetryUpload,
+        nowMillis: Long,
+    ): RemoteTelemetryUploadResult {
+        lastUploadAt.set(nowMillis)
+        val result = try {
+            apiClient.uploadTelemetry(accessToken, upload)
+        } catch (error: Throwable) {
+            if (error !is CancellationException) {
+                val failures = consecutiveUploadFailures.incrementAndGet()
+                uploadBlockedUntil.set(nowMillis + BackendRetryPolicy.delayMillis(failures))
+            }
+            throw error
+        }
+        consecutiveUploadFailures.set(0)
+        uploadBlockedUntil.set(0L)
+        return result
     }
 
     fun distanceViolation(
@@ -339,6 +388,11 @@ class EyeCareTelemetryReporter(
     }
 
     private fun frontCameraResolution(): String {
+        cachedFrontCameraResolution?.let { return it }
+        return computeFrontCameraResolution().also { cachedFrontCameraResolution = it }
+    }
+
+    private fun computeFrontCameraResolution(): String {
         return runCatching {
             val manager = context.getSystemService(CameraManager::class.java) ?: return "unknown"
             val characteristics = manager.cameraIdList.firstNotNullOfOrNull { id ->
@@ -373,13 +427,6 @@ class EyeCareTelemetryReporter(
 
     private fun RuntimeStateEntity.toDeveloperDebug(settings: AppSettingsEntity): DeveloperDebugTelemetry? {
         if (!settings.diagnosticTelemetryUploadEnabled) return null
-        val crashLogs = if (settings.diagnosticCrashReportUploadEnabled) {
-            CrashReportStore(context).load()?.let { report ->
-                listOf(report.toCrashLogTelemetry())
-            }.orEmpty()
-        } else {
-            emptyList()
-        }
         val sensorDisturbance = if (settings.developerModeEnabled) {
             SensorDisturbanceTelemetry(
                 pitchDegrees = sensorPitchDegrees.toDouble(),
@@ -393,10 +440,12 @@ class EyeCareTelemetryReporter(
         val apiTraces = ProjectLumenApiDiagnostics.traces.value
             .take(MAX_API_TRACE_COUNT)
             .map { it.toTelemetry() }
-        if (sensorDisturbance == null && crashLogs.isEmpty() && apiTraces.isEmpty()) return null
+        if (sensorDisturbance == null && apiTraces.isEmpty()) return null
+        // Crash reports travel only on the dedicated idempotent channel (uploadCrashReport),
+        // which clears the stored report once accepted.
         return DeveloperDebugTelemetry(
             sensorDisturbance = sensorDisturbance,
-            crashLogs = crashLogs,
+            crashLogs = emptyList(),
             apiTraces = apiTraces,
         )
     }

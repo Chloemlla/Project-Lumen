@@ -16,6 +16,12 @@ object LumenCrashDefaults {
     /** Default path of the anonymous crash-report upload endpoint. */
     const val DEFAULT_CRASH_BACKEND_ENDPOINT_PATH: String = "/api/crash-sdk/v1/crash-report"
 
+    /** Version of the ingest payload shape, so the backend can branch on old installs. */
+    const val INGEST_SCHEMA_VERSION: Int = 1
+
+    /** SDK version reported alongside every uploaded report; mirrors `lumen-crash/sdk.version`. */
+    const val SDK_VERSION: String = "0.1.0"
+
     fun fileProviderAuthority(packageName: String): String {
         return packageName + FILE_PROVIDER_AUTHORITY_SUFFIX
     }

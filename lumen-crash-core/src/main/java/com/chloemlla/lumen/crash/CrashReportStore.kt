@@ -153,12 +153,9 @@ class CrashReportStore private constructor(
                 appContext.externalCacheDir?.resolve(DIR_NAME),
             ).distinctBy { it.absolutePath }
 
-            return dirs.map { dir ->
-                if (!dir.exists()) {
-                    dir.mkdirs()
-                }
-                File(dir, FILE_NAME)
-            }
+            // Directories are created by writeAtomically, so a load() never has to touch
+            // external storage beyond the reads it actually needs.
+            return dirs.map { dir -> File(dir, FILE_NAME) }
         }
 
         fun resolveLegacyPrivateTargets(appContext: Context): List<File> = listOf(

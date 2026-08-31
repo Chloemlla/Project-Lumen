@@ -4,6 +4,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -41,7 +42,11 @@ internal fun <T> SettingsScrollAnchors(
     anchorPositions: MutableMap<T, Int>,
     content: @Composable () -> Unit,
 ) {
-    val topOffsetPx = with(LocalDensity.current) { 96.dp.toPx().roundToInt() }
+    val density = LocalDensity.current
+    val topOffsetPx = remember(density) { with(density) { 96.dp.toPx().roundToInt() } }
+    // Plain holder, not snapshot state: the dedupe check runs in the layout phase and must not
+    // register a snapshot read there.
+    val lastReportedPosition = remember { intArrayOf(Int.MIN_VALUE) }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -52,6 +57,8 @@ internal fun <T> SettingsScrollAnchors(
                         coordinates.positionInRoot().y.roundToInt() -
                         topOffsetPx
                     ).coerceAtLeast(0)
+                if (lastReportedPosition[0] == position) return@onGloballyPositioned
+                lastReportedPosition[0] = position
                 targets.forEach { target ->
                     anchorPositions[target] = position
                 }

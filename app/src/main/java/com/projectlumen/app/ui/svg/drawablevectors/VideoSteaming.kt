@@ -2,6 +2,7 @@ package com.projectlumen.app.ui.svg.drawablevectors
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType.Companion.NonZero
 import androidx.compose.ui.graphics.SolidColor
@@ -15,7 +16,9 @@ import com.projectlumen.app.ui.svg.DynamicColorImageVectors
 
 @Composable
 fun DynamicColorImageVectors.videoSteaming(): ImageVector {
-    return Builder(
+    val lumenColorScheme = MaterialTheme.colorScheme
+    return remember(lumenColorScheme) {
+        Builder(
             name = "VideoSteaming",
             defaultWidth = 766.0.dp,
             defaultHeight = 663.78.dp,
@@ -24,7 +27,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
         )
         .apply {
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                fill = SolidColor(lumenColorScheme.surfaceContainerHighest),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -40,7 +43,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                fill = SolidColor(lumenColorScheme.surfaceContainerHighest),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -146,7 +149,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.tertiaryContainer),
+                fill = SolidColor(lumenColorScheme.tertiaryContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -258,7 +261,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -300,7 +303,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                fill = SolidColor(lumenColorScheme.surfaceContainerHighest),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -317,7 +320,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
             }
 
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                fill = SolidColor(lumenColorScheme.surfaceContainerHighest),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -331,7 +334,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
                 arcToRelative(0.87f, 0.87f, 0.0f, true, true, -1.74f, 0.0f)
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                fill = SolidColor(lumenColorScheme.surfaceContainerHighest),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -345,7 +348,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
                 arcToRelative(0.435f, 0.435f, 0.0f, true, true, -0.87f, 0.0f)
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                fill = SolidColor(lumenColorScheme.surfaceContainerHighest),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -359,7 +362,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
                 arcToRelative(0.435f, 0.435f, 0.0f, true, true, -0.87f, 0.0f)
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainerHighest),
+                fill = SolidColor(lumenColorScheme.surfaceContainerHighest),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -470,7 +473,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
                 arcToRelative(23.386f, 23.386f, 0.0f, true, true, -46.772f, 0.0f)
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -494,7 +497,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -556,7 +559,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.primary),
+                fill = SolidColor(lumenColorScheme.primary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -570,7 +573,7 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
                 arcToRelative(114.0f, 114.0f, 0.0f, true, true, -228.0f, 0.0f)
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.onPrimary),
+                fill = SolidColor(lumenColorScheme.onPrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -589,4 +592,5 @@ fun DynamicColorImageVectors.videoSteaming(): ImageVector {
             }
         }
         .build()
+    }
 }

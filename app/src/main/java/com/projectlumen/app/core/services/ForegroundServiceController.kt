@@ -5,6 +5,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.ServiceCompat
@@ -27,17 +29,18 @@ fun interface ForegroundServiceFailureReporter {
  *
  * Android 16 (SDK 36) introduced stricter [mAllowStartForeground] gating: the flag is reset on
  * process start and takes a short window before it becomes true. The [start] method handles this
- * by catching [ForegroundServiceStartNotAllowedException] and retrying once after a short delay.
+ * by catching [ForegroundServiceStartNotAllowedException] and re-posting the start once after a
+ * short delay, without blocking the calling thread.
  */
 internal object ForegroundServiceController {
     /**
      * Attempts to start a foreground service.
      *
-     * On Android 16+, if the start fails with [ForegroundServiceStartNotAllowedException]
-     * (mAllowStartForeground is false), the method retries once after [RETRY_DELAY_MILLIS].
-     * This handles the cold-start window where the platform has not yet set the flag.
+     * On Android 12+, if the start fails because the platform refuses a background start, the
+     * start is re-posted once after [RETRY_DELAY_MILLIS] and this method returns true, meaning
+     * "accepted", not "already running".
      *
-     * @return true if the service was started successfully, false otherwise.
+     * @return true if the service was started or a retry was queued, false otherwise.
      */
     fun start(
         context: Context,
@@ -66,23 +69,17 @@ internal object ForegroundServiceController {
             true
         } catch (exception: Exception) {
             // Android 16: mAllowStartForeground may be false during cold start.
-            // Retry once after a short delay to give the platform time to set the flag.
+            // Re-post once instead of sleeping; callers can be on the main thread.
             if (isForegroundServiceStartNotAllowed(exception)) {
                 Log.i(TAG, "Foreground service start refused (mAllowStartForeground false); " +
                     "retrying ${serviceName} in ${RETRY_DELAY_MILLIS}ms")
-                SystemClock.sleep(RETRY_DELAY_MILLIS)
-                try {
-                    ContextCompat.startForegroundService(context, intent)
-                    return true
-                } catch (retryException: Exception) {
-                    handleFailure(
-                        context = context,
-                        serviceName = serviceName,
-                        operation = "start",
-                        throwable = retryException,
-                        becameIneligible = becameIneligible(eligibilityCheck),
-                    )
-                }
+                scheduleStartRetry(
+                    context = context.applicationContext,
+                    intent = intent,
+                    serviceName = serviceName,
+                    eligibilityCheck = eligibilityCheck,
+                )
+                true
             } else {
                 handleFailure(
                     context = context,
@@ -93,6 +90,30 @@ internal object ForegroundServiceController {
                 )
             }
         }
+    }
+
+    private fun scheduleStartRetry(
+        context: Context,
+        intent: Intent,
+        serviceName: String,
+        eligibilityCheck: (() -> Boolean)?,
+    ) {
+        retryHandler.postDelayed(
+            {
+                try {
+                    ContextCompat.startForegroundService(context, intent)
+                } catch (retryException: Exception) {
+                    handleFailure(
+                        context = context,
+                        serviceName = serviceName,
+                        operation = "start",
+                        throwable = retryException,
+                        becameIneligible = becameIneligible(eligibilityCheck),
+                    )
+                }
+            },
+            RETRY_DELAY_MILLIS,
+        )
     }
 
     fun promote(
@@ -270,6 +291,9 @@ internal object ForegroundServiceController {
     }
 
     private val expectedRefusalRecordedAt = ConcurrentHashMap<String, AtomicLong>()
+
+    // Lazy: touching Looper during class init would break plain JVM unit tests.
+    private val retryHandler by lazy { Handler(Looper.getMainLooper()) }
 
     private const val TAG = "ForegroundService"
     private const val EXPECTED_REFUSAL_LOG_WINDOW_MILLIS = 30_000L

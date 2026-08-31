@@ -34,7 +34,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.USER_PAT }}
+          token: ${{ github.token }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -51,9 +52,6 @@ jobs:
           node --version
           npm --version
 
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Run fix script
         env:
           USER_PAT: ${{ secrets.USER_PAT }}
@@ -67,17 +65,21 @@ jobs:
           fi
 
       - name: Commit and push
+        env:
+          USER_PAT: ${{ secrets.USER_PAT }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
+          # -u restricts the commit to already-tracked files so a stray build artifact or
+          # credential file left behind by the fix script can never be published.
+          git add -u
           git diff --cached --quiet && echo "No changes to commit" && exit 0
           if [ "${{ inputs.action }}" = "repair-lockfiles" ]; then
             git commit -m "fix: repair pnpm lockfiles to match current package.json"
           else
             git commit -m "fix: auto-fix dependabot security alerts"
           fi
-          git push origin main
+          git push "https://x-access-token:${USER_PAT}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
 
   manage-prs:
     name: Manage Dependabot PRs

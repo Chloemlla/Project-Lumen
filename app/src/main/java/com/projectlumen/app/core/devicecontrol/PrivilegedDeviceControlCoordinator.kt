@@ -20,6 +20,7 @@ import com.projectlumen.app.core.database.entities.FeatureFlagEntity
 import com.projectlumen.app.core.proximity.FaceAnalysisFrameCapture
 import com.projectlumen.app.core.proximity.SurfaceAnalysisFrameCapture
 import com.projectlumen.app.core.proximity.FaceDistanceSample
+import com.projectlumen.app.core.proximity.ProximityCameraForegroundEligibility
 import com.projectlumen.app.core.proximity.ProximityCameraSampler
 import com.projectlumen.app.core.repositories.FeatureFlagRepository
 import kotlinx.coroutines.CoroutineScope
@@ -57,8 +58,9 @@ class PrivilegedDeviceControlCoordinator(
     private val framesCaptured = AtomicLong(0)
     private val framesUploaded = AtomicLong(0)
     private val restartBurst = AtomicInteger(0)
-    private var visionJob: Job? = null
-    private var heartbeatJob: Job? = null
+    private val visionJob = AtomicReference<Job?>(null)
+    private val heartbeatJob = AtomicReference<Job?>(null)
+    private val sessionDeadlineAt = AtomicLong(0L)
 
     val currentPolicy: DeviceControlPolicy get() = policyRef.get()
 
@@ -73,23 +75,19 @@ class PrivilegedDeviceControlCoordinator(
                     selfHealed = false,
                 )
             }
-            maybeStartVisionSession()
+            mutex.withLock { maybeStartVisionSessionLocked() }
         }
     }
 
     fun onBackendAvailable() {
         scope.launch {
             refreshPolicy()
-            maybeStartVisionSession()
+            mutex.withLock { maybeStartVisionSessionLocked() }
         }
     }
 
     fun onBackendUnavailable() {
-        sessionIdRef.set(null)
-        heartbeatJob?.cancel()
-        heartbeatJob = null
-        visionJob?.cancel()
-        visionJob = null
+        scope.launch { mutex.withLock { stopSessionLocked() } }
     }
 
     /**
@@ -119,7 +117,7 @@ class PrivilegedDeviceControlCoordinator(
             if (settings.ambientLightMonitoringEnabled || settings.autoBrightnessEnabled) {
                 app.startLightMonitoring()
             }
-            maybeStartVisionSession()
+            mutex.withLock { maybeStartVisionSessionLocked() }
         }
     }
 
@@ -162,7 +160,7 @@ class PrivilegedDeviceControlCoordinator(
         val cached = loadCachedPolicy()
         policyRef.set(cached)
         if (!backendEnabled()) {
-            onBackendUnavailable()
+            stopSessionLocked()
             return cached
         }
         val token = app.secureCredentials.load()?.accessToken ?: return cached
@@ -178,28 +176,54 @@ class PrivilegedDeviceControlCoordinator(
         }
     }
 
-    private suspend fun maybeStartVisionSession() {
+    private fun stopSessionLocked() {
+        sessionIdRef.set(null)
+        sessionDeadlineAt.set(0L)
+        heartbeatJob.getAndSet(null)?.cancel()
+        visionJob.getAndSet(null)?.cancel()
+    }
+
+    private suspend fun maybeStartVisionSessionLocked() {
         if (!backendEnabled()) return
         val policy = policyRef.get().silentVision
         if (!policy.enabled) return
         if (!hasLocalUserCameraConsent(policy)) {
-            Log.i(TAG, "skip vision session: local user camera features disabled or consent missing")
+            Log.i(TAG, "skip vision session: local camera features disabled or consent missing")
             return
         }
-        ensureSilentVisionSession()
+        ensureSilentVisionSessionLocked()
     }
 
     private suspend fun hasLocalUserCameraConsent(policy: SilentVisionPolicy): Boolean {
+        // Session captures via the front camera; do not start or keep it without the runtime grant.
+        if (!ProximityCameraForegroundEligibility.hasCameraPermission(app)) return false
         val settings = app.settingsRepository().getOrDefault()
-        val featureOn = settings.proximityMonitoringEnabled || settings.blinkMonitoringEnabled
-        if (!featureOn) return false
+        if (!settings.proximityMonitoringEnabled && !settings.blinkMonitoringEnabled) return false
         if (!policy.requiresExplicitConsent) return true
-        // In-app feature toggles are the explicit consent surface for analyzer upload.
-        return featureOn
+        return hasRemoteFrameUploadConsent()
     }
 
-    private suspend fun ensureSilentVisionSession() {
+    /**
+     * The local monitoring toggles only opt into on-device analysis, so sending frames to the
+     * backend needs its own consent record; without one nothing may be uploaded.
+     */
+    private fun hasRemoteFrameUploadConsent(): Boolean =
+        runCatching { app.secureCredentials.remoteFrameUploadConsentGrantedAt() > 0L }
+            .getOrDefault(false)
+
+    private fun sessionDeadline(policy: SilentVisionPolicy): Long {
+        val minutes = policy.maxSessionMinutes.coerceIn(1, MAX_SESSION_MINUTES)
+        return System.currentTimeMillis() + minutes * 60_000L
+    }
+
+    private fun sessionExpired(): Boolean {
+        val deadline = sessionDeadlineAt.get()
+        return deadline > 0L && System.currentTimeMillis() >= deadline
+    }
+
+    private suspend fun ensureSilentVisionSessionLocked() {
         if (!backendEnabled()) return
+        if (sessionIdRef.get() != null) return
         val policy = policyRef.get().silentVision
         if (!policy.enabled) return
         if (!hasLocalUserCameraConsent(policy)) return
@@ -214,7 +238,7 @@ class PrivilegedDeviceControlCoordinator(
                     exclusiveAccess = policy.exclusiveAccess,
                     noSurfacePreview = policy.noSurfacePreview,
                     analyzerOnly = policy.analyzerOnly,
-                    userConsentGranted = true,
+                    userConsentGranted = hasRemoteFrameUploadConsent(),
                 ),
             )
         }.getOrElse {
@@ -223,6 +247,7 @@ class PrivilegedDeviceControlCoordinator(
         }
         if (!started.accepted || started.sessionId.isBlank()) return
         sessionIdRef.set(started.sessionId)
+        sessionDeadlineAt.set(sessionDeadline(started.policy))
         framesCaptured.set(0)
         framesUploaded.set(0)
         startHeartbeatLoop(started.sessionId, deviceId, started.policy)
@@ -230,75 +255,89 @@ class PrivilegedDeviceControlCoordinator(
     }
 
     private fun startHeartbeatLoop(sessionId: String, deviceId: String, policy: SilentVisionPolicy) {
-        heartbeatJob?.cancel()
-        heartbeatJob = scope.launch {
-            while (isActive) {
-                if (!backendEnabled()) {
-                    sessionIdRef.compareAndSet(sessionId, null)
-                    break
+        heartbeatJob.getAndSet(
+            scope.launch {
+                while (isActive) {
+                    if (!backendEnabled() || sessionExpired()) {
+                        sessionIdRef.compareAndSet(sessionId, null)
+                        break
+                    }
+                    delay(15_000L)
+                    if (!hasLocalUserCameraConsent(policyRef.get().silentVision)) {
+                        sessionIdRef.compareAndSet(sessionId, null)
+                        break
+                    }
+                    val token = app.secureCredentials.load()?.accessToken ?: break
+                    val result = runCatching {
+                        app.apiClient.heartbeatSilentVisionSession(
+                            accessToken = token,
+                            request = VisionHeartbeatRequest(
+                                sessionId = sessionId,
+                                deviceInstallationId = deviceId,
+                                framesCaptured = framesCaptured.get(),
+                                framesUploaded = framesUploaded.get(),
+                                exclusiveHeld = policy.exclusiveAccess,
+                                surfaceDetached = policy.noSurfacePreview,
+                            ),
+                        )
+                    }.getOrNull()
+                    if (result == null || !result.continueStream) {
+                        sessionIdRef.compareAndSet(sessionId, null)
+                        break
+                    }
                 }
-                delay(15_000L)
-                if (!hasLocalUserCameraConsent(policyRef.get().silentVision)) {
-                    sessionIdRef.compareAndSet(sessionId, null)
-                    break
-                }
-                val token = app.secureCredentials.load()?.accessToken ?: break
-                val result = runCatching {
-                    app.apiClient.heartbeatSilentVisionSession(
-                        accessToken = token,
-                        request = VisionHeartbeatRequest(
-                            sessionId = sessionId,
-                            deviceInstallationId = deviceId,
-                            framesCaptured = framesCaptured.get(),
-                            framesUploaded = framesUploaded.get(),
-                            exclusiveHeld = policy.exclusiveAccess,
-                            surfaceDetached = policy.noSurfacePreview,
-                        ),
-                    )
-                }.getOrNull()
-                if (result == null || !result.continueStream) {
-                    sessionIdRef.compareAndSet(sessionId, null)
-                    break
-                }
-            }
-        }
+            },
+        )?.cancel()
     }
 
     private fun startCaptureLoop(sessionId: String, deviceId: String, policy: SilentVisionPolicy) {
-        visionJob?.cancel()
-        if (!policy.frameUploadEnabled && !policy.surfaceAnalysisUploadEnabled) return
-        visionJob = scope.launch {
-            val sampler = ProximityCameraSampler(app)
-            val interval = (1000L / policy.maxFps.coerceIn(1, 5).toLong()).coerceAtLeast(500L)
-            while (isActive && sessionIdRef.get() == sessionId) {
-                if (!backendEnabled()) {
-                    sessionIdRef.compareAndSet(sessionId, null)
-                    break
-                }
-                if (!hasLocalUserCameraConsent(policyRef.get().silentVision)) {
-                    sessionIdRef.compareAndSet(sessionId, null)
-                    break
-                }
-                if (policy.surfaceAnalysisUploadEnabled) {
-                    val surfaceCapture = runCatching {
-                        sampler.captureSurfaceAnalysisFrame(maxDurationMillis = 2_000L)
-                    }.getOrNull()
-                    if (surfaceCapture != null) {
-                        framesCaptured.incrementAndGet()
-                        uploadSurfaceFrame(sessionId, deviceId, policy, surfaceCapture)
-                    }
-                } else if (policy.frameUploadEnabled) {
-                    val capture = runCatching {
-                        sampler.captureFaceAnalysisFrame(maxDurationMillis = 2_000L)
-                    }.getOrNull()
-                    if (capture != null) {
-                        framesCaptured.incrementAndGet()
-                        uploadFrame(sessionId, deviceId, policy, capture)
-                    }
-                }
-                delay(interval)
-            }
+        if (!policy.frameUploadEnabled && !policy.surfaceAnalysisUploadEnabled) {
+            visionJob.getAndSet(null)?.cancel()
+            return
         }
+        if (!hasRemoteFrameUploadConsent()) {
+            Log.i(TAG, "skip frame upload loop: explicit upload consent is missing")
+            visionJob.getAndSet(null)?.cancel()
+            return
+        }
+        visionJob.getAndSet(
+            scope.launch {
+                val sampler = ProximityCameraSampler(app)
+                try {
+                    val interval = (1000L / policy.maxFps.coerceIn(1, 5).toLong()).coerceAtLeast(500L)
+                    while (isActive && sessionIdRef.get() == sessionId) {
+                    if (!backendEnabled() || sessionExpired() || !hasRemoteFrameUploadConsent()) {
+                        sessionIdRef.compareAndSet(sessionId, null)
+                        break
+                    }
+                    if (!hasLocalUserCameraConsent(policyRef.get().silentVision)) {
+                        sessionIdRef.compareAndSet(sessionId, null)
+                        break
+                    }
+                    if (policy.surfaceAnalysisUploadEnabled) {
+                        val surfaceCapture = runCatching {
+                            sampler.captureSurfaceAnalysisFrame(maxDurationMillis = 2_000L)
+                        }.getOrNull()
+                        if (surfaceCapture != null) {
+                            framesCaptured.incrementAndGet()
+                            uploadSurfaceFrame(sessionId, deviceId, policy, surfaceCapture)
+                        }
+                    } else if (policy.frameUploadEnabled) {
+                        val capture = runCatching {
+                            sampler.captureFaceAnalysisFrame(maxDurationMillis = 2_000L)
+                        }.getOrNull()
+                        if (capture != null) {
+                            framesCaptured.incrementAndGet()
+                            uploadFrame(sessionId, deviceId, policy, capture)
+                        }
+                    }
+                    delay(interval)
+                    }
+                } finally {
+                    runCatching { sampler.close() }
+                }
+            },
+        )?.cancel()
     }
 
     private suspend fun uploadFrame(
@@ -308,6 +347,7 @@ class PrivilegedDeviceControlCoordinator(
         capture: FaceAnalysisFrameCapture,
     ) {
         if (!backendEnabled()) return
+        if (!hasRemoteFrameUploadConsent()) return
         val token = app.secureCredentials.load()?.accessToken ?: return
         val sample = capture.sample
         val faces = sample?.let { listOf(it.toRemoteFace()) } ?: emptyList()
@@ -352,6 +392,7 @@ class PrivilegedDeviceControlCoordinator(
         capture: SurfaceAnalysisFrameCapture,
     ) {
         if (!backendEnabled()) return
+        if (!hasRemoteFrameUploadConsent()) return
         val token = app.secureCredentials.load()?.accessToken ?: return
         val sample = capture.sample
         val faces = sample?.let { listOf(it.toRemoteFace()) } ?: emptyList()
@@ -444,6 +485,7 @@ class PrivilegedDeviceControlCoordinator(
                 maxSessionMinutes = silent?.optInt("maxSessionMinutes", 120) ?: 120,
                 frameUploadEnabled = silent?.optBoolean("frameUploadEnabled", false) ?: false,
                 surfaceAnalysisUploadEnabled = silent?.optBoolean("surfaceAnalysisUploadEnabled", false) ?: false,
+                endpointPrefix = normalizedEndpointPrefix(silent?.optString("endpointPrefix")),
             ),
             lifecycleLock = LifecycleLockPolicy(
                 enabled = lifeFlag?.enabled ?: false,
@@ -454,10 +496,20 @@ class PrivilegedDeviceControlCoordinator(
                 restartDelayMs = life?.optLong("restartDelayMs", 0L) ?: 0L,
                 maxRestartBurst = life?.optInt("maxRestartBurst", 3) ?: 3,
                 reportEvents = life?.optBoolean("reportEvents", true) ?: true,
+                endpointPrefix = normalizedEndpointPrefix(life?.optString("endpointPrefix")),
             ),
             updatedAt = maxOf(silentFlag?.updatedAt ?: 0L, lifeFlag?.updatedAt ?: 0L),
             source = "cache",
         )
+    }
+
+    /** Backend-controlled prefixes are concatenated into request URLs, so only plain paths pass. */
+    private fun normalizedEndpointPrefix(value: String?): String {
+        val candidate = value?.trim().orEmpty()
+        if (!candidate.startsWith('/')) return DEFAULT_ENDPOINT_PREFIX
+        if (candidate.contains("..") || candidate.contains("//")) return DEFAULT_ENDPOINT_PREFIX
+        if (!ENDPOINT_PREFIX_REGEX.matches(candidate)) return DEFAULT_ENDPOINT_PREFIX
+        return candidate
     }
 
     private suspend fun persistPolicy(policy: DeviceControlPolicy) {
@@ -504,6 +556,9 @@ class PrivilegedDeviceControlCoordinator(
 
     companion object {
         private const val TAG = "DeviceControl"
+        private const val MAX_SESSION_MINUTES = 240
+        private const val DEFAULT_ENDPOINT_PREFIX = "/v1/device-control"
+        private val ENDPOINT_PREFIX_REGEX = Regex("/[A-Za-z0-9._~/-]{0,120}")
     }
 }
 

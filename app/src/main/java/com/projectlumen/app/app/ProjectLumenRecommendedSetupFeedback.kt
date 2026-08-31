@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -42,10 +43,8 @@ private data class RecommendedEyeCareSetupSnapshot(
     val followUpCount: Int,
     val needsDistanceCalibration: Boolean,
     val needsShizukuAuthorization: Boolean,
-) {
-    val profileApplied: Boolean
-        get() = settingsMatchCount == totalSettings && goalMatchCount == totalGoals
-}
+    val profileApplied: Boolean,
+)
 
 @Composable
 internal fun rememberRecommendedEyeCareApplyFeedback(
@@ -69,11 +68,14 @@ internal fun RecommendedEyeCareSetupFeedback(
     applyFeedbackCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    val snapshot = recommendedEyeCareSetupSnapshot(
-        uiState = uiState,
-        permissionRequirements = permissionRequirements,
-        shizukuReady = shizukuReady,
-    )
+    val snapshot = remember(uiState.settings, uiState.dailyGoal, permissionRequirements, shizukuReady) {
+        recommendedEyeCareSetupSnapshot(
+            settings = uiState.settings,
+            dailyGoal = uiState.dailyGoal,
+            permissionRequirements = permissionRequirements,
+            shizukuReady = shizukuReady,
+        )
+    }
     // Every child here is a StatusLine, which already paints the nested surface. A wrapper
     // surface of the same role would only add an invisible box and a stray inset.
     Column(
@@ -193,14 +195,13 @@ private fun RecommendedSetupFollowUpLine(snapshot: RecommendedEyeCareSetupSnapsh
 }
 
 private fun recommendedEyeCareSetupSnapshot(
-    uiState: ProjectLumenUiState,
+    settings: AppSettingsEntity,
+    dailyGoal: DailyGoalEntity,
     permissionRequirements: PermissionRequirements,
     shizukuReady: Boolean,
 ): RecommendedEyeCareSetupSnapshot {
-    val settings = uiState.settings
-    val dailyGoal = uiState.dailyGoal
-    val settingMatches = recommendedEyeCareSettingMatches(settings)
-    val goalMatches = recommendedEyeCareGoalMatches(dailyGoal)
+    val recommendedSettings = recommendedEyeCareSettings(settings)
+    val recommendedGoal = recommendedEyeCareDailyGoal(dailyGoal)
     val needsDistanceCalibration = settings.proximityMonitoringEnabled &&
         settings.proximityBaselineEyeDistancePx <= 0f &&
         settings.proximityBaselineFaceWidthPercent <= 0
@@ -218,57 +219,56 @@ private fun recommendedEyeCareSetupSnapshot(
     ).count { it }
 
     return RecommendedEyeCareSetupSnapshot(
-        settingsMatchCount = settingMatches.count { it },
-        totalSettings = settingMatches.size,
-        goalMatchCount = goalMatches.count { it },
-        totalGoals = goalMatches.size,
+        settingsMatchCount = RecommendedSettingFields.count { read -> read(settings) == read(recommendedSettings) },
+        totalSettings = RecommendedSettingFields.size,
+        goalMatchCount = RecommendedGoalFields.count { read -> read(dailyGoal) == read(recommendedGoal) },
+        totalGoals = RecommendedGoalFields.size,
         activeProtectionCount = recommendedEyeCareActiveProtectionCount(settings),
         followUpCount = followUpCount,
         needsDistanceCalibration = needsDistanceCalibration,
         needsShizukuAuthorization = needsShizukuAuthorization,
+        // Whole-entity equality, not the field counts: the recommended profile is a `copy` of the
+        // current row, so any untouched field is equal by construction and a newly recommended field
+        // cannot go unchecked just because the reader list below was not updated with it.
+        profileApplied = settings == recommendedSettings && dailyGoal == recommendedGoal,
     )
 }
 
-private fun recommendedEyeCareSettingMatches(settings: AppSettingsEntity): List<Boolean> {
-    val recommended = recommendedEyeCareSettings(settings)
-    return listOf(
-        settings.reminderEnabled == recommended.reminderEnabled,
-        settings.warnIntervalMinutes == recommended.warnIntervalMinutes,
-        settings.restDurationSeconds == recommended.restDurationSeconds,
-        settings.statsEnabled == recommended.statsEnabled,
-        settings.notificationEnabled == recommended.notificationEnabled,
-        settings.keepAliveEnabled == recommended.keepAliveEnabled,
-        settings.preAlertEnabled == recommended.preAlertEnabled,
-        settings.preAlertSeconds == recommended.preAlertSeconds,
-        settings.askBeforeBreak == recommended.askBeforeBreak,
-        settings.disableSkip == recommended.disableSkip,
-        settings.quietHoursEnabled == recommended.quietHoursEnabled,
-        settings.proximityMonitoringEnabled == recommended.proximityMonitoringEnabled,
-        settings.proximityCheckIntervalMinutes == recommended.proximityCheckIntervalMinutes,
-        settings.proximityCaptureSeconds == recommended.proximityCaptureSeconds,
-        settings.proximityDistanceMultiplierPercent == recommended.proximityDistanceMultiplierPercent,
-        settings.proximityAlertCooldownSeconds == recommended.proximityAlertCooldownSeconds,
-        settings.blinkMonitoringEnabled == recommended.blinkMonitoringEnabled,
-        settings.blinkNoBlinkThresholdSeconds == recommended.blinkNoBlinkThresholdSeconds,
-        settings.blinkAlertCooldownSeconds == recommended.blinkAlertCooldownSeconds,
-        settings.ambientLightMonitoringEnabled == recommended.ambientLightMonitoringEnabled,
-        settings.ambientLightLowLuxThreshold == recommended.ambientLightLowLuxThreshold,
-        settings.autoBrightnessEnabled == recommended.autoBrightnessEnabled,
-        settings.globalOverlayEnabled == recommended.globalOverlayEnabled,
-        settings.overlayRestDurationSeconds == recommended.overlayRestDurationSeconds,
-        settings.overlayStrictDistancePercent == recommended.overlayStrictDistancePercent,
-    )
-}
+/** Drives the user-visible "matched x/y" count only; [recommendedEyeCareSettings] owns the values. */
+private val RecommendedSettingFields: List<(AppSettingsEntity) -> Any?> = listOf(
+    AppSettingsEntity::reminderEnabled,
+    AppSettingsEntity::warnIntervalMinutes,
+    AppSettingsEntity::restDurationSeconds,
+    AppSettingsEntity::statsEnabled,
+    AppSettingsEntity::notificationEnabled,
+    AppSettingsEntity::keepAliveEnabled,
+    AppSettingsEntity::preAlertEnabled,
+    AppSettingsEntity::preAlertSeconds,
+    AppSettingsEntity::askBeforeBreak,
+    AppSettingsEntity::disableSkip,
+    AppSettingsEntity::quietHoursEnabled,
+    AppSettingsEntity::proximityMonitoringEnabled,
+    AppSettingsEntity::proximityCheckIntervalMinutes,
+    AppSettingsEntity::proximityCaptureSeconds,
+    AppSettingsEntity::proximityDistanceMultiplierPercent,
+    AppSettingsEntity::proximityAlertCooldownSeconds,
+    AppSettingsEntity::blinkMonitoringEnabled,
+    AppSettingsEntity::blinkNoBlinkThresholdSeconds,
+    AppSettingsEntity::blinkAlertCooldownSeconds,
+    AppSettingsEntity::ambientLightMonitoringEnabled,
+    AppSettingsEntity::ambientLightLowLuxThreshold,
+    AppSettingsEntity::autoBrightnessEnabled,
+    AppSettingsEntity::globalOverlayEnabled,
+    AppSettingsEntity::overlayRestDurationSeconds,
+    AppSettingsEntity::overlayStrictDistancePercent,
+)
 
-private fun recommendedEyeCareGoalMatches(dailyGoal: DailyGoalEntity): List<Boolean> {
-    val recommended = recommendedEyeCareDailyGoal(dailyGoal)
-    return listOf(
-        dailyGoal.restBreakGoal == recommended.restBreakGoal,
-        dailyGoal.maxContinuousWorkMinutes == recommended.maxContinuousWorkMinutes,
-        dailyGoal.pomodoroGoal == recommended.pomodoroGoal,
-        dailyGoal.weeklyActiveDaysGoal == recommended.weeklyActiveDaysGoal,
-    )
-}
+private val RecommendedGoalFields: List<(DailyGoalEntity) -> Any?> = listOf(
+    DailyGoalEntity::restBreakGoal,
+    DailyGoalEntity::maxContinuousWorkMinutes,
+    DailyGoalEntity::pomodoroGoal,
+    DailyGoalEntity::weeklyActiveDaysGoal,
+)
 
 private fun recommendedEyeCareActiveProtectionCount(settings: AppSettingsEntity): Int {
     return listOf(

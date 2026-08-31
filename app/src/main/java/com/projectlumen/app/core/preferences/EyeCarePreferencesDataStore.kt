@@ -77,8 +77,19 @@ data class EyeCarePreferences(
 )
 
 class EyeCarePreferencesDataStore(context: Context) {
-    private val appContext = context.applicationContext
-    private val legacyDataStore = appContext.eyeCarePreferencesLegacyDataStore
+    private val legacyDataStore = context.applicationContext.eyeCarePreferencesLegacyDataStore
+
+    fun observe(): Flow<EyeCarePreferences> = EyeCarePreferencesMmkvStore.observe(legacyDataStore)
+
+    suspend fun read(): EyeCarePreferences = EyeCarePreferencesMmkvStore.read(legacyDataStore)
+
+    suspend fun saveFromSettings(settings: AppSettingsEntity) {
+        EyeCarePreferencesMmkvStore.saveFromSettings(legacyDataStore, settings)
+    }
+}
+
+// 内存缓存与 MMKV 句柄挂在进程级 object 上：类被重复构造时不会各自持有互不同步的冻结快照。
+private object EyeCarePreferencesMmkvStore {
     private val mmkv by lazy { ProjectLumenMmkv.mmkvWithId(STORE_ID) }
     private val migrationLock = Mutex()
     private val state by lazy { MutableStateFlow(readFromMmkv()) }
@@ -86,20 +97,20 @@ class EyeCarePreferencesDataStore(context: Context) {
     @Volatile
     private var legacyMigrationComplete = false
 
-    fun observe(): Flow<EyeCarePreferences> {
+    fun observe(legacyDataStore: DataStore<Preferences>): Flow<EyeCarePreferences> {
         return flow {
-            ensureLegacyMigrated()
+            ensureLegacyMigrated(legacyDataStore)
             emitAll(state)
         }
     }
 
-    suspend fun read(): EyeCarePreferences {
-        ensureLegacyMigrated()
+    suspend fun read(legacyDataStore: DataStore<Preferences>): EyeCarePreferences {
+        ensureLegacyMigrated(legacyDataStore)
         return state.value
     }
 
-    suspend fun saveFromSettings(settings: AppSettingsEntity) {
-        ensureLegacyMigrated()
+    suspend fun saveFromSettings(legacyDataStore: DataStore<Preferences>, settings: AppSettingsEntity) {
+        ensureLegacyMigrated(legacyDataStore)
         writeToMmkv(settings.toEyeCarePreferences())
     }
 
@@ -154,7 +165,7 @@ class EyeCarePreferencesDataStore(context: Context) {
         )
     }
 
-    private suspend fun ensureLegacyMigrated() {
+    private suspend fun ensureLegacyMigrated(legacyDataStore: DataStore<Preferences>) {
         if (legacyMigrationComplete) return
         if (mmkv.decodeBool(KEY_MMKV_MIGRATION_COMPLETE, false)) {
             legacyMigrationComplete = true

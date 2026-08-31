@@ -452,7 +452,6 @@ fun LumenCrashReportScreen(
                     Toast.LENGTH_SHORT,
                 ).show()
                 uploadCrashReportPasteLink(
-                    context = context,
                     report = report,
                     baseUrl = config?.pasteUploadBaseUrl
                         ?: CrashReportPasteUploader.DEFAULT_BASE_URL,
@@ -486,7 +485,7 @@ fun LumenCrashReportScreen(
                 copyTextToClipboard(context, label = "crash report link", text = url)
                 Toast.makeText(
                     context,
-                    context.getString(R.string.lumen_crash_report_share_link_ready, url),
+                    context.getString(R.string.lumen_crash_report_share_link_copied, url),
                     Toast.LENGTH_LONG,
                 ).show()
             },
@@ -1392,13 +1391,11 @@ private fun CrashReportShareableLinkDialog(
 }
 
 private fun uploadCrashReportPasteLink(
-    context: Context,
     report: CrashReport,
     baseUrl: String,
     onSuccess: (String) -> Unit,
     onFailure: (Throwable) -> Unit,
 ) {
-    val appContext = context.applicationContext
     val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
     // Never let network / integrity / clipboard failures crash the host process.
     // Upload is best-effort; text/file share remain available after a failed paste upload.
@@ -1416,16 +1413,7 @@ private fun uploadCrashReportPasteLink(
                 mainHandler.post {
                     runCatching {
                         result.fold(
-                            onSuccess = { url ->
-                                runCatching {
-                                    copyTextToClipboard(
-                                        appContext,
-                                        label = "crash report link",
-                                        text = url,
-                                    )
-                                }
-                                onSuccess(url)
-                            },
+                            onSuccess = onSuccess,
                             onFailure = onFailure,
                         )
                     }.onFailure { callbackError ->

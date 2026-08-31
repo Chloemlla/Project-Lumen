@@ -26,9 +26,7 @@ object LumenOpenContracts {
     const val ACTION_START_VISUAL_MONITOR = "com.project.lumen.action.START_VISUAL_MONITOR"
     const val ACTION_BIND_OPEN_API = "com.project.lumen.action.BIND_OPEN_API"
 
-    const val EXTRA_CALLER_PACKAGE = "EXTRA_CALLER_PACKAGE"
     const val EXTRA_REST_DURATION_MIN = "EXTRA_REST_DURATION_MIN"
-    const val EXTRA_SOURCE_APP = "com.project.lumen.extra.SOURCE_APP"
 
     const val SOURCE_APP_PROJECT_LUMEN = "project_lumen"
     const val SOURCE_APP_EXTERNAL = "external"
@@ -45,9 +43,9 @@ object LumenOpenIntents {
             LumenOpenContracts.ACTION_START_VISUAL_MONITOR -> LumenOpenLaunchTarget.VISUAL_MONITOR
             else -> return null
         }
+        // Attribution comes only from the platform (Activity.callingPackage / referrer host), never
+        // from caller-supplied extras; those are forgeable by any app holding ACCESS_LUMEN_CORE.
         val rawCaller = platformCallerPackage
-            ?: intent.getStringExtra(LumenOpenContracts.EXTRA_CALLER_PACKAGE)
-            ?: intent.getStringExtra(LumenOpenContracts.EXTRA_SOURCE_APP)
         val sourceApp = sanitizeLumenOpenSourceApp(
             rawCaller,
             fallback = LumenOpenContracts.SOURCE_APP_EXTERNAL,

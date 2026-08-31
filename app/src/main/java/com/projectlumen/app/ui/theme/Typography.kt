@@ -13,11 +13,29 @@ val LumenMonoFontFamily = FontFamily(
 )
 
 val LumenTypography = Typography(
+    displayMedium = TextStyle(
+        fontFamily = LumenMonoFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 40.sp,
+        lineHeight = 48.sp,
+    ),
+    headlineLarge = TextStyle(
+        fontFamily = LumenMonoFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 32.sp,
+        lineHeight = 40.sp,
+    ),
     headlineMedium = TextStyle(
         fontFamily = LumenMonoFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 26.sp,
         lineHeight = 32.sp,
+    ),
+    headlineSmall = TextStyle(
+        fontFamily = LumenMonoFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 22.sp,
+        lineHeight = 28.sp,
     ),
     titleLarge = TextStyle(
         fontFamily = LumenMonoFontFamily,
@@ -63,5 +81,11 @@ val LumenTypography = Typography(
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
+    ),
+    labelSmall = TextStyle(
+        fontFamily = LumenMonoFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 14.sp,
     ),
 )

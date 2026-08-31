@@ -21,10 +21,13 @@ import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.repositories.TipTemplateRepository
 import com.projectlumen.app.core.security.SecureCredentialStore
 import com.projectlumen.app.core.services.DataBackupService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -63,16 +66,19 @@ internal class ProjectLumenRemoteFeatureEntry(
 ) {
     private val _state = MutableStateFlow(ProjectLumenRemoteUiState())
     val state: StateFlow<ProjectLumenRemoteUiState> = _state.asStateFlow()
+    private var currentJob: Job? = null
 
     init {
         val session = runCatching { credentials.load() }.getOrNull()
         if (session != null) {
-            _state.value = _state.value.copy(
-                signedInEmail = session.userEmail,
-                sessionAvailable = true,
-                syncCursor = credentials.remoteSyncCursor(),
-                lastOperation = "Stored session loaded",
-            )
+            _state.update {
+                it.copy(
+                    signedInEmail = session.userEmail,
+                    sessionAvailable = true,
+                    syncCursor = credentials.remoteSyncCursor(),
+                    lastOperation = "Stored session loaded",
+                )
+            }
         }
     }
 
@@ -83,36 +89,41 @@ internal class ProjectLumenRemoteFeatureEntry(
         val normalized = email.trim()
         require(normalized.isNotBlank()) { "Email is required." }
         val start = apiClient.startEmailLogin(normalized)
-        _state.value = _state.value.copy(
-            pendingEmail = normalized,
-            pendingRequestId = start.requestId,
-            devCode = start.devCode.orEmpty(),
-            lastOperation = "Verification code sent",
-        )
+        _state.update {
+            it.copy(
+                pendingEmail = normalized,
+                pendingRequestId = start.requestId,
+                devCode = start.devCode.orEmpty(),
+                lastOperation = "Verification code sent",
+            )
+        }
     }
 
     fun verifyEmailLogin(code: String) = launchRemote(
         capability = BackendCapability.ACCOUNT_SESSION,
         successMessage = "Signed in",
     ) {
-        val current = _state.value
-        require(current.pendingEmail.isNotBlank() && current.pendingRequestId.isNotBlank()) {
+        val pendingEmail = _state.value.pendingEmail
+        val pendingRequestId = _state.value.pendingRequestId
+        require(pendingEmail.isNotBlank() && pendingRequestId.isNotBlank()) {
             "Request a verification code first."
         }
         val session = apiClient.verifyEmailLogin(
-            email = current.pendingEmail,
-            requestId = current.pendingRequestId,
+            email = pendingEmail,
+            requestId = pendingRequestId,
             code = code.trim(),
             deviceInstallationId = credentials.deviceInstallationId(),
         )
         credentials.save(session)
-        _state.value = current.copy(
-            signedInEmail = session.user.email,
-            sessionAvailable = true,
-            pendingRequestId = "",
-            devCode = "",
-            lastOperation = "Signed in as ${session.user.email}",
-        )
+        _state.update {
+            it.copy(
+                signedInEmail = session.user.email,
+                sessionAvailable = true,
+                pendingRequestId = "",
+                devCode = "",
+                lastOperation = "Signed in as ${session.user.email}",
+            )
+        }
         refreshAccountWithAccessToken(session.accessToken)
     }
 
@@ -146,13 +157,15 @@ internal class ProjectLumenRemoteFeatureEntry(
                 lastEntitlementSyncAt = entitlements.syncedAt,
             )
         }
-        _state.value = _state.value.copy(
-            signedInEmail = user.email,
-            sessionAvailable = true,
-            cloudTier = entitlements.tier,
-            entitlementCount = entitlements.entitlements.size,
-            lastOperation = "Account, entitlements, feature flags, config ($configApplied), and plan tier refreshed",
-        )
+        _state.update {
+            it.copy(
+                signedInEmail = user.email,
+                sessionAvailable = true,
+                cloudTier = entitlements.tier,
+                entitlementCount = entitlements.entitlements.size,
+                lastOperation = "Account, entitlements, feature flags, config ($configApplied), and plan tier refreshed",
+            )
+        }
     }
 
     fun syncNow() = launchRemote(
@@ -178,10 +191,12 @@ internal class ProjectLumenRemoteFeatureEntry(
         val pulledAfterPush = applyRemoteSyncChanges(afterPush.changes, deviceId)
         val nextCursor = maxOf(beforePush.nextCursor, pushResult.nextCursor, afterPush.nextCursor)
         credentials.saveRemoteSyncCursor(nextCursor)
-        _state.value = _state.value.copy(
-            syncCursor = nextCursor,
-            lastOperation = "Applied $configApplied config updates; pulled ${pulledBeforePush + pulledAfterPush} remote changes; pushed ${pushResult.accepted} local records",
-        )
+        _state.update {
+            it.copy(
+                syncCursor = nextCursor,
+                lastOperation = "Applied $configApplied config updates; pulled ${pulledBeforePush + pulledAfterPush} remote changes; pushed ${pushResult.accepted} local records",
+            )
+        }
     }
 
     fun uploadCloudBackup() = launchRemote(
@@ -194,11 +209,13 @@ internal class ProjectLumenRemoteFeatureEntry(
             deviceInstallationId = credentials.deviceInstallationId(),
             backupJson = backup.exportBackupJson(),
         )
-        _state.value = _state.value.copy(
-            latestBackupUploadedAt = metadata.uploadedAt,
-            latestBackupSchemaVersion = metadata.schemaVersion,
-            lastOperation = "Cloud backup uploaded",
-        )
+        _state.update {
+            it.copy(
+                latestBackupUploadedAt = metadata.uploadedAt,
+                latestBackupSchemaVersion = metadata.schemaVersion,
+                lastOperation = "Cloud backup uploaded",
+            )
+        }
     }
 
     fun restoreLatestCloudBackup() = launchRemote(
@@ -209,11 +226,13 @@ internal class ProjectLumenRemoteFeatureEntry(
         val remoteBackup = apiClient.fetchLatestBackup(requireAccessToken())
             ?: error("No cloud backup is available.")
         val summary = backup.importBackupJson(remoteBackup.backup)
-        _state.value = _state.value.copy(
-            latestBackupUploadedAt = remoteBackup.metadata.uploadedAt,
-            latestBackupSchemaVersion = summary.schemaVersion,
-            lastOperation = "Restored ${summary.eyeStatDays} eye-stat days and ${summary.templateCount} templates",
-        )
+        _state.update {
+            it.copy(
+                latestBackupUploadedAt = remoteBackup.metadata.uploadedAt,
+                latestBackupSchemaVersion = summary.schemaVersion,
+                lastOperation = "Restored ${summary.eyeStatDays} eye-stat days and ${summary.templateCount} templates",
+            )
+        }
     }
 
     fun verifyGooglePurchase(productId: String, purchaseToken: String) = launchRemote(
@@ -241,14 +260,18 @@ internal class ProjectLumenRemoteFeatureEntry(
                 lastEntitlementSyncAt = verification.verifiedAt,
             )
         }
-        _state.value = _state.value.copy(
-            cloudTier = verification.tier,
-            entitlementCount = entitlementCount,
-            lastOperation = "Google purchase ${verification.status}",
-        )
+        _state.update {
+            it.copy(
+                cloudTier = verification.tier,
+                entitlementCount = entitlementCount,
+                lastOperation = "Google purchase ${verification.status}",
+            )
+        }
     }
 
     fun signOut() {
+        currentJob?.cancel()
+        currentJob = null
         credentials.clear()
         _state.value = ProjectLumenRemoteUiState(
             sessionAvailable = false,
@@ -261,24 +284,34 @@ internal class ProjectLumenRemoteFeatureEntry(
         successMessage: String,
         block: suspend () -> Unit,
     ) {
-        scope.launch {
-            _state.value = _state.value.copy(busy = true, errorMessage = "")
+        if (_state.value.busy) return
+        // Claim the gate before dispatching, so a double tap cannot start two remote operations.
+        _state.update { it.copy(busy = true, errorMessage = "") }
+        currentJob = scope.launch {
             runCatching {
                 backendConnectivity.requireExecutable(capability)
                 block()
             }
                 .onFailure { throwable ->
-                    _state.value = _state.value.copy(
-                        busy = false,
-                        errorMessage = throwable.message ?: "Remote operation failed.",
-                    )
+                    if (throwable is CancellationException) {
+                        _state.update { it.copy(busy = false) }
+                    } else {
+                        _state.update {
+                            it.copy(
+                                busy = false,
+                                errorMessage = throwable.message ?: "Remote operation failed.",
+                            )
+                        }
+                    }
                 }
                 .onSuccess {
-                    _state.value = _state.value.copy(
-                        busy = false,
-                        errorMessage = "",
-                        lastOperation = _state.value.lastOperation.ifBlank { successMessage },
-                    )
+                    _state.update {
+                        it.copy(
+                            busy = false,
+                            errorMessage = "",
+                            lastOperation = it.lastOperation.ifBlank { successMessage },
+                        )
+                    }
                 }
         }
     }
@@ -288,12 +321,12 @@ internal class ProjectLumenRemoteFeatureEntry(
         val refreshMarginMillis = 60_000L
         val nowMillis = System.currentTimeMillis()
         if (stored.expiresAt <= 0L || stored.expiresAt > nowMillis + refreshMarginMillis) {
-            _state.value = _state.value.copy(sessionAvailable = true)
+            _state.update { it.copy(sessionAvailable = true) }
             return stored.accessToken
         }
         if (stored.refreshExpiresAt > 0L && stored.refreshExpiresAt <= nowMillis) {
             credentials.clear()
-            _state.value = _state.value.copy(sessionAvailable = false, signedInEmail = "")
+            _state.update { it.copy(sessionAvailable = false, signedInEmail = "") }
             error("Stored session expired. Sign in again.")
         }
         val refreshed = apiClient.refreshSession(
@@ -301,11 +334,13 @@ internal class ProjectLumenRemoteFeatureEntry(
             deviceInstallationId = credentials.deviceInstallationId(),
         )
         credentials.save(refreshed)
-        _state.value = _state.value.copy(
-            signedInEmail = refreshed.user.email,
-            sessionAvailable = true,
-            lastOperation = "Session refreshed",
-        )
+        _state.update {
+            it.copy(
+                signedInEmail = refreshed.user.email,
+                sessionAvailable = true,
+                lastOperation = "Session refreshed",
+            )
+        }
         return refreshed.accessToken
     }
 
@@ -452,8 +487,6 @@ internal class ProjectLumenRemoteFeatureEntry(
         val arrays = mutableMapOf<String, JSONArray>()
         changes.forEach { change ->
             when (change.collection) {
-                "settings" -> backupJson.put("settings", change.payload)
-                "dailyGoal" -> backupJson.put("dailyGoal", change.payload)
                 "templates" -> arrays.addItems("templates", change.payload)
                 "dailyEyeStats" -> arrays.addItems("dailyEyeStats", change.payload)
                 "dailyPomodoroStats" -> arrays.addItems("dailyPomodoroStats", change.payload)
@@ -479,9 +512,7 @@ internal class ProjectLumenRemoteFeatureEntry(
     }
 
     private fun JSONObject.hasImportableSections(): Boolean {
-        return has("settings") ||
-            has("dailyGoal") ||
-            has("templates") ||
+        return has("templates") ||
             has("dailyEyeStats") ||
             has("dailyPomodoroStats") ||
             has("entitlements") ||
@@ -489,12 +520,13 @@ internal class ProjectLumenRemoteFeatureEntry(
             has("reminderPlans")
     }
 
+    // Settings and the daily goal are single-document collections that importSettings overwrites
+    // field by field, so syncing them would let one device silently reset another's configuration.
+    // Moving them across devices stays an explicit cloud backup / restore action.
     private fun backupJsonToSyncChanges(backupJson: JSONObject): List<RemoteSyncChange> {
         val now = System.currentTimeMillis()
         val deviceId = credentials.deviceInstallationId()
         val collections = listOf(
-            "settings" to backupJson.optJSONObject("settings"),
-            "dailyGoal" to backupJson.optJSONObject("dailyGoal"),
             "templates" to JSONObject().put("items", backupJson.optJSONArray("templates")),
             "dailyEyeStats" to JSONObject().put("items", backupJson.optJSONArray("dailyEyeStats")),
             "dailyPomodoroStats" to JSONObject().put("items", backupJson.optJSONArray("dailyPomodoroStats")),
@@ -502,8 +534,7 @@ internal class ProjectLumenRemoteFeatureEntry(
             "featureFlags" to JSONObject().put("items", backupJson.optJSONArray("featureFlags")),
             "reminderPlans" to JSONObject().put("items", backupJson.optJSONArray("reminderPlans")),
         )
-        return collections.mapNotNull { (collection, payload) ->
-            payload ?: return@mapNotNull null
+        return collections.map { (collection, payload) ->
             RemoteSyncChange(
                 collection = collection,
                 remoteId = "local-$collection",

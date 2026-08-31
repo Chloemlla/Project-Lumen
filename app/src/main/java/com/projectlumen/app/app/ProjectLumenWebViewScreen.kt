@@ -414,6 +414,12 @@ internal fun copyWebPageUrl(context: Context, url: String) {
 }
 
 internal fun openUri(context: Context, uri: Uri) {
+    // Some of these URLs arrive from remote release metadata, so the target of an ACTION_VIEW is
+    // attacker-influenced; only web schemes may leave the app.
+    if (uri.scheme?.lowercase() !in setOf("http", "https")) {
+        Toast.makeText(context, context.getString(R.string.webview_open_failed), Toast.LENGTH_SHORT).show()
+        return
+    }
     val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     runCatching { context.startActivity(intent) }
         .onFailure { Toast.makeText(context, context.getString(R.string.webview_open_failed), Toast.LENGTH_SHORT).show() }

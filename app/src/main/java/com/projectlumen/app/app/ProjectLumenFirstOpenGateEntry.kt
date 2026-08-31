@@ -14,6 +14,10 @@ internal class ProjectLumenFirstOpenGateEntry(
     private val initialInstallProfile: DeviceInstallProfile,
     private val deviceFingerprint: String,
 ) {
+    // The startup coroutine calls refresh() while the gate's own click callbacks run on the main
+    // thread; both read-modify-write the three fields below and then re-resolve the gate from them.
+    private val gateLock = Any()
+
     private var installProfile = initialInstallProfile
     private var onboardingEligible = initialInstallProfile.ossNoticeCompletedAt > 0L &&
         initialInstallProfile.onboardingCompletedAt <= 0L
@@ -34,39 +38,46 @@ internal class ProjectLumenFirstOpenGateEntry(
     }
 
     fun refresh(hadExistingLocalUse: Boolean) {
-        installProfile = runCatching { secureCredentials.installProfile() }
-            .getOrDefault(installProfile)
+        synchronized(gateLock) {
+            installProfile = runCatching { secureCredentials.installProfile() }
+                .getOrDefault(installProfile)
 
-        val existingUserBeforeOssFeature = installProfile.ossNoticeCompletedAt <= 0L &&
-            installProfile.onboardingCompletedAt > 0L
-        if (existingUserBeforeOssFeature) {
-            val completedAt = System.currentTimeMillis().coerceAtLeast(1L)
-            runCatching { secureCredentials.markOssNoticeCompleted(completedAt) }
-                .onSuccess {
-                    installProfile = installProfile.copy(ossNoticeCompletedAt = completedAt)
-                }
+            val existingUserBeforeOssFeature = installProfile.ossNoticeCompletedAt <= 0L &&
+                installProfile.onboardingCompletedAt > 0L
+            if (existingUserBeforeOssFeature) {
+                val completedAt = System.currentTimeMillis().coerceAtLeast(1L)
+                runCatching { secureCredentials.markOssNoticeCompleted(completedAt) }
+                    .onSuccess {
+                        installProfile = installProfile.copy(ossNoticeCompletedAt = completedAt)
+                    }
+            }
+
+            onboardingEligible = installProfile.onboardingCompletedAt <= 0L &&
+                (
+                    installProfile.ossNoticeCompletedAt > 0L ||
+                        (!initialInstallProfile.hadDeviceCredentialBeforeLaunch && !hadExistingLocalUse)
+                    )
+            newInstallDetected = detectNewInstall()
+            applyAutomaticGate()
         }
-
-        onboardingEligible = installProfile.onboardingCompletedAt <= 0L &&
-            (
-                installProfile.ossNoticeCompletedAt > 0L ||
-                    (!initialInstallProfile.hadDeviceCredentialBeforeLaunch && !hadExistingLocalUse)
-                )
-        newInstallDetected = detectNewInstall()
-        applyAutomaticGate()
     }
 
     fun completeOssNotice() {
-        if (_ossNoticeState.value.reopenMode) {
-            dismissOssNotice()
-            return
-        }
+        synchronized(gateLock) {
+            if (_ossNoticeState.value.reopenMode) {
+                dismissOssNotice()
+                return
+            }
 
-        val completedAt = System.currentTimeMillis().coerceAtLeast(1L)
-        secureCredentials.markOssNoticeCompleted(completedAt)
-        installProfile = installProfile.copy(ossNoticeCompletedAt = completedAt)
-        onboardingEligible = installProfile.onboardingCompletedAt <= 0L
-        applyAutomaticGate()
+            val completedAt = System.currentTimeMillis().coerceAtLeast(1L)
+            // The encrypted store can throw on a broken Keystore or after a backup restore. Swallowing
+            // it costs at most one repeat of this gate on the next launch; letting it escape the click
+            // callback crashes the app on every attempt and the user never reaches the main screen.
+            runCatching { secureCredentials.markOssNoticeCompleted(completedAt) }
+            installProfile = installProfile.copy(ossNoticeCompletedAt = completedAt)
+            onboardingEligible = installProfile.onboardingCompletedAt <= 0L
+            applyAutomaticGate()
+        }
     }
 
     fun dismissOssNotice() {
@@ -81,34 +92,42 @@ internal class ProjectLumenFirstOpenGateEntry(
     }
 
     fun completeOnboarding() {
-        val completedAt = System.currentTimeMillis().coerceAtLeast(1L)
-        secureCredentials.markOnboardingCompleted(completedAt)
-        installProfile = installProfile.copy(onboardingCompletedAt = completedAt)
-        onboardingEligible = false
-        applyAutomaticGate()
+        synchronized(gateLock) {
+            val completedAt = System.currentTimeMillis().coerceAtLeast(1L)
+            runCatching { secureCredentials.markOnboardingCompleted(completedAt) }
+            installProfile = installProfile.copy(onboardingCompletedAt = completedAt)
+            onboardingEligible = false
+            applyAutomaticGate()
+        }
     }
 
     fun withdrawPrivacyConsent() {
-        secureCredentials.resetOnboardingCompletion()
-        installProfile = installProfile.copy(onboardingCompletedAt = 0L)
-        onboardingEligible = installProfile.ossNoticeCompletedAt > 0L
+        synchronized(gateLock) {
+            runCatching { secureCredentials.resetOnboardingCompletion() }
+            installProfile = installProfile.copy(onboardingCompletedAt = 0L)
+            onboardingEligible = installProfile.ossNoticeCompletedAt > 0L
+        }
     }
 
     fun completeBuildUpdateNotes() {
-        if (_buildUpdateNotesState.value.reopenMode) {
-            dismissBuildUpdateNotes()
-            return
-        }
+        synchronized(gateLock) {
+            if (_buildUpdateNotesState.value.reopenMode) {
+                dismissBuildUpdateNotes()
+                return
+            }
 
-        secureCredentials.markBuildUpdateNotesAcknowledged(
-            commitHash = currentBuild.commitHash,
-            buildTimeUtcMillis = currentBuild.buildTimeUtcMillis,
-        )
-        installProfile = installProfile.copy(
-            lastAcknowledgedCommitHash = currentBuild.commitHash,
-            lastAcknowledgedBuildTimeUtcMillis = currentBuild.buildTimeUtcMillis,
-        )
-        applyAutomaticGate()
+            runCatching {
+                secureCredentials.markBuildUpdateNotesAcknowledged(
+                    commitHash = currentBuild.commitHash,
+                    buildTimeUtcMillis = currentBuild.buildTimeUtcMillis,
+                )
+            }
+            installProfile = installProfile.copy(
+                lastAcknowledgedCommitHash = currentBuild.commitHash,
+                lastAcknowledgedBuildTimeUtcMillis = currentBuild.buildTimeUtcMillis,
+            )
+            applyAutomaticGate()
+        }
     }
 
     fun dismissBuildUpdateNotes() {

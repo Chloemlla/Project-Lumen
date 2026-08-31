@@ -14,6 +14,12 @@ interface EntitlementsDao {
     @Query("SELECT * FROM entitlements ORDER BY purchasedAt DESC, id DESC")
     suspend fun getAll(): List<EntitlementEntity>
 
+    @Query(
+        "SELECT * FROM entitlements WHERE source = :source AND productId = :productId " +
+            "AND purchaseToken = :purchaseToken ORDER BY id DESC LIMIT 1",
+    )
+    suspend fun findByIdentity(source: String, productId: String, purchaseToken: String): EntitlementEntity?
+
     @Upsert
     suspend fun upsert(entitlement: EntitlementEntity)
 }

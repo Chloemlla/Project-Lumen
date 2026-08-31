@@ -154,16 +154,15 @@ internal fun privacyReadinessScore(
     permissionRequirements: PermissionRequirements,
     shizukuReady: Boolean,
 ): Int {
+    // Only "an enabled feature has what it needs" counts, so 100% is reachable with statistics,
+    // keep-alive or ambient light deliberately switched off. Mirrors privacyActionNeededCount.
     val checks = listOf(
-        settings.statsEnabled,
         !permissionRequirements.usageAccess,
         !settings.notificationEnabled || !permissionRequirements.notification,
         !settings.notificationEnabled || !permissionRequirements.exactAlarm,
         !settings.notificationEnabled || !permissionRequirements.fullScreenIntent,
-        settings.keepAliveEnabled,
         !settings.proximityMonitoringEnabled || !permissionRequirements.camera,
         !settings.blinkMonitoringEnabled || !permissionRequirements.camera,
-        settings.ambientLightMonitoringEnabled,
         !settings.autoBrightnessEnabled || !permissionRequirements.writeSettings || usesShizukuNativeBrightness(settings),
         !settings.globalOverlayEnabled || !permissionRequirements.overlay,
         !settings.shizukuAdvancedModeEnabled || shizukuReady,

@@ -329,6 +329,10 @@ private data class PermissionEntry(
 private val legalPermissions = listOf(
     PermissionEntry(R.string.legal_permission_camera_name, R.string.legal_permission_camera_desc),
     PermissionEntry(R.string.legal_permission_notifications_name, R.string.legal_permission_notifications_desc),
+    PermissionEntry(
+        R.string.legal_permission_promoted_notifications_name,
+        R.string.legal_permission_promoted_notifications_desc,
+    ),
     PermissionEntry(R.string.legal_permission_exact_alarm_name, R.string.legal_permission_exact_alarm_desc),
     PermissionEntry(R.string.legal_permission_full_screen_intent_name, R.string.legal_permission_full_screen_intent_desc),
     PermissionEntry(R.string.legal_permission_overlay_name, R.string.legal_permission_overlay_desc),
@@ -336,6 +340,14 @@ private val legalPermissions = listOf(
     PermissionEntry(R.string.legal_permission_usage_access_name, R.string.legal_permission_usage_access_desc),
     PermissionEntry(R.string.legal_permission_boot_name, R.string.legal_permission_boot_desc),
     PermissionEntry(R.string.legal_permission_foreground_service_name, R.string.legal_permission_foreground_service_desc),
+    PermissionEntry(
+        R.string.legal_permission_foreground_service_special_use_name,
+        R.string.legal_permission_foreground_service_special_use_desc,
+    ),
+    PermissionEntry(
+        R.string.legal_permission_foreground_service_camera_name,
+        R.string.legal_permission_foreground_service_camera_desc,
+    ),
     PermissionEntry(R.string.legal_permission_internet_name, R.string.legal_permission_internet_desc),
     PermissionEntry(R.string.legal_permission_network_state_name, R.string.legal_permission_network_state_desc),
     PermissionEntry(R.string.legal_permission_battery_name, R.string.legal_permission_battery_desc),

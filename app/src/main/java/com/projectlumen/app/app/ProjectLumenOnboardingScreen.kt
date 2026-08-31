@@ -137,7 +137,7 @@ internal fun ProjectLumenOnboardingScreen(
                     page = activePage,
                     deviceFingerprint = state.deviceFingerprint,
                     newInstallDetected = state.newInstallDetected,
-                    iconScale = iconPulse,
+                    iconScale = { iconPulse },
                 )
             }
 
@@ -202,7 +202,7 @@ private fun OnboardingPageCard(
     page: OnboardingPageSpec,
     deviceFingerprint: String,
     newInstallDetected: Boolean,
-    iconScale: Float,
+    iconScale: () -> Float,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -217,9 +217,11 @@ private fun OnboardingPageCard(
         ) {
             LumenIconChip(
                 page.icon,
+                // Read inside graphicsLayer: the pulse then only invalidates drawing instead of
+                // recomposing the whole onboarding screen 60 times a second.
                 modifier = Modifier.graphicsLayer {
-                    scaleX = iconScale
-                    scaleY = iconScale
+                    scaleX = iconScale()
+                    scaleY = iconScale()
                 },
                 size = 64.dp,
             )

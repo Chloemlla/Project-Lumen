@@ -2,6 +2,7 @@ package com.projectlumen.app.ui.svg.drawablevectors
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType.Companion.NonZero
 import androidx.compose.ui.graphics.SolidColor
@@ -16,7 +17,10 @@ import com.projectlumen.app.ui.svg.DynamicColorImageVectors
 
 @Composable
 fun DynamicColorImageVectors.download(): ImageVector {
-    return Builder(
+    val lumenColorScheme = MaterialTheme.colorScheme
+    val lumenFixedColors = LocalFixedColorRoles.current
+    return remember(lumenColorScheme, lumenFixedColors) {
+        Builder(
             name = "Download",
             defaultWidth = 765.59973.dp,
             defaultHeight = 667.7441.dp,
@@ -25,7 +29,7 @@ fun DynamicColorImageVectors.download(): ImageVector {
         )
         .apply {
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainerHigh),
+                fill = SolidColor(lumenColorScheme.surfaceContainerHigh),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -39,7 +43,7 @@ fun DynamicColorImageVectors.download(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainerHigh),
+                fill = SolidColor(lumenColorScheme.surfaceContainerHigh),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -76,7 +80,7 @@ fun DynamicColorImageVectors.download(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surface),
+                fill = SolidColor(lumenColorScheme.surface),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -101,7 +105,7 @@ fun DynamicColorImageVectors.download(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(LocalFixedColorRoles.current.primaryFixedDim),
+                fill = SolidColor(lumenFixedColors.primaryFixedDim),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -115,7 +119,7 @@ fun DynamicColorImageVectors.download(): ImageVector {
                 arcToRelative(84.446f, 84.446f, 0.0f, true, true, -168.892f, 0.0f)
             }
             path(
-                fill = SolidColor(LocalFixedColorRoles.current.onPrimaryFixedVariant),
+                fill = SolidColor(lumenFixedColors.onPrimaryFixedVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -209,7 +213,7 @@ fun DynamicColorImageVectors.download(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.onBackground),
+                fill = SolidColor(lumenColorScheme.onBackground),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -229,7 +233,7 @@ fun DynamicColorImageVectors.download(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -343,7 +347,7 @@ fun DynamicColorImageVectors.download(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -362,7 +366,7 @@ fun DynamicColorImageVectors.download(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -381,7 +385,7 @@ fun DynamicColorImageVectors.download(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -398,4 +402,5 @@ fun DynamicColorImageVectors.download(): ImageVector {
             }
         }
         .build()
+    }
 }

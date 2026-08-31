@@ -76,7 +76,6 @@ import com.projectlumen.app.core.api.ProjectLumenApiConfig
 import com.projectlumen.app.core.api.ProjectLumenApiTrace
 import com.chloemlla.lumen.crash.CrashAppInfo
 import com.chloemlla.lumen.crash.CrashReport
-import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.debug.MemoryHealthSnapshot
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
 import kotlin.math.roundToInt
@@ -198,9 +197,14 @@ internal fun DeveloperDebugScreen(
         }
 
         SettingsSection(R.string.developer_section_system, Icons.Outlined.BatterySaver) {
+            // permissionRequirements is a stable instance per foreground cycle, so this reuses its
+            // ON_RESUME cadence instead of hitting PowerManager on every recomposition.
+            val ignoringBatteryOptimizations = remember(permissionRequirements) {
+                isIgnoringBatteryOptimizations(context)
+            }
             DeveloperMetricRow(
                 R.string.developer_battery_optimization,
-                if (isIgnoringBatteryOptimizations(context)) {
+                if (ignoringBatteryOptimizations) {
                     stringResource(R.string.developer_battery_whitelisted)
                 } else {
                     stringResource(R.string.developer_battery_limited)
@@ -215,9 +219,9 @@ internal fun DeveloperDebugScreen(
             DeveloperMetricRow(R.string.developer_service_uptime, serviceUptimeLabel(runtime.foregroundServiceStartedAt, runtime.foregroundServiceStoppedAt, uiState.nowMillis))
             DeveloperMetricRow(R.string.developer_service_last_restart, timestampLabel(runtime.foregroundServiceLastStickyRestartAt))
             DeveloperMetricRow(R.string.developer_service_task_removed, timestampLabel(runtime.foregroundServiceLastTaskRemovedAt))
-            DeveloperMetricRow(R.string.shizuku_status, developerShizukuStatusLabel(shizukuState))
+            DeveloperMetricRow(R.string.shizuku_status, shizukuStatusLabel(shizukuState))
             DeveloperMetricRow(R.string.shizuku_foreground_context, developerShizukuContextLabel(shizukuState))
-            DeveloperMetricRow(R.string.shizuku_system_guards, developerShizukuSystemGuardLabel(settings, shizukuState))
+            DeveloperMetricRow(R.string.shizuku_system_guards, shizukuSystemGuardLabel(settings, shizukuState))
             OutlinedButton(
                 onClick = viewModel::refreshShizukuState,
                 modifier = Modifier.fillMaxWidth(),
@@ -262,6 +266,8 @@ internal fun DeveloperDebugScreen(
         )
 
         SettingsSection(R.string.developer_section_api_security, Icons.Outlined.Lock) {
+            val apiPinCount = remember { configuredPinCount(ProjectLumenApiConfig.apiCertificatePins) }
+            val translationPinCount = remember { configuredPinCount(ProjectLumenApiConfig.translationCertificatePins) }
             DeveloperMetricRow(R.string.developer_security_api_base, ProjectLumenApiConfig.baseUrl)
             BackendConnectivityDeveloperControls(
                 state = backendConnectivityState,
@@ -273,7 +279,7 @@ internal fun DeveloperDebugScreen(
             DeveloperMetricRow(
                 R.string.developer_security_api_pins,
                 securityPinStatus(
-                    pinCount = configuredPinCount(ProjectLumenApiConfig.apiCertificatePins),
+                    pinCount = apiPinCount,
                     required = false,
                     optional = true,
                 ),
@@ -282,7 +288,7 @@ internal fun DeveloperDebugScreen(
             DeveloperMetricRow(
                 R.string.developer_security_translation_pins,
                 securityPinStatus(
-                    pinCount = configuredPinCount(ProjectLumenApiConfig.translationCertificatePins),
+                    pinCount = translationPinCount,
                     required = false,
                     optional = true,
                 ),
@@ -516,6 +522,7 @@ internal fun DeveloperMetricRow(@StringRes labelRes: Int, value: String) {
 
 @Composable
 private fun DeveloperMetricRow(label: String, value: String) {
+    val wrappedValue = remember(value) { smartWrapDebugText(value) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -535,7 +542,7 @@ private fun DeveloperMetricRow(label: String, value: String) {
         )
         SelectionContainer {
             Text(
-                text = smartWrapDebugText(value),
+                text = wrappedValue,
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
@@ -742,34 +749,6 @@ private fun developerShizukuContextLabel(state: ShizukuCapabilityState): String 
     }
 }
 
-@Composable
-private fun developerShizukuSystemGuardLabel(settings: AppSettingsEntity, state: ShizukuCapabilityState): String {
-    val reasons = mutableListOf<String>()
-    if (settings.shizukuScreenOffGuardEnabled && !state.deviceInteractive) {
-        reasons += stringResource(R.string.shizuku_guard_reason_screen_off)
-    }
-    if (settings.shizukuLowBatteryGuardEnabled && state.lowBatteryActive) {
-        reasons += stringResource(R.string.shizuku_guard_reason_low_battery)
-    }
-    if (settings.shizukuPowerSaveGuardEnabled && state.powerSaveActive) {
-        reasons += stringResource(R.string.shizuku_guard_reason_power_save)
-    }
-    if (settings.shizukuDndGuardEnabled && state.dndActive) {
-        reasons += stringResource(R.string.shizuku_guard_reason_dnd)
-    }
-    if (settings.shizukuThermalGuardEnabled && state.thermalStatus >= 2) {
-        reasons += stringResource(R.string.shizuku_guard_reason_thermal, state.thermalStatus)
-    }
-    if (settings.shizukuCameraPrivacyGuardEnabled && state.cameraPrivacyEnabled) {
-        reasons += stringResource(R.string.shizuku_guard_reason_camera_privacy)
-    }
-    return if (reasons.isEmpty()) {
-        stringResource(R.string.shizuku_system_normal)
-    } else {
-        stringResource(R.string.shizuku_system_deferred, reasons.joinToString(", "))
-    }
-}
-
 private fun isIgnoringBatteryOptimizations(context: Context): Boolean {
     val powerManager = context.getSystemService(PowerManager::class.java)
     return powerManager.isIgnoringBatteryOptimizations(context.packageName)
@@ -782,7 +761,7 @@ private fun openBatteryOptimizationSettings(context: Context) {
     runCatching { context.startActivity(requestIntent) }
         .onFailure {
             runCatching { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
-                .onFailure { openAppNotificationSettings(context) }
+                .onFailure { openAppDetailsSettings(context) }
         }
 }
 

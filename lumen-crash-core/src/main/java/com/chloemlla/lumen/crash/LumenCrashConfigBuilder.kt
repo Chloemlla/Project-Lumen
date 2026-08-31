@@ -10,34 +10,40 @@ import android.os.Build
  *
  * Auto-fills app display name / version metadata from [PackageManager] unless overridden.
  * Author attribution remains non-configurable.
+ *
+ * Every optional field takes its initial value from [LumenCrashConfig] so the two install paths
+ * cannot drift apart; only [fileProviderAuthority] deliberately differs, because the short path
+ * knows the host package name.
  */
 class LumenCrashConfigBuilder internal constructor(
     private val application: Application,
 ) {
+    private val defaults = LumenCrashConfig(appDisplayName = "", versionName = "", versionCode = 0)
+
     var appDisplayName: String? = null
     var versionName: String? = null
     var versionCode: Int? = null
-    var commitHash: String = "unknown"
+    var commitHash: String = defaults.commitHash
     var fileProviderAuthority: String? = LumenCrashDefaults.fileProviderAuthority(application.packageName)
-    var shareSubject: String? = null
-    var reportTitle: String? = null
-    var reportMessage: String? = null
-    var pasteUploadEnabled: Boolean = true
-    var pasteUploadBaseUrl: String = CrashReportPasteUploader.DEFAULT_BASE_URL
-    var onCrashSaved: ((CrashReport) -> Unit)? = null
-    var killProcessWhenNoPreviousHandler: Boolean = true
-    var anrWatchdogEnabled: Boolean = true
-    var anrWatchdogTimeoutMillis: Long = 5_000L
-    var anrWatchdogCheckIntervalMillis: Long = 1_000L
-    var startupHangWatchdogEnabled: Boolean = false
-    var startupHangTimeoutMillis: Long = 15_000L
-    var onReportSaved: ((CrashReport) -> Unit)? = null
-    var onAnrDetected: ((CrashReport) -> Unit)? = null
-    var priorExitCaptureEnabled: Boolean = true
-    var crashReportBackendEnabled: Boolean = true
-    var crashReportBackendBaseUrl: String = LumenCrashDefaults.DEFAULT_CRASH_BACKEND_BASE_URL
-    var crashReportAccessToken: String? = null
-    var deviceInstallationIdProvider: (() -> String?)? = null
+    var shareSubject: String? = defaults.shareSubject
+    var reportTitle: String? = defaults.reportTitle
+    var reportMessage: String? = defaults.reportMessage
+    var pasteUploadEnabled: Boolean = defaults.pasteUploadEnabled
+    var pasteUploadBaseUrl: String = defaults.pasteUploadBaseUrl
+    var onCrashSaved: ((CrashReport) -> Unit)? = defaults.onCrashSaved
+    var killProcessWhenNoPreviousHandler: Boolean = defaults.killProcessWhenNoPreviousHandler
+    var anrWatchdogEnabled: Boolean = defaults.anrWatchdogEnabled
+    var anrWatchdogTimeoutMillis: Long = defaults.anrWatchdogTimeoutMillis
+    var anrWatchdogCheckIntervalMillis: Long = defaults.anrWatchdogCheckIntervalMillis
+    var startupHangWatchdogEnabled: Boolean = defaults.startupHangWatchdogEnabled
+    var startupHangTimeoutMillis: Long = defaults.startupHangTimeoutMillis
+    var onReportSaved: ((CrashReport) -> Unit)? = defaults.onReportSaved
+    var onAnrDetected: ((CrashReport) -> Unit)? = defaults.onAnrDetected
+    var priorExitCaptureEnabled: Boolean = defaults.priorExitCaptureEnabled
+    var crashReportBackendEnabled: Boolean = defaults.crashReportBackendEnabled
+    var crashReportBackendBaseUrl: String = defaults.crashReportBackendBaseUrl
+    var crashReportAccessToken: String? = defaults.crashReportAccessToken
+    var deviceInstallationIdProvider: (() -> String?)? = defaults.deviceInstallationIdProvider
 
     fun build(): LumenCrashConfig {
         val packageInfo = runCatching {

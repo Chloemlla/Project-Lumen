@@ -532,7 +532,9 @@ internal fun UpdateDialog(
             Text(stringResource(R.string.about_update_build_time, buildTime))
             Text(stringResource(R.string.about_update_publish_time, publishTime))
             if (release.body.isNotBlank()) {
-                Text(release.body)
+                // The dialog text slot does not scroll, so an unbounded changelog pushes the buttons
+                // off screen.
+                Text(release.body, maxLines = 12, overflow = TextOverflow.Ellipsis)
             }
             Text(stringResource(R.string.about_update_release_notes, release.releaseName))
         }
@@ -541,7 +543,7 @@ internal fun UpdateDialog(
     when (val currentState = state) {
         UpdateDialogState.Hidden -> Unit
         UpdateDialogState.Checking -> AlertDialog(
-            onDismissRequest = {},
+            onDismissRequest = onDismiss,
             title = { Text(stringResource(R.string.about_update_checking_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -550,6 +552,10 @@ internal fun UpdateDialog(
                 }
             },
             confirmButton = {},
+            // A hung or slow network check must not leave the user stuck behind a modal.
+            dismissButton = {
+                OutlinedButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+            },
         )
         UpdateDialogState.NoUpdate -> AlertDialog(
             onDismissRequest = onDismiss,
@@ -582,7 +588,11 @@ internal fun UpdateDialog(
                             if (targetAsset != null) {
                                 onDownloadUpdate(candidate, targetAsset)
                             } else {
-                                pendingReleaseUrl = release.htmlUrl.ifBlank { PROJECT_LUMEN_RELEASES_BASE_URL }
+                                // htmlUrl comes from remote release metadata; pinning the prefix keeps
+                                // ACTION_VIEW on the project's own releases page.
+                                pendingReleaseUrl = release.htmlUrl
+                                    .takeIf { it.startsWith(PROJECT_LUMEN_RELEASES_BASE_URL) }
+                                    ?: PROJECT_LUMEN_RELEASES_BASE_URL
                             }
                         },
                     ) {

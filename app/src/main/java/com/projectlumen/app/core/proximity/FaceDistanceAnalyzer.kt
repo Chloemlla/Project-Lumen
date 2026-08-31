@@ -10,13 +10,15 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.google.mlkit.vision.face.FaceLandmark
 import com.google.mlkit.vision.facemesh.FaceMeshDetection
 import com.google.mlkit.vision.facemesh.FaceMeshDetectorOptions
+import java.io.Closeable
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 import kotlin.math.hypot
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
 
-class FaceDistanceAnalyzer(private val includeTopology: Boolean = false) {
+class FaceDistanceAnalyzer(private val includeTopology: Boolean = false) : Closeable {
     private val detector = FaceDetection.getClient(
         FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
@@ -36,6 +38,11 @@ class FaceDistanceAnalyzer(private val includeTopology: Boolean = false) {
         )
     } else {
         null
+    }
+
+    override fun close() {
+        runCatching { detector.close() }
+        runCatching { meshDetector?.close() }
     }
 
     suspend fun analyze(bitmap: Bitmap, rotationDegrees: Int): FaceDistanceSample? {
@@ -101,10 +108,14 @@ class FaceDistanceAnalyzer(private val includeTopology: Boolean = false) {
                 )
             }
         }
-        val mesh = runCatching {
+        val mesh = try {
             meshDetector?.process(image)?.await()
                 ?.maxByOrNull { it.boundingBox.safeArea() }
-        }.getOrNull()
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (throwable: Throwable) {
+            null
+        }
         val meshPoints = mesh?.allPoints?.map { point ->
             val position = point.position
             FaceTopologyPoint(
@@ -155,9 +166,16 @@ class FaceDistanceAnalyzer(private val includeTopology: Boolean = false) {
     private fun Rect.safeArea(): Int = safeWidth() * height().coerceAtLeast(0)
 
     private suspend fun <T> com.google.android.gms.tasks.Task<T>.await(): T {
-        return suspendCoroutine { continuation ->
-            addOnSuccessListener { continuation.resume(it) }
-            addOnFailureListener { continuation.resumeWithException(it) }
+        return suspendCancellableCoroutine { continuation ->
+            addOnCompleteListener { task ->
+                val failure = task.exception
+                when {
+                    // A canceled Task never calls success/failure listeners.
+                    task.isCanceled -> continuation.cancel()
+                    failure != null -> continuation.resumeWithException(failure)
+                    else -> continuation.resume(task.result)
+                }
+            }
         }
     }
 

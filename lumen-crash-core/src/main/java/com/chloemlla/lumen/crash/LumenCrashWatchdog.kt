@@ -19,14 +19,17 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * Freeze detection is gated on the app having a resumed (foreground) activity. While the
  * process is backgrounded the OS may stop scheduling it entirely (doze / OEM app-freeze /
- * screen off): `elapsedRealtime` keeps climbing but the main thread simply cannot process
- * heartbeats, so a watchdog that reports in that state produces false positives. The
- * heartbeat baseline is therefore refreshed in the background, and a freeze is only emitted
- * for a foreground main thread that stays silent past the timeout for two consecutive checks.
+ * screen off): the main thread simply cannot process heartbeats, so a watchdog that reports in
+ * that state produces false positives. The heartbeat baseline is therefore refreshed in the
+ * background, and a freeze is only emitted for a foreground main thread that stays silent past
+ * the timeout for two consecutive checks. All timing uses [SystemClock.uptimeMillis] so deep
+ * sleep is not counted as an unresponsive main thread.
  *
  * Startup detection is gated the same way: only a process the user is waiting on owes a first
  * frame, so a launch that is not user-visible when the timeout expires is retired rather than
- * reported.
+ * reported. A resumed activity also completes the startup timer on its own, because it is
+ * objective proof that the process can draw; [markStartupComplete] stays available as the more
+ * precise host-supplied signal.
  */
 internal class LumenCrashWatchdog(
     private val application: Application,
@@ -40,7 +43,7 @@ internal class LumenCrashWatchdog(
     private val startupReported = AtomicBoolean(false)
     private val freezeReported = AtomicBoolean(false)
     private val freezeCandidate = AtomicBoolean(false)
-    private val startedAtMillis = SystemClock.elapsedRealtime()
+    private val startedAtMillis = SystemClock.uptimeMillis()
     private val lastHeartbeatAtMillis = AtomicLong(startedAtMillis)
 
     /** Number of activities currently resumed. > 0 means the app is user-visible. */
@@ -50,7 +53,7 @@ internal class LumenCrashWatchdog(
     private var worker: Thread? = null
 
     private val heartbeat = Runnable {
-        lastHeartbeatAtMillis.set(SystemClock.elapsedRealtime())
+        lastHeartbeatAtMillis.set(SystemClock.uptimeMillis())
         // Allow a later freeze to produce a new report after the app recovers.
         freezeReported.set(false)
     }
@@ -58,6 +61,8 @@ internal class LumenCrashWatchdog(
     private val activityLifecycleCallbacks = object : Application.ActivityLifecycleCallbacks {
         override fun onActivityResumed(activity: Activity) {
             resumedActivityCount.incrementAndGet()
+            // The process demonstrably draws frames, whether or not the host reports it.
+            markStartupComplete()
         }
 
         override fun onActivityPaused(activity: Activity) {
@@ -112,11 +117,15 @@ internal class LumenCrashWatchdog(
             // refreshing lastHeartbeatAtMillis, so only a main thread that cannot
             // process messages (a real freeze) lets the age cross the timeout.
             mainHandler.post(heartbeat)
-            val now = SystemClock.elapsedRealtime()
+            val now = SystemClock.uptimeMillis()
             val startupPending = config.startupHangWatchdogEnabled && !startupComplete.get()
 
-            if (startupPending &&
-                now - startedAtMillis >= startupTimeoutMillis &&
+            if (WatchdogDecisions.startupDeadlineExpired(
+                    startupPending = startupPending,
+                    nowMillis = now,
+                    startedAtMillis = startedAtMillis,
+                    timeoutMillis = startupTimeoutMillis,
+                ) &&
                 startupReported.compareAndSet(false, true)
             ) {
                 if (isUserVisibleLaunch()) {
@@ -133,23 +142,25 @@ internal class LumenCrashWatchdog(
 
             // A startup report is more useful than a duplicate generic freeze report while the
             // host has not yet reported its first frame.
-            if (!startupPending &&
-                config.anrWatchdogEnabled &&
-                isForeground
-            ) {
+            if (!startupPending && config.anrWatchdogEnabled && isForeground) {
                 val heartbeatAge = now - lastHeartbeatAtMillis.get()
-                if (heartbeatAge >= anrTimeoutMillis) {
-                    if (freezeCandidate.compareAndSet(false, true)) {
-                        // First sighting of a silent main thread. Grant one grace interval so a
-                        // main thread that was merely suspended by the OS (and resumes a tick
-                        // behind the watchdog) can process the queued heartbeat. Only report if
-                        // it is still silent on the next check.
-                    } else if (freezeReported.compareAndSet(false, true)) {
-                        emit(CrashReportKind.FREEZE, heartbeatAge)
-                    }
-                } else {
+                when (
+                    WatchdogDecisions.freezeDecision(
+                        heartbeatAgeMillis = heartbeatAge,
+                        timeoutMillis = anrTimeoutMillis,
+                        alreadyCandidate = freezeCandidate.get(),
+                    )
+                ) {
                     // The main thread processed a heartbeat during the grace window.
-                    freezeCandidate.set(false)
+                    WatchdogFreezeDecision.RESPONSIVE -> freezeCandidate.set(false)
+                    // First sighting of a silent main thread. Grant one grace interval so a main
+                    // thread that was merely suspended by the OS (and resumes a tick behind the
+                    // watchdog) can process the queued heartbeat.
+                    WatchdogFreezeDecision.CANDIDATE -> freezeCandidate.set(true)
+                    WatchdogFreezeDecision.REPORT ->
+                        if (freezeReported.compareAndSet(false, true)) {
+                            emit(CrashReportKind.FREEZE, heartbeatAge)
+                        }
                 }
             } else {
                 // Background / not user-visible: a silent main thread here is almost always the

@@ -13,17 +13,22 @@ import com.chloemlla.lumen.crash.LumenCrash
  *
  * Loads any pending report and either shows [LumenCrashReportScreen] or the host [content].
  * Continue clears the pending report by default so the next cold start is not re-blocked.
+ *
+ * When [initialReport] is null the report is loaded once per gate instance. Loading it from a
+ * default argument instead would re-read storage on the composition thread on every
+ * recomposition, and could replace a running host UI with the crash screen mid-session.
  */
 @Composable
 fun LumenCrashGate(
-    initialReport: CrashReport? = LumenCrash.loadPendingReportSafely(),
+    initialReport: CrashReport? = null,
     clearStoredReportOnContinue: Boolean = true,
     onClearStoredReport: (() -> Unit)? = null,
     onContinue: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    var pendingReport by remember(initialReport?.reportId) {
-        mutableStateOf(initialReport)
+    val resolvedReport = initialReport ?: remember { LumenCrash.loadPendingReportSafely() }
+    var pendingReport by remember(resolvedReport?.reportId) {
+        mutableStateOf(resolvedReport)
     }
 
     val report = pendingReport

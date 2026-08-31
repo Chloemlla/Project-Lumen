@@ -9,6 +9,7 @@ internal enum class DelegatedNetworkGuardDisplayStatus {
     ACTIVE,
     CLEARED,
     UNSUPPORTED,
+    FAILED,
     NOT_ATTEMPTED,
 }
 
@@ -22,7 +23,9 @@ internal val AppNetworkControlEntity.delegatedNetworkGuardDisplayStatus: Delegat
         lastError.isBlank() ||
             (!lastError.contains(SHIZUKU_DELEGATED_GUARD_ERROR_PREFIX) &&
                 lastError.contains(SHIZUKU_UID_POLICY_ERROR_PREFIX)) -> DelegatedNetworkGuardDisplayStatus.CLEARED
-        else -> DelegatedNetworkGuardDisplayStatus.UNSUPPORTED
+        lastError.contains(SHIZUKU_DELEGATED_GUARD_ERROR_PREFIX) -> DelegatedNetworkGuardDisplayStatus.UNSUPPORTED
+        // Any other error is a failed attempt, not evidence the ROM lacks the guard.
+        else -> DelegatedNetworkGuardDisplayStatus.FAILED
     }
 
 private val ShizukuNetworkPolicyResult.hasActiveNetworkRestriction: Boolean

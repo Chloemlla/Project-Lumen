@@ -19,6 +19,17 @@ internal fun openUsageAccessSettings(context: Context) {
     )
 }
 
+internal fun openAppDetailsSettings(context: Context) {
+    val packageUri = Uri.parse("package:${context.packageName}")
+    startFirstAvailableSettingsActivity(
+        context,
+        listOf(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri),
+            Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS),
+        ),
+    )
+}
+
 internal fun openSystemBatteryUsageSettings(context: Context) {
     val packageUri = Uri.parse("package:${context.packageName}")
     startFirstAvailableSettingsActivity(

@@ -1,6 +1,5 @@
 package com.chloemlla.lumen.crash
 
-import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -49,38 +48,19 @@ object CrashReportBackendUploader {
             val body = buildRequestBody(report, deviceInstallationId, packageName, versionCode)
             val bodyBytes = body.toString().toByteArray(StandardCharsets.UTF_8)
 
-            val url = URL(endpoint)
-            val rawConnection = url.openConnection()
-            val effectiveToken = accessToken?.trim().orEmpty()
-            val connection = (rawConnection as HttpURLConnection).apply {
-                requestMethod = "POST"
-                doInput = true
-                doOutput = true
-                useCaches = false
-                connectTimeout = connectTimeoutMillis.coerceAtLeast(1_000)
-                readTimeout = readTimeoutMillis.coerceAtLeast(1_000)
-                instanceFollowRedirects = true
-                setRequestProperty("Accept", "application/json, */*")
-                setRequestProperty("Content-Type", "application/json")
-                if (effectiveToken.isNotEmpty()) {
-                    setRequestProperty("Authorization", "Bearer $effectiveToken")
-                }
-                setRequestProperty("Content-Length", bodyBytes.size.toString())
-                setRequestProperty("User-Agent", "lumen-crash-sdk")
-            }
-
-            try {
-                connection.outputStream.use { stream ->
-                    stream.write(bodyBytes)
-                    stream.flush()
-                }
-                val status = connection.responseCode
-                val responseText = readBody(
-                    if (status in 200..299) connection.inputStream else connection.errorStream,
-                )
-                classifyResponse(status, responseText)
-            } finally {
-                runCatching { connection.disconnect() }
+            val first = post(endpoint, bodyBytes, accessToken, connectTimeoutMillis, readTimeoutMillis)
+            val location = first.redirectLocation
+                ?: return classifyResponse(first.status, first.body)
+            // Redirects are followed manually and at most once: the platform HttpURLConnection
+            // follows an https -> http downgrade by default, which would put the whole report on
+            // the wire in clear text.
+            val redirected = resolveHttpsRedirect(endpoint, location)
+                ?: return CrashUploadOutcome.REJECTED
+            val second = post(redirected, bodyBytes, accessToken, connectTimeoutMillis, readTimeoutMillis)
+            if (second.redirectLocation != null) {
+                CrashUploadOutcome.REJECTED
+            } else {
+                classifyResponse(second.status, second.body)
             }
         } catch (_: IOException) {
             // Network-level failure: the report is still worth uploading on a later launch.
@@ -92,12 +72,69 @@ object CrashReportBackendUploader {
         }
     }
 
+    private class HttpAttempt(
+        val status: Int,
+        val body: String,
+        val redirectLocation: String?,
+    )
+
+    private fun post(
+        endpoint: String,
+        bodyBytes: ByteArray,
+        accessToken: String?,
+        connectTimeoutMillis: Int,
+        readTimeoutMillis: Int,
+    ): HttpAttempt {
+        val effectiveToken = accessToken?.trim().orEmpty()
+        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            doInput = true
+            doOutput = true
+            useCaches = false
+            connectTimeout = connectTimeoutMillis.coerceAtLeast(1_000)
+            readTimeout = readTimeoutMillis.coerceAtLeast(1_000)
+            instanceFollowRedirects = false
+            setRequestProperty("Accept", "application/json, */*")
+            setRequestProperty("Content-Type", "application/json")
+            if (effectiveToken.isNotEmpty()) {
+                setRequestProperty("Authorization", "Bearer $effectiveToken")
+            }
+            setRequestProperty("Content-Length", bodyBytes.size.toString())
+            setRequestProperty("User-Agent", "lumen-crash-sdk")
+        }
+
+        try {
+            connection.outputStream.use { stream ->
+                stream.write(bodyBytes)
+                stream.flush()
+            }
+            val status = connection.responseCode
+            val responseText = readBody(
+                if (status in 200..299) connection.inputStream else connection.errorStream,
+            )
+            val location = if (status in 300..399) {
+                connection.getHeaderField("Location")?.takeIf { it.isNotBlank() }
+            } else {
+                null
+            }
+            return HttpAttempt(status, responseText, location)
+        } finally {
+            runCatching { connection.disconnect() }
+        }
+    }
+
+    private fun resolveHttpsRedirect(currentUrl: String, location: String): String? {
+        val resolved = runCatching { URL(URL(currentUrl), location).toString() }.getOrNull() ?: return null
+        return resolved.takeIf { it.startsWith("https://", ignoreCase = true) }
+    }
+
     /**
      * Builds the ingest payload.
      *
-     * The backend persists [CrashReport.systemInfo] but has no column for `exitReason`, so a
-     * PRIOR_EXIT report's kill reason would never reach the crash dashboard. Fold it into the
-     * uploaded system info instead of mutating the locally stored report.
+     * `schemaVersion` / `sdkVersion` let the backend tell an old install apart from a payload it
+     * simply cannot parse. The backend persists [CrashReport.systemInfo] but has no column for
+     * `exitReason`, so a PRIOR_EXIT report's kill reason would never reach the crash dashboard.
+     * Fold it into the uploaded system info instead of mutating the locally stored report.
      */
     internal fun buildRequestBody(
         report: CrashReport,
@@ -105,6 +142,8 @@ object CrashReportBackendUploader {
         packageName: String,
         versionCode: Int,
     ): JSONObject = report.toJson().apply {
+        put("schemaVersion", LumenCrashDefaults.INGEST_SCHEMA_VERSION)
+        put("sdkVersion", LumenCrashDefaults.SDK_VERSION)
         put("deviceInstallationId", deviceInstallationId)
         put("packageName", packageName)
         put("versionCode", versionCode)
@@ -146,9 +185,21 @@ object CrashReportBackendUploader {
     private fun readBody(stream: InputStream?): String {
         if (stream == null) return ""
         return runCatching {
-            BufferedReader(InputStreamReader(stream, StandardCharsets.UTF_8)).use { reader ->
-                reader.readText()
+            InputStreamReader(stream, StandardCharsets.UTF_8).use { reader ->
+                val buffer = CharArray(READ_CHUNK_CHARS)
+                val text = StringBuilder()
+                while (text.length < MAX_RESPONSE_CHARS) {
+                    val limit = minOf(buffer.size, MAX_RESPONSE_CHARS - text.length)
+                    val read = reader.read(buffer, 0, limit)
+                    if (read <= 0) break
+                    text.append(buffer, 0, read)
+                }
+                text.toString()
             }
         }.getOrDefault("")
     }
+
+    /** The response only carries an `accepted` flag, so a larger body is never useful. */
+    private const val MAX_RESPONSE_CHARS = 64 * 1024
+    private const val READ_CHUNK_CHARS = 4 * 1024
 }

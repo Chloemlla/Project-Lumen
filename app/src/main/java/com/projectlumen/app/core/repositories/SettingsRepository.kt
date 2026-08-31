@@ -7,6 +7,8 @@ import com.projectlumen.app.core.preferences.withEyeCarePreferences
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class SettingsRepository(
     private val dao: AppSettingsDao,
@@ -36,32 +38,34 @@ class SettingsRepository(
     }
 
     suspend fun ensureDefault() {
-        val current = dao.get()
-        val preferredDeviceInstallationId = deviceInstallationIdProvider?.invoke(current?.deviceInstallationId)
-        val baseSettings = if (current == null) {
-            AppSettingsEntity(
-                deviceInstallationId = preferredDeviceInstallationId ?: UUID.randomUUID().toString(),
-            ).also { dao.upsert(it) }
-        } else if (current.deviceInstallationId.isBlank()) {
-            current.copy(
-                deviceInstallationId = preferredDeviceInstallationId ?: UUID.randomUUID().toString(),
-                updatedAt = System.currentTimeMillis(),
-            ).also { dao.upsert(it) }
-        } else if (preferredDeviceInstallationId != null && preferredDeviceInstallationId != current.deviceInstallationId) {
-            current.copy(
-                deviceInstallationId = preferredDeviceInstallationId,
-                updatedAt = System.currentTimeMillis(),
-            ).also { dao.upsert(it) }
-        } else {
-            current
-        }
+        AppSettingsWriteLock.mutex.withLock {
+            val current = dao.get()
+            val preferredDeviceInstallationId = deviceInstallationIdProvider?.invoke(current?.deviceInstallationId)
+            val baseSettings = if (current == null) {
+                AppSettingsEntity(
+                    deviceInstallationId = preferredDeviceInstallationId ?: UUID.randomUUID().toString(),
+                ).also { dao.upsert(it) }
+            } else if (current.deviceInstallationId.isBlank()) {
+                current.copy(
+                    deviceInstallationId = preferredDeviceInstallationId ?: UUID.randomUUID().toString(),
+                    updatedAt = System.currentTimeMillis(),
+                ).also { dao.upsert(it) }
+            } else if (preferredDeviceInstallationId != null && preferredDeviceInstallationId != current.deviceInstallationId) {
+                current.copy(
+                    deviceInstallationId = preferredDeviceInstallationId,
+                    updatedAt = System.currentTimeMillis(),
+                ).also { dao.upsert(it) }
+            } else {
+                current
+            }
 
-        val preferencesStore = preferences ?: return
-        val persistedPreferences = preferencesStore.read()
-        if (persistedPreferences.hasPersistedValues) {
-            dao.upsert(baseSettings.withEyeCarePreferences(persistedPreferences))
-        } else {
-            preferencesStore.saveFromSettings(baseSettings)
+            val preferencesStore = preferences ?: return
+            val persistedPreferences = preferencesStore.read()
+            if (persistedPreferences.hasPersistedValues) {
+                dao.upsert(baseSettings.withEyeCarePreferences(persistedPreferences))
+            } else {
+                preferencesStore.saveFromSettings(baseSettings)
+            }
         }
     }
 
@@ -69,10 +73,18 @@ class SettingsRepository(
         nowMillis: Long = System.currentTimeMillis(),
         transform: (AppSettingsEntity) -> AppSettingsEntity,
     ): AppSettingsEntity {
-        val current = getOrDefault()
-        val updated = transform(current).copy(id = 1, updatedAt = nowMillis)
-        dao.upsert(updated)
-        preferences?.saveFromSettings(updated)
-        return updated
+        return AppSettingsWriteLock.mutex.withLock {
+            val current = getOrDefault()
+            val updated = transform(current).copy(id = 1, updatedAt = nowMillis)
+            // MMKV 是读路径的权威源，必须先落地；否则两次写之间被杀会让陈旧 MMKV 永久覆盖新 Room。
+            preferences?.saveFromSettings(updated)
+            dao.upsert(updated)
+            updated
+        }
     }
+}
+
+// 仓库在 5 处独立构造，实例级 Mutex 串行不了并发写者，锁必须挂在进程级 object 上。
+private object AppSettingsWriteLock {
+    val mutex = Mutex()
 }

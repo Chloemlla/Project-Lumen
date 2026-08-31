@@ -1,7 +1,6 @@
 package com.projectlumen.app.core.update
 
 import android.content.Context
-import android.net.ConnectivityManager
 import android.os.Build
 import android.provider.Settings
 import com.projectlumen.app.core.api.BackendCapability
@@ -10,15 +9,14 @@ import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.api.RemoteReleaseAsset
 import com.projectlumen.app.core.api.RemoteReleaseCheck
 import com.projectlumen.app.core.api.RemoteReleasePatch
-import com.projectlumen.app.core.network.ClashPartnerCompat
-import org.json.JSONArray
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.net.Proxy
-import java.net.URLEncoder
-import java.net.URL
+import java.net.HttpURLConnection
 import java.time.Instant
-import javax.net.ssl.HttpsURLConnection
 
 class UpdateChecker(
     private val context: Context,
@@ -27,30 +25,39 @@ class UpdateChecker(
     private val githubReleaseApiUrl: String = PROJECT_LUMEN_RELEASE_API,
     private val channel: String = DEFAULT_CHANNEL,
 ) {
-    suspend fun checkForUpdate(currentBuild: BuildMetadata = BuildMetadata.current()): UpdateCandidate? {
+    suspend fun checkForUpdate(
+        currentBuild: BuildMetadata = BuildMetadata.current(),
+    ): UpdateCandidate? = withContext(Dispatchers.IO) {
         if (backendGate.decision(BackendCapability.RELEASE_DISCOVERY).executable) {
-            when (val backendResult = runCatching { fetchBackendReleaseManifest(currentBuild) }.getOrNull()) {
-                is BackendReleaseResult.Update -> return backendResult.candidate
-                BackendReleaseResult.NoUpdate -> return null
+            val backendResult = try {
+                fetchBackendReleaseManifest(currentBuild)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                null
+            }
+            when (backendResult) {
+                is BackendReleaseResult.Update -> return@withContext backendResult.candidate
+                BackendReleaseResult.NoUpdate -> return@withContext null
                 null -> Unit
             }
         }
 
-        val latest = fetchLatestGitHubRelease() ?: return null
-        if (isSdkRelease(latest.tagName)) return null
+        val latest = fetchLatestGitHubRelease() ?: return@withContext null
+        if (isSdkRelease(latest.tagName)) return@withContext null
 
         val localVersion = parseVersionDescriptor("${currentBuild.versionName}-${currentBuild.shortHash}")
             ?: parseVersionDescriptor(currentBuild.versionName)
-            ?: return null
-        if (isExactVersionMatch(latest.tagName, localVersion)) return null
+            ?: return@withContext null
+        if (isExactVersionMatch(latest.tagName, localVersion)) return@withContext null
 
         val versionComparison = compareReleaseVersion(latest.tagName, localVersion)
         val publishTimeNewer = latest.publishedAtUtcMillis > currentBuild.buildTimeUtcMillis + PUBLISH_TIME_TOLERANCE_MILLIS
 
         val shouldUpdate = versionComparison > 0 || publishTimeNewer
-        if (!shouldUpdate) return null
+        if (!shouldUpdate) return@withContext null
 
-        return UpdateCandidate(
+        UpdateCandidate(
             currentBuild = currentBuild,
             release = latest,
             matchedAsset = selectBestAsset(latest.assets),
@@ -82,19 +89,18 @@ class UpdateChecker(
     }
 
     private fun fetchLatestGitHubRelease(): ReleaseInfo? {
-        val connection = openHttpConnection(githubReleaseApiUrl).apply {
+        val connection = UpdateEndpointPolicy.open(context, githubReleaseApiUrl) {
             requestMethod = "GET"
             connectTimeout = REQUEST_TIMEOUT_MILLIS
             readTimeout = REQUEST_TIMEOUT_MILLIS
             setRequestProperty("Accept", "application/vnd.github+json")
             setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
-            setRequestProperty("User-Agent", USER_AGENT)
         }
         try {
             if (connection.responseCode !in 200..299) {
                 throw IOException("GitHub release request failed with HTTP ${connection.responseCode}")
             }
-            val payload = connection.inputStream.bufferedReader().use { it.readText() }
+            val payload = connection.readBoundedText(MAX_RELEASE_PAYLOAD_BYTES)
             val json = JSONObject(payload)
             val releaseAssets = parseReleaseAssets(json)
             val checksums = parseSha256Checksums(json.optString("body")) + fetchSha256ChecksumAssets(releaseAssets)
@@ -196,10 +202,6 @@ class UpdateChecker(
         }.getOrNull().orEmpty()
     }
 
-    private fun queryEncode(value: String): String {
-        return URLEncoder.encode(value, "UTF-8").replace("+", "%20")
-    }
-
     private fun parseReleaseAssets(json: JSONObject): List<ReleaseAsset> {
         return json.optJSONArray("assets")
             ?.let { array ->
@@ -237,24 +239,42 @@ class UpdateChecker(
     }
 
     private fun fetchTextAsset(url: String): String? {
-        val connection = openHttpConnection(url).apply {
+        val connection = UpdateEndpointPolicy.open(context, url) {
             requestMethod = "GET"
             connectTimeout = REQUEST_TIMEOUT_MILLIS
             readTimeout = REQUEST_TIMEOUT_MILLIS
             setRequestProperty("Accept", "text/plain, application/octet-stream")
-            setRequestProperty("User-Agent", USER_AGENT)
         }
         return try {
             if (connection.responseCode !in 200..299) {
                 null
             } else {
-                connection.inputStream.bufferedReader().use { it.readText() }
+                connection.readBoundedText(MAX_CHECKSUM_PAYLOAD_BYTES)
             }
         } catch (_: IOException) {
             null
         } finally {
             connection.disconnect()
         }
+    }
+
+    private fun HttpURLConnection.readBoundedText(maxBytes: Int): String {
+        if (contentLengthLong > maxBytes) {
+            throw IOException("Update response exceeded $maxBytes bytes.")
+        }
+        val collected = ByteArrayOutputStream()
+        inputStream.use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                if (collected.size() + read > maxBytes) {
+                    throw IOException("Update response exceeded $maxBytes bytes.")
+                }
+                collected.write(buffer, 0, read)
+            }
+        }
+        return collected.toString("UTF-8")
     }
 
     private fun parseSha256Checksums(text: String): Map<String, String> {
@@ -284,22 +304,6 @@ class UpdateChecker(
         return value.substringAfterLast('/')
             .lowercase()
             .trim()
-    }
-
-    private fun openHttpConnection(url: String): HttpsURLConnection {
-        val parsedUrl = URL(url)
-        if (parsedUrl.protocol != "https") {
-            throw IOException("Update endpoints must use HTTPS.")
-        }
-        // Clash VPN path: process is bound to VPN; never stack system/app proxy.
-        // openConnection(Proxy.NO_PROXY) still uses the process-bound Network.
-        if (ClashPartnerCompat.shouldSkipManualProxy()) {
-            return parsedUrl.openConnection(Proxy.NO_PROXY) as HttpsURLConnection
-        }
-        val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
-        val network = connectivityManager?.activeNetwork
-            ?: return parsedUrl.openConnection() as HttpsURLConnection
-        return network.openConnection(parsedUrl) as HttpsURLConnection
     }
 
     private fun compareReleaseVersion(remoteTagName: String, localVersion: VersionDescriptor): Int {
@@ -427,7 +431,8 @@ class UpdateChecker(
     private companion object {
         private const val REQUEST_TIMEOUT_MILLIS = 6_000
         private const val PUBLISH_TIME_TOLERANCE_MILLIS = 90_000L
-        private const val USER_AGENT = "Project-Lumen"
+        private const val MAX_RELEASE_PAYLOAD_BYTES = 1024 * 1024
+        private const val MAX_CHECKSUM_PAYLOAD_BYTES = 64 * 1024
         private const val DEFAULT_CHANNEL = "stable"
         private const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chloemlla/Project-Lumen/releases/latest"
         private val SDK_RELEASE_PREFIXES = listOf("lumen-crash", "sdk-", "lumen-sdk")

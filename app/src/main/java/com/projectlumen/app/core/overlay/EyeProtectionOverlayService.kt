@@ -29,6 +29,8 @@ class EyeProtectionOverlayService : Service() {
     private val countdownTicker = Runnable { tickCountdown() }
     private var overlayView: View? = null
     private var removeAtMillis: Long = 0L
+    private var titleText: TextView? = null
+    private var messageText: TextView? = null
     private var countdownText: TextView? = null
     private var renderedRemainingSeconds: Int = -1
 
@@ -55,7 +57,9 @@ class EyeProtectionOverlayService : Service() {
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: getString(R.string.break_title)
         val message = intent?.getStringExtra(EXTRA_MESSAGE) ?: getString(R.string.break_message)
         val durationSeconds = intent?.getIntExtra(EXTRA_DURATION_SECONDS, 20)?.coerceIn(5, 300) ?: 20
-        showOverlay(title, message, durationSeconds)
+        if (!showOverlay(app, title, message, durationSeconds)) {
+            stopSelf(startId)
+        }
         return START_NOT_STICKY
     }
 
@@ -67,16 +71,42 @@ class EyeProtectionOverlayService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun showOverlay(title: String, message: String, durationSeconds: Int) {
+    private fun showOverlay(
+        app: ProjectLumenApplication,
+        title: String,
+        message: String,
+        durationSeconds: Int,
+    ): Boolean {
+        val now = System.currentTimeMillis()
+        val requestedRemoveAt = now + durationSeconds * 1000L
+        if (overlayView != null && removeAtMillis > now) {
+            titleText?.text = title
+            messageText?.text = message
+            removeAtMillis = max(removeAtMillis, requestedRemoveAt)
+            renderedRemainingSeconds = -1
+            return true
+        }
         removeOverlay()
-        removeAtMillis = System.currentTimeMillis() + durationSeconds * 1000L
-        val windowManager = getSystemService(WindowManager::class.java)
-        renderedRemainingSeconds = durationSeconds
-        countdownText = TextView(this).apply {
+        handler.removeCallbacks(countdownTicker)
+        val windowManager = getSystemService(WindowManager::class.java) ?: return false
+        val countdown = TextView(this).apply {
             text = getString(R.string.overlay_countdown_seconds, durationSeconds)
             textSize = 56f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
+        }
+        val heading = TextView(this).apply {
+            text = title
+            textSize = 28f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+        }
+        val body = TextView(this).apply {
+            text = message
+            textSize = 18f
+            setTextColor(Color.rgb(226, 232, 240))
+            gravity = Gravity.CENTER
+            setPadding(0, 18, 0, 28)
         }
         val view = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -84,21 +114,9 @@ class EyeProtectionOverlayService : Service() {
             setPadding(48, 48, 48, 48)
             setBackgroundColor(Color.argb(232, 20, 24, 28))
             isClickable = true
-            isFocusable = true
-            addView(TextView(context).apply {
-                text = title
-                textSize = 28f
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-            })
-            addView(TextView(context).apply {
-                text = message
-                textSize = 18f
-                setTextColor(Color.rgb(226, 232, 240))
-                gravity = Gravity.CENTER
-                setPadding(0, 18, 0, 28)
-            })
-            addView(countdownText)
+            addView(heading)
+            addView(body)
+            addView(countdown)
         }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -107,10 +125,19 @@ class EyeProtectionOverlayService : Service() {
             overlayWindowFlags(),
             PixelFormat.TRANSLUCENT,
         )
-        windowManager.addView(view, params)
+        val added = runCatching { windowManager.addView(view, params) }
+            .onFailure(app::recordHandledFailure)
+            .isSuccess
+        if (!added) return false
         overlayView = view
+        titleText = heading
+        messageText = body
+        countdownText = countdown
+        removeAtMillis = requestedRemoveAt
+        renderedRemainingSeconds = durationSeconds
         forceImmersive(view)
         tickCountdown()
+        return true
     }
 
     private fun overlayWindowFlags(): Int {
@@ -118,7 +145,8 @@ class EyeProtectionOverlayService : Service() {
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             modernFlags
         } else {
@@ -170,6 +198,9 @@ class EyeProtectionOverlayService : Service() {
     private fun removeOverlay() {
         val view = overlayView ?: return
         overlayView = null
+        titleText = null
+        messageText = null
+        countdownText = null
         runCatching {
             getSystemService(WindowManager::class.java).removeView(view)
         }
@@ -180,13 +211,13 @@ class EyeProtectionOverlayService : Service() {
         private const val EXTRA_MESSAGE = "message"
         private const val EXTRA_DURATION_SECONDS = "durationSeconds"
 
-        fun show(context: Context, title: String, message: String, durationSeconds: Int) {
-            if (!Settings.canDrawOverlays(context)) return
+        fun show(context: Context, title: String, message: String, durationSeconds: Int): Boolean {
+            if (!Settings.canDrawOverlays(context)) return false
             val intent = Intent(context, EyeProtectionOverlayService::class.java)
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_MESSAGE, message)
                 .putExtra(EXTRA_DURATION_SECONDS, durationSeconds)
-            ForegroundServiceController.start(context, intent)
+            return ForegroundServiceController.start(context, intent)
         }
     }
 }

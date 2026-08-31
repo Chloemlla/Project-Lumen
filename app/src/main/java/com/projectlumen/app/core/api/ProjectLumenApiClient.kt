@@ -2,6 +2,7 @@ package com.projectlumen.app.core.api
 
 import android.os.SystemClock
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -356,8 +357,11 @@ class ProjectLumenApiClient(
             )
         }
 
+        val call = httpClient.newCall(request)
+        // execute() is blocking and ignores coroutine cancellation on its own.
+        val cancellationHandle = coroutineContext.job.invokeOnCompletion { call.cancel() }
         try {
-            httpClient.newCall(request).execute().use { response ->
+            call.execute().use { response ->
                 val responseText = readResponseText(response)
                 if (response.code !in 200..299) {
                     val message = parseErrorMessage(responseText, response.code)
@@ -386,6 +390,8 @@ class ProjectLumenApiClient(
                 recordTrace(error = error)
             }
             throw error
+        } finally {
+            cancellationHandle.dispose()
         }
     }
 
@@ -397,7 +403,11 @@ class ProjectLumenApiClient(
     }
 
     private fun readResponseText(response: Response): String {
-        return response.body?.string().orEmpty()
+        val body = response.body ?: return ""
+        if (body.contentLength() > MAX_RESPONSE_BYTES || body.source().request(MAX_RESPONSE_BYTES + 1L)) {
+            throw IOException("Project Lumen API response exceeded ${MAX_RESPONSE_BYTES / BYTES_PER_MB} MB.")
+        }
+        return body.string()
     }
 
     private fun parseErrorMessage(responseText: String, responseCode: Int): String {
@@ -422,6 +432,8 @@ class ProjectLumenApiClient(
 
     private companion object {
         private const val USER_AGENT = "Project-Lumen-Android"
+        private const val BYTES_PER_MB = 1024L * 1024L
+        private const val MAX_RESPONSE_BYTES = 8L * 1024L * 1024L
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }

@@ -27,13 +27,16 @@ internal object NativeSecurityBridge {
         }.getOrNull()
     }
 
-    external fun isAdbOverNetworkDetected(): Boolean
+    /** -1 = unknown (probing files unreadable), 0 = clean, 1 = detected. */
+    external fun isAdbOverNetworkDetected(): Int
 
     external fun isDebuggerAttachedNative(): Boolean
 
     fun isAdbOverNetworkDetectedOrNull(): Boolean? {
         if (!isAvailable) return null
-        return runCatching { isAdbOverNetworkDetected() }.getOrNull()
+        return runCatching { isAdbOverNetworkDetected() }
+            .getOrNull()
+            ?.let { verdict -> when (verdict) { 1 -> true; 0 -> false; else -> null } }
     }
 
     fun isDebuggerAttachedNativeOrNull(): Boolean? {

@@ -21,6 +21,15 @@ class ClashPartnerCompatTest {
     }
 
     @Test
+    fun unknownAccessTiersFailClosedInsteadOfGrantingFullAccess() {
+        assertEquals(ClashAccess.Denied, parseClashAccess(mapOf("accessTier" to "restricted")))
+        assertEquals(
+            ClashAccess.Denied,
+            parseClashAccess(mapOf("accessTier" to "FULL", "vpnRunning" to true)),
+        )
+    }
+
+    @Test
     fun everyCmfaDenialReasonMapsToDistinctActionableText() {
         val reasons = listOf(
             "pending_user_approval",

@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -21,7 +22,6 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -156,8 +156,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -168,7 +171,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.core.graphics.toColorInt
@@ -221,6 +223,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun LumenTopBar(
@@ -430,13 +433,65 @@ internal fun SettingsSection(
     summary: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val context = LocalContext.current
-    val restoredExpanded = remember(title, initiallyExpanded) {
-        SettingsSectionExpansionStore.isExpanded(context, title, initiallyExpanded)
+    SettingsSectionContent(
+        persistenceId = title,
+        title = title,
+        icon = icon,
+        initiallyExpanded = initiallyExpanded,
+        forceExpanded = forceExpanded,
+        headerAccessory = headerAccessory,
+        summary = summary,
+        content = content,
+    )
+}
+
+@Composable
+internal fun SettingsSection(
+    @StringRes titleRes: Int,
+    icon: ImageVector,
+    initiallyExpanded: Boolean = true,
+    forceExpanded: Boolean = false,
+    headerAccessory: (@Composable () -> Unit)? = null,
+    summary: (@Composable ColumnScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val resources = LocalContext.current.resources
+    // Resource entry names survive translation and ID renumbering; a localized title or a raw
+    // resource ID cannot key persisted expand state across either.
+    val persistenceId = remember(resources, titleRes) {
+        runCatching { resources.getResourceEntryName(titleRes) }.getOrNull() ?: titleRes.toString()
     }
-    var expanded by rememberSaveable(title) { mutableStateOf(restoredExpanded) }
-    LaunchedEffect(title, expanded) {
-        SettingsSectionExpansionStore.setExpanded(context, title, expanded)
+    SettingsSectionContent(
+        persistenceId = persistenceId,
+        title = stringResource(titleRes),
+        icon = icon,
+        initiallyExpanded = initiallyExpanded,
+        forceExpanded = forceExpanded,
+        headerAccessory = headerAccessory,
+        summary = summary,
+        content = content,
+    )
+}
+
+@Composable
+private fun SettingsSectionContent(
+    persistenceId: String,
+    title: String,
+    icon: ImageVector,
+    initiallyExpanded: Boolean,
+    forceExpanded: Boolean,
+    headerAccessory: (@Composable () -> Unit)?,
+    summary: (@Composable ColumnScope.() -> Unit)?,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val context = LocalContext.current
+    val restoredExpanded = remember(persistenceId, initiallyExpanded) {
+        SettingsSectionExpansionStore.isExpanded(context, persistenceId, initiallyExpanded)
+    }
+    // Saveable keeps in-session/nav restore; SharedPreferences keeps cross-session continuity.
+    var expanded by rememberSaveable(persistenceId) { mutableStateOf(restoredExpanded) }
+    LaunchedEffect(persistenceId, expanded) {
+        SettingsSectionExpansionStore.setExpanded(context, persistenceId, expanded)
     }
     LaunchedEffect(forceExpanded) {
         if (forceExpanded) expanded = true
@@ -453,7 +508,7 @@ internal fun SettingsSection(
     val arrowRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = tween(180),
-        label = "settingsSection",
+        label = "settingsSectionArrow",
     )
     Card(
         modifier = Modifier
@@ -474,6 +529,8 @@ internal fun SettingsSection(
                     .clip(LumenPreferenceShape)
                     .background(lumenNestedContainerColor)
                     .then(
+                        // A force-expanded section is driving a guided flow; a stray tap on the
+                        // header must not collapse the rows that flow is pointing at.
                         if (forceExpanded) {
                             Modifier
                         } else {
@@ -516,105 +573,6 @@ internal fun SettingsSection(
                 visible = expanded,
                 enter = fadeIn(tween(160)) + slideInVertically(tween(160)) { -it / 8 },
                 exit = fadeOut(tween(160)) + slideOutVertically(tween(160)) { -it / 8 },
-            ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
-                    content = content,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun SettingsSection(
-    @StringRes titleRes: Int,
-    icon: ImageVector,
-    initiallyExpanded: Boolean = true,
-    forceExpanded: Boolean = false,
-    headerAccessory: (@Composable () -> Unit)? = null,
-    summary: (@Composable ColumnScope.() -> Unit)? = null,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    val context = LocalContext.current
-    val restoredExpanded = remember(titleRes, initiallyExpanded) {
-        SettingsSectionExpansionStore.isExpanded(context, titleRes, initiallyExpanded)
-    }
-    // Saveable keeps in-session/nav restore; SharedPreferences keeps cross-session continuity.
-    var expanded by rememberSaveable(titleRes) { mutableStateOf(restoredExpanded) }
-    LaunchedEffect(titleRes, expanded) {
-        SettingsSectionExpansionStore.setExpanded(context, titleRes, expanded)
-    }
-    LaunchedEffect(forceExpanded) {
-        if (forceExpanded) expanded = true
-    }
-    val groupController = LocalSettingsSectionGroup.current
-    if (groupController != null) {
-        LaunchedEffect(groupController.expandToken) {
-            if (groupController.expandToken > 0) expanded = true
-        }
-        LaunchedEffect(groupController.collapseToken) {
-            if (groupController.collapseToken > 0 && !forceExpanded) expanded = false
-        }
-    }
-    val arrowRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = tween(180),
-        label = "settingsSectionArrow",
-    )
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-        shape = LumenCardShape,
-        colors = lumenCardColors(),
-        elevation = lumenCardElevation(),
-        border = lumenCardBorder(),
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(LumenPreferenceShape)
-                    .background(lumenNestedContainerColor)
-                    .clickable(
-                        role = Role.Button,
-                        onClickLabel = stringResource(
-                            if (expanded) R.string.settings_section_collapse else R.string.settings_section_expand,
-                        ),
-                    ) { expanded = !expanded }
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
-            ) {
-                LumenIconChip(icon)
-                Text(
-                    stringResource(titleRes),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                headerAccessory?.invoke()
-                Icon(
-                    Icons.Outlined.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.graphicsLayer { rotationZ = arrowRotation },
-                )
-            }
-            summary?.let { summaryContent ->
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
-                    content = summaryContent,
-                )
-            }
-            AnimatedVisibility(
-                visible = expanded,
-                enter = fadeIn(tween(160)) + slideInVertically(tween(160)) { -it / 8 },
-                exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 8 },
             ) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap),
@@ -828,21 +786,56 @@ internal fun FileSettingRow(
 
 @Composable
 internal fun UriImagePreview(path: String) {
-    AndroidView(
-        modifier = Modifier
-            .size(64.dp)
-            .clip(RoundedCornerShape(6.dp)),
-        factory = { context ->
-            ImageView(context).apply {
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                setImageURI(path.toUri())
-            }
-        },
-        update = { imageView ->
-            imageView.setImageURI(path.toUri())
-        },
-    )
+    val context = LocalContext.current
+    val targetPx = with(LocalDensity.current) { UriImagePreviewSize.roundToPx() }
+    var preview by remember(path, targetPx) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(path, targetPx) {
+        preview = withContext(Dispatchers.IO) {
+            decodeSampledImage(context, path, targetPx)?.asImageBitmap()
+        }
+    }
+    val boxModifier = Modifier
+        .size(UriImagePreviewSize)
+        .clip(RoundedCornerShape(6.dp))
+    val bitmap = preview
+    if (bitmap == null) {
+        // Missing file, revoked SAF grant or a still-running decode all land here rather than
+        // throwing out of composition.
+        Box(modifier = boxModifier.background(lumenNestedContainerColor), contentAlignment = Alignment.Center) {
+            Icon(
+                Icons.Outlined.PhotoCamera,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    } else {
+        Image(
+            bitmap = bitmap,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = boxModifier,
+        )
+    }
 }
+
+private val UriImagePreviewSize = 64.dp
+
+/** Downsamples on a background thread; a 4000x3000 pick would otherwise decode at full size. */
+private fun decodeSampledImage(context: Context, path: String, targetPx: Int): Bitmap? = runCatching {
+    val uri = path.toUri()
+    val resolver = context.contentResolver
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return@runCatching null
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+    val target = targetPx.coerceAtLeast(1)
+    var sampleSize = 1
+    while (bounds.outWidth / (sampleSize * 2) >= target && bounds.outHeight / (sampleSize * 2) >= target) {
+        sampleSize *= 2
+    }
+    val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+}.getOrNull()
 
 @Composable
 internal fun NotificationRequirementCard(

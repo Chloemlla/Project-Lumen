@@ -5,8 +5,10 @@ import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.time.QuietHours
+import com.projectlumen.app.core.time.MAX_SINGLE_ELAPSED_SECONDS
 import com.projectlumen.app.core.time.coerceElapsedSecondsSince
 import kotlin.math.max
+import kotlin.math.min
 
 class ReminderEngine {
     fun newWorkingState(settings: AppSettingsEntity, nowMillis: Long): RuntimeStateEntity {
@@ -68,6 +70,17 @@ class ReminderEngine {
         state: RuntimeStateEntity,
         nowMillis: Long,
     ): RuntimeTransition {
+        if (state.reminderPhase == ReminderPhase.RESTING.name) {
+            // Skipping a running break settles the rest actually taken; billing it as work would
+            // inflate the daily eye stats and lose the rest measurement entirely.
+            return RuntimeTransition(
+                nextRuntime = newWorkingState(settings, nowMillis),
+                eyeStatsDelta = EyeStatsDelta(
+                    restSeconds = elapsedRestSeconds(state, nowMillis),
+                    completedBreakCount = 1,
+                ),
+            )
+        }
         val continuousSeconds = continuousWorkingSeconds(state, nowMillis)
         return RuntimeTransition(
             nextRuntime = newWorkingState(settings, nowMillis),
@@ -287,16 +300,16 @@ class ReminderEngine {
 
     private fun elapsedWorkingSeconds(state: RuntimeStateEntity, nowMillis: Long): Long {
         val start = max(state.reminderStartedAt, state.lastStatsTickAt)
-        return nowMillis.coerceElapsedSecondsSince(start)
+        return min(nowMillis.coerceElapsedSecondsSince(start), MAX_SINGLE_ELAPSED_SECONDS)
     }
 
     private fun elapsedRestSeconds(state: RuntimeStateEntity, nowMillis: Long): Long {
         val start = max(state.breakStartedAt, state.lastStatsTickAt)
-        return nowMillis.coerceElapsedSecondsSince(start)
+        return min(nowMillis.coerceElapsedSecondsSince(start), MAX_SINGLE_ELAPSED_SECONDS)
     }
 
     private fun continuousWorkingSeconds(state: RuntimeStateEntity, nowMillis: Long): Long {
-        return nowMillis.coerceElapsedSecondsSince(state.reminderStartedAt)
+        return min(nowMillis.coerceElapsedSecondsSince(state.reminderStartedAt), MAX_SINGLE_ELAPSED_SECONDS)
     }
 
     private companion object {

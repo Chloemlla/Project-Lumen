@@ -162,6 +162,16 @@ class NotificationService(private val context: Context) {
         return context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
     }
 
+    /**
+     * Android 14 stopped granting USE_FULL_SCREEN_INTENT by default to apps outside the
+     * alarm/calling categories; without this check the platform silently downgrades the
+     * full-screen reminder to a heads-up notification.
+     */
+    fun canUseFullScreenIntents(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return true
+        return context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
+    }
+
     fun showReminderDue() {
         show(
             id = NotificationIds.BREAK_DUE,
@@ -209,30 +219,15 @@ class NotificationService(private val context: Context) {
 
     fun showUpdateAvailable(tagName: String, releaseName: String) {
         if (!canPostNotifications()) return
+        val found = context.getString(R.string.about_update_found, tagName)
         show(
-            id = NotificationIds.POMODORO + 1000,
+            id = NotificationIds.UPDATE_AVAILABLE,
             channel = NotificationChannels.STATUS,
             title = context.getString(R.string.about_update_status),
-            message = context.getString(R.string.about_update_found, tagName),
+            message = if (releaseName.isBlank() || releaseName == tagName) found else "$found · $releaseName",
             priority = NotificationCompat.PRIORITY_DEFAULT,
             includeBreakActions = false,
         )
-        try {
-            notificationManager.notify(
-                NotificationIds.POMODORO + 1001,
-                NotificationCompat.Builder(context, NotificationChannels.STATUS)
-                    .setSmallIcon(R.drawable.ic_notification_lumen)
-                    .setContentTitle(context.getString(R.string.about_update_status))
-                    .setContentText("$tagName $releaseName")
-                    // Reuse the explicit MainActivity PendingIntent builder so Android 14
-                    // package/component requirements stay centralized.
-                    .setContentIntent(openAppPendingIntent(NotificationIds.POMODORO + 1001))
-                    .setAutoCancel(true)
-                    .build(),
-            )
-        } catch (_: SecurityException) {
-            return
-        }
     }
 
     fun buildOngoingStatusNotification(state: RuntimeStateEntity? = null): Notification {
@@ -457,19 +452,19 @@ class NotificationService(private val context: Context) {
             .setAutoCancel(true)
             .setPriority(priority)
             .setCategory(if (fullScreen) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
-        if (fullScreen) {
-            builder.setFullScreenIntent(openAppPendingIntent(id + 100), true)
+        if (fullScreen && canUseFullScreenIntents()) {
+            builder.setFullScreenIntent(openAppPendingIntent(id + FULL_SCREEN_REQUEST_CODE_OFFSET), true)
         }
         if (includeBreakActions) {
             builder.addAction(
                 R.drawable.ic_launcher_foreground,
                 context.getString(R.string.start_break),
-                actionPendingIntent(NotificationIds.BREAK_DUE + 10, ReminderActionReceiver.ACTION_START_BREAK),
+                actionPendingIntent(NotificationIds.START_BREAK_ACTION, ReminderActionReceiver.ACTION_START_BREAK),
             )
             builder.addAction(
                 R.drawable.ic_launcher_foreground,
                 context.getString(R.string.skip_break),
-                actionPendingIntent(NotificationIds.BREAK_DUE + 11, ReminderActionReceiver.ACTION_SKIP_BREAK),
+                actionPendingIntent(NotificationIds.SKIP_BREAK_ACTION, ReminderActionReceiver.ACTION_SKIP_BREAK),
             )
         }
         try {
@@ -872,6 +867,7 @@ class NotificationService(private val context: Context) {
         const val LIVE_UPDATE_PROGRESS_MAX = 1_000
         const val LIVE_UPDATE_PROGRESS_BUCKET = 10
         const val LIVE_UPDATE_CHRONOMETER_MIN_MILLIS = 2 * 60_000L
+        const val FULL_SCREEN_REQUEST_CODE_OFFSET = 100
 
         val reminderNotificationIds = listOf(
             NotificationIds.PRE_ALERT,

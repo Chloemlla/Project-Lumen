@@ -3,6 +3,7 @@ package com.projectlumen.app.core.services
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
+import androidx.room.withTransaction
 import com.projectlumen.app.core.share.SecureShareIntents
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.AppDatabase
@@ -15,9 +16,15 @@ import com.projectlumen.app.core.database.entities.FeatureFlagEntity
 import com.projectlumen.app.core.database.entities.ReminderPlanEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
+import com.projectlumen.app.core.repositories.EntitlementRepository
 import com.projectlumen.app.core.repositories.FeatureFlagRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
+import com.projectlumen.app.core.repositories.StatisticsRepository
 import java.io.File
+import java.time.LocalDate
+import java.time.ZoneId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -38,9 +45,11 @@ class DataBackupService(
     private val deviceInstallationIdProvider: ((String?) -> String)? = null,
 ) {
     suspend fun shareBackup() {
-        val file = File(context.cacheDir, "project_lumen_backup.json")
-        file.writeText(exportBackupJson().toString(2), Charsets.UTF_8)
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val uri = withContext(Dispatchers.IO) {
+            val file = File(context.cacheDir, "project_lumen_backup.json")
+            file.writeText(exportBackupJson().toString(2), Charsets.UTF_8)
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        }
         SecureShareIntents.shareStream(
             context = context,
             uri = uri,
@@ -72,14 +81,23 @@ class DataBackupService(
 
     suspend fun importBackupJson(json: JSONObject): BackupImportSummary {
         val summary = backupSummary(json)
-        importSettings(json.optJSONObject("settings"))
-        importDailyGoal(json.optJSONObject("dailyGoal"))
-        importTemplates(json.optJSONArray("templates"))
+        val settings = json.optJSONObject("settings")?.let { importedSettings(it) }
+        // Through the repository: it holds the settings write lock and lands the eye-care
+        // preferences before Room, so dying between the two writes cannot revert the import.
+        settings?.let { imported -> settingsRepository().update { imported } }
+        // One transaction for the plain DAO bulk: a malformed entry halfway through must not leave
+        // half of the templates replaced. Repository-backed writes stay outside the transaction —
+        // they take process-level mutexes, and a concurrent holder would block on this
+        // transaction's write lock while the transaction waits for that mutex.
+        database.withTransaction {
+            importDailyGoal(json.optJSONObject("dailyGoal"))
+            importTemplates(json.optJSONArray("templates"))
+            importReminderPlans(json.optJSONArray("reminderPlans"))
+        }
         importEyeStats(json.optJSONArray("dailyEyeStats"))
         importPomodoroStats(json.optJSONArray("dailyPomodoroStats"))
         importEntitlements(json.optJSONArray("entitlements"))
         importFeatureFlags(json.optJSONArray("featureFlags"))
-        importReminderPlans(json.optJSONArray("reminderPlans"))
         return summary
     }
 
@@ -110,12 +128,12 @@ class DataBackupService(
             .put("reminderPlans", database.reminderPlansDao().getActive().toJsonArray { it.toJson() })
     }
 
-    private fun readBackupJson(uri: Uri): JSONObject {
+    private suspend fun readBackupJson(uri: Uri): JSONObject = withContext(Dispatchers.IO) {
         val text = context.contentResolver.openInputStream(uri)
             ?.bufferedReader(Charsets.UTF_8)
             ?.use { it.readText() }
             ?: error("Unable to read backup file.")
-        return JSONObject(text)
+        JSONObject(text)
     }
 
     private fun settingsRepository(): SettingsRepository {
@@ -126,10 +144,9 @@ class DataBackupService(
         return FeatureFlagRepository(database.featureFlagsDao())
     }
 
-    private suspend fun importSettings(json: JSONObject?) {
-        if (json == null) return
+    private suspend fun importedSettings(json: JSONObject): AppSettingsEntity {
         val current = settingsRepository().getOrDefault()
-        val imported = current.copy(
+        return current.copy(
             languageCode = json.optString("languageCode", current.languageCode),
             themeMode = json.optString("themeMode", current.themeMode),
             useDynamicColors = json.optBoolean("useDynamicColors", current.useDynamicColors),
@@ -280,8 +297,6 @@ class DataBackupService(
             autoUpdateCheckEnabled = json.optBoolean("autoUpdateCheckEnabled", current.autoUpdateCheckEnabled),
             updatedAt = System.currentTimeMillis(),
         )
-        database.appSettingsDao().upsert(imported)
-        eyeCarePreferences?.saveFromSettings(imported)
     }
 
     private suspend fun importDailyGoal(json: JSONObject?) {
@@ -307,58 +322,73 @@ class DataBackupService(
 
     private suspend fun importEyeStats(array: JSONArray?) {
         if (array == null) return
+        val statisticsRepository = StatisticsRepository(
+            database.dailyEyeStatsDao(),
+            database.dailyPomodoroStatsDao(),
+        )
         for (index in 0 until array.length()) {
             val imported = array.optJSONObject(index)?.toEyeStats() ?: continue
-            val current = database.dailyEyeStatsDao().get(imported.statDate)
-            database.dailyEyeStatsDao().upsert(
-                if (current == null) {
-                    imported
-                } else {
-                    current.copy(
-                        workingSeconds = current.workingSeconds + imported.workingSeconds,
-                        restSeconds = current.restSeconds + imported.restSeconds,
-                        skipCount = current.skipCount + imported.skipCount,
-                        completedBreakCount = current.completedBreakCount + imported.completedBreakCount,
-                        preAlertCount = current.preAlertCount + imported.preAlertCount,
-                        maxContinuousWorkSeconds = maxOf(current.maxContinuousWorkSeconds, imported.maxContinuousWorkSeconds),
-                        proximityWarningCount = current.proximityWarningCount + imported.proximityWarningCount,
-                        proximityCloseSeconds = current.proximityCloseSeconds + imported.proximityCloseSeconds,
-                        eyeDryWarningCount = current.eyeDryWarningCount + imported.eyeDryWarningCount,
-                        lowLightWarningCount = current.lowLightWarningCount + imported.lowLightWarningCount,
-                        updatedAt = System.currentTimeMillis(),
-                    )
-                },
-            )
+            // updateEyeStats keys rows by todayKey(nowMillis), so map the imported statDate back to
+            // local midnight to write the same day; a malformed date skips like a blank one.
+            val dateMillis = runCatching {
+                LocalDate.parse(imported.statDate)
+                    .atStartOfDay(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+            }.getOrNull() ?: continue
+            // The repository takes the same process-level stats lock as the running foreground
+            // service, so a concurrent tick can no longer be lost against this read-modify-write.
+            statisticsRepository.updateEyeStats(statsEnabled = true, nowMillis = dateMillis) { current ->
+                current.copy(
+                    workingSeconds = current.workingSeconds + imported.workingSeconds,
+                    restSeconds = current.restSeconds + imported.restSeconds,
+                    skipCount = current.skipCount + imported.skipCount,
+                    completedBreakCount = current.completedBreakCount + imported.completedBreakCount,
+                    preAlertCount = current.preAlertCount + imported.preAlertCount,
+                    maxContinuousWorkSeconds = maxOf(current.maxContinuousWorkSeconds, imported.maxContinuousWorkSeconds),
+                    proximityWarningCount = current.proximityWarningCount + imported.proximityWarningCount,
+                    proximityCloseSeconds = current.proximityCloseSeconds + imported.proximityCloseSeconds,
+                    eyeDryWarningCount = current.eyeDryWarningCount + imported.eyeDryWarningCount,
+                    lowLightWarningCount = current.lowLightWarningCount + imported.lowLightWarningCount,
+                )
+            }
         }
     }
 
     private suspend fun importPomodoroStats(array: JSONArray?) {
         if (array == null) return
+        val statisticsRepository = StatisticsRepository(
+            database.dailyEyeStatsDao(),
+            database.dailyPomodoroStatsDao(),
+        )
         for (index in 0 until array.length()) {
             val imported = array.optJSONObject(index)?.toPomodoroStats() ?: continue
-            val current = database.dailyPomodoroStatsDao().get(imported.statDate)
-            database.dailyPomodoroStatsDao().upsert(
-                if (current == null) {
-                    imported
-                } else {
-                    current.copy(
-                        completedTomatoCount = current.completedTomatoCount + imported.completedTomatoCount,
-                        restartCount = current.restartCount + imported.restartCount,
-                        completedFocusSessions = current.completedFocusSessions + imported.completedFocusSessions,
-                        totalFocusSeconds = current.totalFocusSeconds + imported.totalFocusSeconds,
-                        totalBreakSeconds = current.totalBreakSeconds + imported.totalBreakSeconds,
-                        updatedAt = System.currentTimeMillis(),
-                    )
-                },
-            )
+            val dateMillis = runCatching {
+                LocalDate.parse(imported.statDate)
+                    .atStartOfDay(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+            }.getOrNull() ?: continue
+            statisticsRepository.updatePomodoroStats(statsEnabled = true, nowMillis = dateMillis) { current ->
+                current.copy(
+                    completedTomatoCount = current.completedTomatoCount + imported.completedTomatoCount,
+                    restartCount = current.restartCount + imported.restartCount,
+                    completedFocusSessions = current.completedFocusSessions + imported.completedFocusSessions,
+                    totalFocusSeconds = current.totalFocusSeconds + imported.totalFocusSeconds,
+                    totalBreakSeconds = current.totalBreakSeconds + imported.totalBreakSeconds,
+                )
+            }
         }
     }
 
     private suspend fun importEntitlements(array: JSONArray?) {
         if (array == null) return
+        val repository = EntitlementRepository(database.entitlementsDao())
         for (index in 0 until array.length()) {
             val entitlement = array.optJSONObject(index)?.toEntitlement() ?: continue
-            database.entitlementsDao().upsert(entitlement)
+            // id=0 rows never hit @Upsert's primary-key match; the repository resolves the business
+            // identity first so a re-import updates instead of appending a duplicate row.
+            repository.upsert(entitlement)
         }
     }
 
@@ -529,17 +559,17 @@ class DataBackupService(
         .put("totalBreakSeconds", totalBreakSeconds)
         .put("updatedAt", updatedAt)
 
+    // purchaseToken and rawPayloadJson stay out of the backup: the file is handed to whatever app
+    // the user picks in the share sheet, and entitlements are re-established by server verification.
     private fun EntitlementEntity.toJson(): JSONObject = JSONObject()
         .put("id", id)
         .put("source", source)
         .put("productId", productId)
-        .put("purchaseToken", purchaseToken)
         .put("tier", tier)
         .put("status", status)
         .put("purchasedAt", purchasedAt)
         .put("expiresAt", expiresAt)
         .put("lastVerifiedAt", lastVerifiedAt)
-        .put("rawPayloadJson", rawPayloadJson)
 
     private fun FeatureFlagEntity.toJson(): JSONObject = JSONObject()
         .put("key", key)
@@ -582,30 +612,38 @@ class DataBackupService(
         deletedAt = optLong("deletedAt", 0L),
     )
 
-    private fun JSONObject.toEyeStats(): DailyEyeStatsEntity = DailyEyeStatsEntity(
-        statDate = getString("statDate"),
-        workingSeconds = optLong("workingSeconds", 0L),
-        restSeconds = optLong("restSeconds", 0L),
-        skipCount = optInt("skipCount", 0),
-        completedBreakCount = optInt("completedBreakCount", 0),
-        preAlertCount = optInt("preAlertCount", 0),
-        maxContinuousWorkSeconds = optLong("maxContinuousWorkSeconds", 0L),
-        proximityWarningCount = optInt("proximityWarningCount", 0),
-        proximityCloseSeconds = optLong("proximityCloseSeconds", 0L),
-        eyeDryWarningCount = optInt("eyeDryWarningCount", 0),
-        lowLightWarningCount = optInt("lowLightWarningCount", 0),
-        updatedAt = System.currentTimeMillis(),
-    )
+    private fun JSONObject.toEyeStats(): DailyEyeStatsEntity? {
+        val date = optString("statDate")
+        if (date.isBlank()) return null
+        return DailyEyeStatsEntity(
+            statDate = date,
+            workingSeconds = optLong("workingSeconds", 0L),
+            restSeconds = optLong("restSeconds", 0L),
+            skipCount = optInt("skipCount", 0),
+            completedBreakCount = optInt("completedBreakCount", 0),
+            preAlertCount = optInt("preAlertCount", 0),
+            maxContinuousWorkSeconds = optLong("maxContinuousWorkSeconds", 0L),
+            proximityWarningCount = optInt("proximityWarningCount", 0),
+            proximityCloseSeconds = optLong("proximityCloseSeconds", 0L),
+            eyeDryWarningCount = optInt("eyeDryWarningCount", 0),
+            lowLightWarningCount = optInt("lowLightWarningCount", 0),
+            updatedAt = System.currentTimeMillis(),
+        )
+    }
 
-    private fun JSONObject.toPomodoroStats(): DailyPomodoroStatsEntity = DailyPomodoroStatsEntity(
-        statDate = getString("statDate"),
-        completedTomatoCount = optInt("completedTomatoCount", 0),
-        restartCount = optInt("restartCount", 0),
-        completedFocusSessions = optInt("completedFocusSessions", 0),
-        totalFocusSeconds = optLong("totalFocusSeconds", 0L),
-        totalBreakSeconds = optLong("totalBreakSeconds", 0L),
-        updatedAt = System.currentTimeMillis(),
-    )
+    private fun JSONObject.toPomodoroStats(): DailyPomodoroStatsEntity? {
+        val date = optString("statDate")
+        if (date.isBlank()) return null
+        return DailyPomodoroStatsEntity(
+            statDate = date,
+            completedTomatoCount = optInt("completedTomatoCount", 0),
+            restartCount = optInt("restartCount", 0),
+            completedFocusSessions = optInt("completedFocusSessions", 0),
+            totalFocusSeconds = optLong("totalFocusSeconds", 0L),
+            totalBreakSeconds = optLong("totalBreakSeconds", 0L),
+            updatedAt = System.currentTimeMillis(),
+        )
+    }
 
     private fun JSONObject.toEntitlement(): EntitlementEntity = EntitlementEntity(
         id = optLong("id", 0L),
@@ -620,12 +658,16 @@ class DataBackupService(
         rawPayloadJson = optString("rawPayloadJson", ""),
     )
 
-    private fun JSONObject.toFeatureFlag(): FeatureFlagEntity = FeatureFlagEntity(
-        key = getString("key"),
-        enabled = optBoolean("enabled", false),
-        payloadJson = optString("payloadJson", ""),
-        updatedAt = optLong("updatedAt", System.currentTimeMillis()),
-    )
+    private fun JSONObject.toFeatureFlag(): FeatureFlagEntity? {
+        val key = optString("key")
+        if (key.isBlank()) return null
+        return FeatureFlagEntity(
+            key = key,
+            enabled = optBoolean("enabled", false),
+            payloadJson = optString("payloadJson", ""),
+            updatedAt = optLong("updatedAt", System.currentTimeMillis()),
+        )
+    }
 
     private fun JSONObject.toReminderPlan(): ReminderPlanEntity = ReminderPlanEntity(
         id = optLong("id", 0L),

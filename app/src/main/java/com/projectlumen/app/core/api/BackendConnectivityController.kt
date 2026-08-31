@@ -31,6 +31,9 @@ class BackendConnectivityController internal constructor(
     private val blockedBreadcrumbAt = AtomicLong(0L)
     private val probeLock = Any()
     private var activeProbe: Deferred<BackendConnectivityState>? = null
+
+    // Written from the probe coroutines (IO) and from lifecycle callbacks (main).
+    @Volatile
     private var retryJob: Job? = null
     private val _state = MutableStateFlow(initialState(persistence.load()))
 

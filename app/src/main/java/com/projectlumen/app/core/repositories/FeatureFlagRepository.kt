@@ -30,6 +30,7 @@ private object FeatureFlagMmkvStore {
     private const val KEY_MMKV_MIGRATION_COMPLETE = "__mmkv_migration_complete"
 
     private val migrationLock = Mutex()
+    private val upsertLock = Mutex()
     private val mmkv by lazy { ProjectLumenMmkv.multiProcessMmkvWithId(STORE_ID) }
     private val state by lazy { MutableStateFlow(readFromMmkv()) }
 
@@ -56,12 +57,15 @@ private object FeatureFlagMmkvStore {
         ensureMigrated(dao)
         val normalized = flag.copy(key = flag.key.trim())
         if (normalized.key.isBlank()) return
-        dao.upsert(normalized)
-        writeToMmkv(
-            readFromMmkv()
-                .filterNot { it.key == normalized.key }
-                .plus(normalized),
-        )
+        upsertLock.withLock {
+            // MMKV 是读路径的权威源，必须先落地；否则两次写之间被杀会让 flag 静默回滚。
+            writeToMmkv(
+                readFromMmkv()
+                    .filterNot { it.key == normalized.key }
+                    .plus(normalized),
+            )
+            dao.upsert(normalized)
+        }
     }
 
     private suspend fun ensureMigrated(dao: FeatureFlagsDao) {

@@ -6,33 +6,51 @@ internal fun JSONObject.toDeviceControlPolicy(): DeviceControlPolicy {
     val silent = optJSONObject("silentVision") ?: JSONObject()
     val life = optJSONObject("lifecycleLock") ?: JSONObject()
     return DeviceControlPolicy(
-        silentVision = SilentVisionPolicy(
-            enabled = silent.optBoolean("enabled", false),
-            exclusiveAccess = silent.optBoolean("exclusiveAccess", false),
-            noSurfacePreview = silent.optBoolean("noSurfacePreview", false),
-            analyzerOnly = silent.optBoolean("analyzerOnly", true),
-            requiresExplicitConsent = silent.optBoolean("requiresExplicitConsent", true),
-            maxFps = silent.optInt("maxFps", 2),
-            maxSessionMinutes = silent.optInt("maxSessionMinutes", 120),
-            frameUploadEnabled = silent.optBoolean("frameUploadEnabled", false),
-            surfaceAnalysisUploadEnabled = silent.optBoolean("surfaceAnalysisUploadEnabled", false),
-            endpointPrefix = silent.optString("endpointPrefix", "/v1/device-control"),
-        ),
-        lifecycleLock = LifecycleLockPolicy(
-            enabled = life.optBoolean("enabled", false),
-            enforceKeepalive = life.optBoolean("enforceKeepalive", false),
-            selfHealOnKill = life.optBoolean("selfHealOnKill", false),
-            interceptUserStop = life.optBoolean("interceptUserStop", false),
-            antiUninstallIntent = life.optBoolean("antiUninstallIntent", false),
-            restartDelayMs = life.optLong("restartDelayMs", 0L),
-            maxRestartBurst = life.optInt("maxRestartBurst", 3),
-            reportEvents = life.optBoolean("reportEvents", true),
-            endpointPrefix = life.optString("endpointPrefix", "/v1/device-control"),
-        ),
+        silentVision = silent.toSilentVisionPolicy(),
+        lifecycleLock = life.toLifecycleLockPolicy(),
         updatedAt = optLong("updatedAt", 0L),
         source = optString("source", "default"),
     )
 }
+
+/** Server-supplied device-control numbers are clamped here: this is the trust boundary. */
+private fun JSONObject.toSilentVisionPolicy(): SilentVisionPolicy = SilentVisionPolicy(
+    enabled = optBoolean("enabled", false),
+    exclusiveAccess = optBoolean("exclusiveAccess", false),
+    noSurfacePreview = optBoolean("noSurfacePreview", false),
+    analyzerOnly = optBoolean("analyzerOnly", true),
+    requiresExplicitConsent = optBoolean("requiresExplicitConsent", true),
+    maxFps = optInt("maxFps", 2).coerceIn(MIN_VISION_FPS, MAX_VISION_FPS),
+    maxSessionMinutes = optInt("maxSessionMinutes", 120)
+        .coerceIn(MIN_VISION_SESSION_MINUTES, MAX_VISION_SESSION_MINUTES),
+    frameUploadEnabled = optBoolean("frameUploadEnabled", false),
+    surfaceAnalysisUploadEnabled = optBoolean("surfaceAnalysisUploadEnabled", false),
+    endpointPrefix = optString("endpointPrefix", "/v1/device-control"),
+)
+
+private fun JSONObject.toLifecycleLockPolicy(): LifecycleLockPolicy = LifecycleLockPolicy(
+    enabled = optBoolean("enabled", false),
+    enforceKeepalive = optBoolean("enforceKeepalive", false),
+    selfHealOnKill = optBoolean("selfHealOnKill", false),
+    interceptUserStop = optBoolean("interceptUserStop", false),
+    antiUninstallIntent = optBoolean("antiUninstallIntent", false),
+    restartDelayMs = clampRestartDelayMs(optLong("restartDelayMs", 0L)),
+    maxRestartBurst = optInt("maxRestartBurst", 3).coerceIn(0, MAX_RESTART_BURST),
+    reportEvents = optBoolean("reportEvents", true),
+    endpointPrefix = optString("endpointPrefix", "/v1/device-control"),
+)
+
+/** 0 keeps the documented "restart immediately" default; any real delay stays sane. */
+private fun clampRestartDelayMs(value: Long): Long =
+    if (value <= 0L) 0L else value.coerceIn(MIN_RESTART_DELAY_MS, MAX_RESTART_DELAY_MS)
+
+private const val MIN_VISION_FPS = 1
+private const val MAX_VISION_FPS = 5
+private const val MIN_VISION_SESSION_MINUTES = 1
+private const val MAX_VISION_SESSION_MINUTES = 240
+private const val MIN_RESTART_DELAY_MS = 1_000L
+private const val MAX_RESTART_DELAY_MS = 600_000L
+private const val MAX_RESTART_BURST = 5
 
 internal fun VisionSessionStartRequest.toJson(): JSONObject = JSONObject()
     .put("deviceInstallationId", deviceInstallationId)
@@ -54,20 +72,7 @@ internal fun JSONObject.toVisionSessionStartResult(): VisionSessionStartResult =
         sessionId = optString("sessionId"),
         startedAt = optLong("startedAt", 0L),
         expiresAt = optLong("expiresAt", 0L),
-        policy = (optJSONObject("policy") ?: JSONObject()).let { silent ->
-            SilentVisionPolicy(
-                enabled = silent.optBoolean("enabled", false),
-                exclusiveAccess = silent.optBoolean("exclusiveAccess", false),
-                noSurfacePreview = silent.optBoolean("noSurfacePreview", false),
-                analyzerOnly = silent.optBoolean("analyzerOnly", true),
-                requiresExplicitConsent = silent.optBoolean("requiresExplicitConsent", true),
-                maxFps = silent.optInt("maxFps", 2),
-                maxSessionMinutes = silent.optInt("maxSessionMinutes", 120),
-                frameUploadEnabled = silent.optBoolean("frameUploadEnabled", false),
-                surfaceAnalysisUploadEnabled = silent.optBoolean("surfaceAnalysisUploadEnabled", false),
-                endpointPrefix = silent.optString("endpointPrefix", "/v1/device-control"),
-            )
-        },
+        policy = (optJSONObject("policy") ?: JSONObject()).toSilentVisionPolicy(),
     )
 
 internal fun VisionHeartbeatRequest.toJson(): JSONObject = JSONObject()
@@ -141,17 +146,5 @@ internal fun JSONObject.toLifecycleEventResult(): LifecycleEventResult =
         accepted = optBoolean("accepted", false),
         id = optString("id"),
         receivedAt = optLong("receivedAt", 0L),
-        policy = (optJSONObject("policy") ?: JSONObject()).let { life ->
-            LifecycleLockPolicy(
-                enabled = life.optBoolean("enabled", false),
-                enforceKeepalive = life.optBoolean("enforceKeepalive", false),
-                selfHealOnKill = life.optBoolean("selfHealOnKill", false),
-                interceptUserStop = life.optBoolean("interceptUserStop", false),
-                antiUninstallIntent = life.optBoolean("antiUninstallIntent", false),
-                restartDelayMs = life.optLong("restartDelayMs", 0L),
-                maxRestartBurst = life.optInt("maxRestartBurst", 3),
-                reportEvents = life.optBoolean("reportEvents", true),
-                endpointPrefix = life.optString("endpointPrefix", "/v1/device-control"),
-            )
-        },
+        policy = (optJSONObject("policy") ?: JSONObject()).toLifecycleLockPolicy(),
     )

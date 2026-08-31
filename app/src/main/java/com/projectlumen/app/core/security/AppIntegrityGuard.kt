@@ -30,6 +30,13 @@ object AppIntegrityGuard {
      */
     fun enforce(context: Context) {
         if (BuildConfig.DEBUG || !BuildConfig.APP_INTEGRITY_ENFORCEMENT_ENABLED) return
+        // The full scan is only affordable once per cold start; the Application's onCreate and the
+        // gate's init both call enforce(), and a verdict never changes mid-process. Replaying a
+        // failed verdict keeps the gate's second call fail-closed without rescanning.
+        cachedVerdict?.let { verified ->
+            if (!verified) throw SecurityException("Project Lumen integrity check failed.")
+            return
+        }
 
         val appContext = context.applicationContext
         // Auxiliary processes run this same Application, and CRooot's own probe process is
@@ -62,10 +69,12 @@ object AppIntegrityGuard {
         }
         if (failureReasons.isNotEmpty()) {
             Log.e(TAG, "Integrity check failed: ${failureReasons.joinToString()}")
+            cachedVerdict = false
             throw SecurityException(
                 "Project Lumen integrity check failed: ${failureReasons.joinToString()}.",
             )
         }
+        cachedVerdict = true
     }
 
     /**
@@ -100,7 +109,13 @@ object AppIntegrityGuard {
     fun isIntegrityConfirmed(assessment: DeviceSecurityScanner.SecurityAssessment): Boolean {
         if (!assessment.completed) {
             // Scan didn't complete — conservative: treat as unconfirmed.
-            Log.w(TAG, "Integrity not confirmed: scan did not complete. ${assessment.summary}")
+            Log.w(
+                TAG,
+                "Integrity not confirmed: scan did not complete. " +
+                    "rooted=${assessment.rooted} suspicious=${assessment.suspicious} " +
+                    "selinuxEnforcing=${assessment.selinuxEnforcing} " +
+                    "teeAttestationOk=${assessment.teeAttestationOk}",
+            )
             return false
         }
         if (assessment.rooted) {
@@ -114,7 +129,12 @@ object AppIntegrityGuard {
         // Suspicious indicators are logged but not automatically rejected —
         // they may be false positives on custom ROMs or developer devices.
         if (assessment.suspicious) {
-            Log.w(TAG, "Integrity warning: suspicious indicators present. ${assessment.summary}")
+            Log.w(
+                TAG,
+                "Integrity warning: suspicious indicators present. " +
+                    "selinuxEnforcing=${assessment.selinuxEnforcing} " +
+                    "teeAttestationOk=${assessment.teeAttestationOk}",
+            )
         }
         return true
     }
@@ -151,6 +171,9 @@ object AppIntegrityGuard {
             runCatching { Class.forName(className) }.isSuccess
         }
     }
+
+    @Volatile
+    private var cachedVerdict: Boolean? = null
 
     @Volatile
     private var cachedSigningCertificateSha256: String? = null

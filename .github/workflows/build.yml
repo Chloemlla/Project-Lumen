@@ -13,6 +13,10 @@ permissions:
   contents: write
   packages: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   android:
     name: Android Gradle build
@@ -31,19 +35,27 @@ jobs:
 
       - name: Accept Android SDK licenses
         run: |
+          NDK_VERSION="$(sed -n 's/^projectLumenNdkVersion=//p' gradle.properties | tail -n 1 | tr -d '[:space:]')"
+          CMAKE_VERSION="$(sed -n 's/^projectLumenCmakeVersion=//p' gradle.properties | tail -n 1 | tr -d '[:space:]')"
+          if [ -z "$NDK_VERSION" ] || [ -z "$CMAKE_VERSION" ]; then
+            echo "::error::projectLumenNdkVersion and projectLumenCmakeVersion must be set in gradle.properties."
+            exit 1
+          fi
           SDK_MANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           if [ ! -f "$SDK_MANAGER" ]; then
             SDK_MANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
           fi
-          if [ -f "$SDK_MANAGER" ]; then
-            echo "Accepting Android SDK licenses via $SDK_MANAGER"
-            yes | "$SDK_MANAGER" --licenses 2>&1 || true
-            "$SDK_MANAGER" --install "ndk;30.0.15729638" 2>&1 || true
-          else
-            echo "sdkmanager not found at $ANDROID_HOME; trying PATH"
-            yes | sdkmanager --licenses 2>&1 || true
-            sdkmanager --install "ndk;30.0.15729638" 2>&1 || true
+          if [ ! -f "$SDK_MANAGER" ]; then
+            SDK_MANAGER="$(command -v sdkmanager || true)"
           fi
+          if [ -z "$SDK_MANAGER" ]; then
+            echo "::warning::sdkmanager was not found; the Android Gradle Plugin will download the toolchain itself."
+            exit 0
+          fi
+          echo "Accepting Android SDK licenses via $SDK_MANAGER"
+          yes | "$SDK_MANAGER" --licenses 2>&1 || true
+          # AGP downloads these itself when missing, so a transient install failure must not fail the job.
+          "$SDK_MANAGER" --install "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}" 2>&1 || true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -51,9 +63,6 @@ jobs:
           gradle-version: "9.5.1"
           cache-read-only: ${{ github.event_name == 'pull_request' }}
           cache-cleanup: on-success
-
-      # - name: Set up Android native toolchain
-      #   uses: ./.github/actions/setup-android-native-toolchain
 
       - name: Read app version
         run: |
@@ -81,6 +90,24 @@ jobs:
             --build-time-utc-millis "$PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS" \
             --commit-hash "$PROJECT_LUMEN_COMMIT_HASH" \
             --short-hash "$PROJECT_LUMEN_SHORT_HASH"
+
+      - name: Run state machine unit tests
+        env:
+          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
+          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
+          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
+          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
+          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
+        run: gradle testDebugUnitTest --no-daemon --warning-mode all --stacktrace
+
+      - name: Run Android lint
+        env:
+          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
+          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
+          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
+          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
+          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
+        run: gradle :app:lintDebug --no-daemon --warning-mode all --stacktrace
 
       - name: Write signing config
         env:
@@ -355,7 +382,7 @@ jobs:
           PY
 
       - name: Automatic release
-        if: success() && github.event_name != 'pull_request'
+        if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -375,7 +402,7 @@ jobs:
           retention-days: 30
 
       - name: Sync release manifest to admin API
-        if: success() && github.event_name != 'pull_request'
+        if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           PROJECT_LUMEN_API_BASE_URL: ${{ secrets.PROJECT_LUMEN_API_BASE_URL }}
           PROJECT_LUMEN_ADMIN_ACTIONS_URL: ${{ secrets.PROJECT_LUMEN_ADMIN_ACTIONS_URL }}
@@ -429,26 +456,6 @@ jobs:
               ;;
           esac
 
-      - name: Run state machine unit tests
-        if: ${{ !cancelled() }}
-        env:
-          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
-          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
-          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
-          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
-          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
-        run: gradle testDebugUnitTest --no-daemon --warning-mode all --stacktrace
-
-      - name: Run Android lint
-        if: ${{ !cancelled() }}
-        env:
-          PROJECT_LUMEN_VERSION_NAME: ${{ env.PROJECT_LUMEN_VERSION_NAME }}
-          PROJECT_LUMEN_VERSION_CODE: ${{ env.PROJECT_LUMEN_VERSION_CODE }}
-          PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS: ${{ env.PROJECT_LUMEN_BUILD_TIME_UTC_MILLIS }}
-          PROJECT_LUMEN_COMMIT_HASH: ${{ env.PROJECT_LUMEN_COMMIT_HASH }}
-          PROJECT_LUMEN_SHORT_HASH: ${{ env.PROJECT_LUMEN_SHORT_HASH }}
-        run: gradle :app:lintDebug --no-daemon --warning-mode all --stacktrace
-
       - name: Upload verification reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -458,5 +465,6 @@ jobs:
             app/build/reports/tests/**
             app/build/reports/lint-results-debug.html
             app/build/reports/lint-results-debug.xml
+            app/build/outputs/mapping/**
             build/reports/problems/**
           retention-days: 14

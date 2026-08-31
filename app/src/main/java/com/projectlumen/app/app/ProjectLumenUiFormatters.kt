@@ -184,6 +184,7 @@ import com.projectlumen.app.core.update.UpdateInstaller
 import com.projectlumen.app.core.update.UpdateCandidate
 import com.projectlumen.app.core.update.UpdateChecker
 import com.projectlumen.app.ui.theme.ProjectLumenTheme
+import com.projectlumen.app.ui.theme.dynamicColorSchemeAvailable
 import com.projectlumen.app.ui.theme.templatePaletteDarkness
 import org.json.JSONObject
 import java.io.File
@@ -321,7 +322,7 @@ internal fun activeTemplate(uiState: ProjectLumenUiState): TipTemplateEntity? {
  * rewritten, so it applies again as soon as the template changes.
  */
 internal fun templateAppearanceLocksThemeMode(uiState: ProjectLumenUiState): Boolean {
-    if (uiState.settings.useDynamicColors) return false
+    if (uiState.settings.useDynamicColors && dynamicColorSchemeAvailable()) return false
     return templatePaletteDarkness(activeTemplate(uiState)?.layoutJson) != null
 }
 

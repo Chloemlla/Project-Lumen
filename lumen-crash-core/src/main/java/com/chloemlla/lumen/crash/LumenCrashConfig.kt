@@ -5,6 +5,13 @@ package com.chloemlla.lumen.crash
  *
  * Business metadata and product copy are injectable. Author attribution is **not**
  * configurable and is always forced to Chloemlla / https://github.com/Chloemlla/.
+ *
+ * **Callback threading contract.** [onCrashSaved], [onReportSaved] and [onAnrDetected] are
+ * invoked synchronously on whichever thread produced the report: the crashing thread, the
+ * watchdog thread, or the SDK's background upload thread. None of them is guaranteed to be the
+ * main thread. Implementations must be thread-safe, must not touch the view hierarchy directly,
+ * and must not block — the crash path is racing the system handler that kills the process. Any
+ * exception a callback throws is swallowed by the SDK.
  */
 data class LumenCrashConfig(
     val appDisplayName: String,
@@ -28,7 +35,12 @@ data class LumenCrashConfig(
     val pasteUploadEnabled: Boolean = true,
     /** HTTPS base URL for LogPaste-compatible upload. Trailing slashes are ignored. */
     val pasteUploadBaseUrl: String = CrashReportPasteUploader.DEFAULT_BASE_URL,
-    /** Legacy callback invoked for both crash and watchdog reports after persistence. */
+    /**
+     * Legacy callback invoked for both crash and watchdog reports after persistence.
+     *
+     * Not called for recovered main-thread freezes, which are never persisted; use
+     * [onAnrDetected] for those. See the class-level threading contract.
+     */
     val onCrashSaved: ((CrashReport) -> Unit)? = null,
     val killProcessWhenNoPreviousHandler: Boolean = true,
     /** Detects a main looper that stops processing heartbeat callbacks. */
@@ -41,9 +53,18 @@ data class LumenCrashConfig(
     val startupHangWatchdogEnabled: Boolean = false,
     /** Maximum time from [LumenCrash.install] to [LumenCrash.markStartupComplete]. */
     val startupHangTimeoutMillis: Long = 15_000L,
-    /** Receives every report after at least one persistence target accepted it. */
+    /**
+     * Receives every report after at least one persistence target accepted it.
+     *
+     * See the class-level threading contract.
+     */
     val onReportSaved: ((CrashReport) -> Unit)? = null,
-    /** Receives synthetic startup-hang and main-thread freeze reports. */
+    /**
+     * Receives synthetic startup-hang and main-thread freeze reports.
+     *
+     * A freeze report is delivered here only: it is recoverable, so it is uploaded but never
+     * persisted into the single pending-report slot. See the class-level threading contract.
+     */
     val onAnrDetected: ((CrashReport) -> Unit)? = null,
     /**
      * Collects the previous process's unexpected exit (native crash / signal /

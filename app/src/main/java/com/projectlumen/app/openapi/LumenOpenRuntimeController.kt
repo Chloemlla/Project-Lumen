@@ -10,17 +10,23 @@ import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
 import com.projectlumen.app.core.repositories.StatisticsRepository
 import com.projectlumen.app.core.runtime.AudioEvent
+import com.projectlumen.app.core.runtime.EyeStatsDelta
 import com.projectlumen.app.core.runtime.PomodoroEngine
+import com.projectlumen.app.core.runtime.PomodoroStatsDelta
 import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
 import com.projectlumen.app.core.time.todayKey
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 class LumenOpenRuntimeController(
     private val app: ProjectLumenApplication,
 ) {
+    private val telemetryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val settingsRepository by lazy {
         app.settingsRepository()
     }
@@ -65,16 +71,38 @@ class LumenOpenRuntimeController(
         val duration = durationMs
             .takeIf { it > 0L }
             ?: settings.pomodoroWorkMinutes.coerceAtLeast(1) * 60_000L
-        val nextRuntime = RuntimeStateEntity(
-            activeEngine = ActiveEngine.POMODORO.name,
-            pomodoroPhase = PomodoroPhase.FOCUS.name,
-            pomodoroPhaseStartedAt = nowMillis,
-            pomodoroPhaseEndAt = nowMillis + duration.coerceIn(MIN_FOCUS_DURATION_MS, MAX_FOCUS_DURATION_MS),
-            pomodoroCycleIndex = 1,
-            updatedAt = nowMillis,
-        )
         app.notifications.cancelAllScheduled()
-        runtimeRepository.upsert(nextRuntime)
+        var eyeDelta = EyeStatsDelta()
+        var pomodoroDelta = PomodoroStatsDelta()
+        val nextRuntime = runtimeRepository.update { current ->
+            when (current.activeEngine) {
+                ActiveEngine.REMINDER.name -> if (current.reminderPhase in reminderWorkPhases) {
+                    // skipBreak is used purely as the settlement calculation; the skip counter
+                    // belongs to the user pressing "skip", not to an external app taking over.
+                    eyeDelta = reminderEngine.skipBreak(settings, current, nowMillis)
+                        .eyeStatsDelta
+                        .copy(skipCount = 0)
+                }
+                ActiveEngine.POMODORO.name ->
+                    pomodoroDelta = pomodoroEngine.stop(current, nowMillis).pomodoroStatsDelta
+            }
+            // Copy instead of building a fresh row: sensor flags, warning debounce timestamps and
+            // the user's pause/quiet-hours state live here too and must survive an external call.
+            current.copy(
+                activeEngine = ActiveEngine.POMODORO.name,
+                reminderPhase = ReminderPhase.IDLE.name,
+                nextPreAlertAt = 0L,
+                nextReminderAt = 0L,
+                pomodoroPhase = PomodoroPhase.FOCUS.name,
+                pomodoroPhaseStartedAt = nowMillis,
+                pomodoroPhaseEndAt = nowMillis + duration.coerceIn(MIN_FOCUS_DURATION_MS, MAX_FOCUS_DURATION_MS),
+                pomodoroCycleIndex = current.pomodoroCycleIndex.coerceAtLeast(1),
+                lastStatsTickAt = nowMillis,
+                updatedAt = nowMillis,
+            )
+        }
+        statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, eyeDelta)
+        statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, pomodoroDelta)
         playAudioEvent(
             AudioEvent.ReminderTone(
                 enabled = settings.soundEnabled && settings.pomodoroWorkStartSoundEnabled,
@@ -87,12 +115,16 @@ class LumenOpenRuntimeController(
 
     suspend fun stopFocusSession(sourceApp: String?) = withContext(Dispatchers.IO) {
         val settings = settingsRepository.getOrDefault()
-        val runtime = runtimeRepository.getOrDefault()
-        if (runtime.activeEngine != ActiveEngine.POMODORO.name) return@withContext
         val nowMillis = System.currentTimeMillis()
-        val transition = pomodoroEngine.stop(runtime, nowMillis)
-        statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, transition.pomodoroStatsDelta)
-        runtimeRepository.upsert(transition.nextRuntime)
+        // 引擎计算必须在仓库锁内基于锁内读到的行做：Open API 与前台服务并发写同一行，
+        // 锁外先读再算出的整条快照会把并发写者的字段一起盖回去。
+        var transition: RuntimeTransition? = null
+        runtimeRepository.update { current ->
+            if (current.activeEngine != ActiveEngine.POMODORO.name) return@update current
+            pomodoroEngine.stop(current, nowMillis).also { transition = it }.nextRuntime
+        }
+        val applied = transition ?: return@withContext
+        statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, applied.pomodoroStatsDelta)
         app.notifications.cancelAllScheduled()
         app.notifications.cancelOngoingStatus()
         app.stopTimerService()
@@ -104,7 +136,6 @@ class LumenOpenRuntimeController(
         requestedDurationSeconds: Int? = null,
     ): Int = withContext(Dispatchers.IO) {
         val settings = settingsRepository.getOrDefault()
-        val runtime = runtimeRepository.getOrDefault()
         val nowMillis = System.currentTimeMillis()
         val durationSeconds = (requestedDurationSeconds ?: settings.restDurationSeconds)
             .coerceIn(MIN_REST_DURATION_SECONDS, MAX_REST_DURATION_SECONDS)
@@ -114,26 +145,32 @@ class LumenOpenRuntimeController(
             durationSeconds
         }
         val restSettings = settings.copy(restDurationSeconds = durationSeconds)
-        val transition = if (runtime.activeEngine == ActiveEngine.REMINDER.name &&
-            runtime.reminderPhase in reminderWorkPhases
-        ) {
-            reminderEngine.startBreak(restSettings, runtime, nowMillis)
-        } else {
-            RuntimeTransition(nextRuntime = newExternalRestState(nowMillis, durationSeconds))
+        // 同 stopFocusSession：分支判定与引擎计算都要基于锁内读到的行，否则整条覆盖会丢并发写。
+        var transition: RuntimeTransition? = null
+        var pomodoroStop: RuntimeTransition? = null
+        runtimeRepository.update { current ->
+            val next = if (current.activeEngine == ActiveEngine.REMINDER.name &&
+                current.reminderPhase in reminderWorkPhases
+            ) {
+                reminderEngine.startBreak(restSettings, current, nowMillis)
+            } else {
+                RuntimeTransition(nextRuntime = newExternalRestState(current, nowMillis, durationSeconds))
+            }
+            if (current.activeEngine == ActiveEngine.POMODORO.name) {
+                pomodoroStop = pomodoroEngine.stop(current, nowMillis)
+            }
+            transition = next
+            next.nextRuntime
         }
+        val applied = transition ?: return@withContext blockingDurationSeconds
 
-        statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, transition.eyeStatsDelta)
-        if (runtime.activeEngine == ActiveEngine.POMODORO.name) {
-            statisticsRepository.applyPomodoroDelta(
-                settings.statsEnabled,
-                nowMillis,
-                pomodoroEngine.stop(runtime, nowMillis).pomodoroStatsDelta,
-            )
+        statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, applied.eyeStatsDelta)
+        pomodoroStop?.let {
+            statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, it.pomodoroStatsDelta)
         }
-        runtimeRepository.upsert(transition.nextRuntime)
-        playAudioEvent(transition.audioEvent)
+        playAudioEvent(applied.audioEvent)
         showBlockingOverlayIfNeeded(settings, durationSeconds)
-        refreshActiveNotifications(settings, transition.nextRuntime)
+        refreshActiveNotifications(settings, applied.nextRuntime)
         uploadOpenApiTelemetry(sourceApp)
         blockingDurationSeconds
     }
@@ -160,15 +197,22 @@ class LumenOpenRuntimeController(
     }
 
     private fun newExternalRestState(
+        current: RuntimeStateEntity,
         nowMillis: Long,
         durationSeconds: Int,
     ): RuntimeStateEntity {
-        return RuntimeStateEntity(
+        // Copy so sensor flags, warning debounce timestamps and pause state survive the takeover.
+        return current.copy(
             activeEngine = ActiveEngine.REMINDER.name,
             reminderPhase = ReminderPhase.RESTING.name,
             reminderStartedAt = nowMillis,
+            nextPreAlertAt = 0L,
+            nextReminderAt = 0L,
             breakStartedAt = nowMillis,
             breakEndAt = nowMillis + durationSeconds * 1000L,
+            pomodoroPhase = PomodoroPhase.IDLE.name,
+            pomodoroPhaseStartedAt = 0L,
+            pomodoroPhaseEndAt = 0L,
             lastStatsTickAt = nowMillis,
             updatedAt = nowMillis,
         )
@@ -209,14 +253,16 @@ class LumenOpenRuntimeController(
         }
     }
 
-    private suspend fun uploadOpenApiTelemetry(sourceApp: String?) {
-        app.telemetry.uploadCurrentSnapshot(
-            force = true,
-            sourceApp = sanitizeLumenOpenSourceApp(
-                sourceApp,
-                fallback = LumenOpenContracts.SOURCE_APP_EXTERNAL,
-            ),
+    // Fire-and-forget: an external caller must not wait on a network upload, and it must not be
+    // able to force one either, or any app could drive uploads at its own rate.
+    private fun uploadOpenApiTelemetry(sourceApp: String?) {
+        val resolved = sanitizeLumenOpenSourceApp(
+            sourceApp,
+            fallback = LumenOpenContracts.SOURCE_APP_EXTERNAL,
         )
+        telemetryScope.launch {
+            runCatching { app.telemetry.uploadCurrentSnapshot(force = false, sourceApp = resolved) }
+        }
     }
 
     private fun Long.elapsedSince(startMillis: Long): Long {

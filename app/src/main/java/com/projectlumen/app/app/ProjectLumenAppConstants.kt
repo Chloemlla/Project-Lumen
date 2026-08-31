@@ -200,6 +200,7 @@ internal const val PROJECT_LUMEN_RELEASE_API = "https://api.github.com/repos/Chl
 internal const val PROJECT_LUMEN_RELEASES_BASE_URL = "https://github.com/Chloemlla/Project-Lumen/releases"
 internal const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIFICATIONS"
 internal const val MINI_CHROME_VERSION = 107
+internal const val TRANSLATION_MAX_INPUT_CHARS = 5000
 internal const val COUNTDOWN_STYLE_CIRCLE = "circle"
 internal const val COUNTDOWN_STYLE_BAR = "bar"
 internal const val COUNTDOWN_STYLE_NUMBER = "number"

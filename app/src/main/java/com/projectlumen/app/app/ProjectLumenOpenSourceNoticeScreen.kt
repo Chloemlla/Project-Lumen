@@ -400,6 +400,20 @@ private fun rememberProjectLumenCredits(): List<OssCredit> = remember {
             url = "https://fonts.google.com/icons",
         ),
         OssCredit(
+            name = "JetBrains Mono",
+            author = "JetBrains",
+            descriptionRes = R.string.credit_jetbrains_mono_desc,
+            license = "SIL Open Font License 1.1",
+            url = "https://github.com/JetBrains/JetBrainsMono",
+        ),
+        OssCredit(
+            name = "CRooot SDK",
+            author = "Chloemlla",
+            descriptionRes = R.string.credit_crooot_sdk_desc,
+            license = "Apache License, Version 2.0",
+            url = "https://github.com/Chloemlla/CRooot",
+        ),
+        OssCredit(
             name = "unDraw",
             author = "Katerina Limpitsouni",
             descriptionRes = R.string.credit_undraw_desc,

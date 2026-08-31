@@ -6,6 +6,8 @@
     <string name="legal_permission_camera_desc">在设备本地进行屏幕距离检测以及眨眼与干眼监测。画面帧仅在本地处理，不会被保存或上传。</string>
     <string name="legal_permission_notifications_name">android.permission.POST_NOTIFICATIONS</string>
     <string name="legal_permission_notifications_desc">提醒您休息、显示番茄钟状态并弹出提醒。</string>
+    <string name="legal_permission_promoted_notifications_name">android.permission.POST_PROMOTED_NOTIFICATIONS</string>
+    <string name="legal_permission_promoted_notifications_desc">在较新的 Android 版本上以实时通知形式持续展示休息倒计时。</string>
     <string name="legal_permission_exact_alarm_name">android.permission.SCHEDULE_EXACT_ALARM</string>
     <string name="legal_permission_exact_alarm_desc">在精确的预定时间触发休息与番茄钟提醒。</string>
     <string name="legal_permission_full_screen_intent_name">android.permission.USE_FULL_SCREEN_INTENT</string>
@@ -20,6 +22,10 @@
     <string name="legal_permission_boot_desc">在设备重启后恢复您已安排的提醒。</string>
     <string name="legal_permission_foreground_service_name">android.permission.FOREGROUND_SERVICE</string>
     <string name="legal_permission_foreground_service_desc">在使用期间让计时器、摄像头与光线监测在后台稳定运行。</string>
+    <string name="legal_permission_foreground_service_special_use_name">android.permission.FOREGROUND_SERVICE_SPECIAL_USE</string>
+    <string name="legal_permission_foreground_service_special_use_desc">声明计时前台服务的类型，使休息计划在应用退到后台时仍能继续运行。</string>
+    <string name="legal_permission_foreground_service_camera_name">android.permission.FOREGROUND_SERVICE_CAMERA</string>
+    <string name="legal_permission_foreground_service_camera_desc">声明摄像头前台服务的类型，供设备本地的距离与眨眼检测使用。</string>
     <string name="legal_permission_internet_name">android.permission.INTERNET</string>
     <string name="legal_permission_internet_desc">用于检查更新；仅在您开启时上传可选诊断信息或同步云端账号。</string>
     <string name="legal_permission_network_state_name">android.permission.ACCESS_NETWORK_STATE</string>
@@ -30,8 +36,6 @@
     <string name="legal_permission_biometric_desc">可选权限；使用设备锁或生物识别保护敏感设置。</string>
     <string name="legal_permission_install_packages_name">android.permission.REQUEST_INSTALL_PACKAGES</string>
     <string name="legal_permission_install_packages_desc">安装您从官方发布页下载的更新 APK。</string>
-    <string name="legal_permission_vibrate_name">android.permission.VIBRATE</string>
-    <string name="legal_permission_vibrate_desc">在休息提醒触发时振动。</string>
     <string name="legal_permission_query_all_packages_name">android.permission.QUERY_ALL_PACKAGES</string>
     <string name="legal_permission_query_all_packages_desc">可选权限；列出已安装的应用，以便通过 Shizuku 实现按应用进行网络控制。</string>
     <string name="legal_permission_open_api_access_name">com.project.lumen.permission.ACCESS_LUMEN_CORE</string>

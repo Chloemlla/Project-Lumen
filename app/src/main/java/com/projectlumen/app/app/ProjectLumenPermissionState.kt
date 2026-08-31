@@ -39,9 +39,9 @@ internal fun rememberPermissionRequirements(): PermissionRequirements {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    return refreshKey.let {
-        context.permissionRequirements()
-    }
+    // One binder sweep per foreground cycle: refreshKey only moves on ON_RESUME, and a system
+    // permission dialog always resumes the host activity when it closes.
+    return remember(refreshKey, context) { context.permissionRequirements() }
 }
 
 private fun Context.permissionRequirements(): PermissionRequirements {

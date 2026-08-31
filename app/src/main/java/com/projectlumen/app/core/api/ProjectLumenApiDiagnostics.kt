@@ -75,6 +75,13 @@ object ProjectLumenApiDiagnostics {
 
     private fun previewBody(text: String?): String {
         val normalized = text?.trim()?.takeIf { it.isNotBlank() } ?: return ""
+        if (normalized.length > MAX_PREVIEW_SOURCE_CHARS) {
+            // Truncate before redacting: parsing a multi-megabyte body only to keep
+            // 1200 characters costs several copies of it. Cutting back to the last
+            // quote drops any value the cut left open, so no half token survives.
+            val head = normalized.take(MAX_PREVIEW_SOURCE_CHARS).substringBeforeLast('"')
+            return redactPlainText(head).take(MAX_PREVIEW_CHARS) + "...[truncated]"
+        }
         val redacted = redactJson(normalized) ?: redactPlainText(normalized)
         return if (redacted.length <= MAX_PREVIEW_CHARS) {
             redacted
@@ -137,6 +144,7 @@ object ProjectLumenApiDiagnostics {
 
     private const val MAX_TRACES = 30
     private const val MAX_PREVIEW_CHARS = 1_200
+    private const val MAX_PREVIEW_SOURCE_CHARS = MAX_PREVIEW_CHARS * 2
     private const val REDACTED_VALUE = "[redacted]"
     private val SENSITIVE_KEY_FRAGMENTS = listOf(
         "token",

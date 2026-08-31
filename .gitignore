@@ -15,3 +15,7 @@ docs/todo-7.3
 docs/todo1
 fuck-my-shit-mountain/
 .trellis/
+__pycache__/
+*.pyc
+*.zip
+*.7z

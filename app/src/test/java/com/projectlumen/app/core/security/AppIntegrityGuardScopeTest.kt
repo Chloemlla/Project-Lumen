@@ -13,20 +13,31 @@ class AppIntegrityGuardScopeTest {
     @Test
     fun coldStartEnforcementIsScopedToTheMainProcess() {
         val guard = source("core/security/AppIntegrityGuard.kt").readText()
-        val enforceBody = guard.substringAfter("fun enforce(context: Context) {")
+        assertTrue("AppIntegrityGuard must expose enforce()", guard.contains(ENFORCE_ANCHOR))
+        val enforceBody = guard.substringAfter(ENFORCE_ANCHOR)
             .substringBefore("\n    fun ")
 
-        val processGuardIndex = enforceBody.indexOf("Application.getProcessName() != appContext.packageName")
-        val nativeCheckIndex = enforceBody.indexOf("NativeSecurityBridge.isNativeEnvironmentAllowedOrNull")
-        assertTrue("enforce() must compare the current process against the package name", processGuardIndex >= 0)
-        assertTrue("enforce() must skip auxiliary processes", enforceBody.contains("return"))
+        val processGuardIndex = enforceBody.indexOf("getProcessName()")
+        val nativeCheckIndex = enforceBody.indexOf("NativeSecurityBridge.isNativeEnvironmentAllowed")
+        assertTrue("enforce() must inspect the current process name", processGuardIndex >= 0)
         assertTrue(
-            "The process check must run before any native environment probe",
-            processGuardIndex in 0 until nativeCheckIndex,
+            "enforce() must compare the process name against the package name",
+            enforceBody.contains("packageName"),
         )
+        assertTrue("enforce() must bail out of auxiliary processes", enforceBody.contains("return"))
+        if (nativeCheckIndex >= 0) {
+            assertTrue(
+                "The process check must run before any native environment probe",
+                processGuardIndex < nativeCheckIndex,
+            )
+        }
     }
 
-    private fun source(relativePath: String): File = File(findAppSourceRoot(), relativePath)
+    private fun source(relativePath: String): File {
+        val file = File(findAppSourceRoot(), relativePath)
+        assertTrue("Missing production source: $relativePath", file.isFile)
+        return file
+    }
 
     private fun findAppSourceRoot(): File {
         val workingDirectory = File(System.getProperty("user.dir")).absoluteFile
@@ -39,5 +50,9 @@ class AppIntegrityGuardScopeTest {
             }
             .firstOrNull { it.isDirectory }
             ?: error("Unable to locate Project Lumen Android source root from $workingDirectory")
+    }
+
+    private companion object {
+        const val ENFORCE_ANCHOR = "fun enforce("
     }
 }

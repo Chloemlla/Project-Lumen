@@ -11,6 +11,9 @@ val projectLumenStorePassword = providers.gradleProperty("PROJECT_LUMEN_STORE_PA
 val projectLumenKeyAlias = providers.gradleProperty("PROJECT_LUMEN_KEY_ALIAS").orNull
 val projectLumenKeyPassword = providers.gradleProperty("PROJECT_LUMEN_KEY_PASSWORD").orNull
 val projectLumenApplicationId = "com.chloemlla.projectlumen"
+// Shared with ProjectLumenRequestSigner.FALLBACK_REQUEST_SIGNING_SECRET and the CMake default in
+// lumen_security.cpp; release builds must never ship it (see the require below).
+val projectLumenDevelopmentSigningSecret = "project-lumen-local-request-signing-key"
 val projectLumenReleaseSigningConfigured = listOf(
     projectLumenStoreFile,
     projectLumenStorePassword,
@@ -116,7 +119,7 @@ android {
         ?: providers.gradleProperty("PROJECT_LUMEN_REQUEST_SIGNING_SECRET")
             .orNull
             ?.takeIf { it.isNotBlank() }
-        ?: "project-lumen-local-request-signing-key"
+        ?: projectLumenDevelopmentSigningSecret
     val projectLumenReleaseCertSha256 = providers.environmentVariable("PROJECT_LUMEN_RELEASE_CERT_SHA256")
         .orNull
         ?.takeIf { it.isNotBlank() }
@@ -140,6 +143,33 @@ android {
     }
     require(!projectLumenTranslationCertificatePinningEnabled || projectLumenEffectiveTranslationCertificatePins.isNotBlank()) {
         "PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINNING_ENABLED=true requires PROJECT_LUMEN_TRANSLATION_CERTIFICATE_PINS."
+    }
+
+    // Release intent has to be derived from the requested tasks because these values are resolved
+    // during configuration, before any variant exists.
+    val projectLumenIsReleaseBuild = gradle.startParameter.taskNames.any { taskName ->
+        val normalized = taskName.lowercase()
+        normalized.contains("release") || normalized.contains("bundle")
+    }
+    val projectLumenAllowInsecureRelease = projectLumenBooleanFlag(
+        providers.gradleProperty("projectLumenAllowInsecureRelease").orNull,
+    )
+    require(
+        !projectLumenIsReleaseBuild ||
+            projectLumenAllowInsecureRelease ||
+            projectLumenRequestSigningSecret != projectLumenDevelopmentSigningSecret
+    ) {
+        "Release builds must provide PROJECT_LUMEN_REQUEST_SIGNING_SECRET. The development fallback is a " +
+            "publicly known constant and would be compiled into liblumen_security.so, letting anyone forge " +
+            "signed backend requests. Pass -PprojectLumenAllowInsecureRelease=true only for local diagnostics."
+    }
+    require(
+        !projectLumenIsReleaseBuild ||
+            projectLumenAllowInsecureRelease ||
+            projectLumenReleaseCertSha256.isNotBlank()
+    ) {
+        "Release builds must provide PROJECT_LUMEN_RELEASE_CERT_SHA256; without it " +
+            "APP_INTEGRITY_ENFORCEMENT_ENABLED silently becomes false and repackaging detection is disabled."
     }
 
     defaultConfig {

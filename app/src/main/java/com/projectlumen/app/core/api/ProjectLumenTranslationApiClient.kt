@@ -1,8 +1,8 @@
 package com.projectlumen.app.core.api
 
-import android.content.Context
 import com.projectlumen.app.core.security.ProjectLumenRequestSigner
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
@@ -28,7 +28,6 @@ data class TranslationResult(
 )
 
 class ProjectLumenTranslationApiClient(
-    context: Context,
     private val baseUrl: String = ProjectLumenApiConfig.translationBaseUrl,
     private val httpClient: OkHttpClient = SecureOkHttpFactory.create(
         baseUrl = baseUrl,
@@ -93,19 +92,30 @@ class ProjectLumenTranslationApiClient(
         ProjectLumenRequestSigner.headers(method, url, bodyText)
             .forEach { (name, value) -> requestBuilder.header(name, value) }
 
-        httpClient.newCall(requestBuilder.build()).execute().use { response ->
-            val responseText = readResponseText(response)
-            if (response.code !in 200..299) {
-                throw ProjectLumenApiException(response.code, parseErrorMessage(responseText, response.code))
+        val call = httpClient.newCall(requestBuilder.build())
+        // execute() is blocking and ignores coroutine cancellation on its own.
+        val cancellationHandle = coroutineContext.job.invokeOnCompletion { call.cancel() }
+        try {
+            call.execute().use { response ->
+                val responseText = readResponseText(response)
+                if (response.code !in 200..299) {
+                    throw ProjectLumenApiException(response.code, parseErrorMessage(responseText, response.code))
+                }
+                parse(responseText.toJsonObject())
             }
-            parse(responseText.toJsonObject())
+        } finally {
+            cancellationHandle.dispose()
         }
     }
 
     private fun resolveUrl(path: String) = "${baseUrl.trimEnd('/')}/${path.trimStart('/')}".toHttpUrl()
 
     private fun readResponseText(response: Response): String {
-        return response.body?.string().orEmpty()
+        val body = response.body ?: return ""
+        if (body.contentLength() > MAX_RESPONSE_BYTES || body.source().request(MAX_RESPONSE_BYTES + 1L)) {
+            throw IOException("Translation API response exceeded $MAX_RESPONSE_BYTES bytes.")
+        }
+        return body.string()
     }
 
     private fun parseErrorMessage(responseText: String, responseCode: Int): String {
@@ -129,6 +139,7 @@ class ProjectLumenTranslationApiClient(
 
     private companion object {
         private const val USER_AGENT = "Project-Lumen-Android"
+        private const val MAX_RESPONSE_BYTES = 1024L * 1024L
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }

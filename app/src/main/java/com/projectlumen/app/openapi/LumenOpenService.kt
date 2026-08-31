@@ -8,6 +8,7 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.Process
+import android.util.Log
 import com.project.lumen.open.ILumenOpenApi
 import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.ProjectLumenApplication
@@ -15,6 +16,7 @@ import java.security.MessageDigest
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 
 class LumenOpenService : Service() {
     private val controller: LumenOpenRuntimeController
@@ -23,22 +25,22 @@ class LumenOpenService : Service() {
     private val binder = object : ILumenOpenApi.Stub() {
         override fun getEyeFatigueLevel(): Int {
             requireCaller(LumenOpenContracts.PERMISSION_ACCESS_CORE)
-            return runBlocking(Dispatchers.IO) { controller.getEyeFatigueLevel() }
+            return callController(fallback = 0) { controller.getEyeFatigueLevel() }
         }
 
         override fun getContinuousScreenTime(): Long {
             requireCaller(LumenOpenContracts.PERMISSION_ACCESS_CORE)
-            return runBlocking(Dispatchers.IO) { controller.getContinuousScreenTime() }
+            return callController(fallback = 0L) { controller.getContinuousScreenTime() }
         }
 
         override fun isRestingNow(): Boolean {
             requireCaller(LumenOpenContracts.PERMISSION_ACCESS_CORE)
-            return runBlocking(Dispatchers.IO) { controller.isRestingNow() }
+            return callController(fallback = false) { controller.isRestingNow() }
         }
 
         override fun startFocusSession(tag: String?, durationMs: Long) {
-            val callerPackage = requireCaller(LumenOpenContracts.PERMISSION_ACCESS_CORE)
-            runBlocking(Dispatchers.IO) {
+            val callerPackage = requireCaller(LumenOpenContracts.PERMISSION_TRIGGER_CONTROL)
+            callController(fallback = Unit) {
                 controller.startFocusSession(
                     tag = tag,
                     durationMs = durationMs,
@@ -48,17 +50,34 @@ class LumenOpenService : Service() {
         }
 
         override fun stopFocusSession() {
-            val callerPackage = requireCaller(LumenOpenContracts.PERMISSION_ACCESS_CORE)
-            runBlocking(Dispatchers.IO) { controller.stopFocusSession(callerPackage) }
+            val callerPackage = requireCaller(LumenOpenContracts.PERMISSION_TRIGGER_CONTROL)
+            callController(fallback = Unit) { controller.stopFocusSession(callerPackage) }
         }
 
         override fun triggerEyeRelaxation() {
             val callerPackage = requireCaller(LumenOpenContracts.PERMISSION_TRIGGER_CONTROL)
-            runBlocking(Dispatchers.IO) { controller.triggerEyeRelaxation(callerPackage) }
+            callController(fallback = Unit) { controller.triggerEyeRelaxation(callerPackage) }
         }
     }
 
     override fun onBind(intent: Intent?): IBinder = binder
+
+    /**
+     * Only [SecurityException] and [IllegalArgumentException] survive a binder transaction; any
+     * other escaping throwable would kill this process on behalf of the caller.
+     */
+    private fun <T> callController(fallback: T, block: suspend () -> T): T {
+        return try {
+            runBlocking(Dispatchers.IO) { withTimeout(CONTROLLER_CALL_TIMEOUT_MILLIS) { block() } }
+        } catch (security: SecurityException) {
+            throw security
+        } catch (argument: IllegalArgumentException) {
+            throw argument
+        } catch (throwable: Throwable) {
+            Log.w(TAG, "Open API call failed", throwable)
+            fallback
+        }
+    }
 
     private fun requireCaller(permission: String): String {
         val callingUid = Binder.getCallingUid()
@@ -111,13 +130,9 @@ class LumenOpenService : Service() {
                 packageManager.getPackageInfo(callerPackage, PackageManager.GET_SIGNATURES)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val signingInfo = packageInfo.signingInfo ?: return@runCatching emptyList()
-                val signatures = if (signingInfo.hasMultipleSigners()) {
-                    signingInfo.apkContentsSigners
-                } else {
-                    signingInfo.signingCertificateHistory
-                }
-                signatures?.toList().orEmpty()
+                // Only the certificates the APK is signed with right now may match the allowlist:
+                // signingCertificateHistory would keep trusting keys the caller has rotated away.
+                packageInfo.signingInfo?.apkContentsSigners?.toList().orEmpty()
             } else {
                 packageInfo.signatures?.toList().orEmpty()
             }
@@ -134,5 +149,10 @@ class LumenOpenService : Service() {
             .replace(":", "")
             .replace(" ", "")
             .lowercase(Locale.US)
+    }
+
+    private companion object {
+        private const val TAG = "LumenOpenService"
+        private const val CONTROLLER_CALL_TIMEOUT_MILLIS = 2_000L
     }
 }

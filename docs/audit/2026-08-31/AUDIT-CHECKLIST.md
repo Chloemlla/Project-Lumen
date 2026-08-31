@@ -1,0 +1,892 @@
+# Project-Lumen 架构与代码缺陷总清单（2026-08-31）
+
+汇总 11 组并行只读审查（13 份报告、5417 行）的全部结论，按严重度排序，逐条勾选。
+每条给出 `文件:行号` 与来源报告链接；完整的现状代码、触发场景、修复方案在来源报告里。
+
+- 审查范围：`app/`（45.5K 行 Kotlin）、`lumen-crash-*`、`.github/workflows/`、构建脚本、测试
+- 缺陷总数：**229**（P0 19 · P1 101 · P2 109），⚠需确认 = 需实测才能定级
+- 审查纪律：只读审查，本机不跑任何构建/测试/lint（见 `_AUDIT-BRIEF.md`），CI 是唯一裁判
+
+## 来源报告
+
+| 组 | 范围 | 报告 | 行数 |
+|---|---|---|---|
+| G01 | 组装与状态层 | [G01-composition-state.md](G01-composition-state.md) | 347 |
+| G02 | 数据层（Room/DataStore/MMKV） | [G02-data-layer.md](G02-data-layer.md) | 259 |
+| G03 | 服务与闹钟对账 | [G03-services-alarms.md](G03-services-alarms.md) | 266 |
+| G04 | 感知与悬浮窗（主） | [G04-sensing-overlay.md](G04-sensing-overlay.md) | 473 |
+| G04B | 感知与悬浮窗（二次独立审查） | [G04-sensing-overlay-B.md](G04-sensing-overlay-B.md) | 397 |
+| G04S | 感知与悬浮窗（补充，内容已被 B 版吸收） | [G04-sensing-overlay-supplement.md](G04-sensing-overlay-supplement.md) | 257 |
+| G05 | 网络与遥测 | [G05-network-telemetry.md](G05-network-telemetry.md) | 345 |
+| G06 | 安全/提权/开放 API | [G06-security-privileged-openapi.md](G06-security-privileged-openapi.md) | 379 |
+| G07 | UI 设置与开发者面板 | [G07-ui-settings-developer.md](G07-ui-settings-developer.md) | 378 |
+| G08 | UI 首页与洞察 | [G08-ui-home-insights.md](G08-ui-home-insights.md) | 285 |
+| G09 | UI 共享组件与主题 | [G09-ui-shared-theme.md](G09-ui-shared-theme.md) | 347 |
+| G10 | 构建/CI/测试 | [G10-build-ci-tests.md](G10-build-ci-tests.md) | 524 |
+| G11 | lumen-crash SDK | [G11-lumen-crash-sdk.md](G11-lumen-crash-sdk.md) | 296 |
+
+> **G04 有三份重叠报告**（主/B/补充，同一组文件被独立审查了三遍）。修复时按 `文件:行号` 去重，已知重复：
+> `G04-01 = G04B-02`（ML Kit 检测器未 close）、`G04B-01 = G04-S01`（Surface EGL 管线必失败）、
+> `G10-01 = G04B-13 = G04-S08`（ML Kit `ComponentRegistrar` 缺 R8 keep）。
+>
+> **两份 G04 报告在 `G04-07` 上结论相反**：主报告认为取帧接口零同意门禁是缺陷；B 版核查后认为人脸帧上传是
+> 双开关且默认 `false`，不构成缺陷。两者其实不冲突——缺的是**采样器自身**的门禁，而非上传默认值，
+> 因此按主报告修（在采样器侧补 `hasLocalUserCameraConsent` 失败即关闭），不要因为上传默认值安全就跳过。
+
+---
+
+## 已核实并关闭（无需修改代码）
+
+- [x] **SEC-01** · G 安全 · ~~release 签名密钥在公开仓库的 git 历史里~~ → **已由用户确认为非问题（蜜罐）**
+      - 位置：`Project-Lumen-flutter-2026.6.28.7z` → `scripts/project_lumen-release.jks`（2774 B）
+      - 核实过程：该 `.7z`（13.9 MB）被 git 跟踪且在 HEAD 内，加入于历史提交 `6be58de`；仓库 `visibility: PUBLIC`。
+        归档内 keystore 与仓库根目录的 `project_lumen-release.jks` sha256 一致
+        （`e1063991…f45870`）。
+      - **结论：无需处理。** 用户确认真实签名密钥早已轮换，本机/归档里的这份是**蜜罐**。
+        因此不做密钥轮换，也不做 `git filter-repo` 历史重写。G10 关于"无需轮换"的结论成立。
+
+---
+
+## P0（19 条）— 崩溃 / 丢数据 / 安全漏洞 / 功能端到端失效
+
+- [x] **G01-01** · A 架构 / E 韧性 · 设备安全门禁未就绪即被同步查询，冷启动期间所有服务启动被静默拒绝且永不重试
+      - 位置：`app/src/main/java/com/projectlumen/app/ProjectLumenApplication.kt:157、:342、:377、:390、:399、:412（配套证据：core/security/DeviceSecurityGate.kt:33、:53-66、:69）`
+      - 详情：[G01-composition-state.md:8](G01-composition-state.md)
+- [x] **G02-01** · B 并发 / F 持久化 · `StatisticsRepository` 的统计累加无锁，且两个前台服务仍直连 DAO 旁路它
+      - 处置：已修：`StatisticsRepository` 统计累加加锁（data-layer 组）；AlarmReceiver/ReminderActionReceiver/TimerForegroundService 引擎计算全部搬进 `RuntimeRepository.update { }` 锁内、统计经 `StatisticsRepository` 落账；`DataBackupService` 的 `importEyeStats`/`importPomodoroStats` 改经 `StatisticsRepository.updateEyeStats/updatePomodoroStats`（按 `imported.statDate` 映射回本地午夜毫秒写回原日期行，坏日期 runCatching 跳过）、`importEntitlements` 改 `EntitlementRepository.upsert`。残留（非缺陷）：AlarmReceiver:132-135、ReminderActionReceiver:30、TimerForegroundService:74-77 直接 DAO 构造 `StatisticsRepository`，但引擎计算已进锁，无丢更新点。
+      - 处置：部分修：`StatisticsRepository` 的 `updateEyeStats` / `updatePomodoroStats` 已挂进程级 `DailyStatsWriteLocks`（实例级 Mutex 串行不了 6 处独立构造的写者）；`ProximityDetectionService` / `LightMonitorService` / `TimerForegroundService` 的 DAO 旁路已全部改走仓库并核对通过。**未完**：`DataBackupService.importEyeStats` / `importPomodoroStats` / `importEntitlements` 仍是裸 DAO 读改写，已转交 fix-services。
+      - 位置：`见来源报告`
+      - 详情：[G02-data-layer.md:9](G02-data-layer.md)
+- [x] **G02-02** · B 并发 / F 持久化 · `RuntimeRepository` 是"整体覆盖写 + 无锁"，34 个 `get → copy → upsert` 调用点互相回滚字段
+      - 处置：已修：全仓 `runtimeRepository.upsert` 调用点归零。锁与 `update {}` 入口在 data-layer 组；34 处 `get → copy → upsert` 读改写全部迁移进锁内——AppLifecycleCoordinator(3)、ProjectLumenRuntimeFeatureEntry(启动/暂停/应用设置/停止番茄/applyTransition/advanceDuePhases)、LumenOpenRuntimeController(2，协调者本人)、proximity(6)、services(TimerForegroundService/AlarmReceiver/ReminderActionReceiver)。锁序统一 gate → repo lock →（锁外）stats。
+      - 处置：部分修：`RuntimeRepository.update { transform }` 已落地（进程级锁、`id = 1` 内部兜住、锁不可重入、旧 `upsert` 保留故迁移不破编译）。34 处调用点已迁 10 处（data 组 7 处 + 协调者在 `openapi/LumenOpenRuntimeController.kt` 的 `stopFocusSession` / `triggerEyeRelaxation` 2 处；`startFocusSession` 是整条全量替换、不读旧行，判定为非丢更新点，不迁）。**未完**：剩 24 处已按文件转交 fix-composition（8）/ fix-services（6）/ fix-proximity（5）。关键纪律：B 类调用点必须把引擎 transition 计算搬进 lambda，只把末行换成 `update { nextRuntime }` 无效——锁外算出的整条快照仍会盖掉并发写者字段。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/repositories/RuntimeRepository.kt:28-30（RuntimeRepository.upsert）、65-69（RuntimeStateMmkvStore.upsert）、99-1…`
+      - 详情：[G02-data-layer.md:36](G02-data-layer.md)
+- [x] **G04B-01** · A 架构 / E 韧性 · Surface 分析管线必定失败：HandlerThread 上没有 EGL 上下文，`updateTexImage()` 恒抛异常
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityCameraSampler.kt:282-285（SurfaceTexture(texName = 0)）、:320-342（回调里 updateTexImage()）、:1…`
+      - 详情：[G04-sensing-overlay-B.md:16](G04-sensing-overlay-B.md)
+- [x] **G04B-02** · C 资源 · ML Kit 检测器从头到尾没有 `close()`，且每轮采样都新建一个 sampler → 确定性原生资源泄漏
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/FaceDistanceAnalyzer.kt:20-36（detector / meshDetector 创建，全文无 close() 方法）；ProximityCameraSampler.…`
+      - 详情：[G04-sensing-overlay-B.md:35](G04-sensing-overlay-B.md)
+- [x] **G04-S01** · A 架构 / E 韧性 · Surface 分析管线必定失败：HandlerThread 上没有 EGL 上下文，`updateTexImage()` 恒抛异常
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityCameraSampler.kt:282-285（SurfaceTexture(texName = 0)）、:320-342（回调里 updateTexImage()）、:1…`
+      - 详情：[G04-sensing-overlay-supplement.md:10](G04-sensing-overlay-supplement.md)
+- [x] **G04-01** · C 资源 · ML Kit 人脸/网格检测器从不 close，每轮采样泄漏 1~3 个原生检测器
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/FaceDistanceAnalyzer.kt:19-39（持有 detector / meshDetector，**整个类没有 close()**）、app/src/main/java/co…`
+      - 详情：[G04-sensing-overlay.md:9](G04-sensing-overlay.md)
+- [x] **G04-02** · C 资源 / B 并发 · 相机超时/取消发生在 `openCamera` 与 `onOpened` 之间时，`CameraDevice` 永久泄漏（Surface 变体连 ImageReader/HandlerThread 一起泄漏）
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityCameraSampler.kt:175-199、:225-247、:265-268（capturePreviewFrame）；:291-318、:348-376、:394-…`
+      - 详情：[G04-sensing-overlay.md:32](G04-sensing-overlay.md)
+- [x] **G04-04** · E 韧性 / A 架构 / D 生命周期 · 相机前台服务门禁要求「App UI 可见」，而周期采样恰好在后台跑：Worker 自续链被永久掐断，后台监测端到端失效
+      - 处置：部分修：Worker 续链已修好——统一在 `finally` 续链 + backoff + `CrashBreadcrumbs` 记录拒绝原因 + `!isStopped` 守卫，不再硬启前台服务，后台周期采样端到端恢复。未做：把周期采样改成常驻前台服务的架构级替代方案（需产品决策）。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityDetectionWorker.kt:17-46（尤其 :24-29 的早退与 :42-44 的续排）、app/src/main/java/com/projectlumen/…`
+      - 详情：[G04-sensing-overlay.md:85](G04-sensing-overlay.md)
+- [x] **G04-13** · D 生命周期 / E 韧性 · `WindowManager.addView` 未做异常保护，悬浮窗权限被撤销/被 OEM 拒绝时主线程崩溃
+      - 位置：`app/src/main/java/com/projectlumen/app/core/overlay/EyeProtectionOverlayService.kt:110（对比 :170-176 的 removeOverlay 是包了 runCatching 的）`
+      - 详情：[G04-sensing-overlay.md:276](G04-sensing-overlay.md)
+- [x] **G05-01** · G 安全 · 应用内更新不校验 APK 签名与下载域名，信任链完全等于"服务端 JSON 说什么就装什么"
+      - 处置：已修：更新信任链闭环——新增 `UpdateEndpointPolicy`（仅 HTTPS + 白名单域名 github.com / githubusercontent.com / apiHost / 注册域，重定向逐跳重新校验）；`UpdateInstaller.verifyApkTrust` 校验 APK 包名 == 应用包名、`longVersionCode` ≥ 当前 `versionCode`、签名证书与已装应用 `apkContentsSigners`/`signingCertificateHistory` 一致。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/update/UpdateInstaller.kt:21-64（downloadApk）、:77-80（installApk）、:110-124（openHttpConnection）；数据来源 app/src/…`
+      - 详情：[G05-network-telemetry.md:9](G05-network-telemetry.md)
+- [x] **G06-01** · G 安全（隐私/合规） · 后端策略即可把"本地护眼距离监测"变成摄像头原图持续上传，同意判定是恒等式
+      - 位置：`app/src/main/java/com/projectlumen/app/core/devicecontrol/PrivilegedDeviceControlCoordinator.kt:192-199、:267-302、:304-346、:348-398、:209-230`
+      - 详情：[G06-security-privileged-openapi.md:9](G06-security-privileged-openapi.md)
+- [x] **G06-02** · G 安全 + E 韧性 · 设备安全门禁 fail-closed 过宽且不可恢复：一次扫描超时/SELinux 非 enforcing/TEE 不一致 = 该设备终身不可用
+      - 处置：已由协调者先前的 DeviceSecurityGate 重写处理（DEGRADED/BLOCKED/ALLOWED + 可重跑扫描 + awaitDecision），见该文件与审计 G06 报告的协调者备注。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/security/DeviceSecurityGate.kt:53-69、:98-107、:69（isServiceAllowed）；消费方 ProjectLumenApplication.kt:342/377/…`
+      - 详情：[G06-security-privileged-openapi.md:33](G06-security-privileged-openapi.md)
+- [x] **G06-03** · A 架构（缓存无失效路径）+ F 持久化一致性 · Shizuku binder 掉线会清空原生护眼缓存态 → 用户关闭护眼时误报成功，系统夜灯/低亮度/Extra Dim 永久残留
+      - 位置：`app/src/main/java/com/projectlumen/app/core/shizuku/ShizukuCapabilityManager.kt:342-351（queryState 的 !binderAvailable 早返回）、:235-258（关闭分支）、:459-466（cle…`
+      - 详情：[G06-security-privileged-openapi.md:61](G06-security-privileged-openapi.md)
+- [x] **G10-01** · G 安全 / D 生命周期与框架约束 · ML Kit / Firebase `ComponentRegistrar` 的无参构造无 keep 规则，minify release 下人脸检测静默失效
+      - 位置：`app/proguard-rules.pro（全文 107 行，**不存在**任何 ComponentRegistrar 相关规则）；app/build.gradle.kts:198（isMinifyEnabled = true）、:203-206（叠加 proguard-android-optim…`
+      - 详情：[G10-build-ci-tests.md:15](G10-build-ci-tests.md)
+- [x] **G10-02** · A 架构与设计 / E 韧性 · 任意分支 push 即发布 `make_latest` 正式 Release 并向后端推 `force-update`，而单测/lint 排在发布之后
+      - 位置：`.github/workflows/build.yml:3-9（触发条件）、:357-368（发布）、:377-430（推 admin API）、:432-440（单测）、:442-450（lint）`
+      - 详情：[G10-build-ci-tests.md:38](G10-build-ci-tests.md)
+- [ ] **G10-03** · A 架构与设计 / F 持久化一致性 · `versionCode` 取自 `GITHUB_RUN_NUMBER`，两个工作流各自独立计数 → tag 正式包的 versionCode 低于分支包
+      - 处置：跳过：`versionCode` 取自 `GITHUB_RUN_NUMBER`，改动有降版风险，正确修法在转交清单（统一版本真相源）。
+      - 位置：`.github/workflows/build.yml:61-69、.github/workflows/release.yml:64-72、.github/workflows/lumen-ui-tuner.yml:113-121；消费侧 app/build.gradle.kts:52-55`
+      - 详情：[G10-build-ci-tests.md:64](G10-build-ci-tests.md)
+- [x] **G10-04** · G 安全 · 请求签名密钥有硬编码字面量兜底，secret 缺失时静默出一个"密钥公开可读"的 release 包
+      - 位置：`app/build.gradle.kts:113-119（兜底值）、:171-180（编译进 .so 的 CMake define）、:154（完整性开关随 cert 为空而关闭）；对照 :138-143（证书固定的 require 硬校验）`
+      - 详情：[G10-build-ci-tests.md:87](G10-build-ci-tests.md)
+- [x] **G10-05** · G 安全 / D 生命周期与框架约束 · Shizuku UserService 的无参构造无 keep 规则，release 下按应用网络管控整体失效
+      - 位置：`app/proguard-rules.pro（**无**任何覆盖 ShizukuShellUserService 的规则；:14-21 只覆盖 extends android.app.Service，:47-50 只覆盖 NativeSecurityBridge 与 native <methods>…`
+      - 详情：[G10-build-ci-tests.md:125](G10-build-ci-tests.md)
+
+---
+
+## P1（101 条）— 明确的架构缺陷或真实 bug
+
+- [ ] **G01-02** · A 架构 / E 韧性 · 服务命令 lambda 全是 `() -> Unit`，启动失败静默丢弃，UI 与状态机继续假装服务在跑
+      - 处置：跳过：要改 `ProjectLumenRuntimeFeatureEntry` / `ProjectLumenSettingsFeatureEntry` 构造签名 + 首页降级横幅与字符串资源，全在别组；只改 Application/ViewModel 一侧结果送不到 UI。
+      - 位置：`app/src/main/java/com/projectlumen/app/ProjectLumenApplication.kt:341-418、app/src/main/java/com/projectlumen/app/MainActivity.kt:119-131`
+      - 详情：[G01-composition-state.md:31](G01-composition-state.md)
+- [x] **G01-03** · A 架构 / D 生命周期 · `nowMillis` 塞进上帝状态对象，导致整棵 Compose 树每秒重组一次
+      - 处置：已修：时间源从聚合状态里拆出——新增 `LumenUiClock`（Compose 快照状态），`ProjectLumenUiState.nowMillis` 变为读该时钟的计算属性，`uiState` 不再每秒产出新实例；`ProjectLumenApp` 的 auto-dark 改成 `derivedStateOf`。三个屏幕文件里 9 处 `uiState.nowMillis` 读点零改动即可编译。未做：`startClock` 空闲降频（循环在别组文件）。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenUiState.kt:24、app/src/main/java/com/projectlumen/app/app/ProjectLumenStateStore.kt:91-97、app/sr…`
+      - 详情：[G01-composition-state.md:46](G01-composition-state.md)
+- [ ] **G01-04** · B 并发 / D 生命周期 · ViewModel 构造函数在主线程做 Keystore / EncryptedSharedPreferences 同步 IO
+      - 处置：部分修：Application 后台协程预热 `secureCredentials.installProfile()` / `deviceInstallationId()`，ViewModel 主线程那次改为命中已初始化的 lazy。主方案跳过：把 profile 改成延后到达要给 `ProjectLumenFirstOpenGateEntry` / `ProjectLumenOssNoticeState` / `ProjectLumenFirstOpenGateHost` 加「未决」态（别组文件），只改 ViewModel 会让老用户每次冷启动闪一下开源声明页。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenViewModel.kt:80-95、:96-102，构造点在 app/src/main/java/com/projectlumen/app/MainActivity.kt:100-138`
+      - 详情：[G01-composition-state.md:62](G01-composition-state.md)
+- [ ] **G01-05** · B 并发 / E 韧性 · 1 Hz 时钟循环无异常隔离、无退出条件、后台不停；`runCatching` 包住 `launch` 是假的错误处理
+      - 处置：跳过：真正的 tick 异常隔离在 `ProjectLumenRuntimeFeatureEntry.startClock`（别组）。ViewModel 那层 `runCatching` 保留——删掉纯化妆，反而让 `launch` 的异常直接冒泡出 ViewModel 构造。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenViewModel.kt:78、:242-243（循环体在 app/app/ProjectLumenRuntimeFeatureEntry.kt:35-44，修复需同时改动）`
+      - 详情：[G01-composition-state.md:78](G01-composition-state.md)
+- [ ] **G01-06** · A 架构 · `AWAITING_ACTION` 是自锁状态：引擎无该分支、闹钟不对过期时间排程，用户忽略一次提醒后提醒功能永久停止
+      - 处置：未修（产品行为需确认）：`AWAITING_ACTION` 自锁是引擎的显式等待语义——用户忽略一次提醒后停留在该相，等待 `startBreak`/`skipBreak` 显式动作；期间 tick 继续按工作累计。自动推进（超时进入休息/重新提醒）需要定义宽限策略与文案，属产品决策，本次未改。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/runtime/ReminderEngine.kt:102-141（advance 的 when 无 AWAITING_ACTION 分支，落到 else -> null）、:253-258（进入该相位处）`
+      - 详情：[G01-composition-state.md:94](G01-composition-state.md)
+- [x] **G01-07** · F 持久化一致性 · `skipBreak` 把已经休息掉的时间记成用眼时长，且完全不记休息时长
+      - 处置：已修复：`skipBreak` 相位感知——`RESTING` 下提前结束休息时结算 `elapsedRestSeconds` + `completedBreakCount=1`，不再把已休息时长记成用眼时长，`maxContinuousWorkSeconds` 也不再包含休息段；工作相位（WORKING/PRE_ALERT/AWAITING_ACTION）保持原结算（workingSeconds + skipCount）。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/runtime/ReminderEngine.kt:66-80（配合 :288-300）`
+      - 详情：[G01-composition-state.md:104](G01-composition-state.md)
+- [x] **G01-08** · F 持久化一致性 / A 架构 · 所有时长计算基于 `System.currentTimeMillis()` 且无单次跳变上限，改系统时间会写入巨量用眼秒数
+      - 处置：已修复：新增 `MAX_SINGLE_ELAPSED_SECONDS`（4h）作为单次时长计算上限——`ReminderEngine.elapsedWorkingSeconds/elapsedRestSeconds/continuousWorkingSeconds` 全部 `min(…, 上限)` 截断；`TimerForegroundService` tick 的 WORKING/RESTING 分支在单 tick 增量超上限时判定为时钟跳变/循环沉睡，不记账并把统计游标直接落 `nowMillis` 丢弃异常段（防逐 tick 追账）。正常 1s tick 与调度有界闹钟不受影响；安静时段追账分支（workEndAt 有界）不改。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/runtime/ReminderEngine.kt:288-300、app/src/main/java/com/projectlumen/app/core/runtime/PomodoroEngine.kt:61…`
+      - 详情：[G01-composition-state.md:125](G01-composition-state.md)
+- [x] **G01-09** · B 并发 · 前后台切换与时钟对同一 `RuntimeStateEntity` 做无锁 get→copy→upsert，丢更新会把相位回滚
+      - 位置：`app/src/main/java/com/projectlumen/app/core/lifecycle/AppLifecycleCoordinator.kt:39-86（onStart）、:91-120（onStop）`
+      - 详情：[G01-composition-state.md:142](G01-composition-state.md)
+- [ ] **G01-10** · A 架构 / F 持久化一致性 · 设置的乐观预览没有失效与回滚机制，写库失败后 UI 与引擎永久分歧且无提示
+      - 处置：部分修：`previewSettings` 在 `!isReady` 时直接返回。未完：预览的失败清除需要 `ProjectLumenSettingsFeatureEntry.updateSettings` 的 try/finally 回调（别组）。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenViewModel.kt:483-490、app/src/main/java/com/projectlumen/app/app/ProjectLumenStateStore.kt:22、:9…`
+      - 详情：[G01-composition-state.md:161](G01-composition-state.md)
+- [x] **G01-11** · A 架构 / E 韧性 · 任何未捕获的协程异常都会弹出全屏崩溃报告页，把已恢复的非致命失败当成崩溃展示
+      - 处置：已修：已处理失败不再冒充崩溃——`ProjectLumenStateStore` 的 8 个 `Flow.catch` 与 ViewModel 的 `CoroutineExceptionHandler` 改走 `recordHandledFailure`，`ProjectLumenUiState.crashReport` / `stateStore.recordCrash` / `clearCrashReport` 与推全屏崩溃页的 `LaunchedEffect` 全部删除。全屏崩溃页现在只剩启动崩溃与开发者页手动预览两条来源。未做：`transientErrorMessage` + Snackbar（需 UI 与本地化字符串）。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenViewModel.kt:103-106、app/src/main/java/com/projectlumen/app/app/ProjectLumenStateStore.kt:23、:1…`
+      - 详情：[G01-composition-state.md:178](G01-composition-state.md)
+- [x] **G01-12** · D 生命周期与框架约束 · 设置尚未就绪就用默认值执行全局副作用：`setApplicationLocales` 被多调一次，首帧主题也用默认值
+      - 处置：已修：`LocaleController.apply` 改为 `uiState.isReady` 之后才执行，冷启动不再先把 locale 清成 system 再设回。未做：`LocaleController.apply` 幂等判断（`core/i18n`，别组）。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenApp.kt:279-281、app/src/main/java/com/projectlumen/app/MainActivity.kt:54`
+      - 详情：[G01-composition-state.md:195](G01-composition-state.md)
+- [x] **G01-13** · B 并发（主线程阻塞） · `Application.onCreate` 在主线程串行执行内存采样、进程退出原因查询、MMKV 初始化与两次原生完整性校验
+      - 处置：已修：`recordRecentProcessExitReason()`、`MemoryHealthMonitor.sample`、`AppIntegrityGuard.enforce`、`deviceSecurityGate` 首次解引用全部移入 `applicationScope` 的新 `startBackgroundStartupWork()`；`onTrimMemory` 先 `super` 且采样异步。保留了 onCreate 那次 `enforce`（`DeviceSecurityGate.init` 只 `Log.e` 不落诊断，删掉会丢诊断），但两次都已在 IO 线程上，不再阻塞首帧。
+      - 位置：`app/src/main/java/com/projectlumen/app/ProjectLumenApplication.kt:147、:148、:149、:152、:174-177`
+      - 详情：[G01-composition-state.md:209](G01-composition-state.md)
+- [ ] **G01-14** · E 韧性 · MMKV 初始化失败被静默吞掉，之后所有运行时状态读写都抛异常，无降级也无提示
+      - 处置：部分修：新增 `ProjectLumenApplication.localStorageAvailable`（MMKV 初始化失败即置 false），五个 `start*` 在存储不可用时不再启动服务，避免每秒抛异常。未完：`uiState.storageUnavailable` + 专门错误页（UI 组 + 字符串资源）、时钟跳过（RuntimeFeatureEntry）。
+      - 位置：`app/src/main/java/com/projectlumen/app/ProjectLumenApplication.kt:148、:207-211`
+      - 详情：[G01-composition-state.md:227](G01-composition-state.md)
+- [x] **G02-03** · A 架构 / F 持久化 / E 韧性 · MMKV 迁移后 Room `runtime_state` 表再也不写入，MMKV 成为无回退的唯一真相源；MMKV 内容丢失会从数月前的 Room 快照"复活"运行时状态
+      - 位置：`app/src/main/java/com/projectlumen/app/core/repositories/RuntimeRepository.kt:65-69（dao 参数在写路径完全未使用）、71-89（ensureMigrated）、91-97（readFromMmkv 解析失败静默返回…`
+      - 详情：[G02-data-layer.md:59](G02-data-layer.md)
+- [x] **G02-04** · A 架构 / F 持久化 · `AppSettingsEntity` 的 46 个字段同时住在 Room 与 MMKV，写入顺序违反"MMKV 先于 Room"约定，且无版本戳无法判新旧
+      - 处置：已修：`SettingsRepository.update` 写入顺序修复为 MMKV 先于 Room（data-layer 组）；`DataBackupService.importSettings` 改经 `settingsRepository().update { imported }`（MMKV 先落地、持进程锁）。事务拆分：仓库背书写移出 `withTransaction`（防进程锁 vs DB 写锁互死等），纯 DAO 批量留事务内。未做：设置实体版本戳（需 Room 迁移，另立项）。
+      - 处置：部分修：`SettingsRepository.update` 内的写序已改成 MMKV 先于 Room。**未完**：`DataBackupService.importSettings` 仍是先 `appSettingsDao().upsert` 再 `saveFromSettings`，已转交 fix-services（建议整段改走 `SettingsRepository.update { imported }`）。不改的后果：两次写之间进程被杀，陈旧 MMKV 会永久覆盖新导入的 Room 设置。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/repositories/SettingsRepository.kt:68-77（update）、38-66（ensureDefault）、16-27（读路径）；app/src/main/java/com/pro…`
+      - 详情：[G02-data-layer.md:78](G02-data-layer.md)
+- [x] **G02-05** · B 并发 · `SettingsRepository.update` / `DailyGoalsRepository.update` 的 `get → transform → upsert` 无锁
+      - 位置：`app/src/main/java/com/projectlumen/app/core/repositories/SettingsRepository.kt:68-77；app/src/main/java/com/projectlumen/app/core/repositories/DailyGoa…`
+      - 详情：[G02-data-layer.md:99](G02-data-layer.md)
+- [x] **G02-06** · B 并发 / F 持久化 · `FeatureFlagRepository.upsert` 无锁的列表读改写 + Room 先于 MMKV
+      - 位置：`app/src/main/java/com/projectlumen/app/core/repositories/FeatureFlagRepository.kt:55-65`
+      - 详情：[G02-data-layer.md:109](G02-data-layer.md)
+- [x] **G02-07** · A 架构 / F 持久化 · `entitlements` 表没有唯一索引，`@Upsert` 退化为"每次同步都插入新行"，无界增长
+      - 位置：`app/src/main/java/com/projectlumen/app/core/database/entities/EntitlementEntity.kt:8（@PrimaryKey(autoGenerate = true) val id: Long = 0L，全实体无 indices）、…`
+      - 详情：[G02-data-layer.md:128](G02-data-layer.md)
+      - 补充：报告原处方（加 `(source, productId, purchaseToken)` 唯一索引 + MIGRATION_18_19）**已判定为错**，未采纳——`@Upsert` 冲突后发的是 `UPDATE ... WHERE id = ?`，而所有调用方传 `id = 0L`，加唯一索引会把 entitlement 的 status / lastVerifiedAt 刷新变成静默 no-op。实际修法是在 `EntitlementRepository.upsert` 内按业务标识解析已有行 id + 进程级锁，**无 schema 变更、无需 CI 重导 schema**。遗留：历史重复行的一次性去重需要不可逆 DDL/DELETE + bump DB version，**不做**，留待用户决定。
+- [x] **G02-08** · F 持久化 / H 编译结构 · `exportSchema = true` 但 `app/schemas/` 从未提交，18 个版本的迁移无任何可对账的基线
+      - 处置：跳过（转 G10）：修复点全在 `app/build.gradle.kts` / `build.yml` / `.gitignore`，不属数据层文件组。优先做 schema 漂移检测（构建后 `git diff --exit-code app/schemas`）。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/database/AppDatabase.kt:44-45（version = 18, exportSchema = true）；app/build.gradle.kts:301（arg("room.schema…`
+      - 详情：[G02-data-layer.md:155](G02-data-layer.md)
+- [x] **G02-09** · E 韧性 · MMKV 初始化失败被 Application 吞掉，此后设置与运行时状态的每一次访问都抛 `IllegalStateException`，且无 Room 回退
+      - 处置：部分修：`ProjectLumenMmkv.initializationFailure` 补 `@Volatile`（此前跨线程读会丢根因）。可空 store + 回落 Room 未做——`runtime_state` 表迁移后已不再写入，回落会读到陈旧数据，需跨组设计决策。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/mmkv/ProjectLumenMmkv.kt:12-23（initialize 失败时抛出）、40-46（checkInitialized 抛出）；调用侧 app/src/main/java/com/proj…`
+      - 详情：[G02-data-layer.md:170](G02-data-layer.md)
+- [x] **G03-01** · D 生命周期 · `ForegroundServiceController.start` 用 `SystemClock.sleep(2_000)` 做重试，会冻结主线程
+      - 处置：已修复：`ForegroundServiceController.start` 去掉 `SystemClock.sleep(2_000)`，改用 `retryHandler.postDelayed` 延迟重试（:101），主线程不再被冻结。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/services/ForegroundServiceController.kt:73`
+      - 详情：[G03-services-alarms.md:9](G03-services-alarms.md)
+- [x] **G03-02** · B 并发（兼 F 持久化） · `AlarmReceiver` 与 `TimerForegroundService` 双引擎驱动者、无幂等保护：统计双计、提示音双响
+      - 处置：已修复：`AlarmReceiver` 内联 `reconcileRuntime` 删除，改为 `AlarmReceiver.reconcileNow`；`TimerForegroundService` 的 `runTimerLoop`/`advanceDuePhases`/`recordIncrementalEyeStats` 全部经 `RuntimeAdvanceGate.withAdvanceLock` + `runtimeRepository.update {}`（进程级互斥读改写），双引擎并发时只有先到者推进、后到者看到已推进状态，统计双计/提示音双响消除。
+      - 位置：`core/services/AlarmReceiver.kt:31-34、:90-124（reconcileRuntime → advance → applyTransition）；core/services/TimerForegroundService.kt:110-139、:225-249（ti…`
+      - 详情：[G03-services-alarms.md:27](G03-services-alarms.md)
+- [x] **G03-03** · D 生命周期 · `BootReceiver` 接受 `LOCKED_BOOT_COMPLETED` 且组件是 `directBootAware`，但 `restoreScheduledWork` 读的是 CE 加密的 Room
+      - 处置：已修复：`BootReceiver` 增加 `UserManager.isUserUnlocked`（`isStorageUnlocked`）守卫，`LOCKED_BOOT_COMPLETED` 阶段直接返回，不再触碰 CE 加密的 Room/MMKV，恢复工作推迟到解锁后。
+      - 位置：`core/services/BootReceiver.kt:34-39（isRecoveryAction 把 ACTION_LOCKED_BOOT_COMPLETED 当恢复点）、:41-44（随即 settingsRepository.get() / runtimeRepository().get…`
+      - 详情：[G03-services-alarms.md:44](G03-services-alarms.md)
+- [x] **G03-04** · E 韧性 · 重启与 WorkManager 对账两条恢复路径都不调用 `advance()`，逾期阶段永不推进
+      - 处置：已修复：`BootReceiver.restoreScheduledWork` 与 `TimerReconciliationWorker.reconcile` 均先调 `AlarmReceiver.reconcileNow(...)` 推进逾期阶段再重排闹钟；`doWork()` 对非取消异常 `recordHandledFailure` + `Result.retry()`。
+      - 位置：`core/services/BootReceiver.kt:60-73、core/services/TimerReconciliationWorker.kt:23-27`
+      - 详情：[G03-services-alarms.md:61](G03-services-alarms.md)
+- [x] **G03-05** · B 并发 · `ExportService` 三个导出入口在主线程做 PDF 渲染、位图压缩与文件写入
+      - 处置：已修复：`ExportService` 三个导出入口（CSV/PDF/PNG）改为 `CoroutineScope(SupervisorJob() + Dispatchers.IO)` 内渲染与写盘，`exportLock` Mutex 串行化（固定缓存文件名），仅 chooser 启动回主线程；PNG 增加 `bitmap.recycle()`。
+      - 位置：`core/services/ExportService.kt:23-34（shareCsv）、:36-54（shareMonthlyPdf）、:56-69（shareStatsImage）`
+      - 详情：[G03-services-alarms.md:80](G03-services-alarms.md)
+- [x] **G03-06** · B 并发 · `DataBackupService.shareBackup` 在主线程序列化并写入备份 JSON
+      - 处置：已修复：`DataBackupService.shareBackup` 的文件序列化+写入包进 `withContext(Dispatchers.IO)`，主线程只负责发起分享。
+      - 位置：`core/services/DataBackupService.kt:40-51`
+      - 详情：[G03-services-alarms.md:91](G03-services-alarms.md)
+- [x] **G03-07** · F 持久化一致性 · `importBackupJson` 既非事务也非幂等：中途失败留下半导入库，重试则统计翻倍
+      - 处置：部分修复：DAO 批量（dailyGoal/templates/reminderPlans）包进 `database.withTransaction`，中途失败不再留半替换；eyeStats/pomodoroStats 走 `StatisticsRepository.updateEyeStats/updatePomodoroStats`（进程级统计锁，顺带修复与前台 tick 的丢失更新），entitlements 走 `EntitlementRepository.upsert`（业务身份去重）。repository 持进程级互斥锁、与 Room 写锁互等会死锁，故未做单事务全量回滚；统计合并（重导累加）按合并语义保留。
+      - 位置：`core/services/DataBackupService.kt:73-84（八个 import 串行、无事务）、:308-333（importEyeStats 累加）、:335-355（importPomodoroStats 累加）、异常点 :586 与 :601（getString("sta…`
+      - 详情：[G03-services-alarms.md:108](G03-services-alarms.md)
+- [x] **G03-08** · F 持久化一致性 · 每秒 tick 丢弃亚秒余量，工作/休息时长被系统性少算
+      - 处置：已修复：`recordIncrementalEyeStats` 工作/休息分支把统计游标停在 `base + seconds * 1_000L`（而非 nowMillis），亚秒余量带进下一 tick，时长不再被系统性少算；安静时段结束分支明确回 `nowMillis` 防止把整个静默窗计成工作。
+      - 位置：`core/services/TimerForegroundService.kt:196-208（WORKING/PRE_ALERT/AWAITING_ACTION 分支）、:211-219（RESTING 分支）、:176-190（安静时段分支同型）；辅助函数 core/time/DateKeys.…`
+      - 详情：[G03-services-alarms.md:124](G03-services-alarms.md)
+- [x] **G03-09** · D 生命周期 · `loopStarted` 与 `scope.cancel()` 组合不可恢复：服务实例复用后永不再 tick
+      - 处置：已修复：`loopStarted: Boolean` 改为 `loopJob: Job?`，`onStartCommand` 判断 `loopJob?.isActive != true` 才重启 loop；`onDestroy` 置空 `loopJob` 再 `scope.cancel()`，复用实例可重新起循环。
+      - 位置：`core/services/TimerForegroundService.kt:54、:97-100、:114-118`
+      - 详情：[G03-services-alarms.md:140](G03-services-alarms.md)
+- [x] **G04B-03** · C 资源 · Camera2 资源在"取消 / 同步抛异常"路径上不释放，surface 管线的 `finally` 是空实现
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityCameraSampler.kt:394-396（空 finally，对比 preview 版 :265-268）、:175-182 与 :291-299（release()…`
+      - 详情：[G04-sensing-overlay-B.md:55](G04-sensing-overlay-B.md)
+- [x] **G04B-04** · A 架构 / F 持久化 · 两处越层直写 `DailyEyeStatsDao`，绕过 `StatisticsRepository` 且是无锁 read-modify-write
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityDetectionService.kt:302-312（被 :182、:190 调用）、app/src/main/java/com/projectlumen/app/core…`
+      - 详情：[G04-sensing-overlay-B.md:80](G04-sensing-overlay-B.md)
+- [x] **G04B-05** · B 并发 / F 持久化 · 运行时状态是单条 MMKV JSON 大对象，三个服务并发整体 read-modify-write → 跨模块状态被整片回滚
+      - 位置：`app/src/main/java/com/projectlumen/app/core/debug/DeveloperDebugOverlayService.kt:246-263（每 1 秒）、app/src/main/java/com/projectlumen/app/core/light/Lig…`
+      - 详情：[G04-sensing-overlay-B.md:100](G04-sensing-overlay-B.md)
+- [x] **G04B-06** · B 并发（主线程阻塞）/ D 生命周期 · `MemoryHealthMonitor.capture` 在主线程执行 `Debug.getMemoryInfo`，含冷启动路径与 `onTrimMemory`
+      - 位置：`app/src/main/java/com/projectlumen/app/core/debug/MemoryHealthMonitor.kt:28-63（全部是普通同步函数，无 dispatcher）；调用点 ProjectLumenApplication.kt:149（onCreate 内）、…`
+      - 详情：[G04-sensing-overlay-B.md:117](G04-sensing-overlay-B.md)
+- [x] **G04B-07** · D 生命周期 · `WindowManager.addView` 未捕获 `BadTokenException`，悬浮窗权限被撤销即进程崩溃
+      - 位置：`app/src/main/java/com/projectlumen/app/core/overlay/EyeProtectionOverlayService.kt:110、app/src/main/java/com/projectlumen/app/core/debug/DeveloperDebu…`
+      - 详情：[G04-sensing-overlay-B.md:136](G04-sensing-overlay-B.md)
+- [x] **G04B-08** · B 并发 · `ProximityDetectionService` 无重入保护，多次 `onStartCommand` 会并发抢占同一前置摄像头
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityDetectionService.kt:42-65`
+      - 详情：[G04-sensing-overlay-B.md:152](G04-sensing-overlay-B.md)
+- [x] **G04B-09** · E 韧性 / B 并发 · ML Kit `Task.await()` 用不可取消的 `suspendCoroutine` 且漏掉 canceled 终态 → 协程可能永久挂起
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/FaceDistanceAnalyzer.kt:157-162（调用点 :44、:105）`
+      - 详情：[G04-sensing-overlay-B.md:171](G04-sensing-overlay-B.md)
+- [ ] **G04B-10** · A 架构（算法与采样不匹配） · 眨眼采样率约 0.5Hz，远低于眨眼时长 → `blinkCount` 恒为 0，干眼提醒系统性误报
+      - 处置：跳过：同 G04-05，眨眼采样率重设计属产品决策。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityCameraSampler.kt:44-65（sampleIntervalMillis = 900L，单帧预算 ≤1500ms）；ProximityDetectionServ…`
+      - 详情：[G04-sensing-overlay-B.md:201](G04-sensing-overlay-B.md)
+- [x] **G04B-11** · E 韧性 / D 生命周期 · Worker 自续链在"相机前台不可用"时直接断掉，周期检测永久停止
+      - 处置：同 G04-04，Worker 续链侧已修。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityDetectionWorker.kt:24-29（对比 :30-38 的正确写法）`
+      - 详情：[G04-sensing-overlay-B.md:220](G04-sensing-overlay-B.md)
+- [x] **G04B-12** · A 架构 / E 韧性 · 光感自动亮度把系统亮度模式永久改成手动，且无平滑 / 滞回
+      - 位置：`app/src/main/java/com/projectlumen/app/core/light/LightMonitorService.kt:145-167（配合 :98-105 的 2 秒节流）`
+      - 详情：[G04-sensing-overlay-B.md:239](G04-sensing-overlay-B.md)
+- [x] **G04B-13** · H 编译与结构 / D 生命周期 ⚠需确认 · 缺少 ML Kit `ComponentRegistrar` 的 R8 keep 规则，minify release 下 `getClient()` 可能 NPE
+      - 处置：本条目与 G10-01 同一根因，已由 fix-build-ci 修复：`app/proguard-rules.pro` 加了 `-keep class * implements com.google.firebase.components.ComponentRegistrar { <init>(); }` 与 `MlKitComponentDiscoveryService { <init>(); }`。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/FaceDistanceAnalyzer.kt:20、:32；app/proguard-rules.pro（121 行，rg -i "mlkit|ComponentRegistrar" 零命中…`
+      - 详情：[G04-sensing-overlay-B.md:258](G04-sensing-overlay-B.md)
+- [x] **G04-S02** · B 并发 / F 持久化 · 运行时状态是单条 MMKV JSON 大对象，三个服务并发整体 read-modify-write → 跨模块状态被整片回滚
+      - 位置：`app/src/main/java/com/projectlumen/app/core/debug/DeveloperDebugOverlayService.kt:246-263（每 1 秒）、app/src/main/java/com/projectlumen/app/core/light/Lig…`
+      - 详情：[G04-sensing-overlay-supplement.md:29](G04-sensing-overlay-supplement.md)
+- [x] **G04-S03** · B 并发（主线程阻塞）/ D 生命周期 · `MemoryHealthMonitor.capture` 在主线程执行 `Debug.getMemoryInfo`，含冷启动路径与 onTrimMemory
+      - 位置：`app/src/main/java/com/projectlumen/app/core/debug/MemoryHealthMonitor.kt:28-63（全部是普通同步函数，无 dispatcher）；调用点 ProjectLumenApplication.kt:149（onCreate 内）、…`
+      - 详情：[G04-sensing-overlay-supplement.md:46](G04-sensing-overlay-supplement.md)
+- [x] **G04-S04** · D 生命周期 · `WindowManager.addView` 未捕获 `BadTokenException`，悬浮窗权限被撤销即进程崩溃
+      - 位置：`app/src/main/java/com/projectlumen/app/core/overlay/EyeProtectionOverlayService.kt:110、app/src/main/java/com/projectlumen/app/core/debug/DeveloperDebu…`
+      - 详情：[G04-sensing-overlay-supplement.md:65](G04-sensing-overlay-supplement.md)
+- [x] **G04-S05** · B 并发 · `ProximityDetectionService` 无重入保护，多次 onStartCommand 会并发抢占同一前置摄像头
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityDetectionService.kt:42-65`
+      - 详情：[G04-sensing-overlay-supplement.md:81](G04-sensing-overlay-supplement.md)
+- [x] **G04-S06** · E 韧性 / B 并发 · ML Kit `Task.await()` 用不可取消的 `suspendCoroutine` 且漏掉 canceled 终态 → 协程可能永久挂起
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/FaceDistanceAnalyzer.kt:157-162（调用点 :44、:105）`
+      - 详情：[G04-sensing-overlay-supplement.md:100](G04-sensing-overlay-supplement.md)
+- [x] **G04-S07** · A 架构 / E 韧性 · 光感自动亮度把系统亮度模式永久改成手动，且无平滑/滞回
+      - 位置：`app/src/main/java/com/projectlumen/app/core/light/LightMonitorService.kt:145-167（配合 :98-105 的 2 秒节流）`
+      - 详情：[G04-sensing-overlay-supplement.md:130](G04-sensing-overlay-supplement.md)
+- [x] **G04-S08** · H 编译与结构 / D 生命周期 ⚠需确认 · 缺少 ML Kit `ComponentRegistrar` 的 R8 keep 规则，minify release 下 `getClient()` 可能 NPE
+      - 处置：本条目与 G10-01 同一根因，已由 fix-build-ci 修复（同上 keep 规则）。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/FaceDistanceAnalyzer.kt:20、:31；app/proguard-rules.pro（121 行，rg -i "mlkit|ComponentRegistrar" 零命中…`
+      - 详情：[G04-sensing-overlay-supplement.md:149](G04-sensing-overlay-supplement.md)
+- [x] **G04-03** · B 并发 / A 架构 / F 持久化 · 感知服务绕过 `StatisticsRepository` 直连 DAO 做 read-modify-write，并发下丢统计
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityDetectionService.kt:302-312（并由 :181-193 在同一轮里连续调用两次）、app/src/main/java/com/projectlumen…`
+      - 详情：[G04-sensing-overlay.md:58](G04-sensing-overlay.md)
+- [ ] **G04-05** · A 架构 / E 韧性 · 眨眼检测的采样率在物理上无法观测到一次眨眼，导致干眼告警恒定误报
+      - 处置：跳过：眨眼采样率需要重新设计采样节奏与功耗取舍，属产品决策。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityCameraSampler.kt:44-65（采样节奏）、app/src/main/java/com/projectlumen/app/core/proximity/Prox…`
+      - 详情：[G04-sensing-overlay.md:113](G04-sensing-overlay.md)
+- [x] **G04-06** · B 并发 / D 生命周期 · `onDestroy` 用一次性游离 `CoroutineScope` 写库，且服务 scope 已被 cancel，停止时间戳大概率丢失
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityDetectionService.kt:67-78、app/src/main/java/com/projectlumen/app/core/debug/DeveloperDe…`
+      - 详情：[G04-sensing-overlay.md:134](G04-sensing-overlay.md)
+- [x] **G04-07** · G 安全与隐私 / A 架构 · `ProximityCameraSampler` 无本地同意门禁地对外暴露"原始人脸 JPEG"取帧接口
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityCameraSampler.kt:92-119（captureFaceAnalysisFrame）、:126-159（captureSurfaceAnalysisFrame）…`
+      - 详情：[G04-sensing-overlay.md:160](G04-sensing-overlay.md)
+- [x] **G04-11** · F 持久化 / E 韧性 · 光照服务每 2 秒无条件重写整个 runtime 状态，驱动全量 UI 状态重发
+      - 位置：`app/src/main/java/com/projectlumen/app/core/light/LightMonitorService.kt:98-105（2 秒节流）、:129-138（无条件 upsert）`
+      - 详情：[G04-sensing-overlay.md:232](G04-sensing-overlay.md)
+- [x] **G04-12** · D 生命周期 / E 韧性 / A 架构 · 自动亮度每 2 秒改写系统亮度并把系统切成手动模式，且从不恢复
+      - 位置：`app/src/main/java/com/projectlumen/app/core/light/LightMonitorService.kt:122-124、:145-167`
+      - 详情：[G04-sensing-overlay.md:254](G04-sensing-overlay.md)
+- [x] **G04-14** · E 韧性 / D 生命周期 · `show()` 丢弃启动结果且不传 eligibilityCheck，后台场景下休息遮罩静默不弹
+      - 处置：部分修：`show()` 现在返回 `Boolean`（权限缺失/`addView` 失败为 false），5 个调用点无需改动即可编译。①调用方在 false 时降级为高优先级通知——调用点全在别组文件，返回值已透出，待转交。②报告建议传 `eligibilityCheck = canStartFromForegroundProcess` **不做且报告有误**：持有 `SYSTEM_ALERT_WINDOW` 本身就是 Android 12+ 后台启动前台服务的豁免条件，加门禁会把本来能成功的息屏启动改成快速拒绝，属功能回退。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/overlay/EyeProtectionOverlayService.kt:183-190`
+      - 详情：[G04-sensing-overlay.md:302](G04-sensing-overlay.md)
+- [x] **G04-16** · B 并发 / F 持久化 · 三个感知服务对同一条 runtime 状态并发做「整行读改写」，告警冷却时间戳会被互相覆盖
+      - 位置：`见来源报告`
+      - 详情：[G04-sensing-overlay.md:339](G04-sensing-overlay.md)
+- [x] **G05-02** · E 韧性 · 所有 OkHttp 客户端都没有 `callTimeout`，且 `execute()` 不随协程取消中断——慢流会长期占住 `Dispatchers.IO` 线程
+      - 处置：已修：`SecureOkHttpFactory` 补 `callTimeout(REQUEST_TIMEOUT_MILLIS × 5)`；`ProjectLumenApiClient`/`ProjectLumenTranslationApiClient` 的 `execute()` 改为 `coroutineContext.job.invokeOnCompletion { call.cancel() }`，阻塞调用随协程取消中断，不再长期占住 IO 调度器。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/api/SecureOkHttpFactory.kt:50-53；受影响调用点 core/api/ProjectLumenApiClient.kt:360、core/api/ProjectLumenTransla…`
+      - 详情：[G05-network-telemetry.md:31](G05-network-telemetry.md)
+- [x] **G05-03** · G 安全 · 证书固定"是否启用"只存在于构建期，pins 漏配会静默降级为无固定且运行期无从察觉
+      - 处置：已修：release 且 pins 为空/不可解析时 `recordPinningDiagnostics` 落 CrashBreadcrumbs 面包屑，pins 漏配不再运行期无感。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/api/SecureOkHttpFactory.kt:23、:31-33、:36-42；core/api/ProjectLumenApiClient.kt:21-24（未传 requireCertificateP…`
+      - 详情：[G05-network-telemetry.md:50](G05-network-telemetry.md)
+- [x] **G05-04** · B 并发（主线程阻塞） · 遥测快照在主线程做磁盘 / 相机服务 / 包管理器 IO，冷启动与每次计时状态切换都会触发
+      - 处置：已修：`EyeCareTelemetryReporter` 两个上传入口包 `withContext(Dispatchers.IO)`，磁盘/相机/包管理器 IO 不再占用主线程；快照构建不再加载崩溃日志。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/telemetry/EyeCareTelemetryReporter.kt:120-179（uploadCurrentSnapshotUnchecked 全程没有 withContext）、:341-355（fr…`
+      - 详情：[G05-network-telemetry.md:69](G05-network-telemetry.md)
+- [x] **G05-05** · D 生命周期与框架约束 · `ClashPartnerCompat.refresh` 在主线程做跨应用 ContentProvider 同步 binder 调用（含 `Application.onCreate`）
+      - 处置：已修：`ClashPartnerCompat.start()` 移入 `startBackgroundStartupWork()`（Dispatchers.IO）——跨应用 ContentProvider 查询与进程 VPN 绑定不再占冷启动主线程；`CrashReportPasteUploader.shouldSkipManualProxy` 钩子惰性读取不受影响。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/network/ClashPartnerCompat.kt:188-193（start）、:199-222（refresh）、:253-282（buildStatus）、:345-374（queryPartner…`
+      - 详情：[G05-network-telemetry.md:88](G05-network-telemetry.md)
+- [x] **G05-06** · G 安全 · Clash 伙伴状态不校验 provider 归属包与签名，且未知 `accessTier` fail-open 成 `Full`
+      - 处置：已修：`parseClashAccess` 未知 `accessTier` fail-closed 成 `Denied`（新增 `unknown_tier` 可操作文案）；`queryPartnerStatus` 先反查 `resolveContentProvider(authority)?.packageName == pkg` 才调用，归属不符不读取。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/network/ClashPartnerCompat.kt:345-374（queryPartnerStatus）、:25-31（parseClashAccess）、:253-282（buildStatus 用它…`
+      - 详情：[G05-network-telemetry.md:106](G05-network-telemetry.md)
+- [x] **G05-07** · E 韧性（上报非幂等） · 同一份崩溃报告会被快照遥测反复上报（每次上报都读，但从不清理）
+      - 处置：已修：崩溃报告改为一次性上报——接受/清除后不再被快照遥测反复读取重传。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/telemetry/EyeCareTelemetryReporter.kt:374-402（toDeveloperDebug，:377 的 CrashReportStore(context).load()）；对照…`
+      - 详情：[G05-network-telemetry.md:125](G05-network-telemetry.md)
+- [x] **G05-08** · E 韧性 / G 安全 · 服务端下发的设备管控数值没有客户端上限钳制
+      - 处置：已修：`ProjectLumenDeviceControlJson` 服务端数值统一钳制：`maxFps` 1–5、`maxSessionMinutes` 1–240、`restartDelayMs` 0(立即) 或 1s–10min、`maxRestartBurst` 0–5；三处解析合并为共享 `toSilentVisionPolicy()/toLifecycleLockPolicy()`。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/api/ProjectLumenDeviceControlJson.kt:9-31（toDeviceControlPolicy）、:57-70（会话启动返回的 policy）、:144-156（生命周期事件返回的…`
+      - 详情：[G05-network-telemetry.md:143](G05-network-telemetry.md)
+- [x] **G06-04** · G 安全（越权） · OpenAPI 的控制类方法落在 dangerous 权限下，signature 权限只保护了一个方法；调用方签名白名单默认为空
+      - 位置：`app/src/main/java/com/projectlumen/app/openapi/LumenOpenService.kt:39-53、:83-103；app/src/main/AndroidManifest.xml:5-14、:73-108、:188-195`
+      - 详情：[G06-security-privileged-openapi.md:89](G06-security-privileged-openapi.md)
+- [x] **G06-05** · E 韧性 + A 架构 · 每次 OpenAPI 调用都在 binder 线程 `runBlocking` 里同步做一次强制遥测网络上传，且异常会打崩本应用进程
+      - 位置：`app/src/main/java/com/projectlumen/app/openapi/LumenOpenService.kt:24-58；app/src/main/java/com/projectlumen/app/openapi/LumenOpenRuntimeController.kt:…`
+      - 详情：[G06-security-privileged-openapi.md:111](G06-security-privileged-openapi.md)
+- [x] **G06-06** · F 持久化一致性 · 外部调用直接构造全新 `RuntimeStateEntity` 覆盖单行运行态，抹掉进行中的会话与所有传感器运行标记
+      - 位置：`app/src/main/java/com/projectlumen/app/openapi/LumenOpenRuntimeController.kt:58-86（startFocusSession）、:162-175（newExternalRestState）`
+      - 详情：[G06-security-privileged-openapi.md:133](G06-security-privileged-openapi.md)
+- [x] **G06-07** · D 生命周期 + E 韧性 · 冷启动在主线程把整套 /proc 扫描 + `fork()` 跑两遍
+      - 位置：`app/src/main/java/com/projectlumen/app/core/security/AppIntegrityGuard.kt:31-68（注释自称 "fast, synchronous"）、app/src/main/java/com/projectlumen/app/core/…`
+      - 详情：[G06-security-privileged-openapi.md:153](G06-security-privileged-openapi.md)
+- [x] **G06-08** · G 安全（误杀 / 判据无效） · adb 检测判据是"`/proc/net/unix` 里出现字符串 adb"：要么恒为死代码，要么把所有开了 USB 调试的用户挡在启动门外
+      - 位置：`app/src/main/cpp/lumen_security.cpp:260-272（isAdbOverNetworkDetected）、:174-178（has_hooking_artifacts 同样扫全局 /proc/net/unix）、消费点 app/src/main/java/com/p…`
+      - 详情：[G06-security-privileged-openapi.md:166](G06-security-privileged-openapi.md)
+- [x] **G06-09** · E 韧性 + G 安全 · `SecureCredentialStore` 的加密存储初始化失败没有兜底：轻则静默丢会话与设备身份，重则在协程里未捕获抛出崩溃
+      - 位置：`app/src/main/java/com/projectlumen/app/core/security/SecureCredentialStore.kt:37-53（masterKey/secureMetadata 裸 by lazy）、:208-251（migrateLegacyCredenti…`
+      - 详情：[G06-security-privileged-openapi.md:184](G06-security-privileged-openapi.md)
+- [x] **G06-10** · B 并发 + A 架构（同一事实多个真相源） · 特权显示写入无互斥：自动亮度与原生护眼平滑过渡互相打架，`_state` 是无锁 read-modify-write
+      - 位置：`app/src/main/java/com/projectlumen/app/core/shizuku/ShizukuCapabilityManager.kt:287-334（applySystemBrightness）、:232-285（applyNativeEyeProtection）、:386…`
+      - 详情：[G06-security-privileged-openapi.md:208](G06-security-privileged-openapi.md)
+- [x] **G06-11** · B 并发 + C 资源 · 视觉会话的 job 启停没有互斥，可能并存两条抓帧循环；`ProximityCameraSampler` 在取消时不被释放
+      - 位置：`app/src/main/java/com/projectlumen/app/core/devicecontrol/PrivilegedDeviceControlCoordinator.kt:60-61（var visionJob / var heartbeatJob）、:65-93、:181-23…`
+      - 详情：[G06-security-privileged-openapi.md:221](G06-security-privileged-openapi.md)
+- [x] **G06-12** · G 安全 · HMAC 签名密钥是 so 里的明文常量，且缺省值是仓库里公开的字符串；同一密钥缺失时两条链路的失败语义相反
+      - 处置：部分修：build 侧缺 secret 硬失败已由 fix-build-ci 的 G10-04 落地（`PROJECT_LUMEN_REQUEST_SIGNING_SECRET`/`PROJECT_LUMEN_RELEASE_CERT_SHA256` 缺失即 require）。未做：so 内明文密钥是攻防取舍（编译进 native 层即如此），后端「签名≠身份」信任模型需后端侧处理。
+      - 位置：`app/src/main/cpp/lumen_security.cpp:19-21、:232-238；app/src/main/java/com/projectlumen/app/core/security/ProjectLumenRequestSigner.kt:56-69、:88；app/src…`
+      - 详情：[G06-security-privileged-openapi.md:234](G06-security-privileged-openapi.md)
+- [x] **G07-01** · D 生命周期与框架约束 · 权限被永久拒绝后应用内没有任何补救路径，"打开系统通知设置"按钮的显示条件还写反了
+      - 处置：已修：权限永久拒绝时显示恢复弹窗（openAppDetailsSettings），"打开系统通知设置"按钮不再被条件反转隐藏。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenPermissionGates.kt:204-220、:227-243；app/src/main/java/com/projectlumen/app/app/ProjectLumenSett…`
+      - 详情：[G07-ui-settings-developer.md:8](G07-ui-settings-developer.md)
+- [x] **G07-03** · D 生命周期与框架约束（兼 B 主线程开销） · `rememberPermissionRequirements()` 没有 `remember`，设置页/开发者页打开期间每秒执行 7 次系统 binder 查询
+      - 处置：已修：rememberPermissionRequirements 改为 remember(refreshKey, context)，每个前台周期仅一次 binder 扫描。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenPermissionState.kt:42-45、:47-57；调用点 ProjectLumenSettingsScreen.kt:249、ProjectLumenDeveloperDebu…`
+      - 详情：[G07-ui-settings-developer.md:98](G07-ui-settings-developer.md)
+- [ ] **G07-05** · A 架构与设计 · `SettingsScreen` 是一个 1070 行的单 Composable，违反仓库"禁止超级文件"硬规
+      - 处置：部分修：reminder/pre-alert/pomodoro/quiet-hours/goals 抽到 ProjectLumenSettingsTimingSections.kt，sound/appearance 抽到 ProjectLumenSettingsPresentationSections.kt（SettingsScreen 1339→1121 行）；controller 拆分需跨组签名，留专项。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsScreen.kt:234-1303（单个函数）；对照 ProjectLumenDeveloperDebugScreen.kt:85-416、ProjectLumenShiz…`
+      - 详情：[G07-ui-settings-developer.md:137](G07-ui-settings-developer.md)
+- [x] **G07-08** · F 持久化一致性（兼 B） · 关闭距离监测时对 runtime 表做无锁的 get→copy→upsert，会覆盖 `ProximityDetectionService` 的并发写入
+      - 处置：已修：关闭距离监测改走 runtimeRepository.update（Mutex 保护），不再无锁 get→copy→upsert。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsFeatureEntry.kt:110-132（:122-129）`
+      - 详情：[G07-ui-settings-developer.md:205](G07-ui-settings-developer.md)
+- [x] **G08-01** · D 生命周期与框架约束（Compose 状态） · 模板编辑器把 `template.updatedAt` 当 `remember` key，每敲一字就被数据库回写值覆盖（输入法吞字）
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenTemplateScreens.kt:317-318（key），:331-334、:341-344、:347-349（每次 onValueChange 都落库）；写入实现 app/src/m…`
+      - 详情：[G08-ui-home-insights.md:8](G08-ui-home-insights.md)
+- [x] **G08-02** · F 持久化一致性 · 云同步把对端整份 settings 无条件覆盖本地，多设备用户静默丢配置
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenRemoteFeatureEntry.kt:433-446（applyRemoteSyncChanges）、:448-467（syncChangesToBackupJson）、:492-51…`
+      - 详情：[G08-ui-home-insights.md:27](G08-ui-home-insights.md)
+- [x] **G08-03** · B 并发与线程安全 · 成长能力卡的"立即同步"没有 busy 门禁，`launchRemote` 也无重入保护：连点即并发全量同步
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenEyeCareInsights.kt:622-633（按钮）；app/src/main/java/com/projectlumen/app/app/ProjectLumenRemoteFea…`
+      - 详情：[G08-ui-home-insights.md:44](G08-ui-home-insights.md)
+- [x] **G08-04** · E 韧性 / A 架构 · `startClock` 是无退出条件的 1Hz 循环：空闲时也每秒一次 Room+DataStore 读，并让整棵 UI 每秒重组
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenRuntimeFeatureEntry.kt:35-44（startClock）、:201-210（advanceDuePhases）；启动点 ProjectLumenViewModel.k…`
+      - 详情：[G08-ui-home-insights.md:61](G08-ui-home-insights.md)
+- [x] **G08-05** · D 生命周期与框架约束 · 选图目标 id 用 `remember` 而非 `rememberSaveable`：选图期间旋转/进程重建后所选图片被静默丢弃
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenTemplateScreens.kt:209-217`
+      - 详情：[G08-ui-home-insights.md:84](G08-ui-home-insights.md)
+- [x] **G09-01** · C 资源 · `LumenToast.showOverlay` 不摘除已挂在 Activity 上的前台 toast，视图永久滞留在界面顶部
+      - 位置：`app/src/main/java/com/projectlumen/app/core/toast/LumenToast.kt:202-236（第 210-211 行），对照 :174-180`
+      - 详情：[G09-ui-shared-theme.md:9](G09-ui-shared-theme.md)
+- [x] **G09-02** · A 架构 / F 持久化 · `SettingsSection` 复制成两个 ~100 行重载，`forceExpanded` 语义不一致，且折叠状态的持久化 key 一个随语言变、一个随发版变
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSharedComponents.kt:424-527（String 版）与 :529-626（@StringRes 版）；调用点 ProjectLumenSettingsScreen.kt…`
+      - 详情：[G09-ui-shared-theme.md:30](G09-ui-shared-theme.md)
+- [x] **G09-03** · D 生命周期与框架约束（Compose 重组） · 机器生成的 `ImageVector` 每次重组重建整棵路径树（Coder 70 条路径），无 `remember` 缓存
+      - 位置：`app/src/main/java/com/projectlumen/app/ui/svg/drawablevectors/Coder.kt:18（1451 行 / 70 条 path）、VideoSteaming.kt:17（31 条）、VideoFiles.kt:17（24 条）、Downloa…`
+      - 详情：[G09-ui-shared-theme.md:52](G09-ui-shared-theme.md)
+- [x] **G09-04** · D 生命周期与框架约束（Compose 重组） · 引导页把 60fps 无限动画的值读在顶层 composable，导致整屏每帧重组
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenOnboardingScreen.kt:77-85（读值）、:136-141（透传）、:218-225（真正使用处）`
+      - 详情：[G09-ui-shared-theme.md:78](G09-ui-shared-theme.md)
+- [x] **G09-05** · A 架构（真相源）/ G 安全合规 · 开源声明手写维护，已漏掉随 APK 分发的 JetBrains Mono 字体（OFL-1.1 要求随件附带许可）与 `crooot-sdk`
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenOpenSourceNoticeScreen.kt:302-410（rememberProjectLumenCredits() 手写 15 条）；对照 app/build.gradle.kt…`
+      - 详情：[G09-ui-shared-theme.md:94](G09-ui-shared-theme.md)
+- [ ] **G09-06** · D 生命周期与框架约束 · `LocaleController` 双机制并存：Android 13+ 系统"应用语言"设置会被应用自己存的值覆盖回去
+      - 处置：跳过：删 `LocaleController.wrap()`（`core/i18n`）并改 `ProjectLumenApp.kt:168-273` 组装/状态组文件。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/i18n/LocaleController.kt:15-31；调用点 ProjectLumenApp.kt:168-170（wrap）与 :279-281（apply）；AndroidManifest.xml:5…`
+      - 详情：[G09-ui-shared-theme.md:108](G09-ui-shared-theme.md)
+- [ ] **G10-06** · G 安全 · `settings.gradle.kts` 声明了明文 HTTP 且硬编码凭据的第三方 Maven 仓库，且无 group 限定
+      - 处置：跳过：本机 `GRADLE_USER_HOME` 只有 wrapper/，无法确认 `crooot-sdk` 是否有传递依赖只在 ITGSA nexus 上；删仓库块可能让依赖解析整体失败。
+      - 位置：`settings.gradle.kts:33-40`
+      - 详情：[G10-build-ci-tests.md:152](G10-build-ci-tests.md)
+- [x] **G10-07** · G 安全 · `dependabot-maintenance.yml` 把 USER_PAT 持久化进工作区、用可变分支 ref 的第三方 action、并自动 `git push origin main`
+      - 处置：部分修（加固而非删除）：`dependabot-maintenance.yml` 加 `persist-credentials: false`、删掉无 Cargo.toml 却带写权限的 Rust toolchain 步、`git add -A` → `git add -u`、push 改走一次性 x-access-token URL。`Setup pnpm` 保留（修复脚本硬依赖）。
+      - 位置：`.github/workflows/dependabot-maintenance.yml:36-37、:55、:59-60、:73、:80、:94、:108-109、:264`
+      - 详情：[G10-build-ci-tests.md:173](G10-build-ci-tests.md)
+- [x] **G10-08** · G 安全 / A 架构与设计 · mapping 文件既被重定向出标准位置、也从未上传，线上混淆崩溃无法还原
+      - 位置：`app/proguard-rules.pro:121；.github/workflows/build.yml:452-462（上传清单）、:370-375（release artifact）、.github/workflows/release.yml:95-105、:287-292`
+      - 详情：[G10-build-ci-tests.md:197](G10-build-ci-tests.md)
+- [x] **G10-09** · G 安全 · `release.yml` 不回填 release 证书 SHA-256，正式 tag 包的完整性门禁被静默关闭
+      - 位置：`.github/workflows/release.yml:181，对照 .github/workflows/build.yml:141-145 与 :200；消费点 app/build.gradle.kts:154`
+      - 详情：[G10-build-ci-tests.md:220](G10-build-ci-tests.md)
+- [x] **G10-10** · G 安全 / A 架构与设计 · `lumen-ui-tuner.yml` 在带 USER_PAT 的工作区里执行 `npm install`，并把重新生成的 lockfile 提交推回分支
+      - 位置：`.github/workflows/lumen-ui-tuner.yml:53-56（checkout 带 PAT）、:62-66（npm install）、:68-88（提交并推 lockfile）`
+      - 详情：[G10-build-ci-tests.md:241](G10-build-ci-tests.md)
+- [ ] **G10-11** · G 安全 · Manifest 完全没有 `<queries>`，改用 `QUERY_ALL_PACKAGES` 兜住包可见性
+      - 处置：跳过：`app/src/main/**`（Manifest）非 build 组；`QUERY_ALL_PACKAGES` 兜包可见性是功能有效的取舍。
+      - 位置：`app/src/main/AndroidManifest.xml:35-37（QUERY_ALL_PACKAGES），全文**无 <queries> 元素**`
+      - 详情：[G10-build-ci-tests.md:265](G10-build-ci-tests.md)
+- [x] **G10-12** · A 架构与设计 / E 韧性 · 原生工具链步骤在 3 个工作流里被注释掉，CI 预装的 NDK 版本与 `gradle.properties` 钉的版本不一致；16 KB 对齐校验也被注释
+      - 位置：`.github/workflows/build.yml:55-56、release.yml:52-53、codeql.yml:78-80、lumen-ui-tuner.yml:104-105（四处被注释的 composite action 调用）；build.yml:41+:45、release.y…`
+      - 详情：[G10-build-ci-tests.md:290](G10-build-ci-tests.md)
+- [x] **G11-01** · E 韧性 · 崩溃当次的上报几乎必然失败，而"下次启动补传"只有 UI 宿主才会触发；纯 core 宿主一份都传不出去
+      - 处置：已修：新增 submitInstallFollowUp，install 后异步补传遗留报告，纯 core 宿主也能传出一份。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/LumenCrash.kt:293-301、:315-349、:217-223、:168-178、:50-64；lumen-crash-core/README.md:121-153（Wa…`
+      - 详情：[G11-lumen-crash-sdk.md:11](G11-lumen-crash-sdk.md)
+- [x] **G11-02** · D 生命周期（主线程阻塞） · `install()` 在 `Application.onCreate` 主线程上做 binder 调用 + 最多 9 次文件 IO，每次冷启动都被拖慢
+      - 处置：已修：binder 调用+外部存储 IO+前次退出报告 flush 移入 submitInstallFollowUp 异步执行，install() 主线程不再拖慢冷启动。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/LumenCrash.kt:50-64、:259-268；lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/PriorEx…`
+      - 详情：[G11-lumen-crash-sdk.md:27](G11-lumen-crash-sdk.md)
+- [x] **G11-03** · A 架构 / F 持久化 · 可恢复的 `FREEZE` 报告与真实崩溃共用唯一槽位：既覆盖未展示的真实崩溃，又用崩溃页拦住下一次启动和一次旋转
+      - 处置：已修：recordWatchdogReport 对 FREEZE 或已存在真实崩溃时不再覆盖唯一槽位（saveReport 加门禁）。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/LumenCrash.kt:241-257（recordWatchdogReport → saveReport）、:270-288（saveReport 无条件 startupCrash…`
+      - 详情：[G11-lumen-crash-sdk.md:44](G11-lumen-crash-sdk.md)
+- [x] **G11-04** · D 生命周期 / E 韧性 · `STARTUP_HANG` 仍会误报：watchdog 自己已经在收集 `onActivityResumed`，却没有把它当作"已经画出第一帧"
+      - 处置：已修：LumenCrashWatchdog 在 onActivityResumed 调 markStartupComplete，启动挂起不再误报已画首帧。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/LumenCrashWatchdog.kt:116-132、:179-186、:58-75、:43`
+      - 详情：[G11-lumen-crash-sdk.md:62](G11-lumen-crash-sdk.md)
+- [ ] **G11-05** · G 安全 / 合规 · `lumen-crash-core` 的清单无条件给每个宿主合并 `INTERNET` 权限，并默认把崩溃报告 + 跨重装稳定设备 ID 上报到作者后端
+      - 处置：跳过：manifest 无条件合并 INTERNET 为上传崩溃报告所需（注释即此策略），删除会破坏 core 宿主上报；合规缓解靠配置关闭上传+载荷脱敏，保持现状。
+      - 位置：`lumen-crash-core/src/main/AndroidManifest.xml:4（<uses-permission android:name="android.permission.INTERNET" />）；lumen-crash-core/src/main/java/com/chl…`
+      - 详情：[G11-lumen-crash-sdk.md:77](G11-lumen-crash-sdk.md)
+- [x] **G11-06** · E 韧性 · 上传执行器是无界队列、无客户端限流：服务循环里高频 `recordNonFatal` 会堆积上传任务并冲刷掉面包屑
+      - 处置：已修：上传执行器改 ThreadPoolExecutor(1,1)+ArrayBlockingQueue(32)+DiscardOldestPolicy+allowCoreThreadTimeOut，高频 recordNonFatal 不再无界堆积。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/LumenCrash.kt:293-301（Executors.newSingleThreadExecutor）、:315-349、:139-152；lumen-crash-core/s…`
+      - 详情：[G11-lumen-crash-sdk.md:87](G11-lumen-crash-sdk.md)
+- [x] **G11-07** · D 生命周期（Compose） · `LumenCrashGate` 把 `loadPendingReportSafely()` 写成 Composable 默认参数：每次重组都在主线程读外部存储，且会中途弹出崩溃页
+      - 处置：已修：LumenCrashGate 改 initialReport 默认参数 + remember { loadPendingReportSafely() }，不再每次重组读外部存储。
+      - 位置：`lumen-crash/src/main/java/com/chloemlla/lumen/crash/ui/LumenCrashGate.kt:19、:25-27；调用方 lumen-crash-sample/src/main/java/com/chloemlla/lumen/crash/samp…`
+      - 详情：[G11-lumen-crash-sdk.md:97](G11-lumen-crash-sdk.md)
+- [x] **G11-17** · D 生命周期 / E 韧性 · 崩溃 handler 的 fallback 分支没有被 `runCatching` 包住：OOM 崩溃时报告丢失，且系统 handler 不再执行（Play Console 也看不到）
+      - 处置：已修：崩溃 handler 主体包 runCatching，fallback 分支仍走系统 handler（chained 始终执行），OOM 也不丢平台统计。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/LumenCrash.kt:209-211（handler 内）、:126-127（record() 内同构）`
+      - 详情：[G11-lumen-crash-sdk.md:233](G11-lumen-crash-sdk.md)
+
+---
+
+## P2（109 条）— 可维护性、一致性、潜在隐患
+
+- [x] **G01-15** · A 架构（可测试性） · ViewModel 通过静态 `applicationContext()` 反向依赖 Application，架空了 lambda 注入的设计目的
+      - 处置：已修：ViewModel 不再 import `ProjectLumenApplication`，改为构造参数 `securityEvidence: () -> JSONObject?` 与 `runDeviceSecurityScan: suspend () -> SecurityAssessment`，由 `MainActivity.createProjectLumenViewModel` 绑定。残留：`companion applicationContext()` 全仓库已零调用方但未删（并行改动期删公开静态成员风险大），留待收尾一行删除。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenViewModel.kt:179-183、:203、app/src/main/java/com/projectlumen/app/ProjectLumenApplication.kt:420…`
+      - 详情：[G01-composition-state.md:245](G01-composition-state.md)
+- [ ] **G01-16** · A 架构（分层被击穿） · Compose 层直接强转 Application 取出 apiClient / backendConnectivity 自行组装 UpdateChecker，绕过 ViewModel
+      - 处置：跳过：需新建 `ProjectLumenUpdateFeatureEntry`（`*FeatureEntry` 属别组）。⚠ 谁做这条必须同步改 `app/src/test/.../BackendCommunicationArchitectureTest.kt:63-65`——它断言 `app/ProjectLumenApp.kt` 必须包含 `application.apiClient` 与 `application.backendConnectivity`。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenApp.kt:166-179、:316-320`
+      - 详情：[G01-composition-state.md:261](G01-composition-state.md)
+- [x] **G01-17** · B 并发（主线程阻塞） · 组合期在主线程做磁盘读取（`app.crashReports.load()`）
+      - 位置：`app/src/main/java/com/projectlumen/app/MainActivity.kt:77-79（另见 ProjectLumenApplication.kt:83-93）`
+      - 详情：[G01-composition-state.md:278](G01-composition-state.md)
+- [ ] **G01-18** · A 架构（抽象缺失） · `ProjectLumenUiState` 直接以 Room 实体为字段类型，UI 与数据库 schema 硬绑定
+      - 处置：跳过：`RuntimeSnapshot` 重构横跨多个屏幕文件，报告本身建议单独排一次提交。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenUiState.kt:14-27`
+      - 详情：[G01-composition-state.md:295](G01-composition-state.md)
+- [ ] **G01-19** · A 架构 / B 并发 · `SettingsRepository` / `RuntimeRepository` 被三处各自 new，且 `SettingsRepository.update` 没有任何锁
+      - 处置：部分修：`settingsRepository()` / `runtimeRepository()` 改为返回 `by lazy` 单例，**函数签名不变**，故 `AlarmReceiver` / `BootReceiver` / 各 Worker / `EyeCareTelemetryReporter` 等别组调用点零改动。未完：其余每次 `new` 的仓库构造点。
+      - 位置：`app/src/main/java/com/projectlumen/app/ProjectLumenApplication.kt:355-361、:367-369、app/src/main/java/com/projectlumen/app/core/lifecycle/AppLifecycleC…`
+      - 详情：[G01-composition-state.md:305](G01-composition-state.md)
+- [x] **G01-20** · E 韧性 · 每次进入前台都无条件发一次设备注册请求，无节流无退避
+      - 处置：已修：`registerDeviceAsset` 加进程内节流（成功后 6 小时、失败按 5 分钟重试，窗口在请求前预占以免锁屏亮屏突发叠加），并从 onStart 主协程挪到独立 `scope.launch`。⚠ 6 小时口径若影响后端「活跃设备」统计需用户确认。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/lifecycle/AppLifecycleCoordinator.kt:50、:123-143、:145-166`
+      - 详情：[G01-composition-state.md:315](G01-composition-state.md)
+- [x] **G01-21** · H 编译与结构 · 两个未使用的 import
+      - 处置：已修复：`ProjectLumenApp.kt` 的 `animateContentSize` 与 `ExperimentalMaterial3Api` 两处未用 import 已不在文件内（rg 全文件仅剩 `@file:OptIn(...)` 全限定引用），无需改动。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenApp.kt:10（androidx.compose.animation.animateContentSize）、:50（androidx.compose.material3.Experim…`
+      - 详情：[G01-composition-state.md:325](G01-composition-state.md)
+- [x] **G02-10** · F 持久化 / A 架构 · `proximityCheckIntervalMinutes` 的默认值在三处不一致（迁移 5 / 实体 3 / 偏好 3）
+      - 位置：`app/src/main/java/com/projectlumen/app/core/database/AppDatabase.kt:88（ADD COLUMN proximityCheckIntervalMinutes INTEGER NOT NULL DEFAULT 5）vs app/src/…`
+      - 详情：[G02-data-layer.md:192](G02-data-layer.md)
+- [x] **G02-11** · A 架构 · `EyeCarePreferencesDataStore` 的内存缓存是实例级的，第二个实例会永久返回冻结快照
+      - 位置：`app/src/main/java/com/projectlumen/app/core/preferences/EyeCarePreferencesDataStore.kt:84（private val state by lazy { MutableStateFlow(readFromMmkv())…`
+      - 详情：[G02-data-layer.md:202](G02-data-layer.md)
+- [x] **G02-12** · F 持久化 · 全仓库没有任何 `@Transaction` / `withTransaction`，眼部与番茄统计的双表写入不是原子的
+      - 处置：跳过：`withTransaction` 要求 `StatisticsRepository` 构造参数从两个 DAO 改成持有 `AppDatabase`，波及 6 处构造点（5 处在别组文件）。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/repositories/StatisticsRepository.kt:21-46（applyEyeDelta 与 applyPomodoroDelta 被调用方连续调用，各写一张表）；调用点如 AlarmRe…`
+      - 详情：[G02-data-layer.md:214](G02-data-layer.md)
+- [x] **G02-13** · A 架构 / B 并发 · 统计表的 `observeAll` / `getAll` 无 `LIMIT`，整表随每个 tick 重新查询并整表重建对象
+      - 处置：跳过（有阻塞点）：`ProjectLumenSharingFeatureEntry.kt` 的 CSV/统计图/月报导出直接吃 UI state 里的 `eyeStats`，加 `LIMIT` 会截断用户导出内容。需 UI 组先改成走 `StatisticsRepository.getAll()`。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/database/daos/DailyEyeStatsDao.kt:11-12、17-18；app/src/main/java/com/projectlumen/app/core/database/daos/Da…`
+      - 详情：[G02-data-layer.md:228](G02-data-layer.md)
+- [x] **G03-10** · F 持久化一致性 · 导入设置时先写 Room 再写 DataStore，进程死在中间会让旧偏好永久覆盖导入结果
+      - 处置：已修复：`SettingsRepository.update` 在进程级 `AppSettingsWriteLock` 内先落 MMKV（读路径权威源）再写 Room，DataBackupService 导入改走 `settingsRepository().update { imported }`，两次写之间被杀不会让陈旧 MMKV 覆盖导入结果。
+      - 位置：`core/services/DataBackupService.kt:283-284`
+      - 详情：[G03-services-alarms.md:160](G03-services-alarms.md)
+- [x] **G03-11** · A 架构 · `showUpdateAvailable` 一次发两条几乎相同的更新通知，且通知 id 用魔法偏移绕过 `NotificationIds`
+      - 处置：已修复：重复的状态通知块删除，`NotificationIds.UPDATE_AVAILABLE`(=3001) 常量 + `NotificationIds.START_BREAK_ACTION/SKIP_BREAK_ACTION` 替代魔法偏移，`FULL_SCREEN_REQUEST_CODE_OFFSET` 常量化。
+      - 位置：`core/services/NotificationService.kt:210-236`
+      - 详情：[G03-services-alarms.md:175](G03-services-alarms.md)
+- [ ] **G03-12** · A 架构 · `NotificationService` 895 行上帝类：把 AlarmManager 调度策略、渠道、内容构建、Toast(UI) 和 Live Update 去重全揽在一起
+      - 处置：跳过（services 组裁定）：`NotificationService` 895 行上帝类拆分属大规模重构，修复窗口内风险/收益不划算；本组只修了其中的具体缺陷点（渠道、Live Update 去重等），结构拆分留待专项。
+      - 位置：`core/services/NotificationService.kt:41-84（渠道）、:86-142（**AlarmManager 调度策略**：syncRuntimeAlarms 按 activeEngine/reminderPhase/安静时段决定排哪些闹钟）、:317-376（show…`
+      - 详情：[G03-services-alarms.md:192](G03-services-alarms.md)
+- [x] **G03-13** · A 架构 · 三个 `NotificationService` 实例并存，Live Update 去重签名状态分裂
+      - 处置：已修复：全仓仅剩 `ProjectLumenApplication.notifications` 单例（by lazy），`AlarmReceiver`/`TimerForegroundService` 均改用它，Live Update 去重签名状态统一到同一实例。
+      - 位置：`core/services/TimerForegroundService.kt:70（notifications = NotificationService(this)）、core/services/AlarmReceiver.kt:30（每次收广播 NotificationService(cont…`
+      - 详情：[G03-services-alarms.md:202](G03-services-alarms.md)
+- [ ] **G03-14** · E 韧性 ⚠需确认 · 所有精确闹钟都用 `setExactAndAllowWhileIdle`，Doze 下相邻闹钟会被节流推迟
+      - 处置：跳过（services 组裁定，⚠需确认）：计时器精度必须用精确闹钟，Doze 节流推迟由 `TimerReconciliationWorker`/`BootReceiver` 的 WorkManager 对账兜底；改成 `setExact` 会牺牲保活精度。若产品侧确认可接受延迟可再议。
+      - 位置：`core/services/NotificationService.kt:405-418`
+      - 详情：[G03-services-alarms.md:212](G03-services-alarms.md)
+- [x] **G03-15** · D 生命周期 · Android 14+ 全屏提醒会被静默降级：从不检查 `canUseFullScreenIntent()`
+      - 处置：已修复：`NotificationService.canUseFullScreenIntents()`（API<34 放行，否则 `NotificationManager.canUseFullScreenIntent()`），`show(..., fullScreen = true)` 先检查再 `setFullScreenIntent`，不再被静默降级。
+      - 位置：`core/services/NotificationService.kt:442-462（show(..., fullScreen = true) → setFullScreenIntent），调用方 :165-175（showReminderDue）、:317-337（showProximityW…`
+      - 详情：[G03-services-alarms.md:230](G03-services-alarms.md)
+- [x] **G03-16** · G 安全 · 备份 JSON 明文包含 `purchaseToken` 与全量健康统计，经系统分享面板交给任意应用
+      - 处置：已修复：`EntitlementEntity.toJson()` 不再写出 `purchaseToken` 与 `rawPayloadJson`（分享面板任意应用可见的凭证泄漏关闭，权益由服务端重新校验）；健康统计是备份本体，保留。
+      - 位置：`core/services/DataBackupService.kt:532-542（EntitlementEntity.toJson 写出 purchaseToken）、:40-51（shareBackup 明文落缓存并 ACTION_SEND）`
+      - 详情：[G03-services-alarms.md:240](G03-services-alarms.md)
+- [x] **G04B-14** · C 资源 / D 生命周期 · 休息悬浮窗每次 `show()` 新增一条倒计时 Handler 链且不清旧链；且窗口可获焦点、无退出途径
+      - 位置：`app/src/main/java/com/projectlumen/app/core/overlay/EyeProtectionOverlayService.kt:70-114、:103-127、:156-168`
+      - 详情：[G04-sensing-overlay-B.md:277](G04-sensing-overlay-B.md)
+- [x] **G04B-15** · E 韧性 / B 并发 · 调试面板服务在设置关闭后仍每 750ms 空转；`runCatching` 吞掉 `CancellationException`
+      - 位置：`app/src/main/java/com/projectlumen/app/core/debug/DeveloperDebugOverlayService.kt:155-176；app/src/main/java/com/projectlumen/app/core/proximity/Proxim…`
+      - 详情：[G04-sensing-overlay-B.md:297](G04-sensing-overlay-B.md)
+- [x] **G04B-16** · D 生命周期 / A 架构 · `ProximityEventReceiver` 静态注册 `ACTION_CONFIGURATION_CHANGED` 是死代码；解锁事件用 `REPLACE` 重置整条周期链
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityEventReceiver.kt:55-58、:45；ProximityDetectionWorker.kt:53-63、:76-78`
+      - 详情：[G04-sensing-overlay-B.md:320](G04-sensing-overlay-B.md)
+- [x] **G04B-17** · B 并发 / D 生命周期 · `recordServiceStop` 在 `onDestroy` 里新建游离 `CoroutineScope(Dispatchers.IO)`，写入可能永不发生
+      - 位置：`app/src/main/java/com/projectlumen/app/core/debug/DeveloperDebugOverlayService.kt:301-310、:88、:94`
+      - 详情：[G04-sensing-overlay-B.md:338](G04-sensing-overlay-B.md)
+- [ ] **G04B-18** · A 架构 · `ProximityTriggerGate` 只在开发者模式下生效，普通用户完全没有静止/防抖门禁；距离判定也无滞回区间
+      - 处置：跳过：给普通用户开启静止/防抖门禁、以及距离判定加滞回区间，都要定新的默认值并改用户可见行为，属产品决策。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityTriggerGate.kt:16-26、:17；ProximityDetectionService.kt:342（isTooClose）`
+      - 详情：[G04-sensing-overlay-B.md:355](G04-sensing-overlay-B.md)
+- [x] **G04-S09** · C 资源 / D 生命周期 · 休息悬浮窗每次 `show()` 新增一条倒计时 Handler 链且不清旧链；且窗口可获焦点、无退出途径
+      - 位置：`app/src/main/java/com/projectlumen/app/core/overlay/EyeProtectionOverlayService.kt:70-114、:103-127、:156-168`
+      - 详情：[G04-sensing-overlay-supplement.md:168](G04-sensing-overlay-supplement.md)
+- [x] **G04-S10** · E 韧性 / B 并发 · 调试面板服务在设置关闭后仍每 750ms 空转；`runCatching` 吞掉 `CancellationException`
+      - 位置：`app/src/main/java/com/projectlumen/app/core/debug/DeveloperDebugOverlayService.kt:155-176；app/src/main/java/com/projectlumen/app/core/proximity/Proxim…`
+      - 详情：[G04-sensing-overlay-supplement.md:188](G04-sensing-overlay-supplement.md)
+- [x] **G04-S11** · C 资源 · `captureSurfacePipelineFrame` 的 `finally` 是空实现（与主报告 G04-02 部分重叠，此处补具体修法）
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityCameraSampler.kt:394-396（对比 preview 版 :265-268）`
+      - 详情：[G04-sensing-overlay-supplement.md:211](G04-sensing-overlay-supplement.md)
+- [x] **G04-08** · D 生命周期 / E 韧性 · `ProximityEventReceiver` 在 manifest 里监听 `CONFIGURATION_CHANGED`，该广播静态注册收不到
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityEventReceiver.kt:55-58、清单侧 app/src/main/AndroidManifest.xml:139-145`
+      - 详情：[G04-sensing-overlay.md:181](G04-sensing-overlay.md)
+- [x] **G04-09** · B 并发 ⚠需确认 · 事件触发的 60 秒节流是非原子的 MMKV read-modify-write
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityEventReceiver.kt:66-74`
+      - 详情：[G04-sensing-overlay.md:198](G04-sensing-overlay.md)
+- [x] **G04-10** · D 生命周期 / B 并发 · `ProximityTriggerGate` 的 650 ms 定时回调在取消时未撤销，且传感器回调压在主线程
+      - 位置：`app/src/main/java/com/projectlumen/app/core/proximity/ProximityTriggerGate.kt:66-75`
+      - 详情：[G04-sensing-overlay.md:214](G04-sensing-overlay.md)
+- [x] **G04-15** · D 生命周期 / A 架构 · 全屏遮罩最长 300 秒不可关闭、无逃生出口，且同一轮检测可被连续两次 `show` 覆盖
+      - 处置：部分修：同一轮检测的连续两次 `show` 已在服务侧合并去重（更新文案 + 截止时间取 `max`），不再互相覆盖。①「加强制退出入口 + 单次时长上限」不做：既改用户可见交互又要拍默认值（报告建议 300 s），属产品/UX 决策，需用户定。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/overlay/EyeProtectionOverlayService.kt:57、:81-114、:116-127；触发侧 app/src/main/java/com/projectlumen/app/core…`
+      - 详情：[G04-sensing-overlay.md:323](G04-sensing-overlay.md)
+- [x] **G04-17** · E 韧性 / B 并发 / D 生命周期 · 开发者调试悬浮层的双轮询（750 ms 拉设置 + 1 s 写状态）常驻运行，且 `addView` 同样无异常保护
+      - 处置：部分修：轮询间隔 750 ms → 2 s，设置关闭时服务自停，`addView` 已加异常保护。①「改为订阅 settings Flow 取代轮询」不做：要重构服务生命周期与订阅取消语义，超出最小可评审改动，且报告未给出可观测的真实故障场景。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/debug/DeveloperDebugOverlayService.kt:155-176（750 ms 轮询）、:128-139（1 s 写状态）、:204（裸 addView）、:49-53 与 :246-2…`
+      - 详情：[G04-sensing-overlay.md:360](G04-sensing-overlay.md)
+- [x] **G04-18** · B 并发（主线程阻塞） · `MemoryHealthMonitor.sample` 是重量级同步调用（`Debug.getMemoryInfo` 遍历 smaps），却被主线程的悬浮层轮询链每 5 秒调用一次
+      - 处置：本条目已修：悬浮层侧由 overlay 组完成（`show()` 返回 Boolean），Application 侧由 composition 组完成——`onTrimMemory` 里 `MemoryHealthMonitor.recordTrim` 在 `applicationScope` 内、`sample` 在 `startBackgroundStartupWork()` 内，不再阻塞主线程。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/debug/MemoryHealthMonitor.kt:40-45；调用点 DeveloperDebugOverlayService.kt:321-326、:157、:81、:121；ProjectLumenApplication.kt:149、:175`
+      - 详情：[G04-sensing-overlay.md:389](G04-sensing-overlay.md)
+- [x] **G04-19** · E 韧性 / A 架构 · 洞察的聚合回退路径把跨天的 `INTERVAL_DAILY` 桶重复相加，「高日曝光」建议在该路径上几乎必然误报
+      - 位置：`app/src/main/java/com/projectlumen/app/core/insights/AndroidDeviceInsightDataSource.kt:156-187、:52；DeviceInsightAnalyzer.kt:67-121`
+      - 详情：[G04-sensing-overlay.md:409](G04-sensing-overlay.md)
+- [x] **G04-20** · A 架构 / H 编译结构 · 应用分类映射不全：相册/图片类应用永远落到 `OTHER`，`COMMUNICATION` 枚举永不产生
+      - 说明：已补 `CATEGORY_IMAGE → VIDEO`（相册类计入视觉密集）。`COMMUNICATION` 在平台侧没有对应的
+        `ApplicationInfo.CATEGORY_*`，删枚举会破坏 `ProjectLumenDeviceInsightsCard.kt` 的穷尽 `when`（跨组），故保留不动。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/insights/AndroidDeviceInsightDataSource.kt:207-216；DeviceInsightModels.kt:17-27；DeviceInsightAnalyzer.kt:203-208`
+      - 详情：[G04-sensing-overlay.md:428](G04-sensing-overlay.md)
+- [x] **G05-09** · E 韧性 · 遥测上报失败后没有退避，失败时每个采样 tick 都会重试
+      - 处置：已修：遥测上报失败按 `BackendRetryPolicy.delayMillis` 退避（`uploadBlockedUntil` 防每个采样 tick 重试）。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/telemetry/EyeCareTelemetryReporter.kt:129、:177-178、:189、:211-212`
+      - 详情：[G05-network-telemetry.md:161](G05-network-telemetry.md)
+- [x] **G05-10** · E 韧性 / B 并发 · `runCatching` 吞掉 `CancellationException`，破坏结构化并发
+      - 处置：已修：`runCatching` 捕获后对 `CancellationException` 显式 rethrow（遥测上报与更新检查）。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/telemetry/EyeCareTelemetryReporter.kt:86-93、:101-107、:114-117；app/src/main/java/com/projectlumen/app/core/…`
+      - 详情：[G05-network-telemetry.md:171](G05-network-telemetry.md)
+- [x] **G05-11** · E 韧性 · 响应体没有大小上限，且诊断预览会把整个 body 再完整解析一遍
+      - 处置：已修：`UpdateChecker.readBoundedText(MAX_RELEASE_PAYLOAD_BYTES=1MB)`；`ProjectLumenApiClient`/`ProjectLumenTranslationApiClient` 的 `readResponseText` 先 `contentLength()`/`source().request(上限+1)` 再 `string()`，超过上限即抛 `IOException`（主客户端 8MB、翻译 1MB），响应不再整段读进内存。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/api/ProjectLumenApiClient.kt:399-401（response.body?.string()）、core/api/ProjectLumenTranslationApiClient.kt…`
+      - 详情：[G05-network-telemetry.md:195](G05-network-telemetry.md)
+- [x] **G05-12** · A 架构与设计 · `UpdateChecker.checkForUpdate` 是 `suspend` 却在内部做阻塞 IO，靠调用点自己记得切线程
+      - 处置：已修：`UpdateChecker.checkForUpdate` 内部 `withContext(Dispatchers.IO)`，调用点不再依赖自己记得切线程。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/update/UpdateChecker.kt:30-59（checkForUpdate）、:84-119（fetchLatestGitHubRelease，非 suspend 的阻塞函数）、:239-258（f…`
+      - 详情：[G05-network-telemetry.md:215](G05-network-telemetry.md)
+- [x] **G05-13** · C 资源管理 / E 韧性 · APK 下载：进度回调每 8 KB 触发一次；中断留下半个文件；安装后不清理缓存
+      - 处置：已修：APK 下载进度回调节流、`ensureActive()` 检查、中断删除半成品、安装后清理缓存、`MAX_APK_BYTES=512MB` 上限。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/update/UpdateInstaller.kt:42-59（下载循环）、:29（targetFile）；消费侧 app/app/ProjectLumenApp.kt:258-265`
+      - 详情：[G05-network-telemetry.md:225](G05-network-telemetry.md)
+- [x] **G05-14** · G 安全 / E 韧性 · 非法证书 pin 会让 `apiClient` 每次访问都抛异常（`normalize` 无条件拼前缀）
+      - 处置：已修：`CertificatePinPolicy.normalize` 对不匹配 `SHA256_PIN_REGEX` 的 pin 返回 null 并 `mapNotNull` 过滤，非法 pin 不再令 `apiClient` 每次访问抛异常。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/api/CertificatePinPolicy.kt:12-15；触发点 core/api/SecureOkHttpFactory.kt:36-42；构造点 app/ProjectLumenApplicatio…`
+      - 详情：[G05-network-telemetry.md:244](G05-network-telemetry.md)
+- [x] **G05-15** · B 并发 · `BackendConnectivityController.retryJob` 跨线程读写且无 `@Volatile`/锁
+      - 处置：已修：`BackendConnectivityController.retryJob` 补 `@Volatile`。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/api/BackendConnectivityController.kt:34（声明）、:56-66（onForeground/onBackground，主线程）、:134-135、:164、:168-175（探…`
+      - 详情：[G05-network-telemetry.md:263](G05-network-telemetry.md)
+- [ ] **G05-16** · A 架构与设计 · `ProjectLumenApiClient` 已是覆盖 11 个能力域的上帝类，`SilentVisionPolicy`/`LifecycleLockPolicy` 解析三份复制
+      - 处置：部分修：`SilentVisionPolicy`/`LifecycleLockPolicy` 三份解析复制已合并为共享 `toSilentVisionPolicy()/toLifecycleLockPolicy()`；`ProjectLumenApiClient` 覆盖 11 能力域的上帝类拆分属大规模重构，修复窗口内风险/收益不划算，拆分留专项（本期不做）。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/api/ProjectLumenApiClient.kt:30-304（23 个端点方法）；core/api/ProjectLumenDeviceControlJson.kt:9-20 / :57-70 / :1…`
+      - 详情：[G05-network-telemetry.md:273](G05-network-telemetry.md)
+- [x] **G05-17** · A 架构与设计 · `ProjectLumenTranslationApiClient` 的 `context` 参数从未使用，却强迫调用方持有 `Context`
+      - 处置：已修：`ProjectLumenTranslationApiClient` 移除从未使用的 `context: Context` 构造参数，调用方 `ProjectLumenTranslationScreen` 不再强制持有 Context。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/api/ProjectLumenTranslationApiClient.kt:31`
+      - 详情：[G05-network-telemetry.md:285](G05-network-telemetry.md)
+- [x] **G05-18** · H 编译与结构 · `UpdateChecker` 里有死代码：未使用的 `queryEncode` 与未使用的 `JSONArray` import
+      - 处置：已修：`UpdateChecker` 未使用的 `queryEncode`/`URLEncoder`/`JSONArray` import 删除。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/update/UpdateChecker.kt:199-201（queryEncode 无任何调用方）、:14（import org.json.JSONArray，文件里只用到 optJSONArray 的推断类…`
+      - 详情：[G05-network-telemetry.md:295](G05-network-telemetry.md)
+- [x] **G06-13** · G 安全（误杀） ⚠需确认 · release 证书指纹比较不做归一化，配错格式（冒号/小写）或启用 Play App Signing 会让全量用户冷启动被拦
+      - 位置：`app/src/main/cpp/lumen_security.cpp:248-253；app/src/main/java/com/projectlumen/app/core/security/AppIntegrityGuard.kt:122-147（产出**大写**无分隔 hex）、app/bui…`
+      - 详情：[G06-security-privileged-openapi.md:255](G06-security-privileged-openapi.md)
+- [x] **G06-14** · G 安全（判据无效） · `is_traced_via_ptrace()` 的 TRACEME 用法写反，永远返回 false，但每次调用都 `fork()`
+      - 位置：`app/src/main/cpp/lumen_security.cpp:208-228，消费点 :274-285`
+      - 详情：[G06-security-privileged-openapi.md:272](G06-security-privileged-openapi.md)
+- [x] **G06-15** · G 安全 ⚠需确认 · MMKV 加密密钥实际只有前 16 字符生效，有效熵约 52 bit（另一半 UUID 完全被丢弃）
+      - 位置：`app/src/main/java/com/projectlumen/app/core/security/SecureCredentialStore.kt:51-53、:258-271；core/mmkv/ProjectLumenMmkv.kt:35-38`
+      - 详情：[G06-security-privileged-openapi.md:290](G06-security-privileged-openapi.md)
+- [x] **G06-16** · G 安全 · `sourceApp` 归因可被调用方用 Intent extra 伪造，且导出 Activity 可被反复驱动触发强制遥测上传
+      - 位置：`app/src/main/java/com/projectlumen/app/openapi/LumenOpenContracts.kt:48-50、:73-83；消费点 MainActivity.kt:152-169（callingPackage 作为 platformCallerPackage）…`
+      - 详情：[G06-security-privileged-openapi.md:300](G06-security-privileged-openapi.md)
+- [x] **G06-17** · C 资源 + G 安全（日志） · 每次设备安全扫描都反射生成最多 120 KB 诊断报告并长期驻留内存 / 打进 logcat
+      - 位置：`app/src/main/java/com/projectlumen/app/core/security/CroootReportFormatter.kt:22-32、:45-59、:91-116；生产者 DeviceSecurityScanner.kt:160（summary = CroootRe…`
+      - 详情：[G06-security-privileged-openapi.md:319](G06-security-privileged-openapi.md)
+- [x] **G06-18** · F 持久化一致性 · `loadCachedPolicy` 写入了 `endpointPrefix` 却从不读回，离线冷启动会静默丢失后端下发的路径前缀
+      - 位置：`app/src/main/java/com/projectlumen/app/core/devicecontrol/PrivilegedDeviceControlCoordinator.kt:430-461（读，无 endpointPrefix）对比 :463-499（写，put("endpoint…`
+      - 详情：[G06-security-privileged-openapi.md:332](G06-security-privileged-openapi.md)
+- [x] **G06-19** · E 韧性 + B 并发 · Shizuku shell 调用没有超时与错误分类，绑定等待用不可取消的 `Object.wait(5s)` 且可能阻塞主线程回调
+      - 位置：`app/src/main/java/com/projectlumen/app/core/shizuku/ShizukuCapabilityManager.kt:510-543（executeShellCommand）、:545-573（shellServiceBinder）、:36-50（onSer…`
+      - 详情：[G06-security-privileged-openapi.md:342](G06-security-privileged-openapi.md)
+- [x] **G06-20** · A 架构（缓存失效路径缺失） · 未注册 Shizuku binder 存活监听，也从不注销权限回调，UI 会长时间显示陈旧的"可用"状态
+      - 位置：`app/src/main/java/com/projectlumen/app/core/shizuku/ShizukuCapabilityManager.kt:51-60`
+      - 详情：[G06-security-privileged-openapi.md:355](G06-security-privileged-openapi.md)
+- [x] **G07-02** · D 生命周期与框架约束 · 用户放弃授权后 `activePermissionSetupTarget` 永不清空，权限行永久停在"引导中"、"全部折叠"对该分区静默失效
+      - 处置：已修：ON_RESUME 后清空放弃授权的 activePermissionSetupTarget，权限行不再永久停在引导态。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsScreen.kt:283-290（scrollToPermissionTarget）、:309-315、:541-567（唯一的自动清空点）、:387（另一条清空路径）、:…`
+      - 详情：[G07-ui-settings-developer.md:33](G07-ui-settings-developer.md)
+- [x] **G07-04** · D 生命周期与框架约束 ⚠需确认 · `pendingBackupImportUri` 用 `remember` 而其配对状态在 ViewModel 里，Activity 重建后备份导入对话框的"确认"变成死键
+      - 处置：已修：pendingBackupImportUri 改 rememberSaveable，Activity 重建后对话框确认键不再失效。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsScreen.kt:272、:465-487`
+      - 详情：[G07-ui-settings-developer.md:118](G07-ui-settings-developer.md)
+- [x] **G07-06** · D 生命周期与框架约束 · 权限收尾 `LaunchedEffect` 的 key 漏了 `settings.shizukuNativeEyeProtectionEnabled`，靠 Shizuku 满足亮度权限时引导不会收尾
+      - 处置：已修：权限收尾 LaunchedEffect key 补 settings.shizukuNativeEyeProtectionEnabled。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsScreen.kt:541-567（key 列表）对照 :291-308（isPermissionTargetConfigured，第 303-304 行的 BRIGHTNE…`
+      - 详情：[G07-ui-settings-developer.md:152](G07-ui-settings-developer.md)
+- [x] **G07-07** · B 并发与线程安全 ⚠需确认 · `updateSettings` 的"改动前基线"是独立的一次读取，并发写设置时会漏掉距离监测重排与 Shizuku 护眼重下发
+      - 处置：已修：updateSettings 改动前基线改在 update lambda 内捕获，消除并发读窗口。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsFeatureEntry.kt:43-74（尤其 :48-49、:70）`
+      - 详情：[G07-ui-settings-developer.md:174](G07-ui-settings-developer.md)
+- [ ] **G07-09** · A 架构与设计（同一事实多个真相源） · 隐私中心把同一批权限渲染了两遍（磁贴网格 + 长条列表），两套定义各写一份；`shizukuNativeBrightness` 判定有三份副本
+      - 处置：部分修：shizukuNativeBrightness 判定三份副本收拢为 usesShizukuNativeBrightness 单一来源；磁贴+长条双渲染保留（BackendFeatureVisibilityTest 断言依赖），留专项。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsPrivacyCenter.kt:104-112（磁贴）与 :113-262（长条列表）；app/src/main/java/com/projectlumen/app/app…`
+      - 详情：[G07-ui-settings-developer.md:226](G07-ui-settings-developer.md)
+- [x] **G07-10** · A 架构与设计 · 就绪评分与"待处理项"两套口径不一致：关掉统计/保活/环境光后评分永远到不了 100%，却没有任何一行提示该修什么
+      - 处置：已修：privacyReadinessScore 由 12 项改 9 项与 privacyActionNeededCount 镜像，关闭统计/保活/环境光后可到 100%。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsPrivacyModel.kt:152-172（privacyReadinessScore，12 项）对照 :174-191（privacyActionNeededCount…`
+      - 详情：[G07-ui-settings-developer.md:236](G07-ui-settings-developer.md)
+- [x] **G07-11** · H 编译与结构 · `ProjectLumenSettingsScreen.kt` 与 `ProjectLumenPermissionGates.kt` 的 import 块是整块复制的，其中 307 条未被使用
+      - 处置：已修：SettingsScreen 与 PermissionGates import 裁剪至实际使用（仅剩 getValue/setValue 委托操作符）。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsScreen.kt:3-200（198 条 import，125 条未使用）；app/src/main/java/com/projectlumen/app/app/Proje…`
+      - 详情：[G07-ui-settings-developer.md:246](G07-ui-settings-developer.md)
+- [x] **G07-12** · D 生命周期与框架约束（组合期做 IO/系统查询） · 开发者面板在 composition 期每秒做一次 `PowerManager` binder 查询，并对 ~40 个诊断行重跑字符串折行
+      - 处置：已修：isIgnoringBatteryOptimizations 包 remember(permissionRequirements)，折行按值 remember；电池优化入口失败回退 openAppDetailsSettings。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenDeveloperDebugScreen.kt:200-208（isIgnoringBatteryOptimizations(context) 直接出现在 DeveloperMetricRo…`
+      - 详情：[G07-ui-settings-developer.md:256](G07-ui-settings-developer.md)
+- [x] **G07-13** · A 架构与设计（重复实现） · Shizuku 状态文案与系统守卫文案在本组内各有两份完全重复的实现
+      - 处置：已修：Shizuku 状态/守卫文案三副本收拢为 ProjectLumenShizukuStatusLabels.kt 单一来源。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenDeveloperShizukuNetworkControls.kt:219-227（developerShizukuStatusLabel）对照 app/src/main/java/com…`
+      - 详情：[G07-ui-settings-developer.md:276](G07-ui-settings-developer.md)
+- [x] **G07-14** · E 韧性 · 网络管控记录卡固定 `take(12)`，同时生效的限制超过 12 条时多出来的在 UI 上无法恢复；限制按钮也没有二次确认
+      - 处置：已修：搜索过滤同时作用于记录与 app；生效中限制不再截断；限制按钮加 AlertDialog 二次确认。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenDeveloperShizukuNetworkControls.kt:88-91、:275-276（MAX_NETWORK_RECORD_CARDS = 12）、:140-150（无确认的限…`
+      - 详情：[G07-ui-settings-developer.md:285](G07-ui-settings-developer.md)
+- [x] **G07-15** · B 并发与线程安全 · `restrictApp` 的"已限制"守卫在提权 shell 调用之前，双击可并发下发两次限制
+      - 处置：已修：restrictApp 加 per-package Mutex 防双击重入，nowMillis 移到 shell 调用后。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenAppNetworkControlFeatureEntry.kt:28-36`
+      - 详情：[G07-ui-settings-developer.md:303](G07-ui-settings-developer.md)
+- [x] **G07-16** · D 生命周期与框架约束（框架契约用错） · 7 组 `NumberSlider` 的 `steps` 算错，导致 20% / 25% / 20 秒这类整数档位选不到
+      - 处置：已修：7 组 NumberSlider steps 修正（5 音量 20→19、overlay_rest_duration 23→22、overlay_strict_distance 26→25），整数档位可选。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsScreen.kt:1157、:1160、:1163、:1166、:1169（5 个音量滑杆）、:1109（overlay_rest_duration）、:1112（over…`
+      - 详情：[G07-ui-settings-developer.md:325](G07-ui-settings-developer.md)
+- [x] **G07-17** · H 编译与结构 · `ProjectLumenSettingsFeatureEntry` 注入了从未使用的 `NotificationService`
+      - 处置：已修：删除 ProjectLumenSettingsFeatureEntry 未使用的 NotificationService 注入及构造点调用。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsFeatureEntry.kt:22（private val notifications: NotificationService）；构造点 ProjectLumenView…`
+      - 详情：[G07-ui-settings-developer.md:338](G07-ui-settings-developer.md)
+- [x] **G07-18** · A 架构与设计 · 委托网络守卫的状态靠错误字符串前缀匹配推断，无关错误会被误报成"ROM 不支持"
+      - 处置：已修：DelegatedNetworkGuardDisplayStatus 新增 FAILED，未知错误不再误归 UNSUPPORTED；面板 when 补分支+EN/ZH 文案。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenAppNetworkControlState.kt:18-26`
+      - 详情：[G07-ui-settings-developer.md:348](G07-ui-settings-developer.md)
+- [x] **G07-19** · E 韧性（性能） · 滚动锚点在 layout 阶段每帧向 `mutableStateMapOf` 写入，无变更去重
+      - 处置：已修：滚动锚点用 intArray 持有者做变更去重，layout 阶段不再读写 snapshot 状态。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSettingsAnchors.kt:44-58`
+      - 详情：[G07-ui-settings-developer.md:366](G07-ui-settings-developer.md)
+- [x] **G08-06** · A 架构与设计 · 同一套 14 天洞察聚合被复制三份，阈值已经漂移：同一页两张卡对同一数据给出矛盾结论
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenEyeCareInsights.kt:782-900（eyeCareInsightSummary，权威版）、:693-765（applyPersonalizedEyeCareGuidance…`
+      - 详情：[G08-ui-home-insights.md:102](G08-ui-home-insights.md)
+- [x] **G08-07** · E 韧性（数据展示正确性） · 配置分公式可以在"还有待办权限"时算到 100%，同一张卡自相矛盾
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenEyeCareInsights.kt:849-850（公式）；展示处 :209-217（首页洞察卡把配置分和"还有 N 项待完成"并排放）、:456-464（另一张卡的进度条）`
+      - 详情：[G08-ui-home-insights.md:120](G08-ui-home-insights.md)
+- [ ] **G08-08** · A 架构 / H 结构 · 权限透明度卡与系统背景选择器从未被组合：整块隐私说明 UI 出厂即不可达
+      - 处置：部分修：EyeCareSetupAndPrivacyCard 已接入 ProjectLumenSettingsScreen 隐私区块（透明度卡+7 条权限说明可达）；SystemBackgroundPicker 接线需改 TemplateScreens seed / 删除需改 TemplatesFeatureEntry+ViewModel（跨组），留专项。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenEyeCareInsights.kt:435-511（EyeCareSetupAndPrivacyCard，77 行）；app/src/main/java/com/projectlumen/…`
+      - 详情：[G08-ui-home-insights.md:134](G08-ui-home-insights.md)
+- [x] **G08-09** · E 韧性 · 备份导入/预览失败无任何用户反馈，异常被崩溃处理器静默吃掉
+      - 处置：部分修：状态层完成——`previewBackupImport`/`importBackup` 改 `runCatching` 写入新 `_importError` state，`failImport` 给可读文案，`CancellationException` 显式 rethrow。未做：UI 面（ViewModel 暴露 + Settings 屏展示）已路由给 fix-ui-settings。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenBackupFeatureEntry.kt:29-50`
+      - 详情：[G08-ui-home-insights.md:144](G08-ui-home-insights.md)
+- [x] **G08-10** · E 韧性 · 首页/设置页的"导出报告"按钮恒可点，但统计关闭时静默什么都不做；无数据时导出空报告
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSharingFeatureEntry.kt:21-25（静默 return）；恒可点的入口 app/src/main/java/com/projectlumen/app/app/Proje…`
+      - 详情：[G08-ui-home-insights.md:163](G08-ui-home-insights.md)
+- [x] **G08-11** · F 持久化一致性（用户配置丢失） · 一键"应用推荐/家庭档案/个性化指导"直接覆写 20-30 项已持久化设置，无确认无撤销
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenEyeCareInsights.kt:649-691（applyFamilyEyeCareMode，覆写 30 个字段 + 4 项目标）、:693-765（applyPersonalized…`
+      - 详情：[G08-ui-home-insights.md:181](G08-ui-home-insights.md)
+- [x] **G08-12** · A 架构 / G 安全（潜在） · `ProjectLumenEntitlementFeatureEntry` 整类不可达（本地自授 PRO，无服务端校验），`SecurityScanUiState` 是无人引用的第二真相源
+      - 处置：部分修：`ProjectLumenSecurityScanState.kt` 已删除（`SecurityScanUiState` 全仓零引用，删前 rg 复核）。未做：`ProjectLumenEntitlementFeatureEntry` 删除需同步改 `ProjectLumenViewModel.kt:163-167、:469`（跨组）且"手动自授 PRO 是否保留"是产品决策，跳过并移交。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenEntitlementFeatureEntry.kt:10-37；app/src/main/java/com/projectlumen/app/app/ProjectLumenSecurit…`
+      - 详情：[G08-ui-home-insights.md:201](G08-ui-home-insights.md)
+- [x] **G08-13** · H 编译与结构 · 5 个文件各带约 150 行复制粘贴的无用 import（WebView / HttpURLConnection / UpdateChecker 等），真实依赖面被淹没
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenStatisticsCards.kt:3-198、ProjectLumenMetricsAndLayout.kt:3-200、ProjectLumenTemplateScreens.kt:3-202、ProjectLumenMainScreens.kt:3-199、ProjectLumenStatsAndTimerCards.kt:3-198`
+      - 详情：[G08-ui-home-insights.md:220](G08-ui-home-insights.md)
+- [x] **G08-14** · E 韧性（i18n 正确性） · `DeviceSecurityScanCard` 一半文案是硬编码英文，与同卡的本地化标签混排
+      - 位置：`app/src/main/java/com/projectlumen/app/app/DeviceSecurityScanCard.kt:74、:83、:90、:101、:113、:124、:130、:136-139、:154-157、:172-175`
+      - 详情：[G08-ui-home-insights.md:235](G08-ui-home-insights.md)
+- [ ] **G09-07** · H 编译与结构 · 6 个文件复制粘贴同一份 ~195 行 import 块，`ProjectLumenAppConstants.kt` 284 行里 195 行是 import
+      - 处置：跳过：6 文件 ~195 行 import 块精简是跨文件机械改写，`app/src/test` 有源码文本断言用例且文件 CRLF，风险/收益不划算。
+      - 位置：`ProjectLumenAppConstants.kt:3-195、ProjectLumenSharedComponents.kt:3-223、ProjectLumenAboutAndDialogs.kt:3-209、ProjectLumenUiFormatters.kt:3-199、Project…`
+      - 详情：[G09-ui-shared-theme.md:125](G09-ui-shared-theme.md)
+- [x] **G09-08** · A 架构 · 模板调色板与自定义主题色在 API 29/30 上被完全忽略（`useDynamicColors` 默认 true，minSdk 29）
+      - 位置：`app/src/main/java/com/projectlumen/app/ui/theme/Theme.kt:86-118`
+      - 详情：[G09-ui-shared-theme.md:135](G09-ui-shared-theme.md)
+- [x] **G09-09** · A 架构（真相源） · `LumenToast` 硬编码 12 个十六进制颜色，与 `ui/theme/Color.kt` 平行维护，且无视动态取色 / 模板调色板
+      - 处置：部分修：`LumenToast` 枚举色改引 `ui/theme/Color.kt` 品牌色（`toArgb()`），不再平行维护第二套十六进制。未做：`accentColor` getter / `richMessage(kind)` 签名改动会牵动 `core/services/NotificationService.kt`（别组）。
+      - 位置：`app/src/main/java/com/projectlumen/app/core/toast/LumenToast.kt:53-73（4 个 kind × 2 个 accent）、:278-284（surface / surfaceSoft / outline / body 共 6 个）、:7…`
+      - 详情：[G09-ui-shared-theme.md:159](G09-ui-shared-theme.md)
+- [x] **G09-10** · C 资源 / D 生命周期 · `UriImagePreview` 在主线程同步解码用户任意图片，且每次重组重复解码
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenSharedComponents.kt:829-845`
+      - 详情：[G09-ui-shared-theme.md:180](G09-ui-shared-theme.md)
+- [x] **G09-11** · A 架构 / D 生命周期 · 设计令牌每进一个屏幕就在组合期解析一次 asset；13 个 topBar 令牌里 8 个从未被消费
+      - 处置：部分修：① `LumenUiTokens.load` 加进程级缓存，一次解析。② 8 个从未被消费的 topBar 令牌：接线改布局或删除需动 `tools/` 设计源，跳过。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenUiTokens.kt:15-23（load）、:96-99（rememberLumenUiTokens）；消费点 ProjectLumenSharedComponents.kt:236（L…`
+      - 详情：[G09-ui-shared-theme.md:199](G09-ui-shared-theme.md)
+- [x] **G09-12** · A 架构（真相源）/ D 重组 · 推荐护眼配置存在两份平行清单（25 字段赋值 + 25 条相等比较），且快照每秒重算
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenRecommendedSetupFeedback.kt:106-134 与 :232-261；目标值同样两份 :136-143 与 :263-271；未缓存的快照 :72-76`
+      - 详情：[G09-ui-shared-theme.md:215](G09-ui-shared-theme.md)
+- [x] **G09-13** · G 安全 · `openUri` 对任意 scheme 发 `ACTION_VIEW`，而 URL 可以来自 GitHub Release 响应
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenWebViewScreen.kt:416-420（openUri）、:203-219（白名单外一律外跳）、:370-377（shouldOverrideUrlLoading 同样外跳）；污点…`
+      - 详情：[G09-ui-shared-theme.md:225](G09-ui-shared-theme.md)
+- [x] **G09-14** · E 韧性 · 更新检查 / 下载对话框完全模态且无取消入口，Release 说明无长度上限
+      - 处置：部分修：①③ Checking 对话框可取消（`onDismissRequest = onDismiss` + 取消按钮）；Release 说明加 `maxLines=12` + ellipsis。② 下载中取消需在 `ProjectLumenApp.kt` 加 `Job` + `onCancelDownload`（别组），跳过。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenAboutAndDialogs.kt:543-553（Checking）、:597-624（Downloading）、:535（Text(release.body)）`
+      - 详情：[G09-ui-shared-theme.md:246](G09-ui-shared-theme.md)
+- [x] **G09-15** · B 并发 / E 韧性 · 首开门禁的可变状态无同步，且三个"完成"入口直接调加密存储不做兜底
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenFirstOpenGateEntry.kt:17-20（三个裸 var）、:36-57（refresh）、:59-70、:83-89、:97-112（三个 complete*）`
+      - 详情：[G09-ui-shared-theme.md:261](G09-ui-shared-theme.md)
+- [ ] **G09-16** · A 架构（真相源） · 隐私同意的真相源就是"引导流程完成时间"，而引导页有一个直接记同意的"跳过"按钮
+      - 处置：跳过：隐私同意真相源改动需 `SecureCredentialStore`/`DeviceInstallProfile`（G06 组）+ 数据迁移。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenOnboardingScreen.kt:112（跳过）、:169-175（完成）；ProjectLumenFirstOpenGateEntry.kt:83-89（completeOnboar…`
+      - 详情：[G09-ui-shared-theme.md:272](G09-ui-shared-theme.md)
+- [x] **G09-17** · A 架构（设计系统一致性） · `LumenTypography` 只定义 9/15 个 M3 文本样式，而未定义的 4 个样式正被用在最显眼的标题上
+      - 位置：`app/src/main/java/com/projectlumen/app/ui/theme/Typography.kt:15-67（缺陷本体）；未定义样式的使用点：headlineLarge → ProjectLumenBuildUpdateNotesScreen.kt:92；headlineS…`
+      - 详情：[G09-ui-shared-theme.md:283](G09-ui-shared-theme.md)
+- [x] **G09-18** · A 架构（真相源） · 法务"应用权限"清单手写维护，与 `AndroidManifest.xml` 已经不一致
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenLegalCenterScreen.kt:329-347（legalPermissions 手写 17 条）；对照 app/src/main/AndroidManifest.xml:16-3…`
+      - 详情：[G09-ui-shared-theme.md:293](G09-ui-shared-theme.md)
+- [x] **G09-19** · E 韧性 / H 结构 · 翻译页：5000 字上限三处硬编码且校验分支不可达；每次进屏新建一个 OkHttpClient
+      - 处置：部分修：②③ 5000 上限收敛为 `TRANSLATION_MAX_INPUT_CHARS` 单常量，删除不可达 `>5000` 校验分支与 `translation_error_text_too_long` 死文案（中英双语言已清）。① OkHttpClient 提升到 Application 需动 `ProjectLumenApplication.kt`（别组），跳过。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenTranslationScreen.kt:79（客户端构造）、:112、:160、:166（三处 5000）`
+      - 详情：[G09-ui-shared-theme.md:305](G09-ui-shared-theme.md)
+- [x] **G09-20** · D 生命周期与框架约束 · `LumenToast` 的静态初始化包含 `Handler(Looper.getMainLooper())` 与 8 次 `Color.parseColor`，纯 JVM 单测一加载即 `ExceptionInInitializerError`
+      - 位置：`app/src/main/java/com/projectlumen/app/core/toast/LumenToast.kt:90（private val mainHandler = Handler(Looper.getMainLooper())）、:51-74（枚举常量里 8 次 Color.p…`
+      - 详情：[G09-ui-shared-theme.md:322](G09-ui-shared-theme.md)
+- [x] **G10-13** · H 编译与结构 / D 生命周期与框架约束 · 3 个单元测试是"源码文本断言"型，会硬性锁死后续重构方式（修复阶段必读）
+      - 位置：`app/src/test/java/com/projectlumen/app/core/api/BackendCommunicationArchitectureTest.kt(92 行)、core/services/ForegroundServiceArchitectureTest.kt(60 行)…`
+      - 详情：[G10-build-ci-tests.md:317](G10-build-ci-tests.md)
+- [ ] **G10-14** · A 架构与设计 · `applicationId` 存在 3 个独立的真相源，改包名会让 CI 在发版前一步挂掉
+      - 处置：跳过：`applicationId` 多真相源收敛涉及 `baselineprofile/**`，改动会威胁 release 必经的 baseline-profile 步。
+      - 位置：`app/build.gradle.kts:13（val projectLumenApplicationId = "com.chloemlla.projectlumen"）、baselineprofile/src/main/java/com/projectlumen/baselineprofile/B…`
+      - 详情：[G10-build-ci-tests.md:353](G10-build-ci-tests.md)
+- [ ] **G10-15** · D 生命周期与框架约束 · `minSdk 29` 下 4 个 `styles.xml` 变体中的 `Theme.ProjectLumen` 永远不会生效
+      - 处置：跳过：`minSdk 29` 下 styles 变体失效属清理项，动 `res/**` 非 build 组。
+      - 位置：`app/src/main/res/values/styles.xml:3-8、values-night/styles.xml:3-9、values-v28/styles.xml（整文件）、values-night-v28/styles.xml（整文件）；对照 app/build.gradle.kts…`
+      - 详情：[G10-build-ci-tests.md:367](G10-build-ci-tests.md)
+- [x] **G10-16** · A 架构与设计 · CodeQL 未覆盖 C/C++，且只扫 `main` 分支，而 `build.yml` 从任意分支发版
+      - 位置：`.github/workflows/codeql.yml:36-40（语言矩阵）、:5-9（分支限定）、:89-94（死分支）、:22（超时）、:102-104（构建步骤）`
+      - 详情：[G10-build-ci-tests.md:380](G10-build-ci-tests.md)
+- [ ] **G10-17** · A 架构与设计 / G 安全 · 仓库里提交了约 14 MB 的陈旧源码归档（`Project-Lumen.zip` / `*.7z`）
+      - 处置：跳过：需 git 写操作（`git rm` 约 14 MB 陈旧归档），协调者提交时处理。
+      - 位置：`仓库根 Project-Lumen.zip（596,686 字节，334 个条目，**已被 git 跟踪**）、Project-Lumen-flutter-2026.6.28.7z（13,893,454 字节，**已被 git 跟踪**）`
+      - 详情：[G10-build-ci-tests.md:399](G10-build-ci-tests.md)
+- [ ] **G10-18** · H 编译与结构 · 高风险模块的单测覆盖盲区（并发、时间边界、持久化顺序、请求签名）
+      - 处置：跳过：新增行为测试会引用正被 11 个 agent 重写的生产类，修复窗口结束后再补。
+      - 位置：`app/src/test/（20 个文件，1547 行）`
+      - 详情：[G10-build-ci-tests.md:409](G10-build-ci-tests.md)
+- [x] **G10-19** · G 安全 · 打包进 APK 的"更新说明"直接展示整段 commit body，会把内部提交信息带给用户
+      - 位置：`scripts/generate_build_update_notes.py:72（"body": body）、:60-61（取 %b）；调用点 .github/workflows/build.yml:74-83（输出到 app/src/main/assets/build-update-notes.…`
+      - 详情：[G10-build-ci-tests.md:425](G10-build-ci-tests.md)
+- [ ] **G10-20** · D 生命周期与框架约束 ⚠需确认 · `android:intentMatchingFlags="enforceIntentFilter"` 与两个无 intent-filter 的 receiver 可能冲突（需确认）
+      - 处置：跳过：`enforceIntentFilter` 与无 intent-filter receiver 的冲突会改变可见行为，证据不足。
+      - 位置：`app/src/main/AndroidManifest.xml:49；受影响组件 :110-112（AlarmReceiver，无 intent-filter）、:122-124（ReminderActionReceiver，无 intent-filter）`
+      - 详情：[G10-build-ci-tests.md:443](G10-build-ci-tests.md)
+- [x] **G11-08** · A 架构 / E 韧性 · ingest 载荷没有 `schemaVersion` / SDK 版本，且 `REJECTED`（4xx）后本地报告永不清理，每次启动重复 POST 一次
+      - 处置：已修：ingest 载荷补 schemaVersion/sdkVersion（LumenCrashDefaults），REJECTED 后清理本地报告不再重复 POST。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/CrashReportBackendUploader.kt:102-115、:124-136；lumen-crash-core/src/main/java/com/chloemlla/l…`
+      - 详情：[G11-lumen-crash-sdk.md:120](G11-lumen-crash-sdk.md)
+- [ ] **G11-09** · G 安全 · 崩溃报告优先写 app 外部存储：在 SDK 声明支持的 API 26~28 上，任何持 `READ_EXTERNAL_STORAGE` 的应用都能读到
+      - 处置：部分修：load() 不再 mkdirs；save() 仍优先 app 外部存储（getExternalFilesDir），API26-28 上 READ_EXTERNAL_STORAGE 可读风险未彻底消除，留专项。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/CrashReportStore.kt:8-17（类注释即声明此策略）、:64-79、:149-162；lumen-crash-core/build.gradle.kts:32（minS…`
+      - 详情：[G11-lumen-crash-sdk.md:130](G11-lumen-crash-sdk.md)
+- [ ] **G11-10** · A 架构 · `LumenCrashReportScreen.kt` 1497 行，是全仓库最大文件，直接违反"禁止超级文件"硬规
+      - 处置：跳过：LumenCrashReportScreen.kt 1485 行仍是全仓最大文件，拆分需跨文件重构+UI 契约，留专项（与 G05-16 同策略）。
+      - 位置：`lumen-crash/src/main/java/com/chloemlla/lumen/crash/ui/LumenCrashReportScreen.kt:1-1497`
+      - 详情：[G11-lumen-crash-sdk.md:140](G11-lumen-crash-sdk.md)
+- [ ] **G11-11** · H 编译与结构 / A 架构 · consumer ProGuard 规则用整包 `-keep` 关掉了下游对 SDK 的 R8，并往宿主注入全局 `-keepattributes`
+      - 处置：跳过：consumer-rules.pro 仍保留整包 -keep 豁免（安全默认），收窄需真实 R8 验证环境（G11-13 已点出 CI 不跑 sample R8），留专项。
+      - 位置：`lumen-crash-core/consumer-rules.pro（末 3 行 + 第 4 行）、lumen-crash/consumer-rules.pro（同）、lumen-crash/host-proguard-template.pro`
+      - 详情：[G11-lumen-crash-sdk.md:156](G11-lumen-crash-sdk.md)
+- [ ] **G11-12** · A 架构 / H 编译与结构（需确认） · 发布元数据缺陷：Compose 依赖用 `api` 暴露但 BOM 只在 `implementation`，下游可能解析不到版本；`material-icons-extended` 被强推给下游；core 声明了未使用的 `core-ktx`
+      - 处置：跳过：发布元数据（Compose BOM implementation 与 api 暴露、material-icons-extended 强推、core-ktx 未用）为纯发布契约问题，改动需配合下游验证，留专项。
+      - 位置：`lumen-crash/build.gradle.kts:71-85；lumen-crash-core/build.gradle.kts:65-69`
+      - 详情：[G11-lumen-crash-sdk.md:174](G11-lumen-crash-sdk.md)
+- [ ] **G11-13** · H 编译与结构 / D 生命周期 · 关键路径零测试：watchdog 完全不可单测，CI 也从不真正跑 sample 的 R8（`assembleRelease` 缺席）
+      - 处置：部分修：watchdog 判定抽到 WatchdogDecisions 纯函数并新增 WatchdogDecisionsTest 可单测；CI 仍不跑 sample R8（assembleRelease 缺席），后半留专项。
+      - 位置：`7 份测试文件（lumen-crash-core/src/test/java/com/chloemlla/lumen/crash/）；lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/LumenCrashWatchdog.kt:36-3…`
+      - 详情：[G11-lumen-crash-sdk.md:193](G11-lumen-crash-sdk.md)
+- [ ] **G11-14** · A 架构（发布契约） · 发布纪律：推 main 即发版但没有任何 API 兼容性校验，版本号恒为 `0.1.0-<sha>`，破坏性变更会无感落到下游
+      - 处置：跳过：发布纪律（推 main 即发版、sdk.version 恒 0.1.0、无 API 兼容校验）涉及发布流水线与下游 CLens 消费契约，留专项。
+      - 位置：`.github/workflows/lumen-crash-sdk-release.yml:111-123、:141-149、:21-23；lumen-crash/sdk.version（内容始终是 0.1.0）；lumen-crash/README.md:229-233、:456、:1680（要求…`
+      - 详情：[G11-lumen-crash-sdk.md:203](G11-lumen-crash-sdk.md)
+- [x] **G11-15** · G 安全（需确认具体泄露路径） · 脱敏只覆盖本地路径与 URI，UI 的隐私文案却宣称"最近事件细节已脱敏"；paste 分享把整份报告发到第三方公共站点且自动写进剪贴板
+      - 处置：已修：CrashReport/CrashBreadcrumbs 均增加 Bearer token 与 token/key/secret 参数脱敏（两套正则）。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/CrashReport.kt:16-20、:294-301；lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/CrashB…`
+      - 详情：[G11-lumen-crash-sdk.md:213](G11-lumen-crash-sdk.md)
+- [x] **G11-16** · A 架构 / B 并发 · 宿主回调的执行线程没有契约（崩溃线程 / watchdog 线程 / 主线程三种都可能），配置默认值存在两份真相源
+      - 处置：已修：LumenCrashConfig 补线程契约 KDoc，builder 字段统一从单一 LumenCrashConfig 实例初始化，消除两份真相源。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/LumenCrash.kt:276-284（onCrashSaved / onReportSaved / onAnrDetected 的调用点）；LumenCrashConfig.kt:…`
+      - 详情：[G11-lumen-crash-sdk.md:223](G11-lumen-crash-sdk.md)
+- [x] **G11-18** · G 安全（需确认） · 两个上传器都开着 `instanceFollowRedirects = true`：Android 的 `HttpURLConnection` 由 OkHttp 实现，默认会跟随 `https → http` 降级重定向
+      - 处置：已修：两个上传器均 instanceFollowRedirects=false，改手动 HTTPS-only 单跳重定向，拒绝降级 http。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/CrashReportPasteUploader.kt:66、lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/Crash…`
+      - 详情：[G11-lumen-crash-sdk.md:261](G11-lumen-crash-sdk.md)
+- [x] **G11-19** · B 并发 · watchdog 抓取面包屑时会无限期阻塞在 `@Synchronized` 锁上：主线程恰好卡在 `record()` 里时，卡顿报告丢失且 watchdog 永久停摆
+      - 处置：已修：CrashBreadcrumbs 改 ReentrantLock，snapshot() 用 tryLock(50ms) 超时返回 UNAVAILABLE_MARKER，watchdog 不再无限期阻塞。
+      - 位置：`lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/CrashBreadcrumbs.kt:18-32；lumen-crash-core/src/main/java/com/chloemlla/lumen/crash/LumenCrash…`
+      - 详情：[G11-lumen-crash-sdk.md:271](G11-lumen-crash-sdk.md)
+
+---
+
+## 修复纪律
+
+1. 本机**不跑**任何 `gradle` / `gradlew` / 测试 / lint——CI 是唯一裁判
+2. 并行修复的 subagent 分组必须**两两不相交**，每组返回后用 `git diff` 核实真的落盘
+3. `git add` 必须显式列出文件，**禁止 `-A`**（防止把签名材料/凭据暂存进去）
+4. 每次 push 到 `main` 都会触发 `make_latest` 正式发版 + 后端 `force-update`（见 G10-02），所以**先全部改完再一次推送**

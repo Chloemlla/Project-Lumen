@@ -2,6 +2,7 @@ package com.projectlumen.app.ui.svg.drawablevectors
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType.Companion.NonZero
 import androidx.compose.ui.graphics.SolidColor
@@ -15,7 +16,9 @@ import com.projectlumen.app.ui.svg.DynamicColorImageVectors
 
 @Composable
 fun DynamicColorImageVectors.videoFiles(): ImageVector {
-    return Builder(
+    val lumenColorScheme = MaterialTheme.colorScheme
+    return remember(lumenColorScheme) {
+        Builder(
             name = "VideoFiles",
             defaultWidth = 1008.9205.dp,
             defaultHeight = 607.45.dp,
@@ -24,7 +27,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
         )
         .apply {
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -44,7 +47,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -63,7 +66,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -83,7 +86,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -147,7 +150,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -161,7 +164,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 arcToRelative(36.17f, 36.17f, 0.0f, true, true, -72.33f, 0.0f)
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -185,7 +188,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -205,7 +208,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -224,7 +227,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -244,7 +247,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -308,7 +311,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -322,7 +325,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 arcToRelative(36.17f, 36.17f, 0.0f, true, true, -72.33f, 0.0f)
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -346,7 +349,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -366,7 +369,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -385,7 +388,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceVariant),
+                fill = SolidColor(lumenColorScheme.surfaceVariant),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -405,7 +408,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -425,7 +428,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -449,7 +452,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.inversePrimary),
+                fill = SolidColor(lumenColorScheme.inversePrimary),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -469,7 +472,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 close()
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.outline),
+                fill = SolidColor(lumenColorScheme.outline),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -483,7 +486,7 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
                 arcToRelative(36.17f, 36.17f, 0.0f, true, true, -72.33f, 0.0f)
             }
             path(
-                fill = SolidColor(MaterialTheme.colorScheme.surfaceContainer),
+                fill = SolidColor(lumenColorScheme.surfaceContainer),
                 stroke = null,
                 strokeLineWidth = 0.0f,
                 strokeLineCap = Butt,
@@ -508,4 +511,5 @@ fun DynamicColorImageVectors.videoFiles(): ImageVector {
             }
         }
         .build()
+    }
 }

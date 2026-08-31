@@ -12,6 +12,7 @@ import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.overlay.EyeProtectionOverlayService
 import com.projectlumen.app.core.repositories.StatisticsRepository
 import com.projectlumen.app.core.runtime.AudioEvent
+import com.projectlumen.app.core.runtime.EyeStatsDelta
 import com.projectlumen.app.core.runtime.PomodoroEngine
 import com.projectlumen.app.core.runtime.ReminderEngine
 import com.projectlumen.app.core.runtime.RuntimeTransition
@@ -27,11 +28,10 @@ class AlarmReceiver : BroadcastReceiver() {
             val app = context.applicationContext as? ProjectLumenApplication
             runCatching {
                 app ?: return@runCatching
-                val notifications = NotificationService(context.applicationContext)
+                val notifications = app.notifications
                 val settings = app.settingsRepository().getOrDefault()
-                val runtime = app.runtimeRepository().getOrDefault()
                 val nowMillis = System.currentTimeMillis()
-                val reconciledRuntime = reconcileRuntime(app, notifications, settings, runtime, nowMillis)
+                val reconciledRuntime = reconcileNow(app, notifications, settings, nowMillis)
                 val suppressReminder = QuietHours.suppressesReminderNotifications(settings, nowMillis) &&
                     intent.action in REMINDER_ACTIONS
                 notifications.ensureChannels()
@@ -87,49 +87,6 @@ class AlarmReceiver : BroadcastReceiver() {
         }
     }
 
-    private suspend fun reconcileRuntime(
-        app: ProjectLumenApplication,
-        notifications: NotificationService,
-        settings: AppSettingsEntity,
-        runtime: RuntimeStateEntity,
-        nowMillis: Long,
-    ): RuntimeStateEntity {
-        val transition = when (runtime.activeEngine) {
-            ActiveEngine.REMINDER.name -> ReminderEngine().advance(settings, runtime, nowMillis)
-            ActiveEngine.POMODORO.name -> PomodoroEngine().advance(settings, runtime, nowMillis)
-            else -> null
-        } ?: return runtime.also {
-            notifications.syncRuntimeAlarms(settings, it, nowMillis)
-        }
-        val statisticsRepository = StatisticsRepository(
-            app.database.dailyEyeStatsDao(),
-            app.database.dailyPomodoroStatsDao(),
-        )
-        applyTransition(app, statisticsRepository, settings, nowMillis, transition)
-        notifications.syncRuntimeAlarms(settings, transition.nextRuntime, nowMillis)
-        return transition.nextRuntime
-    }
-
-    private suspend fun applyTransition(
-        app: ProjectLumenApplication,
-        statisticsRepository: StatisticsRepository,
-        settings: AppSettingsEntity,
-        nowMillis: Long,
-        transition: RuntimeTransition,
-    ) {
-        statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, transition.eyeStatsDelta)
-        statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, transition.pomodoroStatsDelta)
-        app.runtimeRepository().upsert(transition.nextRuntime)
-        playAudioEvent(app, transition.audioEvent)
-    }
-
-    private fun playAudioEvent(app: ProjectLumenApplication, event: AudioEvent) {
-        when (event) {
-            AudioEvent.None -> Unit
-            is AudioEvent.ReminderTone -> app.audio.playReminderTone(event)
-        }
-    }
-
     companion object {
         const val ACTION_PRE_ALERT = "com.projectlumen.app.action.PRE_ALERT"
         const val ACTION_BREAK_DUE = "com.projectlumen.app.action.BREAK_DUE"
@@ -137,5 +94,67 @@ class AlarmReceiver : BroadcastReceiver() {
         const val ACTION_POMODORO = "com.projectlumen.app.action.POMODORO"
 
         private val REMINDER_ACTIONS = setOf(ACTION_PRE_ALERT, ACTION_BREAK_DUE, ACTION_BREAK_DONE)
+
+        /**
+         * Advances any phase that is already due, persists the transition and re-arms the alarms.
+         * Recovery callers (boot, reconciliation worker) pass [capStatsDelta] so a phase that
+         * expired while the process was dead cannot bill hours of wall-clock time as work.
+         */
+        suspend fun reconcileNow(
+            app: ProjectLumenApplication,
+            notifications: NotificationService,
+            settings: AppSettingsEntity,
+            nowMillis: Long,
+            capStatsDelta: Boolean = false,
+        ): RuntimeStateEntity = RuntimeAdvanceGate.withAdvanceLock {
+            // The engine runs inside the repository lock: a snapshot computed outside it would
+            // overwrite whatever the timer service or the sensors persisted meanwhile.
+            var transition: RuntimeTransition? = null
+            val nextRuntime = app.runtimeRepository().update { current ->
+                val computed = when (current.activeEngine) {
+                    ActiveEngine.REMINDER.name -> ReminderEngine().advance(settings, current, nowMillis)
+                    ActiveEngine.POMODORO.name -> PomodoroEngine().advance(settings, current, nowMillis)
+                    else -> null
+                } ?: return@update current
+                val applied = if (capStatsDelta) {
+                    computed.copy(eyeStatsDelta = computed.eyeStatsDelta.capped(settings))
+                } else {
+                    computed
+                }
+                transition = applied
+                applied.nextRuntime
+            }
+            val applied = transition
+            if (applied == null) {
+                notifications.syncRuntimeAlarms(settings, nextRuntime, nowMillis)
+                return@withAdvanceLock nextRuntime
+            }
+            val statisticsRepository = StatisticsRepository(
+                app.database.dailyEyeStatsDao(),
+                app.database.dailyPomodoroStatsDao(),
+            )
+            statisticsRepository.applyEyeDelta(settings.statsEnabled, nowMillis, applied.eyeStatsDelta)
+            statisticsRepository.applyPomodoroDelta(settings.statsEnabled, nowMillis, applied.pomodoroStatsDelta)
+            playAudioEvent(app, applied.audioEvent)
+            notifications.syncRuntimeAlarms(settings, applied.nextRuntime, nowMillis)
+            applied.nextRuntime
+        }
+
+        private fun playAudioEvent(app: ProjectLumenApplication, event: AudioEvent) {
+            when (event) {
+                AudioEvent.None -> Unit
+                is AudioEvent.ReminderTone -> app.audio.playReminderTone(event)
+            }
+        }
+
+        private fun EyeStatsDelta.capped(settings: AppSettingsEntity): EyeStatsDelta {
+            val workingCap = settings.warnIntervalMinutes.coerceAtLeast(1).toLong() * 60L
+            val restCap = settings.restDurationSeconds.coerceAtLeast(1).toLong()
+            return copy(
+                workingSeconds = workingSeconds.coerceAtMost(workingCap),
+                restSeconds = restSeconds.coerceAtMost(restCap),
+                maxContinuousWorkSeconds = maxContinuousWorkSeconds.coerceAtMost(workingCap),
+            )
+        }
     }
 }

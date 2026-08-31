@@ -7,11 +7,11 @@ class CertificatePinPolicyTest {
     @Test
     fun parseNormalizesPinsAndSupportsMultipleSeparators() {
         val pins = CertificatePinPolicy.parse(
-            "abc=; sha256/def=\n ghi=",
+            "$FIRST_PIN; sha256/$SECOND_PIN\n $THIRD_PIN",
         )
 
         assertEquals(
-            listOf("sha256/abc=", "sha256/def=", "sha256/ghi="),
+            listOf("sha256/$FIRST_PIN", "sha256/$SECOND_PIN", "sha256/$THIRD_PIN"),
             pins,
         )
     }
@@ -19,9 +19,24 @@ class CertificatePinPolicyTest {
     @Test
     fun parseDropsBlankPinsAndDeduplicatesConfiguredPins() {
         val pins = CertificatePinPolicy.parse(
-            "sha256/abc=,, abc=;\n",
+            "sha256/$FIRST_PIN,, $FIRST_PIN;\n",
         )
 
-        assertEquals(listOf("sha256/abc="), pins)
+        assertEquals(listOf("sha256/$FIRST_PIN"), pins)
+    }
+
+    @Test
+    fun parseDropsPinsThatAreNotBase64Sha256Digests() {
+        val pins = CertificatePinPolicy.parse(
+            "abc=, sha256/not-a-digest, 0123456789abcdef, $FIRST_PIN",
+        )
+
+        assertEquals(listOf("sha256/$FIRST_PIN"), pins)
+    }
+
+    private companion object {
+        private const val FIRST_PIN = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        private const val SECOND_PIN = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+        private const val THIRD_PIN = "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC="
     }
 }

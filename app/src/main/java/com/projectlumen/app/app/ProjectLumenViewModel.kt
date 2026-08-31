@@ -4,12 +4,10 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.api.BackendConnectivityController
 import com.projectlumen.app.core.api.ProjectLumenApiClient
 import com.projectlumen.app.core.api.ProjectLumenApiDiagnostics
 import com.chloemlla.lumen.crash.CrashBreadcrumbs
-import com.chloemlla.lumen.crash.CrashReport
 import com.projectlumen.app.core.database.AppDatabase
 import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
@@ -39,6 +37,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 class ProjectLumenViewModel(
     private val database: AppDatabase,
@@ -67,7 +66,9 @@ class ProjectLumenViewModel(
     private val simulateDeveloperLowMemory: () -> Unit,
     nativeProtectionSummary: () -> String,
     private val uploadTelemetrySnapshot: suspend () -> Unit,
-    private val recordCrashReport: (Throwable) -> CrashReport?,
+    private val recordHandledFailure: (Throwable) -> Unit,
+    securityEvidence: () -> JSONObject?,
+    private val runDeviceSecurityScan: suspend () -> DeviceSecurityScanner.SecurityAssessment,
 ) : ViewModel() {
     private val repositories = ProjectLumenRepositories(
         database = database,
@@ -76,7 +77,7 @@ class ProjectLumenViewModel(
         deviceInsights = deviceInsights,
     )
     private val now = MutableStateFlow(System.currentTimeMillis())
-    private var crashStateStore: ProjectLumenStateStore? = null
+    private val uiClock = LumenUiClock(now.value)
     private val installProfile = runCatching { secureCredentials.installProfile() }
         .onFailure { Log.e(TAG, "installProfile failed in ViewModel", it) }
         .getOrElse {
@@ -101,15 +102,16 @@ class ProjectLumenViewModel(
         deviceFingerprint = deviceFingerprint,
     )
     private val crashReportingHandler = CoroutineExceptionHandler { _, throwable ->
-        crashStateStore?.recordCrash(throwable) ?: recordCrashReport(throwable)
+        Log.e(TAG, "Unhandled coroutine failure", throwable)
+        recordHandledFailure(throwable)
     }
     private val reportingScope = CoroutineScope(viewModelScope.coroutineContext + crashReportingHandler)
     private val stateStore = ProjectLumenStateStore(
         repositories = repositories,
         scope = reportingScope,
-        now = now,
-        recordCrashReport = recordCrashReport,
-    ).also { crashStateStore = it }
+        clock = uiClock,
+        recordHandledFailure = recordHandledFailure,
+    )
     private val runtimeEntry = ProjectLumenRuntimeFeatureEntry(
         scope = reportingScope,
         settingsRepository = repositories.settings,
@@ -120,6 +122,7 @@ class ProjectLumenViewModel(
         startTimerService = startTimerService,
         stopTimerService = stopTimerService,
         uploadTelemetrySnapshot = uploadTelemetrySnapshot,
+        recordHandledFailure = recordHandledFailure,
     )
     private val settingsEntry = ProjectLumenSettingsFeatureEntry(
         scope = reportingScope,
@@ -127,7 +130,6 @@ class ProjectLumenViewModel(
         runtimeRepository = repositories.runtime,
         dailyGoalsRepository = repositories.dailyGoals,
         runtimeEntry = runtimeEntry,
-        notifications = notifications,
         stopTimerService = stopTimerService,
         scheduleProximityMonitoring = scheduleProximityMonitoring,
         cancelProximityMonitoring = cancelProximityMonitoring,
@@ -176,10 +178,7 @@ class ProjectLumenViewModel(
         featureFlagRepository = repositories.featureFlags,
         tipTemplateRepository = repositories.tipTemplates,
         nativeProtectionSummary = nativeProtectionSummary,
-        securityEvidence = {
-            val ctx = ProjectLumenApplication.applicationContext()
-            (ctx as? ProjectLumenApplication)?.deviceSecurityGate?.backendEvidence()
-        },
+        securityEvidence = securityEvidence,
     )
     private val _webPageRequests = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val webPageRequests = _webPageRequests.asSharedFlow()
@@ -187,6 +186,7 @@ class ProjectLumenViewModel(
     val onboardingState = firstOpenGateEntry.onboardingState
     val buildUpdateNotesState = firstOpenGateEntry.buildUpdateNotesState
     val backupImportPreview = backupEntry.importPreview
+    val backupImportError = backupEntry.importError
     internal val remoteState = remoteEntry.state
     val backendConnectivityState = backendConnectivity.state
     val shizukuState = shizuku.state
@@ -200,13 +200,11 @@ class ProjectLumenViewModel(
     val securityScanState = _securityScanState.asStateFlow()
 
     fun startDeviceSecurityScan() {
-        val context = ProjectLumenApplication.applicationContext() ?: return
         if (_securityScanState.value is DeviceSecurityScanState.Running) return
         _securityScanState.value = DeviceSecurityScanState.Running
         reportingScope.launch {
             try {
-                val scanner = DeviceSecurityScanner(context)
-                val assessment = scanner.fullScan()
+                val assessment = runDeviceSecurityScan()
                 _securityScanState.value = DeviceSecurityScanState.Complete(assessment)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 _securityScanState.value = DeviceSecurityScanState.Idle
@@ -222,6 +220,9 @@ class ProjectLumenViewModel(
     init {
         runCatching { CrashBreadcrumbs.record("ProjectLumenViewModel.init") }
         reportingScope.launch {
+            now.collect { nowMillis -> uiClock.update(nowMillis) }
+        }
+        reportingScope.launch {
             runCatching {
                 val hadExistingLocalUse = hasExistingLocalUse()
                 repositories.settings.ensureDefault()
@@ -236,7 +237,7 @@ class ProjectLumenViewModel(
                 runCatching { uploadTelemetrySnapshot() }
             }.onFailure { error ->
                 Log.e(TAG, "ViewModel startup work failed", error)
-                recordCrashReport(error)
+                recordHandledFailure(error)
             }
         }
         runCatching { runtimeEntry.startClock(now) }
@@ -370,12 +371,8 @@ class ProjectLumenViewModel(
     fun uploadDiagnosticsNow() {
         reportingScope.launch {
             runCatching { uploadTelemetrySnapshot() }
-                .onFailure(stateStore::recordCrash)
+                .onFailure(recordHandledFailure)
         }
-    }
-
-    fun clearCrashReport() {
-        stateStore.clearCrashReport()
     }
 
     fun completeOssNotice() {
@@ -464,6 +461,7 @@ class ProjectLumenViewModel(
     fun shareBackup() = backupEntry.shareBackup()
     fun previewBackupImport(uri: Uri) = backupEntry.previewBackupImport(uri)
     fun clearBackupImportPreview() = backupEntry.clearBackupImportPreview()
+    fun clearBackupImportError() = backupEntry.clearBackupImportError()
     fun importBackup(uri: Uri) = backupEntry.importBackup(uri)
 
     fun recordManualProEntitlement(productId: String = "manual_pro") = entitlementEntry.recordManualProEntitlement(productId)
@@ -484,8 +482,11 @@ class ProjectLumenViewModel(
         nowMillis: Long,
         transform: (AppSettingsEntity) -> AppSettingsEntity,
     ) {
-        val current = stateStore.uiState.value.settings
-        val updated = transform(current)
+        val state = stateStore.uiState.value
+        // Before the persisted settings arrive the baseline is AppSettingsEntity(), so a preview
+        // would flash every untouched option back to its default value.
+        if (!state.isReady) return
+        val updated = transform(state.settings)
         stateStore.previewSettings(updated.copy(id = 1, updatedAt = nowMillis))
     }
 
@@ -502,7 +503,7 @@ class ProjectLumenViewModel(
     }
 
     private inline fun reportIfThrows(block: () -> Unit) {
-        runCatching(block).onFailure(stateStore::recordCrash)
+        runCatching(block).onFailure(recordHandledFailure)
     }
 
     private inline fun traceAction(name: String, block: () -> Unit) {

@@ -74,6 +74,9 @@ private val DarkColors = darkColorScheme(
     outlineVariant = LumenOutlineVariantDark,
 )
 
+/** Wallpaper-derived color schemes only exist from API 31, whatever the user preference says. */
+fun dynamicColorSchemeAvailable(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
 @Composable
 fun ProjectLumenTheme(
     themeMode: AppThemeMode,
@@ -83,8 +86,11 @@ fun ProjectLumenTheme(
     themePaletteJson: String? = null,
     content: @Composable () -> Unit,
 ) {
-    val templatePaletteIsDark = remember(useDynamicColors, themePaletteJson) {
-        if (useDynamicColors) null else templatePaletteDarkness(themePaletteJson)
+    // Wallpaper extraction only exists from API 31; below that the switch cannot be allowed to
+    // suppress the template palette, or those users silently get no theming at all.
+    val dynamicColorsActive = useDynamicColors && dynamicColorSchemeAvailable()
+    val templatePaletteIsDark = remember(dynamicColorsActive, themePaletteJson) {
+        if (dynamicColorsActive) null else templatePaletteDarkness(themePaletteJson)
     }
     val darkTheme = templatePaletteIsDark ?: when (themeMode) {
         AppThemeMode.SYSTEM -> isSystemInDarkTheme()
@@ -93,7 +99,7 @@ fun ProjectLumenTheme(
     }
     val context = LocalContext.current
     val baseColorScheme = when {
-        useDynamicColors && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+        dynamicColorsActive -> {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         darkTheme -> DarkColors
@@ -101,12 +107,12 @@ fun ProjectLumenTheme(
     }
     val colorScheme = remember(
         baseColorScheme,
-        useDynamicColors,
+        dynamicColorsActive,
         themePrimaryColor,
         themeBackgroundColor,
         themePaletteJson,
     ) {
-        if (useDynamicColors) {
+        if (dynamicColorsActive) {
             baseColorScheme
         } else {
             baseColorScheme.applyTemplatePalette(

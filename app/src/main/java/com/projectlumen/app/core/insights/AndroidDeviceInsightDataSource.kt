@@ -3,6 +3,7 @@ package com.projectlumen.app.core.insights
 import android.app.ActivityManager
 import android.app.AppOpsManager
 import android.app.usage.UsageEvents
+import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
@@ -160,9 +161,14 @@ internal class AndroidDeviceInsightDataSource(
             .filter { it.totalTimeInForeground > 0L }
         if (stats.isEmpty()) return null
         val periodDuration = periodEnd - periodStart
-        val topApps = stats
-            .groupBy { it.packageName }
-            .mapValues { (_, entries) -> entries.sumOf { it.totalTimeInForeground } }
+        // A daily bucket carries a whole day of foreground time, and a 24h window almost always
+        // straddles midnight, so summing the buckets verbatim reports up to twice the real usage.
+        val prorated = stats.map { it.packageName to it.proratedForegroundMillis(periodStart, periodEnd) }
+            .filter { (_, millis) -> millis > 0L }
+        if (prorated.isEmpty()) return null
+        val topApps = prorated
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, durations) -> durations.sum() }
             .entries
             .sortedWith(compareByDescending<Map.Entry<String, Long>> { it.value }.thenBy { it.key })
             .take(5)
@@ -177,13 +183,25 @@ internal class AndroidDeviceInsightDataSource(
         return DeviceUsageSummary(
             periodStartMillis = periodStart,
             periodEndMillis = periodEnd,
-            totalForegroundMillis = stats.sumOf { it.totalTimeInForeground }.coerceAtMost(periodDuration),
+            totalForegroundMillis = prorated.sumOf { it.second }.coerceAtMost(periodDuration),
             longestContinuousSessionMillis = 0L,
             lateNightForegroundMillis = 0L,
             appSwitchCount = 0,
             topApps = topApps,
             quality = UsageDataQuality.AGGREGATED_FALLBACK,
         )
+    }
+
+    /** Scales a bucket's foreground time by how much of the bucket actually falls in the window. */
+    private fun UsageStats.proratedForegroundMillis(periodStart: Long, periodEnd: Long): Long {
+        val bucketStart = firstTimeStamp
+        val bucketEnd = lastTimeStamp
+        val bucketSpan = bucketEnd - bucketStart
+        if (bucketSpan <= 0L) return totalTimeInForeground
+        val overlap = minOf(bucketEnd, periodEnd) - maxOf(bucketStart, periodStart)
+        if (overlap <= 0L) return 0L
+        if (overlap >= bucketSpan) return totalTimeInForeground
+        return totalTimeInForeground * overlap / bucketSpan
     }
 
     @Suppress("DEPRECATION")
@@ -212,6 +230,9 @@ internal class AndroidDeviceInsightDataSource(
         ApplicationInfo.CATEGORY_NEWS -> AppUsageCategory.READING
         ApplicationInfo.CATEGORY_MAPS -> AppUsageCategory.NAVIGATION
         ApplicationInfo.CATEGORY_AUDIO -> AppUsageCategory.AUDIO
+        // Gallery / photo apps are visually intense, and the platform has no dedicated image bucket
+        // on this enum, so they fold into VIDEO rather than silently landing in OTHER.
+        ApplicationInfo.CATEGORY_IMAGE -> AppUsageCategory.VIDEO
         else -> AppUsageCategory.OTHER
     }
 
