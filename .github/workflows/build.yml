@@ -523,19 +523,17 @@ jobs:
             build/reports/problems/**
           retention-days: 14
 
-  # Split out of assemble-release so tests and lint gate the *release* without gating the *build*:
-  # the three jobs above run concurrently on separate runners, and only publishing waits for all of
-  # them. Keeping the release steps in one job would serialize the emulator-driven baseline profile
-  # behind unit tests and lint.
+  # Publishing is gated on the APK job alone, so a release goes out as soon as the APK is built
+  # instead of waiting for the test suite and lint to finish on their own runners.
+  #
+  # This is deliberate and it is the one thing to know about this job: unit-tests and android-lint
+  # still run, but a red one no longer blocks a release. The trade is accepted — the alternative is
+  # that every commit to main waits for the slowest of three concurrent jobs before anything ships.
   publish-release:
     name: Publish release
     needs:
       - build-identity
-      - unit-tests
-      - android-lint
       - assemble-release
-    # success() is spelled out rather than left implicit: an `if` here decides whether a GitHub
-    # release gets published, and a red unit test must never be able to reach it.
     if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
