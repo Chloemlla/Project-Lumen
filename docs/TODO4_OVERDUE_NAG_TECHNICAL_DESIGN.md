@@ -418,7 +418,7 @@ internal fun ScheduleOverdueNagCard(settings: AppSettingsEntity, viewModel: Proj
 
 > **进度：29 / 30 已勾选**（C-30 待 CI 结论；C-31 ~ C-45 见 §13.11，其中 C-46 待 CI）。
 > 核对方式：逐文件读落盘代码 + `git diff`，**不采信子代理自述**。
-> 核对过程中发现并已修正的 4 条：**C-12**（`index` → `index + 1`，原写法会让每轮最该催的那条被静默丢弃）、**C-38**（抽成唯一 `armEveningSlot`）、文档 §13.6 与 §10 的表述失真、以及两处「控件数量变了但注释没跟」的失真。
+> 核对过程中发现并已修正的 3 条：**C-12**（`index` → `index + 1`，原写法会让每轮最该催的那条被静默丢弃）、文档 §13.6 关于 `armEveningSlot` 的表述失真（代码最终是单侧方案，文档一度写成双侧）、以及两处「控件数量变了但注释没跟」的失真。
 
 ### 11.1 数据层
 - [x] C-01 `AppSettingsEntity.kt:115-118` —— 三列齐全：`scheduleOverdueNagEnabled = false` / `scheduleOverdueNagIntervalMinutes = 120` / `scheduleOverdueNagEveningMinute = 1290`
@@ -587,27 +587,18 @@ private suspend fun resolveValidated(
 
 `resolveValidated` 承担原第 1–5 步（取行 → `completed` → 取设置 → 开关 → `isOverdue`），返回 `null` 表示应当静默退出。
 
-两个入口的差异：
+两个入口的差异只在**重排**，且**各自只重排自己那一枚**：
 
-- `dispatch`（间隔槽触发）：发通知 → 排下一轮**间隔**槽 → 调 `armEveningSlot`
-- `dispatchEvening`（晚间槽触发）：发通知 → 调 `armEveningSlot` → 排下一轮**间隔**槽
+- `dispatch`（间隔槽触发）：发通知 → 排下一轮**间隔**槽。**不碰晚间槽。**
+- `dispatchEvening`（晚间槽触发）：发通知 → 排下一晚**晚间**槽。**不碰间隔槽。**
 
-**两个入口都通过同一个私有 `armEveningSlot` 补排晚间槽**，该 helper 内部是**唯一**一处 `endedInMorning` 判定：
-
-```kotlin
-private fun armEveningSlot(scheduler, occurrence, settings, nowMillis) {
-    val zone = ZoneId.systemDefault()
-    if (!ScheduleOverdueNag.endedInMorning(occurrence, zone)) return
-    scheduler.scheduleEvening(occurrence.id,
-        ScheduleOverdueNag.nextEveningNagAt(nowMillis, settings.scheduleOverdueNagEveningMinute.coerceIn(0, 1435), zone))
-}
-```
-
-> **为什么两个入口都要补排晚间槽，而不是各管各的**（原设计写的是「各自只重排自己那一枚」，实现在此基础上做了收敛）：
+> **为什么不做交叉补排**（这里曾一度改为「两个入口都调同一个 `armEveningSlot` 补排晚间槽」，最终又收回单侧方案）：
 >
-> 单侧补排的动机是「避免 `dispatch` 漏判 `endedInMorning` 而给下午结束的待办也催」。但这个风险**只要判定只存在一处**就消失了 —— 现在两个入口调的是同一个 `armEveningSlot`，`rearmAll` 第 8b 步也调同一个判定函数，三处不可能漂移。而保留双侧补排换来一条不变量：**任意一轮结束后，两枚闹钟都是按同一套判定对齐的**，不会出现「间隔槽在跑、晚间槽因为某次失败或丢失而长期缺位」。
+> 交叉补排的动机是「`dispatch` 万一漏判 `endedInMorning`，就会给下午结束的待办也催」。但单侧方案下这个风险**根本不存在**：`dispatch` 不碰晚间槽，就无需在那里再判一次；一条待办**只可能通过 `rearmAll` 第 8b 步**进入晚间链路，而那处是全仓**唯一**的 `endedInMorning` 判定点（交叉补排方案反而让判定点从 1 处变成 3 处）。
 >
-> 代价是 K-12 记录的那点节奏扰动。
+> 单侧方案还额外消掉两个副作用：间隔计时不会在 21:30 被重置；一次间隔轮也不会把当晚仍待发的晚间闹钟改写成明晚。
+>
+> 代价是 `dispatchEvening` 不再顺带修复「间隔槽丢失」——但这本就不是可达状态（间隔槽存在 ⇒ `rearmAll` 排过它 ⇒ 同一次 `rearmAll` 也排过晚间槽），且下一次 `rearmAll`（开机 / 打开应用 / 日程写入 / 设置改动）会把两枚都收敛回期望状态。
 
 **两个入口都发通知**，用的是同一个通知 id。因此 21:30 那一下会把间隔槽最近一条通知就地更新并重新响铃，不会堆叠。
 
@@ -699,7 +690,7 @@ fun setScheduleOverdueNagEveningMinute(minute: Int) {
 - [x] C-35 `ScheduleOverdueNagScheduler.kt:45-47, 63-68, 104-107` —— `scheduleEvening` 存在；`cancel` 遍历 `NAG_ACTIONS`，两枚一起撤
 - [x] C-36 `ScheduleOverdueNagScheduler.kt:155-172` —— 第 8b 步已加，**未**做 index 错开，注释写明与第 8 步相反的取舍理由
 - [x] C-37 `ScheduleOverdueNagScheduler.kt:23-27` —— 注释写明身份是 `(requestCode, Intent.filterEquals)`、靠 **action** 区分，并警告把两个 action 常量改成相同会静默合并两枚闹钟；`AlarmReceiver.kt:142 / 145` 两条字符串确实不同
-- [x] C-38 `ScheduleOverdueNagDispatcher.kt:68-84, 90-103` —— 两个入口共用 `resolveValidated`；`endedInMorning` 判定与晚间槽补排收在**唯一**一个 `armEveningSlot`，两个入口都调它
+- [x] C-38 `ScheduleOverdueNagDispatcher.kt:69-82` —— 两个入口共用 `resolveValidated`；`:37-44` 与 `:53-62` 各自只重排自己那一枚（无交叉补排），`endedInMorning` 全仓仅在 `ScheduleOverdueNagScheduler.kt:162` 一处判定
 - [x] C-39 `ScheduleOverdueNagDispatcher.kt:34-35, 48-49` —— 两个入口都发 `showScheduleOverdue`，通知 id 同为 `notificationIdFor(occurrenceId)`
 - [x] C-40 `AlarmReceiver.kt:62-76` —— `ACTION_SCHEDULE_OVERDUE_EVENING` 分支存在且提前返回
 - [x] C-41 `ProjectLumenScheduleOverdueSettings.kt:38-47` —— 晚间时间滑杆在既有 `if (settings.scheduleOverdueNagEnabled)` 块内
@@ -716,5 +707,4 @@ fun setScheduleOverdueNagEveningMinute(minute: Int) {
 | K-9 | 晚间补催不做错开，所有上午结束的逾期项在同一时刻响 | 那是「当天收尾」的固定时点，本该同时到达；错开会让它漂移到 21:31、21:32，反而破坏「9 点半」这个语义。与 K-6 的差异是有意的 |
 | K-10 | 已过今晚时刻时排到明晚，而不是立刻补一次 | 用户说的是「晚上 9 点半弹一下」，22:00 开机时立刻补一条会让人莫名其妙；间隔槽本来就会继续催，不会漏掉 |
 | K-11 | 晚间时刻与设置页既有时间项一样是 5 分钟粒度 | 与 `autoDarkStartMinute` / `autoDarkEndMinute` 复用同一套 `timeOfDayLabel` + `snapTimeMinute`，交互一致；21:30 本身就在 5 分钟网格上，粒度不会妨碍本需求 |
-| K-12 | 晚间槽触发时会顺带把间隔槽重排成 `now + interval`，间隔计时被重置一次 | 21:30 那一下等于把下一次间隔轮往后推，原本该在 22:00 响的那轮会挪到 23:30。代价是「每 2 小时」在晚间那一次前后有最多一个间隔的漂移。换来的是「任意一轮结束后两枚闹钟都与同一套判定对齐」这条不变量；对「反复催」的语义没有实质影响 |
-| K-13 | 间隔轮若落在「已过今晚时刻」的窗口内（Doze 延迟时可能），会把当晚仍待发的晚间闹钟改写成明晚 | 该窗口很窄，且间隔轮刚刚发过同一条通知，用户当下仍被提醒到，可观察影响接近零；不额外加「今晚是否已发过」的状态来消除它 |
+| K-12 | 一条**已经逾期**的待办若被编辑成「结束时刻从上午改到下午」，它先前那枚晚间闹钟不会被撤销，仍会每晚催，直到下一轮 `rearmAll` 把它当普通逾期项处理 | `rearmAll` 的撤销集合是「不在 `overdue` 里」的项，而这条待办**仍在逾期集合内**，因此走不到 `cancel`；晚间槽是逾期集合的一个子集，撤销逻辑没有按子集细分。要修就得让 `cancel` 拆成「撤两枚 / 只撤晚间」，为这个很窄的场景增加一层结构。实际后果偏「多催一次」而非「漏催」，与需求方向一致，故记录不修。触发条件需同时满足：已被催过 → 编辑结束时刻跨过 12:00 → 且仍处于逾期 |
