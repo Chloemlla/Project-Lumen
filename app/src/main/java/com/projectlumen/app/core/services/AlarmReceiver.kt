@@ -144,6 +144,22 @@ class AlarmReceiver : BroadcastReceiver() {
                         durationSeconds = settings.restDurationSeconds.coerceAtLeast(settings.overlayRestDurationSeconds),
                     )
                 }
+                // Republish the ongoing Live Update with the phase this alarm just advanced to. An
+                // alarm is what moves the runtime while the screen is off, and the 1 Hz tick skips
+                // its refresh in exactly that case (TimerForegroundService.processTick returns before
+                // showOngoingStatus when the device is not interactive), so nothing else would
+                // publish the new phase — the notification would keep showing the one that ended.
+                // Gated on keepAliveEnabled because that is the mode in which the ongoing
+                // notification is meant to outlive the app: with it off, AppLifecycleCoordinator
+                // cancels the notification on background and re-posting it here would leave one the
+                // app never updates.
+                if (
+                    settings.notificationEnabled &&
+                    settings.keepAliveEnabled &&
+                    reconciledRuntime.activeEngine != ActiveEngine.IDLE.name
+                ) {
+                    notifications.showOngoingStatus(reconciledRuntime)
+                }
                 if (settings.keepAliveEnabled && reconciledRuntime.activeEngine != ActiveEngine.IDLE.name) {
                     app.startTimerService()
                 }

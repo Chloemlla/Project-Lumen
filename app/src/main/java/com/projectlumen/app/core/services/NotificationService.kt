@@ -37,6 +37,12 @@ private const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIF
 
 class NotificationService(private val context: Context) {
     private val lastPublishedLiveUpdateSignature = AtomicReference<String?>(null)
+
+    // The content the Live Update is currently showing. A foreground-service promotion builds a
+    // notification without a runtime state in hand, so without this it would fall back to the
+    // generic "timer is running" copy, visibly replacing whatever phase was on screen and resetting
+    // the dedupe signature below.
+    private val lastPublishedLiveUpdate = AtomicReference<OngoingLiveUpdateContent?>(null)
     private val notificationManager by lazy { NotificationManagerCompat.from(context) }
     private val ongoingContentIntent by lazy { openAppPendingIntent(NotificationIds.FOREGROUND_TIMER) }
     private val ongoingStopIntent by lazy {
@@ -312,12 +318,22 @@ class NotificationService(private val context: Context) {
     }
 
     fun buildOngoingStatusNotification(state: RuntimeStateEntity? = null): Notification {
-        val content = ongoingLiveUpdateContent(state, System.currentTimeMillis())
+        val content = if (state != null) {
+            ongoingLiveUpdateContent(state, System.currentTimeMillis())
+        } else {
+            // No runtime state in hand: this is a foreground-service promotion re-posting the
+            // ongoing notification. Show what the Live Update already shows rather than the generic
+            // placeholder, which would otherwise replace the current phase on every promotion and,
+            // with the screen off, stay there — the 1 Hz tick that would correct it is skipped then.
+            lastPublishedLiveUpdate.get()
+                ?: ongoingLiveUpdateContent(null, System.currentTimeMillis())
+        }
         return buildOngoingStatusNotification(content)
     }
 
     private fun buildOngoingStatusNotification(content: OngoingLiveUpdateContent): Notification {
         lastPublishedLiveUpdateSignature.set(content.signature)
+        lastPublishedLiveUpdate.set(content)
         val builder = NotificationCompat.Builder(context, NotificationChannels.STATUS)
             .setSmallIcon(R.drawable.ic_notification_lumen)
             .setContentTitle(content.title)
@@ -468,6 +484,7 @@ class NotificationService(private val context: Context) {
 
     fun cancelOngoingStatus() {
         lastPublishedLiveUpdateSignature.set(null)
+        lastPublishedLiveUpdate.set(null)
         notificationManager.cancel(NotificationIds.FOREGROUND_TIMER)
     }
 
