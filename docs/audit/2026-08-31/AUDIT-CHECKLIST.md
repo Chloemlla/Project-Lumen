@@ -738,8 +738,8 @@
       - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenEyeCareInsights.kt:849-850（公式）；展示处 :209-217（首页洞察卡把配置分和"还有 N 项待完成"并排放）、:456-464（另一张卡的进度条）`
       - 详情：[G08-ui-home-insights.md:120](G08-ui-home-insights.md)
 - [ ] **G08-08** · A 架构 / H 结构 · 权限透明度卡与系统背景选择器从未被组合：整块隐私说明 UI 出厂即不可达
-      - 处置：部分修：EyeCareSetupAndPrivacyCard 已接入 ProjectLumenSettingsScreen 隐私区块（透明度卡+7 条权限说明可达）；SystemBackgroundPicker 接线需改 TemplateScreens seed / 删除需改 TemplatesFeatureEntry+ViewModel（跨组），留专项。
-      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenEyeCareInsights.kt:435-511（EyeCareSetupAndPrivacyCard，77 行）；app/src/main/java/com/projectlumen/…`
+      - 处置：EyeCareSetupAndPrivacyCard 走了"①接上"后被撤回，改走方案②删除（2026-09-13）：它接入后与 SettingsPrivacyPermissionCenter 同标题（均为 eye_care_privacy_permissions）且相邻，设置页出现两个「隐私与权限」，其中一个还是不可折叠的只读卡。该卡内容（配置分、7 条权限说明、eye_care_privacy_boundary）是交互版的真子集，连 detailRes 都复用同一批字符串，故连同只被它引用的 PermissionTransparencyLine（含 eye_care_permission_ready/needs_action）一并删除。SystemBackgroundPicker 接线需改 TemplateScreens seed / 删除需改 TemplatesFeatureEntry+ViewModel（跨组），仍留专项。
+      - 位置：`app/src/main/java/com/projectlumen/app/app/ProjectLumenEyeCareInsights.kt（EyeCareSetupAndPrivacyCard / PermissionTransparencyLine 已删除）；app/src/main/java/com/projectlumen/…`
       - 详情：[G08-ui-home-insights.md:134](G08-ui-home-insights.md)
 - [x] **G08-09** · E 韧性 · 备份导入/预览失败无任何用户反馈，异常被崩溃处理器静默吃掉
       - 处置：部分修：状态层完成——`previewBackupImport`/`importBackup` 改 `runCatching` 写入新 `_importError` state，`failImport` 给可读文案，`CancellationException` 显式 rethrow。未做：UI 面（ViewModel 暴露 + Settings 屏展示）已路由给 fix-ui-settings。

@@ -21,7 +21,6 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Spa
@@ -49,7 +48,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
@@ -508,85 +506,6 @@ private fun riskBadgeContentColor(riskScore: Int): Color = when {
     riskScore >= 66 -> MaterialTheme.colorScheme.onErrorContainer
     riskScore >= 33 -> MaterialTheme.colorScheme.onSecondaryContainer
     else -> MaterialTheme.colorScheme.onPrimaryContainer
-}
-
-@Composable
-internal fun EyeCareSetupAndPrivacyCard(
-    uiState: ProjectLumenUiState,
-    permissionRequirements: PermissionRequirements,
-    shizukuReady: Boolean,
-) {
-    val summary = rememberEyeCareInsightSummary(
-        uiState = uiState,
-        permissionRequirements = permissionRequirements,
-        shizukuReady = shizukuReady,
-    )
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),
-        shape = LumenCardShape,
-        colors = lumenCardColors(LumenCardEmphasis.Quiet),
-        elevation = lumenCardElevation(),
-        border = lumenCardBorder(LumenCardEmphasis.Quiet),
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeader(Icons.Outlined.Lock, R.string.eye_care_privacy_permissions)
-            MetricRow(R.string.eye_care_config_score, stringResource(R.string.percent_value, summary.configurationScore))
-            LinearProgressIndicator(
-                progress = { summary.configurationScore / 100f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(CircleShape),
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            )
-            PermissionTransparencyLine(
-                icon = Icons.Outlined.NotificationsActive,
-                titleRes = R.string.eye_care_permission_notifications,
-                detailRes = R.string.eye_care_permission_notifications_detail,
-                satisfied = !permissionRequirements.notification,
-            )
-            PermissionTransparencyLine(
-                icon = Icons.Outlined.Schedule,
-                titleRes = R.string.eye_care_permission_exact_alarm,
-                detailRes = R.string.eye_care_permission_exact_alarm_detail,
-                satisfied = !permissionRequirements.exactAlarm,
-            )
-            PermissionTransparencyLine(
-                icon = Icons.Outlined.NotificationsActive,
-                titleRes = R.string.eye_care_permission_full_screen,
-                detailRes = R.string.eye_care_permission_full_screen_detail,
-                satisfied = !permissionRequirements.fullScreenIntent || !uiState.settings.notificationEnabled,
-            )
-            PermissionTransparencyLine(
-                icon = Icons.Outlined.PhotoCamera,
-                titleRes = R.string.eye_care_permission_camera,
-                detailRes = R.string.eye_care_permission_camera_detail,
-                satisfied = !permissionRequirements.camera || (!uiState.settings.proximityMonitoringEnabled && !uiState.settings.blinkMonitoringEnabled),
-            )
-            PermissionTransparencyLine(
-                icon = Icons.Outlined.Style,
-                titleRes = R.string.eye_care_permission_overlay,
-                detailRes = R.string.eye_care_permission_overlay_detail,
-                satisfied = !permissionRequirements.overlay || !uiState.settings.globalOverlayEnabled,
-            )
-            PermissionTransparencyLine(
-                icon = Icons.Outlined.Style,
-                titleRes = R.string.eye_care_permission_write_settings,
-                detailRes = R.string.eye_care_permission_write_settings_detail,
-                satisfied = !permissionRequirements.writeSettings || !uiState.settings.autoBrightnessEnabled ||
-                    (uiState.settings.shizukuAdvancedModeEnabled && uiState.settings.shizukuNativeEyeProtectionEnabled),
-            )
-            PermissionTransparencyLine(
-                icon = Icons.Outlined.Lock,
-                titleRes = R.string.eye_care_permission_shizuku,
-                detailRes = R.string.eye_care_permission_shizuku_detail,
-                satisfied = !uiState.settings.shizukuAdvancedModeEnabled || shizukuReady,
-            )
-            StatusLine(Icons.Outlined.Info, stringResource(R.string.eye_care_privacy_boundary))
-        }
-    }
 }
 
 @Composable
@@ -1159,61 +1078,6 @@ private fun GuideStepLine(step: EyeCareGuideStep) {
         StatusPill(
             if (step.complete) Icons.Outlined.CheckCircle else Icons.Outlined.Schedule,
             if (step.complete) R.string.eye_care_guide_done else R.string.eye_care_guide_pending,
-        )
-    }
-}
-
-@Composable
-private fun PermissionTransparencyLine(
-    icon: ImageVector,
-    @StringRes titleRes: Int,
-    @StringRes detailRes: Int,
-    satisfied: Boolean,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(LumenPreferenceShape)
-            .background(
-                if (satisfied) {
-                    lumenNestedContainerColor
-                } else {
-                    MaterialTheme.colorScheme.errorContainer
-                },
-            )
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val contentColor = if (satisfied) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.onErrorContainer
-        }
-        Icon(
-            imageVector = if (satisfied) Icons.Outlined.CheckCircle else icon,
-            contentDescription = null,
-            tint = contentColor,
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                stringResource(titleRes),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = if (satisfied) MaterialTheme.colorScheme.onSurface else contentColor,
-            )
-            Text(
-                stringResource(detailRes),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (satisfied) MaterialTheme.colorScheme.onSurfaceVariant else contentColor,
-            )
-        }
-        Text(
-            stringResource(if (satisfied) R.string.eye_care_permission_ready else R.string.eye_care_permission_needs_action),
-            style = MaterialTheme.typography.labelLarge,
-            color = contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }

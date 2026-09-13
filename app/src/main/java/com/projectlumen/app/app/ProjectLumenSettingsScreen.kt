@@ -529,11 +529,6 @@ internal fun SettingsScreen(
                 remoteAnalysisConsentGrantedAt = 0L
             },
         )
-        EyeCareSetupAndPrivacyCard(
-            uiState = uiState,
-            permissionRequirements = permissionRequirements,
-            shizukuReady = shizukuState.ready,
-        )
         EyeCareActionPlanCard(
             uiState = uiState,
             permissionRequirements = permissionRequirements,
