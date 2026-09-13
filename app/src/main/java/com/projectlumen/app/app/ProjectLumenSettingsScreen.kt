@@ -561,6 +561,7 @@ internal fun SettingsScreen(
             },
             onExportReport = viewModel::shareMonthlyReportPdf,
         )
+        ScheduleOverdueNagCard(settings = settings, viewModel = viewModel)
         SettingsScrollAnchors(
             targets = GeneralGrowthAnchors,
             scrollState = settingsScrollState,

@@ -102,6 +102,14 @@ class NotificationService(private val context: Context) {
                     description = context.getString(R.string.channel_schedule_alarm)
                     enableVibration(true)
                 },
+                NotificationChannel(
+                    NotificationChannels.SCHEDULE_OVERDUE,
+                    context.getString(R.string.channel_schedule_overdue),
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    description = context.getString(R.string.channel_schedule_overdue)
+                    enableVibration(true)
+                },
             ),
         )
     }
@@ -257,6 +265,22 @@ class NotificationService(private val context: Context) {
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = false,
             fullScreen = isAlarm,
+        )
+    }
+
+    /**
+     * Re-posts the overdue nag on the same notification id every round. Re-alerting on each round
+     * depends on [show] never setting `setOnlyAlertOnce(true)`: adding that flag there would turn
+     * the whole nag into a single silent alert without any visible failure.
+     */
+    fun showScheduleOverdue(occurrence: ScheduleOccurrenceEntity) {
+        show(
+            id = ScheduleOverdueNagScheduler(context).notificationIdFor(occurrence.id),
+            channel = NotificationChannels.SCHEDULE_OVERDUE,
+            title = occurrence.title,
+            message = context.getString(R.string.schedule_overdue_message, formatClockTime(occurrence.endAt)),
+            priority = NotificationCompat.PRIORITY_HIGH,
+            includeBreakActions = false,
         )
     }
 
@@ -477,6 +501,9 @@ class NotificationService(private val context: Context) {
         return explicitReceiverIntent(action, AlarmReceiver::class.java)
     }
 
+    // Deliberately no setOnlyAlertOnce(true): the overdue nag re-posts on the same id every round
+    // and relies on each notify() re-alerting (sound/vibration). Setting it would silently reduce
+    // the whole nag chain to a single alert.
     private fun show(
         id: Int,
         channel: String,

@@ -985,7 +985,17 @@
     <string name="schedule_weekday_thu">周四</string>
     <string name="schedule_weekday_fri">周五</string>
     <string name="schedule_weekday_sat">周六</string>
+    <string name="schedule_overdue_nag_section">待办逾期提醒</string>
+    <string name="schedule_overdue_nag_enabled">未勾选就持续提醒</string>
+    <string name="schedule_overdue_nag_interval">提醒间隔</string>
+    <string name="schedule_overdue_nag_evening_time">晚间补催时间</string>
+    <string name="schedule_overdue_nag_hint">过了结束时刻仍未勾选的待办会按此间隔持续通知，直到你勾选完成为止；上午结束的待办每晚还会再补催一次。免打扰时段与护眼通知开关都不会压制它们。</string>
+    <string name="schedule_overdue_nag_interval_minutes">%1$d 分钟</string>
+    <string name="schedule_overdue_nag_interval_hours">%1$d 小时</string>
+    <string name="schedule_overdue_nag_interval_hours_minutes">%1$d 小时 %2$d 分钟</string>
+    <string name="schedule_overdue_message">已逾期 · 原定 %1$s 结束</string>
     <string name="channel_schedule_reminder">日程提醒</string>
     <string name="channel_schedule_alarm">日程闹钟</string>
+    <string name="channel_schedule_overdue">待办逾期提醒</string>
 
 </resources>

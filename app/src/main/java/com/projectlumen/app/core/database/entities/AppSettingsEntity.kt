@@ -112,4 +112,8 @@ data class AppSettingsEntity(
     val developerShakeSuppressionEnabled: Boolean = true,
     val autoUpdateCheckEnabled: Boolean = true,
     val updatedAt: Long = System.currentTimeMillis(),
+    val scheduleOverdueNagEnabled: Boolean = false,
+    val scheduleOverdueNagIntervalMinutes: Int = 120,
+    /** Evening follow-up time for to-dos that ended in the morning, as minutes from midnight (21:30). */
+    val scheduleOverdueNagEveningMinute: Int = 1290,
 )

@@ -37,6 +37,7 @@ import com.projectlumen.app.core.services.ForegroundServiceController
 import com.projectlumen.app.core.services.ForegroundServiceFailureReporter
 import com.projectlumen.app.core.services.NotificationService
 import com.projectlumen.app.core.services.ScheduleAlarmRestore
+import com.projectlumen.app.core.services.ScheduleOverdueNagScheduler
 import com.projectlumen.app.core.services.ShizukuResilienceWorker
 import com.projectlumen.app.core.services.TimerForegroundService
 import com.projectlumen.app.core.services.TimerReconciliationWorker
@@ -109,12 +110,14 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     /**
-     * Every path that can invalidate the schedule occurrence window or the alarm that points into
-     * it goes through here: boot, an exact-alarm permission change, and a schedule edit.
+     * Every path that can invalidate the schedule occurrence window or the alarms that point into it
+     * goes through here: boot, an exact-alarm permission change, a schedule edit, and a change to the
+     * overdue-nag settings. It covers both chains — the pre-start reminders and the overdue nag.
      */
     suspend fun rescheduleScheduleReminders() {
         scheduleRepository.refreshWindow()
         ScheduleAlarmRestore.rearm(this, scheduleRepository)
+        ScheduleOverdueNagScheduler.rearmAll(this)
     }
     val telemetry: EyeCareTelemetryReporter by lazy {
         EyeCareTelemetryReporter(

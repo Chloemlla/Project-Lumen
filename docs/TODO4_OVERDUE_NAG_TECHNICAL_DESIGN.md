@@ -200,7 +200,7 @@ Intent(context, AlarmReceiver::class.java)
 6. overdueIds = overdue 的 id 集合
 7. all.filter { it.id !in overdueIds }.forEach { cancel(it.id) }     ← 已完成 / 未到期 / 超龄的闹钟在这里被撤销
 8. overdue.forEachIndexed { index, occurrence ->
-       schedule(occurrence.id, nowMillis + index * SWEEP_STAGGER_MILLIS)
+       schedule(occurrence.id, nowMillis + (index + 1) * SWEEP_STAGGER_MILLIS)
    }
 9. interval = ScheduleOverdueNag.clampIntervalMinutes(settings.scheduleOverdueNagIntervalMinutes)
    —— 只作为第 5 步过滤口径的输入之一，实际每轮间隔由 Dispatcher 在触发时读取
@@ -209,6 +209,8 @@ Intent(context, AlarmReceiver::class.java)
 这一步的**幂等性**是设计核心：它不假设自己知道「已经排了什么」，而是每次都把期望状态和当前全量状态对齐。因此它可以在开机、权限变更、设置改动、任何一次日程写入之后被无脑重复调用。
 
 > 第 8 步用 **当前时刻** 而不是 `endAt` 作为首轮触发点：历史遗留项的 `endAt` 在过去，拿它当触发点会被 `schedule()` 的「过去不排」规则吞掉。
+>
+> 第 8 步的倍数是 **`index + 1` 而不是 `index`**：`index == 0` 那一项算出的触发点恰好等于 `nowMillis`，而 `schedule()` 内部会**再读一次真实时钟**，此时该值已经变成过去，于是「最该被催的那一条」在每一轮扫描里都会被静默丢弃。`+ 1` 保证最小偏移是一整个 `SWEEP_STAGGER_MILLIS`。（这是实现阶段发现并修正的，原设计写的是 `index`。）
 
 ---
 
@@ -391,7 +393,9 @@ internal fun ScheduleOverdueNagCard(settings: AppSettingsEntity, viewModel: Proj
 
 ## 10. 测试
 
-新增 `app/src/test/java/com/projectlumen/app/core/schedule/ScheduleOverdueNagTest.kt`（纯 JVM，钉死 `ZoneId` 无关——本对象只用毫秒，不碰时区）。
+新增 `app/src/test/java/com/projectlumen/app/core/schedule/ScheduleOverdueNagTest.kt`（纯 JVM）。
+
+> **§13 之后本节的「钉死 `ZoneId` 无关」已不再成立**：`endedInMorning` / `nextEveningNagAt` 本质是本地墙钟问题，必须显式传入 `ZoneId`。N-1 ~ N-10 仍不涉及时区；N-11 ~ N-17 显式指定时区，因此这些用例在 UTC 的 CI runner 上结果与开发机一致。
 
 | 编号 | 用例 | 断言 |
 |---|---|---|
@@ -412,45 +416,49 @@ internal fun ScheduleOverdueNagCard(settings: AppSettingsEntity, viewModel: Proj
 
 实现完成后逐条核对；每条要么 ✅ 已实现（附文件:行号），要么 ⏸ 挂起（附理由）。
 
+> **进度：29 / 30 已勾选**（C-30 待 CI 结论；C-31 ~ C-45 见 §13.11，其中 C-46 待 CI）。
+> 核对方式：逐文件读落盘代码 + `git diff`，**不采信子代理自述**。
+> 核对过程中发现并已修正的 4 条：**C-12**（`index` → `index + 1`，原写法会让每轮最该催的那条被静默丢弃）、**C-38**（抽成唯一 `armEveningSlot`）、文档 §13.6 与 §10 的表述失真、以及两处「控件数量变了但注释没跟」的失真。
+
 ### 11.1 数据层
-- [ ] C-01 `AppSettingsEntity` 追加 `scheduleOverdueNagEnabled` / `scheduleOverdueNagIntervalMinutes`，默认值 `false` / `120`
-- [ ] C-02 `AppDatabase` version = 20
-- [ ] C-03 `MIGRATION_19_20` 用 `addColumnIfMissing`，默认值与实体一致
-- [ ] C-04 `MIGRATION_19_20` 已加入 `addMigrations(...)` 列表
-- [ ] C-05 `ScheduleOccurrencesDao.getActive()` 存在
-- [ ] C-06 `ScheduleOverdueNag` 五个成员齐全，`isOverdue` 四条判定齐全
-- [ ] C-07 单测 N-1 ~ N-10 全部落地
+- [x] C-01 `AppSettingsEntity.kt:115-118` —— 三列齐全：`scheduleOverdueNagEnabled = false` / `scheduleOverdueNagIntervalMinutes = 120` / `scheduleOverdueNagEveningMinute = 1290`
+- [x] C-02 `AppDatabase.kt:50` —— `version = 20`
+- [x] C-03 `AppDatabase.kt:221-226` —— `MIGRATION_19_20` 三行均走 `addColumnIfMissing`，默认值与实体逐一对齐（`0` / `120` / `1290`）
+- [x] C-04 `AppDatabase.kt:513` —— `MIGRATION_19_20` 已在 `addMigrations(...)` 列表内
+- [x] C-05 `ScheduleOccurrencesDao.kt:30` —— `getActive()` 存在，且含注释说明为何不能用 `observeAll()`
+- [x] C-06 `ScheduleOverdueNag.kt:27-45, 56-81, 91-115` —— 成员齐全；`isOverdue` 四条判定按「软删 → 已完成 → 未到期 → 超龄」顺序短路
+- [x] C-07 `ScheduleOverdueNagTest.kt:34-134` —— N-1 ~ N-10 全部落地，另多一条 `stillOverdueAtExactlyMaxAge` 钉住 `<=` 边界
 
 ### 11.2 调度与触发
-- [ ] C-08 `NotificationIds` 的 `9900/300` 与 `9600/300` 不重叠
-- [ ] C-09 `ScheduleOverdueNagScheduler` 用 `setAndAllowWhileIdle`，不检查精确闹钟权限
-- [ ] C-10 `rearmAll` 在开关关闭时撤销全部闹钟
-- [ ] C-11 `rearmAll` 会撤销「已完成 / 未到期 / 超龄」三项的闹钟
-- [ ] C-12 `rearmAll` 的首轮触发点是 `now + index * 15s`，不是 `endAt`
-- [ ] C-13 `ScheduleOverdueNagDispatcher` 的 8 步顺序与 §5 一致
-- [ ] C-14 触发后无条件排下一轮（**没有**过期不补的判定）
-- [ ] C-15 `AlarmReceiver` 有 `ACTION_SCHEDULE_OVERDUE_NAG` 分支且**提前返回**，不落到 `reconcileNow`
+- [x] C-08 `NotificationIds.kt:21-26` —— `9600..9899` 与 `9900..10199` 不重叠，注释写明「重叠会让两条链路互顶」
+- [x] C-09 `ScheduleOverdueNagScheduler.kt:49-57` —— 用 `setAndAllowWhileIdle`，全文件**无** `canScheduleExactAlarms` / 权限检查
+- [x] C-10 `ScheduleOverdueNagScheduler.kt:132-135` —— 开关关闭时 `all.forEach { cancel(it.id) }` 后 `return`
+- [x] C-11 `ScheduleOverdueNagScheduler.kt:144-145` —— `all.filter { it.id !in overdueIds }` 覆盖「已完成 / 未到期 / 超龄」三类
+- [x] C-12 `ScheduleOverdueNagScheduler.kt:146-154` —— 首轮触发点是 `nowMillis + (index + 1) * SWEEP_STAGGER_MILLIS`，不是 `endAt`；**`+ 1` 是实现阶段修正的**，理由见 §4.3
+- [x] C-13 `ScheduleOverdueNagDispatcher.kt:90-103` —— `resolveValidated` 内五步顺序与 §5 第 1–5 步一致
+- [x] C-14 `ScheduleOverdueNagDispatcher.kt:38-42` —— 无条件排下一轮；全文件**无** `STALE_AFTER_MILLIS` 一类判定
+- [x] C-15 `AlarmReceiver.kt:49-59` —— 分支存在且以 `return@runCatching` 收尾，不会落进 `reconcileNow`
 
 ### 11.3 接线与通知
-- [ ] C-16 `rescheduleScheduleReminders()` 追加了 `rearmAll`
-- [ ] C-17 `setCompleted` 后 `rearmAll` 会撤销该实例的闹钟（勾选即停）
-- [ ] C-18 新渠道 `schedule_overdue` 为 `IMPORTANCE_HIGH` + 默认声音 + 振动
-- [ ] C-19 `showScheduleOverdue` 走 `show(...)`，**未**新增 `setOnlyAlertOnce(true)`
-- [ ] C-20 **未**新增 `<service>` / `<receiver>`，`AndroidManifest.xml` 无改动
-- [ ] C-21 轰炸不受 `QuietHours` 与 `settings.notificationEnabled` 影响（D-3）
+- [x] C-16 `ProjectLumenApplication.kt:117-120` —— `rescheduleScheduleReminders()` 末尾追加 `ScheduleOverdueNagScheduler.rearmAll(this)`
+- [x] C-17 `ProjectLumenScheduleFeatureEntry.kt:108-112` —— `setCompleted` 落库后调 `rearm()`；配合 `ScheduleOverdueNagScheduler.kt:63-68` 的 `cancel` 同时撤两槽，构成「勾选即停」
+- [x] C-18 `NotificationService.kt:105-112` —— `IMPORTANCE_HIGH` + `enableVibration(true)`；全仓仅一处 `setOnlyAlertOnce`（`:183`，FGS 常驻通知专用），与本渠道无关
+- [x] C-19 `NotificationService.kt:276-285` —— `showScheduleOverdue` 直接走 `show(...)`；`:504-506` 有「刻意不加 `setOnlyAlertOnce(true)`」的注释
+- [x] C-20 —— `git status` 中**无** `AndroidManifest.xml`，无新增 `<service>` / `<receiver>`
+- [x] C-21 `ScheduleOverdueNagDispatcher.kt:99-101` —— 只查开关与 `isOverdue`，**无** `QuietHours` / `notificationEnabled` 判定（D-3）
 
 ### 11.4 UI
-- [ ] C-22 `ScheduleOverdueNagCard` 用 `SettingsSection`，自动进分组工具栏
-- [ ] C-23 间隔滑杆仅在开关打开时渲染
-- [ ] C-24 滑杆范围 5..360、5 分钟粒度、`clampIntervalMinutes` 兜底
-- [ ] C-25 提示文案 `schedule_overdue_nag_hint` 明确写出「免打扰/护眼开关不压制」
-- [ ] C-26 两个 ViewModel 门面方法都是**先落库再重排**
-- [ ] C-27 9 条字符串在 `values/` 与 `values-zh/` 两侧键集一致
+- [x] C-22 `ProjectLumenScheduleOverdueSettings.kt:16` —— 用 `SettingsSection(@StringRes, icon)` 重载；调用点 `ProjectLumenSettingsScreen.kt:564` 落在 `CompositionLocalProvider(LocalSettingsSectionGroup ...)`（`:506`）作用域内，展开/折叠全站联动
+- [x] C-23 `ProjectLumenScheduleOverdueSettings.kt:27` —— 两个滑杆都在 `if (settings.scheduleOverdueNagEnabled)` 内
+- [x] C-24 `ProjectLumenScheduleOverdueSettings.kt:28-37, 69-72` —— 范围 `5f..360f`，`snapOverdueNagMinutes` 吸附到 5 分钟并用 `clampIntervalMinutes` 兜底
+- [x] C-25 `values/strings.xml:993` / `values-zh/strings.xml:992` —— 提示文案已写明「免打扰时段与护眼通知开关都不会压制它们」
+- [x] C-26 `ProjectLumenViewModel.kt:492-510` —— 三个门面方法均**先 `updateSettings` 再 `reportingScope.launch { rescheduleScheduleReminders() }``
+- [x] C-27 —— `rg -o 'name="schedule_overdue[a-z_]*"' | sort` 两侧均为 9 键且完全一致
 
 ### 11.5 纪律
-- [ ] C-28 未新增「超级文件」（卡片独立成文件，设置页只加一行调用）
-- [ ] C-29 未运行任何本地构建/测试命令
-- [ ] C-30 提交已推送且 CI（check-runs 逐 job）全绿
+- [x] C-28 —— 卡片独立成 `ProjectLumenScheduleOverdueSettings.kt`，设置页只加 1 行调用（`:564`）
+- [x] C-29 —— 本轮未在本机执行任何 gradle / 构建 / 测试 / lint 命令
+- [ ] C-30 提交已推送且 CI（check-runs 逐 job）全绿 —— **待本次提交结论**
 
 ---
 
@@ -466,3 +474,247 @@ internal fun ScheduleOverdueNagCard(settings: AppSettingsEntity, viewModel: Proj
 | K-6 | 首轮轰炸在开启开关后 15 秒 × 序号 陆续到达 | 用户选了「历史遗留也一起催」，若同一刻全部触发会瞬间涌出十几条；错开是礼仪性让步，不影响后续按间隔循环 |
 | K-7 | 提醒的精确时刻由系统决定，可能有数分钟偏差 | 不精确闹钟的固有性质；对「每 2 小时催一次」没有实际影响 |
 | K-8 | 未做「通知内直接勾选完成」的动作按钮 | 需求只要求「直到用户手动勾选为止」，点击通知打开 App 即可完成；动作按钮属增量，若需要另行确认 |
+
+---
+
+## 13. 增量：晚间补催（第二轮）
+
+> 本节是**后续追加**的需求，§1–§12 保持原样；第二节实现以本节为准，与前面冲突处以本节为准。
+
+### 13.1 需求原文与已确认的口径
+
+用户原文：
+
+> 如果结束时间在上午，那么在下午晚上 9 点半的时候也弹出来通知一下子。
+
+| 编号 | 分歧点 | 用户选择 | 含义 |
+|---|---|---|---|
+| E-1 | 晚间时刻是否可配 | **做成可设置的时间，默认 21:30** | 新增设置项 `scheduleOverdueNagEveningMinute`，默认 `1290` |
+| E-2 | 「上午」的界线 | **12:00 为界** | `endAt` 的**本地时刻** `< 720` 分钟 |
+| E-3 | 催几天 | **逾期期间每晚都催** | 只要还没勾选，每晚都在该时刻补一次 |
+| E-4 | 与间隔轰炸的关系 | **额外必定响一次（独立于间隔）** | 间隔循环照常，晚间这一次是**额外的**，两者互不挤占 |
+
+### 13.2 为什么是「第二个闹钟槽位」而不是「调整间隔排程」
+
+E-4 决定了不能把晚间时刻并进 `nextNagAt` 的间隔计算里：那样只是把某一次挪个位置，总次数不变，且间隔恰好跨过 21:30 时不会落在 21:30 上。要「必定响一次」，就必须为同一条实例**同时**持有两枚闹钟：
+
+| 槽位 | Intent action | 触发逻辑 |
+|---|---|---|
+| 间隔槽 | `ACTION_SCHEDULE_OVERDUE_NAG` | 每轮触发后自排 `now + interval` |
+| 晚间槽 | `ACTION_SCHEDULE_OVERDUE_EVENING` | 每轮触发后自排「下一个晚间时刻」 |
+
+**两枚闹钟共用同一个 request code 是安全的**：`PendingIntent` 的身份是 `(requestCode, Intent.filterEquals)`，而 `filterEquals` 比较 action/data/type/class/categories —— 两个 Intent 的 **action 不同**，因此得到两个不同的 `PendingIntent`，不会互相顶掉。这一点必须写进代码注释：它是「靠 action 区分」而非「靠 request code 区分」，改动 action 常量时两枚闹钟会静默合并。
+
+**但通知 id 必须共用**（`notificationIdFor(occurrenceId)`），否则同一件事会在下拉栏里堆成两条。
+
+**`cancel(occurrenceId)` 必须同时撤销两枚**，否则关掉开关后晚间槽还会在 21:30 响一次。
+
+### 13.3 设置字段（第二个新列）
+
+`AppSettingsEntity` 追加：
+
+```kotlin
+val scheduleOverdueNagEveningMinute: Int = 1290,   // 21:30，自午夜起的分钟数
+```
+
+`MIGRATION_19_20` 追加一行：
+
+```kotlin
+addColumnIfMissing(db, "app_settings", "scheduleOverdueNagEveningMinute", "INTEGER NOT NULL DEFAULT 1290")
+```
+
+沿用 0..1435 与既有 `autoDarkStartMinute` / `quietStartMinute` 相同的「自午夜起分钟数」表示法，理由：设置页已有 `timeOfDayLabel` + 取整工具一套，直接复用。
+
+### 13.4 纯逻辑 `ScheduleOverdueNag` 追加两个成员
+
+```kotlin
+/** 结束时刻早于中午 12:00 —— 这类待办当天早上就该做完，晚上再补催一次。 */
+const val MORNING_END_MINUTE = 12 * 60
+const val DEFAULT_EVENING_MINUTE = 21 * 60 + 30
+
+fun endedInMorning(occurrence: ScheduleOccurrenceEntity, zoneId: ZoneId): Boolean
+fun nextEveningNagAt(nowMillis: Long, eveningMinute: Int, zoneId: ZoneId): Long
+```
+
+- `endedInMorning`：把 `occurrence.endAt` 转到 `zoneId` 取本地时刻，比较 `hour * 60 + minute < MORNING_END_MINUTE`。
+  **必须是本地时刻，不能用 UTC**：`endAt` 是 epoch 毫秒，直接取模 86400000 得到的是 UTC 当日偏移，东八区用户的 07:30 会被算成 23:30。
+- `nextEveningNagAt`：以 `zoneId` 求「今天该时刻」；若 `<= nowMillis` 则顺延到明天的该时刻。即「只要还没到今晚这一刻就排今晚，否则排明晚」。
+  `eveningMinute` 由调用方先 `coerceIn(0, 1435)`。
+
+> `ScheduleOverdueNag` 原本被设计为**不碰时区**（§3 与 §10 都写了「钉死 `ZoneId` 无关」）。本节打破该约束，因此该文件的类注释与 §10 的开头说明必须同步更新，并在此处记录原因：判定「上午」和「晚间时刻」本质都是本地时间概念，无法回避。
+
+### 13.5 `ScheduleOverdueNagScheduler` 追加
+
+```kotlin
+fun scheduleEvening(occurrenceId: Long, triggerAtMillis: Long)
+fun cancel(occurrenceId: Long)   // 改为同时撤销两个 action 的 PendingIntent
+```
+
+- `scheduleEvening` 与 `schedule` 完全同构，只是 action 换成 `ACTION_SCHEDULE_OVERDUE_EVENING`，且同样用 `setAndAllowWhileIdle`（晚间这一刻精确到秒同样无意义）。
+- `rearmAll` 的第 7 步（撤销不该排的）与第 8 步（排上该排的）都要**同时处理两个槽位**：
+
+```
+7.  all.filter { it.id !in overdueIds }.forEach { cancel(it.id) }        // cancel 内部两枚一起撤
+8.  overdue.forEachIndexed { index, occurrence ->
+        schedule(occurrence.id, nowMillis + index * SWEEP_STAGGER_MILLIS)
+    }
+8b. overdue.filter { ScheduleOverdueNag.endedInMorning(it, zone) }
+        .forEach { occurrence ->
+            scheduleEvening(occurrence.id,
+                ScheduleOverdueNag.nextEveningNagAt(nowMillis, eveningMinute, zone))
+        }
+```
+
+**8b 刻意不做 `index` 错开**：晚间是一次「当天收尾」的固定时点，所有上午结束的逾期项在同一时刻提醒正是该时点的本意；而第 8 步的间隔循环若不错开，开启开关那一刻会一次涌出十几条，那是另一个问题。这条差异要写进注释，否则会被后人当成漏写。
+
+`zone = ZoneId.systemDefault()`，在 `rearmAll` 内取一次即可（不要每项各取一次，跨零点时会不一致）。
+`eveningMinute = settings.scheduleOverdueNagEveningMinute.coerceIn(0, 1435)`。
+
+### 13.6 `ScheduleOverdueNagDispatcher` 追加
+
+把既有的 8 步校验抽成一个私有方法，两个公开入口共用，避免复制粘贴：
+
+```kotlin
+suspend fun dispatch(app: ProjectLumenApplication, occurrenceId: Long, nowMillis: Long)
+suspend fun dispatchEvening(app: ProjectLumenApplication, occurrenceId: Long, nowMillis: Long)
+
+private suspend fun resolveValidated(
+    app: ProjectLumenApplication,
+    occurrenceId: Long,
+    nowMillis: Long,
+): Pair<ScheduleOccurrenceEntity, AppSettingsEntity>?
+```
+
+`resolveValidated` 承担原第 1–5 步（取行 → `completed` → 取设置 → 开关 → `isOverdue`），返回 `null` 表示应当静默退出。
+
+两个入口的差异：
+
+- `dispatch`（间隔槽触发）：发通知 → 排下一轮**间隔**槽 → 调 `armEveningSlot`
+- `dispatchEvening`（晚间槽触发）：发通知 → 调 `armEveningSlot` → 排下一轮**间隔**槽
+
+**两个入口都通过同一个私有 `armEveningSlot` 补排晚间槽**，该 helper 内部是**唯一**一处 `endedInMorning` 判定：
+
+```kotlin
+private fun armEveningSlot(scheduler, occurrence, settings, nowMillis) {
+    val zone = ZoneId.systemDefault()
+    if (!ScheduleOverdueNag.endedInMorning(occurrence, zone)) return
+    scheduler.scheduleEvening(occurrence.id,
+        ScheduleOverdueNag.nextEveningNagAt(nowMillis, settings.scheduleOverdueNagEveningMinute.coerceIn(0, 1435), zone))
+}
+```
+
+> **为什么两个入口都要补排晚间槽，而不是各管各的**（原设计写的是「各自只重排自己那一枚」，实现在此基础上做了收敛）：
+>
+> 单侧补排的动机是「避免 `dispatch` 漏判 `endedInMorning` 而给下午结束的待办也催」。但这个风险**只要判定只存在一处**就消失了 —— 现在两个入口调的是同一个 `armEveningSlot`，`rearmAll` 第 8b 步也调同一个判定函数，三处不可能漂移。而保留双侧补排换来一条不变量：**任意一轮结束后，两枚闹钟都是按同一套判定对齐的**，不会出现「间隔槽在跑、晚间槽因为某次失败或丢失而长期缺位」。
+>
+> 代价是 K-12 记录的那点节奏扰动。
+
+**两个入口都发通知**，用的是同一个通知 id。因此 21:30 那一下会把间隔槽最近一条通知就地更新并重新响铃，不会堆叠。
+
+> 原 §5 第 8 步的「无条件再排下一轮、没有过期不补判定」在 `dispatch` 一侧保持不变；`dispatchEvening` 同样无条件排下一晚，理由一致。
+
+### 13.7 `AlarmReceiver` 追加第二个分支
+
+在 §6.2 的分支之后、护眼 `reconcileNow` 之前：
+
+```kotlin
+if (intent.action == ACTION_SCHEDULE_OVERDUE_EVENING) {
+    val occurrenceId = intent.getLongExtra(ScheduleOverdueNagScheduler.EXTRA_OCCURRENCE_ID, 0L)
+    if (occurrenceId != 0L) {
+        app.notifications.ensureChannels()
+        ScheduleOverdueNagDispatcher.dispatchEvening(app, occurrenceId, System.currentTimeMillis())
+    }
+    return@runCatching
+}
+```
+
+同样**必须提前返回**。
+
+### 13.8 设置页追加
+
+`ScheduleOverdueNagCard` 在间隔滑杆之后追加第三个控件（同样仅在开关打开时渲染）：
+
+```kotlin
+NumberSlider(
+    R.string.schedule_overdue_nag_evening_time,
+    Icons.Outlined.Schedule,
+    settings.scheduleOverdueNagEveningMinute,
+    0f..1435f,
+    0,
+    timeOfDayLabel(settings.scheduleOverdueNagEveningMinute),
+) { viewModel.setScheduleOverdueNagEveningMinute(snapTimeMinute(it)) }
+```
+
+- `timeOfDayLabel(totalMinutes: Int)` 与 `snapTimeMinute(value: Int)` 已存在于 `app/ProjectLumenUiFormatters.kt`，均为 `internal`，**同包 `com.projectlumen.app.app`，不需要 import、也不需要改可见性**。直接复用，**不要复制第二份**（复制出的两份必然漂移）。
+- 两个工具都与 `autoDarkStartMinute` / `autoDarkEndMinute` 用的是同一套，因此晚间时刻的交互与设置页既有时间项**完全一致**：5 分钟粒度、`time_value` 文案。
+- `snapTimeMinute` 内已含 `coerceIn(0, 1435)`，所以 ViewModel 一侧的 `coerceIn` 是第二道防线而非唯一防线。
+- **不改** `NumberSlider` 的签名。
+
+`ProjectLumenViewModel` 追加第三个门面方法，与 §8.2 同构（先落库再重排）：
+
+```kotlin
+fun setScheduleOverdueNagEveningMinute(minute: Int) {
+    val clamped = minute.coerceIn(0, 1435)
+    CrashBreadcrumbs.record("Action setScheduleOverdueNagEveningMinute=$clamped")
+    updateSettings { it.copy(scheduleOverdueNagEveningMinute = clamped) }
+    reportingScope.launch { rescheduleScheduleReminders() }
+}
+```
+
+（`CrashBreadcrumbs.record` 与 §8.2 两个方法保持一致——n3-ui 实现时给那两个方法加了，这里同样加，否则同一张卡片里三个控件只有两个留痕。）
+
+### 13.9 字符串追加（两侧各 +1，并修订 1 条）
+
+| key | 英文 | 中文 |
+|---|---|---|
+| `schedule_overdue_nag_evening_time` | Evening reminder | 晚间补催时间 |
+
+并把 `schedule_overdue_nag_hint` 修订为：
+
+| 语言 | 新文案 |
+|---|---|
+| en | A to-do past its end time keeps notifying at this interval until you check it off. Ones that ended in the morning also remind you once every evening. Quiet hours and the eye-care notification switch do not silence either. |
+| zh | 过了结束时刻仍未勾选的待办会按此间隔持续通知，直到你勾选完成为止；上午结束的待办每晚还会再补催一次。免打扰时段与护眼通知开关都不会压制它们。 |
+
+### 13.10 测试追加
+
+| 编号 | 用例 | 断言 |
+|---|---|---|
+| N-11 | `endedInMorning`：本地 07:30 结束 | true |
+| N-12 | `endedInMorning`：本地 12:00 结束 | false（严格小于） |
+| N-13 | `endedInMorning`：本地 21:00 结束 | false |
+| N-14 | `endedInMorning` 的时区正确性 | 同一个 epoch 毫秒，在 `Asia/Shanghai` 判 true，在 `America/New_York` 判 false（用来钉死「不能用 UTC 取模」） |
+| N-15 | `nextEveningNagAt`：now 早于今晚该时刻 | 返回**今天**该时刻 |
+| N-16 | `nextEveningNagAt`：now 晚于今晚该时刻 | 返回**明天**该时刻 |
+| N-17 | `nextEveningNagAt` 跨夏令时 | 在 `America/New_York` 的 DST 切换日，返回的本地时刻仍是 21:30 |
+
+### 13.11 本节核对清单（与 §11 并行勾选）
+
+> **进度：15 / 16 已勾选**（C-46 需随 C-30 一起由 CI 判定）。
+
+- [x] C-31 `AppSettingsEntity.kt:117-118` —— 追加 `scheduleOverdueNagEveningMinute`，默认 `1290`
+- [x] C-32 `AppDatabase.kt:225` —— `MIGRATION_19_20` 第三列，`INTEGER NOT NULL DEFAULT 1290`；version 未再 bump，未新增迁移对象
+- [x] C-33 `ScheduleOverdueNag.kt:15-19, 42, 45, 91-115` —— 四个成员齐全；类 KDoc 已改写，明确「这两个成员依赖时区是不可避免的」
+- [x] C-34 `ScheduleOverdueNag.kt:92-93` —— 用 `Instant.ofEpochMilli(...).atZone(zoneId)` 取本地时刻；KDoc 点明 `endAt % 86_400_000` 会把东八区 07:30 算成 23:30
+- [x] C-35 `ScheduleOverdueNagScheduler.kt:45-47, 63-68, 104-107` —— `scheduleEvening` 存在；`cancel` 遍历 `NAG_ACTIONS`，两枚一起撤
+- [x] C-36 `ScheduleOverdueNagScheduler.kt:155-172` —— 第 8b 步已加，**未**做 index 错开，注释写明与第 8 步相反的取舍理由
+- [x] C-37 `ScheduleOverdueNagScheduler.kt:23-27` —— 注释写明身份是 `(requestCode, Intent.filterEquals)`、靠 **action** 区分，并警告把两个 action 常量改成相同会静默合并两枚闹钟；`AlarmReceiver.kt:142 / 145` 两条字符串确实不同
+- [x] C-38 `ScheduleOverdueNagDispatcher.kt:68-84, 90-103` —— 两个入口共用 `resolveValidated`；`endedInMorning` 判定与晚间槽补排收在**唯一**一个 `armEveningSlot`，两个入口都调它
+- [x] C-39 `ScheduleOverdueNagDispatcher.kt:34-35, 48-49` —— 两个入口都发 `showScheduleOverdue`，通知 id 同为 `notificationIdFor(occurrenceId)`
+- [x] C-40 `AlarmReceiver.kt:62-76` —— `ACTION_SCHEDULE_OVERDUE_EVENING` 分支存在且提前返回
+- [x] C-41 `ProjectLumenScheduleOverdueSettings.kt:38-47` —— 晚间时间滑杆在既有 `if (settings.scheduleOverdueNagEnabled)` 块内
+- [x] C-42 `ProjectLumenViewModel.kt:506` 与 `ScheduleOverdueNag.kt:105` 双重 `coerceIn(0, 1435)`；`ProjectLumenUiFormatters.kt:239` 的 `snapTimeMinute` 内还有第三道
+- [x] C-43 `ProjectLumenViewModel.kt:505-510` —— 先 `updateSettings` 再 `rescheduleScheduleReminders()`，且 `coerceIn(0, 1435)`
+- [x] C-44 `ScheduleOverdueNagTest.kt:156-236` —— N-11 ~ N-17 落地；N-17 断言 DST 切换后本地仍是 21:30，且偏移由 `-5` 变 `-4`
+- [x] C-45 `values/strings.xml:992-993` / `values-zh/strings.xml:991-992` —— 两侧新增同一键且位置对应，`schedule_overdue_nag_hint` 已修订
+- [ ] C-46 提交已推送且 CI 全绿 —— **待本次提交结论**（与 C-30 同批）
+
+### 13.12 本节取舍
+
+| 编号 | 取舍 | 理由 |
+|---|---|---|
+| K-9 | 晚间补催不做错开，所有上午结束的逾期项在同一时刻响 | 那是「当天收尾」的固定时点，本该同时到达；错开会让它漂移到 21:31、21:32，反而破坏「9 点半」这个语义。与 K-6 的差异是有意的 |
+| K-10 | 已过今晚时刻时排到明晚，而不是立刻补一次 | 用户说的是「晚上 9 点半弹一下」，22:00 开机时立刻补一条会让人莫名其妙；间隔槽本来就会继续催，不会漏掉 |
+| K-11 | 晚间时刻与设置页既有时间项一样是 5 分钟粒度 | 与 `autoDarkStartMinute` / `autoDarkEndMinute` 复用同一套 `timeOfDayLabel` + `snapTimeMinute`，交互一致；21:30 本身就在 5 分钟网格上，粒度不会妨碍本需求 |
+| K-12 | 晚间槽触发时会顺带把间隔槽重排成 `now + interval`，间隔计时被重置一次 | 21:30 那一下等于把下一次间隔轮往后推，原本该在 22:00 响的那轮会挪到 23:30。代价是「每 2 小时」在晚间那一次前后有最多一个间隔的漂移。换来的是「任意一轮结束后两枚闹钟都与同一套判定对齐」这条不变量；对「反复催」的语义没有实质影响 |
+| K-13 | 间隔轮若落在「已过今晚时刻」的窗口内（Doze 延迟时可能），会把当晚仍待发的晚间闹钟改写成明晚 | 该窗口很窄，且间隔轮刚刚发过同一条通知，用户当下仍被提醒到，可观察影响接近零；不额外加「今晚是否已发过」的状态来消除它 |

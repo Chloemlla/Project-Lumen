@@ -20,4 +20,8 @@ object NotificationIds {
     const val GLOBAL_TOAST = 9501
     const val SCHEDULE_REMINDER_BASE = 9600
     const val SCHEDULE_REMINDER_RANGE = 300
+    // Must not overlap the SCHEDULE_REMINDER range (9600..9899): the id doubles as the alarm
+    // request code, so an overlap would let the two chains silently overwrite each other's alarms.
+    const val SCHEDULE_OVERDUE_BASE = 9900
+    const val SCHEDULE_OVERDUE_RANGE = 300
 }

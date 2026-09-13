@@ -44,6 +44,36 @@ class AlarmReceiver : BroadcastReceiver() {
                     }
                     return@runCatching
                 }
+                // Same early return as above, for the same reason: an overdue nag is the user's own
+                // to-do, and falling through would feed it to the eye-care engine as a phase advance.
+                if (intent.action == ACTION_SCHEDULE_OVERDUE_NAG) {
+                    val occurrenceId = intent.getLongExtra(
+                        ScheduleOverdueNagScheduler.EXTRA_OCCURRENCE_ID,
+                        0L,
+                    )
+                    if (occurrenceId != 0L) {
+                        app.notifications.ensureChannels()
+                        ScheduleOverdueNagDispatcher.dispatch(app, occurrenceId, System.currentTimeMillis())
+                    }
+                    return@runCatching
+                }
+                // The evening slot reaches the same user-owned to-do through a second alarm, so it
+                // gets the same early return for the same reason.
+                if (intent.action == ACTION_SCHEDULE_OVERDUE_EVENING) {
+                    val occurrenceId = intent.getLongExtra(
+                        ScheduleOverdueNagScheduler.EXTRA_OCCURRENCE_ID,
+                        0L,
+                    )
+                    if (occurrenceId != 0L) {
+                        app.notifications.ensureChannels()
+                        ScheduleOverdueNagDispatcher.dispatchEvening(
+                            app,
+                            occurrenceId,
+                            System.currentTimeMillis(),
+                        )
+                    }
+                    return@runCatching
+                }
                 val notifications = app.notifications
                 val settings = app.settingsRepository().getOrDefault()
                 val nowMillis = System.currentTimeMillis()
@@ -109,6 +139,10 @@ class AlarmReceiver : BroadcastReceiver() {
         const val ACTION_BREAK_DONE = "com.projectlumen.app.action.BREAK_DONE"
         const val ACTION_POMODORO = "com.projectlumen.app.action.POMODORO"
         const val ACTION_SCHEDULE_REMINDER = "com.projectlumen.app.action.SCHEDULE_REMINDER"
+        const val ACTION_SCHEDULE_OVERDUE_NAG = "com.projectlumen.app.action.SCHEDULE_OVERDUE_NAG"
+        // A second action, not a second request code: the two nag slots are distinguished by their
+        // Intent action (see ScheduleOverdueNagScheduler), so these two constants must stay distinct.
+        const val ACTION_SCHEDULE_OVERDUE_EVENING = "com.projectlumen.app.action.SCHEDULE_OVERDUE_EVENING"
 
         private val REMINDER_ACTIONS = setOf(ACTION_PRE_ALERT, ACTION_BREAK_DUE, ACTION_BREAK_DONE)
 

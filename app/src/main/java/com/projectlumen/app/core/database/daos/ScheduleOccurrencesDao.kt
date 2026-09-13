@@ -21,6 +21,14 @@ interface ScheduleOccurrencesDao {
     @Query("SELECT * FROM schedule_occurrences WHERE seriesId = :seriesId AND deletedAt = 0")
     suspend fun getBySeries(seriesId: Long): List<ScheduleOccurrenceEntity>
 
+    /**
+     * Every live row, completed ones included. The overdue-nag sweep needs to see the completed rows
+     * to cancel their alarms, and it needs a one-shot snapshot inside a suspend reschedule path —
+     * [observeAll] is a `Flow` and cannot serve either purpose.
+     */
+    @Query("SELECT * FROM schedule_occurrences WHERE deletedAt = 0")
+    suspend fun getActive(): List<ScheduleOccurrenceEntity>
+
     @Query("SELECT * FROM schedule_occurrences WHERE deletedAt = 0 AND startAt >= :fromMillis ORDER BY startAt ASC, id ASC")
     suspend fun getUpcoming(fromMillis: Long): List<ScheduleOccurrenceEntity>
 

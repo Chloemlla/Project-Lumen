@@ -22,6 +22,7 @@ import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.repositories.DeviceInsightsRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.schedule.ScheduleDraft
+import com.projectlumen.app.core.schedule.ScheduleOverdueNag
 import com.projectlumen.app.core.services.AuraAudioService
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
@@ -484,6 +485,29 @@ class ProjectLumenViewModel(
 
     fun setScheduleCompleted(id: Long, completed: Boolean) =
         scheduleEntry.setCompleted(id, completed)
+
+    // All three setters persist before rescheduling on purpose: rescheduleScheduleReminders()
+    // re-reads app_settings, so rescheduling first would align the alarms against the stale value
+    // and the switch would look like it needs a second tap to take effect.
+    fun setScheduleOverdueNagEnabled(enabled: Boolean) {
+        CrashBreadcrumbs.record("Action setScheduleOverdueNagEnabled=$enabled")
+        updateSettings { it.copy(scheduleOverdueNagEnabled = enabled) }
+        reportingScope.launch { rescheduleScheduleReminders() }
+    }
+
+    fun setScheduleOverdueNagIntervalMinutes(minutes: Int) {
+        val clamped = ScheduleOverdueNag.clampIntervalMinutes(minutes)
+        CrashBreadcrumbs.record("Action setScheduleOverdueNagIntervalMinutes=$clamped")
+        updateSettings { it.copy(scheduleOverdueNagIntervalMinutes = clamped) }
+        reportingScope.launch { rescheduleScheduleReminders() }
+    }
+
+    fun setScheduleOverdueNagEveningMinute(minute: Int) {
+        val clamped = minute.coerceIn(0, 1435)
+        CrashBreadcrumbs.record("Action setScheduleOverdueNagEveningMinute=$clamped")
+        updateSettings { it.copy(scheduleOverdueNagEveningMinute = clamped) }
+        reportingScope.launch { rescheduleScheduleReminders() }
+    }
 
     fun shareStatistics() = reportIfThrows {
         sharingEntry.shareStatistics()

@@ -47,7 +47,7 @@ import com.projectlumen.app.BuildConfig
         ScheduleSeriesEntity::class,
         ScheduleOccurrenceEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -215,6 +215,14 @@ abstract class AppDatabase : RoomDatabase() {
         private val MIGRATION_18_19 = object : Migration(18, 19) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 createScheduleTables(db)
+            }
+        }
+
+        private val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                addColumnIfMissing(db, "app_settings", "scheduleOverdueNagEnabled", "INTEGER NOT NULL DEFAULT 0")
+                addColumnIfMissing(db, "app_settings", "scheduleOverdueNagIntervalMinutes", "INTEGER NOT NULL DEFAULT 120")
+                addColumnIfMissing(db, "app_settings", "scheduleOverdueNagEveningMinute", "INTEGER NOT NULL DEFAULT 1290")
             }
         }
 
@@ -502,6 +510,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_16_17,
                     MIGRATION_17_18,
                     MIGRATION_18_19,
+                    MIGRATION_19_20,
                 )
             if (BuildConfig.DEBUG) {
                 builder.fallbackToDestructiveMigration(dropAllTables = true)
