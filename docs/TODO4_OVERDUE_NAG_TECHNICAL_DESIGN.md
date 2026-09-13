@@ -805,6 +805,8 @@ overdue.forEach { occurrence ->
 
 ### 14.4 本节核对清单
 
+**进度：9 / 9 已勾选**（C-55 已由 `d9d2129` 的 run `34733707375` 判定）。
+
 - [x] C-47 `AlarmReceiver.ACTION_SCHEDULE_OVERDUE_COMPLETE` 已定义，分支提前返回，未落到眼护理路径
 - [x] C-48 动作按钮的 request code 是 `notificationIdFor(occurrenceId)` 而非共享常量（否则 extras 互相覆盖，勾错条目）
 - [x] C-49 勾选后显式 `cancelScheduleOverdue`，未依赖 `setAutoCancel(true)`（该 flag 对动作按钮不生效）
@@ -813,7 +815,7 @@ overdue.forEach { occurrence ->
 - [x] C-52 `rearmAll` 第 8b 步改为 `forEach` 分支，`else` 走 `cancelEvening`；晚间仍不错开
 - [x] C-53 `schedule_overdue_complete` 在 `values/` 与 `values-zh/` 两侧同时存在
 - [x] C-54 无新增 `<receiver>` / `<service>`，`AndroidManifest.xml` 未改动（§6.4 / C-20 继续成立）
-- [ ] C-55 提交已推送且 CI 全绿
+- [x] C-55 提交已推送且 CI 全绿 —— `d9d2129` 的 `Build Project Lumen Android` run `34733707375` 五个 job 全 `success`（`Resolve build identity` / `JVM unit tests` / `Android lint` / `Assemble release APK` / `Publish release`）
 
 ### 14.5 本节取舍
 
