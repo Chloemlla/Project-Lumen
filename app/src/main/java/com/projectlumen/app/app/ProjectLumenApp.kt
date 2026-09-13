@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.EventNote
 import androidx.compose.material.icons.outlined.Gavel
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Info
@@ -72,10 +73,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.projectlumen.app.R
 import com.projectlumen.app.ProjectLumenApplication
 import com.chloemlla.lumen.crash.CrashReport
@@ -117,6 +120,7 @@ internal enum class Destination(
     STATS("stats", R.string.nav_stats, Icons.Outlined.BarChart),
     SETTINGS("settings", R.string.nav_settings, Icons.Outlined.Settings),
     TRANSLATION("translation", R.string.nav_translation, Icons.Outlined.Translate, false),
+    SCHEDULE("schedule", R.string.nav_schedule, Icons.Outlined.EventNote, false),
     TEMPLATES("templates", R.string.nav_templates, Icons.Outlined.Style, false),
     ABOUT("about", R.string.nav_about, Icons.Outlined.Info, false),
     DEVELOPER("developer", R.string.nav_developer, Icons.Outlined.Code, false),
@@ -345,7 +349,12 @@ fun ProjectLumenApp(
             val backStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = backStackEntry?.destination?.route
             val currentDestination = remember(currentRoute) {
-                Destination.entries.firstOrNull { it.route == currentRoute } ?: Destination.HOME
+                // A destination with arguments reports its full route pattern (`base?arg={arg}`),
+                // so the base segment has to match too or every such page falls back to Home.
+                Destination.entries.firstOrNull { destination ->
+                    currentRoute == destination.route ||
+                        currentRoute?.startsWith("${destination.route}?") == true
+                } ?: Destination.HOME
             }
             val topBarScrollState = rememberSaveable(
                 currentDestination.route,
@@ -482,10 +491,34 @@ fun ProjectLumenApp(
                                 uiState = uiState,
                                 viewModel = viewModel,
                                 openTranslation = { navController.navigate(Destination.TRANSLATION.route) },
+                                openSchedule = { scheduleId ->
+                                    navController.navigate(
+                                        "${Destination.SCHEDULE.route}?scheduleId=$scheduleId",
+                                    )
+                                },
+                                createSchedule = { navController.navigate(Destination.SCHEDULE.route) },
                             )
                         }
                         composable(Destination.BREAK.route) { BreakScreen(uiState, viewModel) }
                         composable(Destination.POMODORO.route) { PomodoroScreen(uiState, viewModel) }
+                        composable(
+                            route = "${Destination.SCHEDULE.route}?scheduleId={scheduleId}",
+                            arguments = listOf(
+                                navArgument("scheduleId") {
+                                    type = NavType.LongType
+                                    defaultValue = 0L
+                                },
+                            ),
+                        ) { entry ->
+                            val scheduleId = entry.arguments?.getLong("scheduleId") ?: 0L
+                            // 0 is the create entry point; any other id loads that to-do.
+                            LaunchedEffect(scheduleId) { viewModel.openScheduleDetail(scheduleId) }
+                            ScheduleDetailScreen(
+                                uiState = uiState,
+                                viewModel = viewModel,
+                                onBack = { navigateBackFromSecondaryPage() },
+                            )
+                        }
                         composable(Destination.STATS.route) { StatisticsScreen(uiState, viewModel) }
                         composable(Destination.SETTINGS.route) {
                             SettingsScreen(

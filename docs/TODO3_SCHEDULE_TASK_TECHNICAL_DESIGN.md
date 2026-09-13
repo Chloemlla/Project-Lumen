@@ -266,7 +266,9 @@ interface ScheduleOccurrencesDao {
 }
 ```
 
-> 所有软删除都**保留已完成（`completed = 1`）与已脱离（`detached = 1`）的行**，历史与用户手改不被清掉。
+> **软删除的取舍（区分两类）**：`softDeleteSeriesFrom`、`softDeleteSeriesGenerated`、`pruneGeneratedOutsideWindow` 带 `detached = 0 AND completed = 0` 过滤 —— 它们清掉的是**可由系列规则原样重建**的行，用户手改（`detached`）与已完成的历史必须保留。
+> `softDeleteSeriesAll` **不过滤**：它表达的是「整条系列连同历史一并删除」，此时留下孤儿实例没有意义。
+> 另注意 `softDelete(seriesId)` 只软删系列行；在 `update`/`delete` 的 `ALL` 分支里，必须**同时**调用它，否则该系列仍是 active，下一次 `materializeAll` 会立刻把实例重新物化回来。
 
 ---
 
@@ -450,6 +452,7 @@ class ScheduleRepository(
     private val occurrencesDao: ScheduleOccurrencesDao,
     private val materializer: ScheduleMaterializer,
     private val now: () -> Long = { System.currentTimeMillis() },
+    private val onScheduleChanged: () -> Unit = {},
 ) {
     fun observeAll(): Flow<List<ScheduleOccurrenceEntity>>
 
@@ -467,7 +470,7 @@ class ScheduleRepository(
 
     suspend fun setCompleted(id: Long, completed: Boolean)
 
-    /** 窗口内、未完成、未删除、有提醒设置的实例，按 startAt 升序。供提醒调度使用。 */
+    /** `startAt >= nowMillis` 且未完成、有提醒设置的实例，按 startAt 升序，取前 limit 条。供提醒调度使用。 */
     suspend fun upcomingReminders(nowMillis: Long, limit: Int): List<ScheduleOccurrenceEntity>
 
     suspend fun markReminderFired(id: Long, firedAt: Long)
@@ -497,8 +500,10 @@ class ScheduleRepository(
 **A. 独立日程（`target.seriesId == 0`）**
 
 - 三个 scope 行为一致：直接写回 `target.copy(...)` 的新字段。
+- `originalStartAt` 随 `startAt` **同步更新**：独立日程的 `originalStartAt` 恒等于 `startAt`（§3.2）。
 - 特殊：`draft.recurrence != NONE` → **升级为系列**：删掉该独立实例（软删），按 `create(draft)` 建系列，返回新实例 id。
-- 特殊：系列/独立均可改 `recurrence` 为 `NONE` 表示「不再重复」→ 见 D。
+- 特殊：改 `recurrence` 为 `NONE` 表示「不再重复」→ 见 D。
+- 防御分支：`seriesId != 0` 但系列行已不存在（脏数据）时，降级为 B 的写法（按 `THIS_ONLY` 处理并置 `detached = true`），不抛异常。
 
 **B. `THIS_ONLY`**
 
@@ -509,22 +514,24 @@ class ScheduleRepository(
 
 **C. `THIS_AND_FUTURE`**
 
-1. `delta = draft.startAt - target.originalStartAt`（用 `originalStartAt` 而非 `startAt`，保证 `detached` 过的实例也能算对）。
-2. 若 `target.originalStartAt <= series.startAt`（改的就是系列首次）→ 直接按 **D（ALL）** 处理。
-3. 否则：
+> 本分支**不需要 delta**：新系列的锚点直接取 `draft.startAt`，平移量只有 D 才用得到。
+
+1. 若 `target.originalStartAt <= series.startAt`（改的就是系列首次）→ 直接按 **D（ALL）** 处理。
+2. 否则：
    - `seriesDao.truncate(series.id, until = target.originalStartAt - 1, updatedAt = now)`（旧系列截止到该次之前）。
    - `occurrencesDao.softDeleteSeriesFrom(series.id, target.originalStartAt, now)`（清掉旧系列从该次起**未完成、未脱离**的已生成实例）。
-   - 建新系列：锚点 `startAt = draft.startAt`、`endAt = draft.startAt + (draft.endAt - draft.startAt)`；`recurrence`、`recurrenceUntil`、`reminder*`、`title`、`category`、`allDay` 全取 `draft`。
-   - 物化新系列。
+   - **`draft.recurrence == NONE`（从此刻起不再重复）**：不建新系列，改插一条独立日程（`seriesId = 0`、`originalStartAt = draft.startAt`），`target.completed` 时迁移完成态。系列层不存 `NONE`。
+   - 否则建新系列：锚点 `startAt = draft.startAt`、`endAt = draft.startAt + (draft.endAt - draft.startAt)`；`recurrence`、`recurrenceUntil`、`reminder*`、`title`、`category`、`allDay` 全取 `draft`；然后物化。
    - 若 `target.completed`：在新系列中找到 `originalStartAt == draft.startAt` 的实例，置 `completed = true`（迁移完成态）。
+   - 返回值：新系列中 `originalStartAt == draft.startAt` 的实例 id；找不到时回退该系列最早一条，再找不到为 `0L`。
 
 **D. `ALL`**
 
-1. `delta = draft.startAt - target.originalStartAt`。
+1. `delta = draft.startAt - target.originalStartAt`（用 `originalStartAt` 而非 `startAt`，保证 `detached` 过的实例也能算对）。
 2. 平移系列锚点：`startAt = series.startAt + delta`、`endAt = series.endAt + delta`，其余字段取 `draft`（`title / category / allDay / recurrence / recurrenceUntil / reminderMinutesBefore / reminderMethod`）。
 3. `occurrencesDao.softDeleteSeriesGenerated(series.id, now)`（清掉**全部未完成、未脱离**的生成实例）。
 4. 物化系列。
-5. `draft.recurrence == NONE` 时：不保留系列，改为 `softDeleteSeriesAll(series.id, now)` + 按 `create(draft)` 建一条独立日程（用 `target.completed` 迁移完成态）。
+5. `draft.recurrence == NONE` 时：不保留系列 —— `softDeleteSeriesAll(series.id, now)` **并且** `seriesDao.softDelete(series.id, now)`（少了后者该系列仍是 active，下一次 `materializeAll` 会立刻把实例重新物化回来）—— 然后插一条独立日程（用 `target.completed` 迁移完成态）。
 
 ### 6.3 `delete(id, scope)`
 
@@ -617,6 +624,10 @@ object ScheduleReminderDispatcher {
 7. 按 `reminderMethod` 发通知（调用 `NotificationService.showScheduleReminder(...)`，见 §7.5）。
 8. `occurrencesDao.markReminderFired(id, nowMillis)`。
 
+> **两点有意为之的语义**（核对时不要当成 bug）：
+> 1. 步骤 4/5/6 三条「不响」路径**不**标记 `reminderFiredAt`：它们表达的不是「已提醒过」，而是「这条本来就不该提醒」，而且 §7.6 的重排本身也会过滤掉它们（只排 `triggerAt > now && reminderFiredAt == 0`）。
+> 2. 系统通知权限缺失时 `NotificationService.show()` 会静默返回，但步骤 8 仍执行 —— 该提醒就此被消费，不再补发。理由：拒绝通知权限是用户的选择，反复重试只会在用户某次重新授权时一次性炸出一堆过期提醒（与步骤 3 的过期抑制同源）。
+
 ### 7.5 `NotificationService` 追加
 
 ```kotlin
@@ -639,16 +650,31 @@ fun showScheduleReminder(occurrence: ScheduleOccurrenceEntity)
 
 ### 7.6 `BootReceiver` 追加
 
-在 `restoreScheduledWork(app)` 内、`reconcileNow` **之前**追加：
+在 `restoreScheduledWork(app)` 内、`reconcileNow` **之前**追加一次 `app.rescheduleScheduleReminders()`。
+
+落盘后的实现把「补窗口 + 建闹钟」收进了 `ProjectLumenApplication` 的单一入口（开机、精确闹钟权限变更、日程编辑三条路径共用，避免三处重复构造仓储）：
 
 ```kotlin
-val scheduleRepository = ScheduleRepository(
-    app.database.scheduleSeriesDao(),
-    app.database.scheduleOccurrencesDao(),
-    ScheduleMaterializer(app.database.scheduleSeriesDao(), app.database.scheduleOccurrencesDao()),
-)
-scheduleRepository.refreshWindow()          // 先补齐物化窗口
-ScheduleAlarmRestore.rearm(app, scheduleRepository)   // 再重建闹钟
+// ProjectLumenApplication.kt
+val scheduleRepository: ScheduleRepository by lazy {
+    ScheduleRepository(
+        database.scheduleSeriesDao(),
+        database.scheduleOccurrencesDao(),
+        ScheduleMaterializer(database.scheduleSeriesDao(), database.scheduleOccurrencesDao()),
+    )
+}
+
+suspend fun rescheduleScheduleReminders() {
+    scheduleRepository.refreshWindow()                    // 先补齐物化窗口
+    ScheduleAlarmRestore.rearm(this, scheduleRepository)  // 再重建闹钟
+}
+```
+
+`BootReceiver` 侧：
+
+```kotlin
+runCatching { app.rescheduleScheduleReminders() }
+    .onFailure { throwable -> app.recordHandledFailure(throwable) }
 ```
 
 `core/services/ScheduleAlarmRestore.kt`（新增）：
@@ -678,10 +704,33 @@ object ScheduleAlarmRestore {
 
 装配位置（二选一，实现时择一并保持一致）：
 
-- `ProjectLumenApplication` 提供 `val scheduleReminders: ScheduleReminderScheduler by lazy { ScheduleReminderScheduler(this) }` 与一个 `suspend fun rescheduleScheduleReminders()`。
+- `ProjectLumenApplication` 提供 `val scheduleRepository: ScheduleRepository by lazy { ... }` 与 `suspend fun rescheduleScheduleReminders()`。
 - `ProjectLumenScheduleFeatureEntry` 在每次写操作后调用 `ScheduleAlarmRestore.rearm(...)`。
 
-> 本次实现选 **FeatureEntry 侧重排**：`ScheduleRepository` 构造函数保留 `onScheduleChanged: () -> Unit = {}` 参数以便未来下沉，但实际重排在 FeatureEntry 内完成，避免仓储持有 `Context`。
+> 本次实现**两者都用了**，分工如下：
+>
+> - `ScheduleRepository` 构造函数保留 `onScheduleChanged: () -> Unit = {}` 参数以便未来下沉，但不使用（四类实例都不传），避免仓储持有 `Context`。
+> - 真正的重排入口是 `ProjectLumenApplication.rescheduleScheduleReminders()`（§7.6），开机 / 精确闹钟权限变更 / 日程编辑三条路径共用。
+> - `ProjectLumenScheduleFeatureEntry` 的 `rearm: suspend () -> Unit` 由 `ProjectLumenViewModel` 的构造参数 `rescheduleScheduleReminders: suspend () -> Unit` 注入，`MainActivity` 传 `app::rescheduleScheduleReminders`。ViewModel 本身没有 `Context`，只能靠回调。
+> - 因此 `persist()` / `delete()` / `setCompleted()` 里的 `rearm()` 调用点位于 FeatureEntry（与本节结论一致），但**实际执行体**在 Application。
+
+### 7.8 `ExactAlarmPermissionReceiver` 追加（启动期之外的第二个重排点）
+
+`core/services/ExactAlarmPermissionReceiver.kt` 原本只在用户授予/撤销精确闹钟权限时重排**护眼**闹钟。日程提醒同样受该权限支配，所以这个 receiver 里也必须补一次：
+
+```kotlin
+runCatching {
+    app.rescheduleScheduleReminders()   // 同 §7.6 的单一入口
+}.onFailure { throwable -> app.recordHandledFailure(throwable) }
+```
+
+要点：
+
+- 必须放在 `app.runtimeRepository().get() ?: return@runCatching` **之前**，否则 runtime 为空时日程重排会被整段跳过。
+- 单独包一层 `runCatching`：日程失败不能连累护眼闹钟的 `syncRuntimeAlarms`。
+- 权限**授予**时把降级的不精确闹钟升级为精确，**撤销**时反向降级。由于 `PendingIntent` 复用同一 request code 且带 `FLAG_UPDATE_CURRENT`，`setExactAndAllowWhileIdle` / `setAndAllowWhileIdle` 会就地替换原闹钟，**无需先 cancel**。
+
+> 不补这一步的后果：用户在系统设置里刚授予精确闹钟权限后，已排的日程提醒仍停留在 `setAndAllowWhileIdle` 的降级排程，要等下次开机或重新打开 App 才升级 —— 这期间提醒可能延迟数分钟到数十分钟。
 
 ---
 
@@ -979,51 +1028,60 @@ fun setScheduleCompleted(id: Long, completed: Boolean)
 
 实现完成后逐条核对；每条要么 ✅ 已实现（附文件:行号），要么 ⏸ 挂起（附理由）。
 
+> 核对时间 2026-09-13，核对方式：逐文件读落盘代码 + `git diff`，**不采信子代理自述**。
+> 行号以核对当次的工作区为准，后续改动可能位移。
+>
+> **进度：36 / 37 已勾选。** 唯一未勾选的是 C-36（提交推送 + CI 全绿），需推送后由
+> `gh api repos/{owner}/{repo}/commits/{sha}/check-runs` 逐 job 判定后回填。
+>
+> 核对过程中判定失败并已修复的 1 条：**C-22**（早期 `rearm` 只刷新物化窗口、不排闹钟）。
+
 ### 12.1 数据层
-- [ ] C-01 四个枚举文件存在且值与 §2 一致
-- [ ] C-02 `ScheduleSeriesEntity` 字段与 §3.1 表逐列一致
-- [ ] C-03 `ScheduleOccurrenceEntity` 字段与 §3.2 表逐列一致，含 3 个索引
-- [ ] C-04 `ScheduleSeriesDao` 方法齐全（含 `truncate` / `softDelete`）
-- [ ] C-05 `ScheduleOccurrencesDao` 方法齐全（含 `getOriginalStartAts` / `pruneGeneratedOutsideWindow` / 三个软删变体）
-- [ ] C-06 展开引擎 6 种规则 + 4 条统一规则全部实现
-- [ ] C-07 物化器实现窗口 7 天前 / 60 天后 + 去重 + 清理，且不清理 `detached` / `completed`
-- [ ] C-08 `ScheduleRepository` 7 个公开方法齐全
-- [ ] C-09 三种编辑范围语义与 §6.2 / §6.3 逐条一致
-- [ ] C-10 展开引擎单测 T-1 ~ T-10 全部落地
+- [x] C-01 四个枚举文件存在且值与 §2 一致 — `core/enums/{ScheduleRecurrence,ScheduleEditScope,ScheduleReminderMethod,ScheduleCategory}.kt`
+- [x] C-02 `ScheduleSeriesEntity` 字段与 §3.1 表逐列一致 — `core/database/entities/ScheduleSeriesEntity.kt`（14 列）
+- [x] C-03 `ScheduleOccurrenceEntity` 字段与 §3.2 表逐列一致，含 3 个索引 — `core/database/entities/ScheduleOccurrenceEntity.kt`（19 列，`indices = [seriesId, startAt, deletedAt]`）
+- [x] C-04 `ScheduleSeriesDao` 方法齐全（含 `truncate` / `softDelete`） — `core/database/daos/ScheduleSeriesDao.kt:23-27`
+- [x] C-05 `ScheduleOccurrencesDao` 方法齐全（含 `getOriginalStartAts` / `pruneGeneratedOutsideWindow` / 三个软删变体） — `core/database/daos/ScheduleOccurrencesDao.kt:28-59`
+- [x] C-06 展开引擎 6 种规则 + 4 条统一规则全部实现 — `core/schedule/ScheduleRecurrenceExpander.kt:31-68`（统一规则：`recurrenceUntil` 截断、`toMillis` 截断、`limit` 上限、迭代预算）
+- [x] C-07 物化器实现窗口 7 天前 / 60 天后 + 去重 + 清理，且不清理 `detached` / `completed` — `core/schedule/ScheduleMaterializer.kt`（`PAST_WINDOW_DAYS = 7` / `FUTURE_WINDOW_DAYS = 60`；`pruneGeneratedOutsideWindow` 的 SQL 带 `detached = 0 AND completed = 0`）
+- [x] C-08 `ScheduleRepository` 公开方法齐全 — `core/repositories/ScheduleRepository.kt`，**实际 10 个**（`observeAll` / `get` / `getSeries` / `create` / `update` / `delete` / `setCompleted` / `upcomingReminders` / `markReminderFired` / `refreshWindow`）。原文写的「7 个」是起草时的估算，以实现为准。
+- [x] C-09 三种编辑范围语义与 §6.2 / §6.3 逐条一致 — `core/repositories/ScheduleRepository.kt:68-149`（分发）、`:178-282`（`updateThisOnly` / `updateThisAndFuture` / `updateAll`）
+- [x] C-10 展开引擎单测 T-1 ~ T-10 全部落地 — `app/src/test/java/com/projectlumen/app/core/schedule/ScheduleRecurrenceExpanderTest.kt`（10 个测试，各自钉死 `ZoneId`：`shanghai` / `utc` / `newYork`）
 
 ### 12.2 接线
-- [ ] C-11 `AppDatabase` version = 19，实体/DAO 注册齐全
-- [ ] C-12 `MIGRATION_18_19` 的建表 SQL 与实体逐列一致，索引名与 Room 生成名一致
-- [ ] C-13 `ProjectLumenRepositories` 暴露 `schedule`
-- [ ] C-14 `ProjectLumenUiState.scheduleTasks` 存在
-- [ ] C-15 `ProjectLumenStateStore` 用合法 arity 的 `combine` 接入了 schedule 流（未使用不存在的 6 参重载）
+- [x] C-11 `AppDatabase` version = 19，实体/DAO 注册齐全 — `core/database/AppDatabase.kt:50`（version）、`:64-65`（两个 DAO 访问器）、`:504`（迁移注册）
+- [x] C-12 `MIGRATION_18_19` 的建表 SQL 与实体逐列一致，索引名与 Room 生成名一致 — `core/database/AppDatabase.kt:215-218`（`Migration(18, 19)`）→ `:324`（`createScheduleTables`，2 个 `CREATE TABLE` + 3 个 `CREATE INDEX`，索引名用 Room 的 `index_<表>_<列>` 约定）。**已与实体逐列对照**：Room 的 `TableInfo` 校验只在运行时发生，编译期不会报错，所以这一条必须人肉核对。
+- [x] C-13 `ProjectLumenRepositories` 暴露 `schedule` — `app/ProjectLumenRepositories.kt:41-45`
+- [x] C-14 `ProjectLumenUiState.scheduleTasks` 存在 — `app/ProjectLumenUiState.kt:42`
+- [x] C-15 `ProjectLumenStateStore` 用合法 arity 的 `combine` 接入了 schedule 流（未使用不存在的 6 参重载） — `app/ProjectLumenStateStore.kt:72-75`（内层 2 参 `combine` 产出 `DeviceAndScheduleSnapshot`）、`:100`（`scheduleTasks = deviceAndSchedule.scheduleTasks`）、`:131`。Kotlin 标准库 `combine` **没有** 6 个具名参数的公开重载，所以拆成「内层 2 参 + 外层 5 参」。
 
 ### 12.3 提醒
-- [ ] C-16 两个渠道 id 与重要性/声音/振动与 §7.5 表一致
-- [ ] C-17 `NotificationIds` 新增 `SCHEDULE_REMINDER_BASE` / `SCHEDULE_REMINDER_RANGE`
-- [ ] C-18 `ScheduleReminderScheduler` 五个方法齐全，id 映射与 §7.2 一致
-- [ ] C-19 `AlarmReceiver` 有 `ACTION_SCHEDULE_REMINDER` 分支，且**不**走到护眼 `reconcileNow`
-- [ ] C-20 `ScheduleReminderDispatcher` 的 7 步校验齐全，含 15 分钟过期判定与 `completed` 抑制
-- [ ] C-21 `BootReceiver` 先 `refreshWindow()` 再 `rearm()`
-- [ ] C-22 日程变更后触发重排（位置与文档一致：FeatureEntry 侧）
-- [ ] C-23 日程提醒不受 `settings.notificationEnabled` 与 `QuietHours` 抑制（按 §7.3 决策）
+- [x] C-16 两个渠道 id 与重要性/声音/振动与 §7.5 表一致 — `core/services/NotificationChannels.kt`（`schedule_reminder` / `schedule_alarm`）+ `core/services/NotificationService.kt:88-102`（均为 `IMPORTANCE_HIGH` + `enableVibration(true)` + **不调** `setSound(null, null)`，即保留默认提示音）
+- [x] C-17 `NotificationIds` 新增 `SCHEDULE_REMINDER_BASE` / `SCHEDULE_REMINDER_RANGE` — `core/constants/NotificationIds.kt:21-22`（`9600` / `300`）
+- [x] C-18 `ScheduleReminderScheduler` 方法齐全，id 映射与 §7.2 一致 — `core/services/ScheduleReminderScheduler.kt`（6 个公开方法：`schedule` / `cancel` / `cancelAll` / `notificationIdFor` / `canScheduleExactAlarms` / `canUseFullScreenIntents`；`notificationIdFor` 在 `:37-40`；`schedule` 在 `:23-26` 做 `triggerAt <= now` 拦截）
+- [x] C-19 `AlarmReceiver` 有 `ACTION_SCHEDULE_REMINDER` 分支，且**不**走到护眼 `reconcileNow` — `core/services/AlarmReceiver.kt:34-46`（`:45` 的 `return@runCatching` 在 `:50` 的 `reconcileNow` 之前返回）。`pendingResult.finish()` 在 `:102` 的 `runCatching` 之外，所有路径都会走到。
+- [x] C-20 `ScheduleReminderDispatcher` 的校验齐全，含 15 分钟过期判定与 `completed` 抑制 — `core/services/ScheduleReminderDispatcher.kt`（顺序：取行 → `deletedAt` → 15 分钟过期（**过期也置 `markReminderFired`**，避免每次恢复都重试）→ `completed` → `reminderMinutesBefore < 0` → `reminderFiredAt != 0` → 发通知 + 置位）
+- [x] C-21 先 `refreshWindow()` 再 `rearm()` — `app/ProjectLumenApplication.kt:115-118`（`rescheduleScheduleReminders()` 内部固定顺序），调用点 `core/services/BootReceiver.kt:72-74`，位置在 `:79` 的 `reconcileNow` **之前**且在 `:75` 的 `settings == null` 早退**之前**
+- [x] C-22 日程变更后触发重排（位置与文档一致：FeatureEntry 侧） — `app/ProjectLumenScheduleFeatureEntry.kt:112`（`setCompleted`）、`:127`（`persist`）、`:138`（`delete`）三处调用 `rearm()`；执行体由 `app/ProjectLumenViewModel.kt:73,164`（构造参数 `rescheduleScheduleReminders` → `rearm`）与 `MainActivity.kt:139`（`app::rescheduleScheduleReminders`）注入。**这一条在核对中曾判定失败并已修复**：早期实现只做 `refreshWindow()` 不排闹钟，新建的提醒要等下次开机才生效；现已统一到 §7.6 的单一入口。
+- [x] C-23 日程提醒不受 `settings.notificationEnabled` 与 `QuietHours` 抑制（按 §7.3 决策） — `core/services/AlarmReceiver.kt:31-33`（分支说明）+ `:45` 提前返回（不经过 `:51-52` 的 `QuietHours` 判定与 `:54` 的 `notificationEnabled` 判定）+ `ScheduleReminderDispatcher.kt` 类注释
+- [x] C-37 `ExactAlarmPermissionReceiver` 在 runtime 判空之前补了 `refreshWindow()` + `rearm()`，且独立 `runCatching` 隔离（§7.8） — `core/services/ExactAlarmPermissionReceiver.kt:26-30`，位于 `:31` 的 `app.runtimeRepository().get() ?: return@runCatching` **之前**，独立于外层 `runCatching`
 
 ### 12.4 UI
-- [ ] C-24 `Destination.SCHEDULE` 存在，`showInBottomNav = false`
-- [ ] C-25 NavHost 注册带 `scheduleId` 参数的路由，新建与编辑两条入口都可进
-- [ ] C-26 详情页 17 项字段与 §9.4 表逐行对应
-- [ ] C-27 首页卡片挂在 `GoalProgressCard` 之后
-- [ ] C-28 首页过滤口径与 §8.4 一致（今天+未来 7 天；今天的已完成保留）
-- [ ] C-29 勾选完成调用 `setScheduleCompleted` 且持久化
-- [ ] C-30 `THIS_ONLY` 下重复控件被禁用/改动被丢弃，且弹层带提示文案
-- [ ] C-31 未设置提醒时「提醒方式」不可选
-- [ ] C-32 所有字符串在 `values/` 与 `values-zh/` 两侧都存在且名称一致
+- [x] C-24 `Destination.SCHEDULE` 存在，`showInBottomNav = false` — `app/ProjectLumenApp.kt:123`
+- [x] C-25 NavHost 注册带 `scheduleId` 参数的路由，新建与编辑两条入口都可进 — `app/ProjectLumenApp.kt:496`（编辑：`?scheduleId=$scheduleId`）、`:499`（新建：不带参数）、`:505`（路由 `?scheduleId={scheduleId}` + `navArgument` 默认 `0L`，`0L` 走 `openNew()`）
+- [x] C-26 详情页 17 项字段与 §9.4 表逐行对应 — `app/ProjectLumenScheduleScreens.kt:134-398`。逐行核对结果：摘要行 5 段在 `ScheduleSummaryText`（`:417-438`，`" · "` 连接）、全天开关 `:149`、开始/结束 `:173-188`、类型 4 项 `:194-200`、提醒 8 项 `:207-216`、提醒方式 2 项 `:219-228`、重复 6 项 `:235-250`、结束重复 `:252-277`、保存/删除 `:281-300`、编辑范围弹层 `:365-398`
+- [x] C-27 首页卡片挂在 `GoalProgressCard` 之后 — `app/ProjectLumenMainScreens.kt:131`
+- [x] C-28 首页过滤口径与 §8.4 一致（今天+未来 7 天；今天的已完成保留） — `app/ProjectLumenHomeScheduleCard.kt:137-154`（`startAt < 今天+8天 00:00` ∧ (`!completed` ∨ `startAt >= 今天 00:00`)，按 `startAt` 升序，`take(8)`）
+- [x] C-29 勾选完成调用 `setScheduleCompleted` 且持久化 — 勾选框 `app/ProjectLumenHomeScheduleCard.kt:91-94` → `ProjectLumenMainScreens.kt:133` → `viewModel.setScheduleCompleted`（`ProjectLumenViewModel.kt:484`）→ `ProjectLumenScheduleFeatureEntry.kt:108-115` → `ScheduleRepository.setCompleted` → `ScheduleOccurrencesDao.setCompleted`（写库并置 `completedAt`）
+- [x] C-30 `THIS_ONLY` 下重复改动被丢弃，且弹层带提示文案 — 丢弃在 `ProjectLumenScheduleFeatureEntry.kt:117-132`（`persist` 把 `scope` 透传给 `repository.update`，由 `ScheduleRepository.updateThisOnly` 忽略 `draft.recurrence` / `draft.recurrenceUntil`）；提示文案 `ProjectLumenScheduleScreens.kt:383-389` 渲染 `R.string.schedule_scope_this_only_hint`。**控件未做 `enabled = false`**：文档 §9.4 给的是「改动被丢弃 + 弹层提示」这条路径，已满足。
+- [x] C-31 未设置提醒时「提醒方式」不可选 — `app/ProjectLumenScheduleScreens.kt:223`（`enabled = draft.reminderMinutesBefore != SCHEDULE_REMINDER_NONE`）
+- [x] C-32 所有字符串在 `values/` 与 `values-zh/` 两侧都存在且名称一致 — `schedule_` 前缀键 **两侧各 57 条**，`diff` 为空（`grep -o 'name="schedule_[a-z_]*"' | sort` 比对）。仓库只有 `values-zh` 一个 locale 目录，无 `MissingTranslation` 风险。
 
 ### 12.5 纪律
-- [ ] C-33 未新增「超级文件」（单文件过大或聚合职责）——详情页与首页卡片分文件
-- [ ] C-34 未新增前台服务（避免触碰 `ForegroundServiceArchitectureTest`）
-- [ ] C-35 未运行任何本地构建/测试命令
-- [ ] C-36 提交已推送且 CI（check-runs 逐 job）全绿
+- [x] C-33 未新增「超级文件」（单文件过大或聚合职责）——详情页与首页卡片分文件 — 新增三个文件：`ProjectLumenScheduleScreens.kt` 654 行、`ProjectLumenScheduleFeatureEntry.kt` 191 行、`ProjectLumenHomeScheduleCard.kt` 154 行；仓库既有最大文件为 1276 行（`ProjectLumenEyeCareInsights.kt`），本次未触碰
+- [x] C-34 未新增前台服务（避免触碰 `ForegroundServiceArchitectureTest`） — `AndroidManifest.xml` 未新增 `<service>`；`AlarmReceiver` / `BootReceiver` / `ExactAlarmPermissionReceiver` 三个 `<receiver>` 均**复用既有条目**（日程分支挂在已有的 `AlarmReceiver` 上，靠 explicit Intent 定向，无需新增 intent-filter）
+- [x] C-35 未运行任何本地构建/测试命令 — 本次核对只做文件读取与 `grep`/`wc`，编译与测试全部交由 GitHub Actions
+- [ ] C-36 提交已推送且 CI（check-runs 逐 job）全绿 — ⏳ **核对时尚未提交**，待推送后回来勾选
 
 ---
 

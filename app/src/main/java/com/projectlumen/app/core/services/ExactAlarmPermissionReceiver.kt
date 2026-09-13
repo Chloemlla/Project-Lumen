@@ -21,6 +21,13 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
             val app = context.applicationContext as? ProjectLumenApplication
             runCatching {
                 app ?: return@runCatching
+                // Granting or revoking exact-alarm permission changes how schedule reminders may be
+                // scheduled, in both directions. Without this they would keep the degraded inexact
+                // alarm chosen when they were first scheduled until the next boot. Isolated in its
+                // own runCatching so a schedule failure cannot cost the eye-care alarms their sync.
+                runCatching {
+                    app.rescheduleScheduleReminders()
+                }.onFailure { throwable -> app.recordHandledFailure(throwable) }
                 val settings = app.settingsRepository().getOrDefault()
                 val runtime = app.runtimeRepository().get() ?: return@runCatching
                 app.notifications.syncRuntimeAlarms(settings, runtime)

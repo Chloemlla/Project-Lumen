@@ -71,6 +71,8 @@ internal fun HomeScreen(
     uiState: ProjectLumenUiState,
     viewModel: ProjectLumenViewModel,
     openTranslation: () -> Unit,
+    openSchedule: (Long) -> Unit,
+    createSchedule: () -> Unit,
 ) {
     val runtime = uiState.runtime
     val reminderActive = runtime.activeEngine == ActiveEngine.REMINDER.name &&
@@ -126,6 +128,13 @@ internal fun HomeScreen(
         StateCard(uiState.runtime, uiState.nowMillis)
         TodayStatsCard(uiState.eyeStats.firstOrNull())
         GoalProgressCard(uiState)
+        HomeScheduleCard(
+            tasks = uiState.scheduleTasks,
+            nowMillis = uiState.nowMillis,
+            onToggleCompleted = viewModel::setScheduleCompleted,
+            onOpenSchedule = openSchedule,
+            onCreateSchedule = createSchedule,
+        )
         HomeConvenienceCard(
             uiState = uiState,
             permissionRequirements = permissionRequirements,

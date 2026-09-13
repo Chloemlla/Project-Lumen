@@ -28,6 +28,22 @@ class AlarmReceiver : BroadcastReceiver() {
             val app = context.applicationContext as? ProjectLumenApplication
             runCatching {
                 app ?: return@runCatching
+                // Schedule reminders belong to the user's own to-dos, so they are handled entirely
+                // here and never reach the eye-care engine below: reconciling the reminder engine or
+                // applying quiet hours to them would let eye-care settings swallow a real to-do.
+                if (intent.action == ACTION_SCHEDULE_REMINDER) {
+                    val occurrenceId = intent.getLongExtra(
+                        ScheduleReminderScheduler.EXTRA_OCCURRENCE_ID,
+                        0L,
+                    )
+                    if (occurrenceId != 0L) {
+                        // Same pre-show channel guarantee the eye-care path below relies on: posting
+                        // to a channel that does not exist yet would drop the reminder silently.
+                        app.notifications.ensureChannels()
+                        ScheduleReminderDispatcher.dispatch(app, occurrenceId, System.currentTimeMillis())
+                    }
+                    return@runCatching
+                }
                 val notifications = app.notifications
                 val settings = app.settingsRepository().getOrDefault()
                 val nowMillis = System.currentTimeMillis()
@@ -92,6 +108,7 @@ class AlarmReceiver : BroadcastReceiver() {
         const val ACTION_BREAK_DUE = "com.projectlumen.app.action.BREAK_DUE"
         const val ACTION_BREAK_DONE = "com.projectlumen.app.action.BREAK_DONE"
         const val ACTION_POMODORO = "com.projectlumen.app.action.POMODORO"
+        const val ACTION_SCHEDULE_REMINDER = "com.projectlumen.app.action.SCHEDULE_REMINDER"
 
         private val REMINDER_ACTIONS = setOf(ACTION_PRE_ALERT, ACTION_BREAK_DUE, ACTION_BREAK_DONE)
 

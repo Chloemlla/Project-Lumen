@@ -18,4 +18,6 @@ object NotificationIds {
     const val OVERLAY_FOREGROUND = 9301
     const val DEVELOPER_DEBUG_FOREGROUND = 9401
     const val GLOBAL_TOAST = 9501
+    const val SCHEDULE_REMINDER_BASE = 9600
+    const val SCHEDULE_REMINDER_RANGE = 300
 }

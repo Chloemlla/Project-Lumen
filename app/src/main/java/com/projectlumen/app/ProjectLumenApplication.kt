@@ -36,6 +36,7 @@ import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.ForegroundServiceController
 import com.projectlumen.app.core.services.ForegroundServiceFailureReporter
 import com.projectlumen.app.core.services.NotificationService
+import com.projectlumen.app.core.services.ScheduleAlarmRestore
 import com.projectlumen.app.core.services.ShizukuResilienceWorker
 import com.projectlumen.app.core.services.TimerForegroundService
 import com.projectlumen.app.core.services.TimerReconciliationWorker
@@ -43,7 +44,9 @@ import com.projectlumen.app.core.light.LightMonitorService
 import com.projectlumen.app.core.proximity.ProximityDetectionWorker
 import com.projectlumen.app.core.repositories.DeviceInsightsRepository
 import com.projectlumen.app.core.repositories.RuntimeRepository
+import com.projectlumen.app.core.repositories.ScheduleRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
+import com.projectlumen.app.core.schedule.ScheduleMaterializer
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.telemetry.EyeCareTelemetryReporter
 import com.projectlumen.app.core.toast.LumenToast
@@ -94,6 +97,25 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     val secureCredentials: SecureCredentialStore by lazy { SecureCredentialStore(this) }
     val deviceSecurityGate: DeviceSecurityGate by lazy { DeviceSecurityGate(this) }
     val openApiController: LumenOpenRuntimeController by lazy { LumenOpenRuntimeController(this) }
+    val scheduleRepository: ScheduleRepository by lazy {
+        ScheduleRepository(
+            database.scheduleSeriesDao(),
+            database.scheduleOccurrencesDao(),
+            ScheduleMaterializer(
+                database.scheduleSeriesDao(),
+                database.scheduleOccurrencesDao(),
+            ),
+        )
+    }
+
+    /**
+     * Every path that can invalidate the schedule occurrence window or the alarm that points into
+     * it goes through here: boot, an exact-alarm permission change, and a schedule edit.
+     */
+    suspend fun rescheduleScheduleReminders() {
+        scheduleRepository.refreshWindow()
+        ScheduleAlarmRestore.rearm(this, scheduleRepository)
+    }
     val telemetry: EyeCareTelemetryReporter by lazy {
         EyeCareTelemetryReporter(
             context = this,

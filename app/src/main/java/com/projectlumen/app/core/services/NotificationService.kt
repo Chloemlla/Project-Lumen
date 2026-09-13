@@ -19,13 +19,18 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.database.entities.ScheduleOccurrenceEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
+import com.projectlumen.app.core.enums.ScheduleReminderMethod
 import com.projectlumen.app.core.toast.LumenToast
 import com.projectlumen.app.core.toast.LumenToastKind
 import com.projectlumen.app.core.toast.showLumenToast
 import com.projectlumen.app.core.time.QuietHours
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicReference
 
 private const val POST_NOTIFICATIONS_PERMISSION = "android.permission.POST_NOTIFICATIONS"
@@ -77,6 +82,24 @@ class NotificationService(private val context: Context) {
                 ).apply {
                     description = context.getString(R.string.channel_proximity)
                     setSound(null, null)
+                    enableVibration(true)
+                },
+                // Unlike the eye-care channels above, schedule reminders keep the default sound:
+                // "notification vs alarm" is the user-visible meaning of the reminder type.
+                NotificationChannel(
+                    NotificationChannels.SCHEDULE_NOTIFICATION,
+                    context.getString(R.string.channel_schedule_reminder),
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    description = context.getString(R.string.channel_schedule_reminder)
+                    enableVibration(true)
+                },
+                NotificationChannel(
+                    NotificationChannels.SCHEDULE_ALARM,
+                    context.getString(R.string.channel_schedule_alarm),
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    description = context.getString(R.string.channel_schedule_alarm)
                     enableVibration(true)
                 },
             ),
@@ -214,6 +237,26 @@ class NotificationService(private val context: Context) {
             message = message,
             priority = NotificationCompat.PRIORITY_DEFAULT,
             includeBreakActions = false,
+        )
+    }
+
+    fun showScheduleReminder(occurrence: ScheduleOccurrenceEntity) {
+        val isAlarm = occurrence.reminderMethod == ScheduleReminderMethod.ALARM.name
+        show(
+            id = ScheduleReminderScheduler(context).notificationIdFor(occurrence.id),
+            channel = if (isAlarm) {
+                NotificationChannels.SCHEDULE_ALARM
+            } else {
+                NotificationChannels.SCHEDULE_NOTIFICATION
+            },
+            title = occurrence.title,
+            message = context.getString(
+                R.string.schedule_notification_message,
+                formatClockTime(occurrence.startAt),
+            ),
+            priority = NotificationCompat.PRIORITY_HIGH,
+            includeBreakActions = false,
+            fullScreen = isAlarm,
         )
     }
 
@@ -844,6 +887,10 @@ class NotificationService(private val context: Context) {
         return previous != content.signature
     }
 
+    private fun formatClockTime(millis: Long): String {
+        return Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).format(CLOCK_TIME_FORMATTER)
+    }
+
     private fun actionPendingIntent(id: Int, action: String): PendingIntent {
         return PendingIntent.getBroadcast(
             context,
@@ -868,6 +915,7 @@ class NotificationService(private val context: Context) {
         const val LIVE_UPDATE_PROGRESS_BUCKET = 10
         const val LIVE_UPDATE_CHRONOMETER_MIN_MILLIS = 2 * 60_000L
         const val FULL_SCREEN_REQUEST_CODE_OFFSET = 100
+        val CLOCK_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
         val reminderNotificationIds = listOf(
             NotificationIds.PRE_ALERT,

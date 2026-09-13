@@ -9,9 +9,11 @@ import com.projectlumen.app.core.repositories.EntitlementRepository
 import com.projectlumen.app.core.repositories.FeatureFlagRepository
 import com.projectlumen.app.core.repositories.ReminderPlansRepository
 import com.projectlumen.app.core.repositories.RuntimeRepository
+import com.projectlumen.app.core.repositories.ScheduleRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.repositories.StatisticsRepository
 import com.projectlumen.app.core.repositories.TipTemplateRepository
+import com.projectlumen.app.core.schedule.ScheduleMaterializer
 import com.projectlumen.app.core.security.SecureCredentialStore
 
 internal class ProjectLumenRepositories(
@@ -36,4 +38,9 @@ internal class ProjectLumenRepositories(
     val entitlements = EntitlementRepository(database.entitlementsDao())
     val featureFlags = FeatureFlagRepository(database.featureFlagsDao())
     val reminderPlans = ReminderPlansRepository(database.reminderPlansDao())
+    val schedule = ScheduleRepository(
+        database.scheduleSeriesDao(),
+        database.scheduleOccurrencesDao(),
+        ScheduleMaterializer(database.scheduleSeriesDao(), database.scheduleOccurrencesDao()),
+    )
 }

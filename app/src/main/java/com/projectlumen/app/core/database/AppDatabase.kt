@@ -15,6 +15,8 @@ import com.projectlumen.app.core.database.daos.EntitlementsDao
 import com.projectlumen.app.core.database.daos.FeatureFlagsDao
 import com.projectlumen.app.core.database.daos.ReminderPlansDao
 import com.projectlumen.app.core.database.daos.RuntimeStateDao
+import com.projectlumen.app.core.database.daos.ScheduleOccurrencesDao
+import com.projectlumen.app.core.database.daos.ScheduleSeriesDao
 import com.projectlumen.app.core.database.daos.TipTemplatesDao
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.AppNetworkControlEntity
@@ -25,6 +27,8 @@ import com.projectlumen.app.core.database.entities.EntitlementEntity
 import com.projectlumen.app.core.database.entities.FeatureFlagEntity
 import com.projectlumen.app.core.database.entities.ReminderPlanEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.database.entities.ScheduleOccurrenceEntity
+import com.projectlumen.app.core.database.entities.ScheduleSeriesEntity
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.projectlumen.app.BuildConfig
 
@@ -40,8 +44,10 @@ import com.projectlumen.app.BuildConfig
         FeatureFlagEntity::class,
         EntitlementEntity::class,
         ReminderPlanEntity::class,
+        ScheduleSeriesEntity::class,
+        ScheduleOccurrenceEntity::class,
     ],
-    version = 18,
+    version = 19,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -55,6 +61,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun featureFlagsDao(): FeatureFlagsDao
     abstract fun entitlementsDao(): EntitlementsDao
     abstract fun reminderPlansDao(): ReminderPlansDao
+    abstract fun scheduleSeriesDao(): ScheduleSeriesDao
+    abstract fun scheduleOccurrencesDao(): ScheduleOccurrencesDao
 
     companion object {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -204,6 +212,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                createScheduleTables(db)
+            }
+        }
+
         private fun migrateEyeProtection(db: SupportSQLiteDatabase) {
             addColumnIfMissing(db, "app_settings", "blinkMonitoringEnabled", "INTEGER NOT NULL DEFAULT 0")
             addColumnIfMissing(db, "app_settings", "blinkNoBlinkThresholdSeconds", "INTEGER NOT NULL DEFAULT 10")
@@ -305,6 +319,57 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 """.trimIndent(),
             )
+        }
+
+        private fun createScheduleTables(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS schedule_series (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    title TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    allDay INTEGER NOT NULL,
+                    startAt INTEGER NOT NULL,
+                    endAt INTEGER NOT NULL,
+                    recurrence TEXT NOT NULL,
+                    recurrenceUntil INTEGER NOT NULL,
+                    reminderMinutesBefore INTEGER NOT NULL,
+                    reminderMethod TEXT NOT NULL,
+                    enabled INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    deletedAt INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS schedule_occurrences (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    seriesId INTEGER NOT NULL,
+                    title TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    allDay INTEGER NOT NULL,
+                    startAt INTEGER NOT NULL,
+                    endAt INTEGER NOT NULL,
+                    reminderMinutesBefore INTEGER NOT NULL,
+                    reminderMethod TEXT NOT NULL,
+                    recurrence TEXT NOT NULL,
+                    recurrenceUntil INTEGER NOT NULL,
+                    originalStartAt INTEGER NOT NULL,
+                    detached INTEGER NOT NULL,
+                    completed INTEGER NOT NULL,
+                    completedAt INTEGER NOT NULL,
+                    reminderFiredAt INTEGER NOT NULL,
+                    createdAt INTEGER NOT NULL,
+                    updatedAt INTEGER NOT NULL,
+                    deletedAt INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_schedule_occurrences_seriesId ON schedule_occurrences (seriesId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_schedule_occurrences_startAt ON schedule_occurrences (startAt)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_schedule_occurrences_deletedAt ON schedule_occurrences (deletedAt)")
         }
 
         private fun migrateDynamicAppearance(db: SupportSQLiteDatabase) {
@@ -436,6 +501,7 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_15_16,
                     MIGRATION_16_17,
                     MIGRATION_17_18,
+                    MIGRATION_18_19,
                 )
             if (BuildConfig.DEBUG) {
                 builder.fallbackToDestructiveMigration(dropAllTables = true)

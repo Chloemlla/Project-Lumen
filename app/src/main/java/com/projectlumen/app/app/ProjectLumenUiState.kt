@@ -9,6 +9,7 @@ import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
 import com.projectlumen.app.core.database.entities.EntitlementEntity
 import com.projectlumen.app.core.database.entities.ReminderPlanEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.database.entities.ScheduleOccurrenceEntity
 import com.projectlumen.app.core.insights.DeviceInsightsState
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
 
@@ -38,6 +39,7 @@ data class ProjectLumenUiState(
     val entitlements: List<EntitlementEntity> = emptyList(),
     val reminderPlans: List<ReminderPlanEntity> = emptyList(),
     val deviceInsights: DeviceInsightsState = DeviceInsightsState(),
+    val scheduleTasks: List<ScheduleOccurrenceEntity> = emptyList(),
     val clock: LumenUiClock = LumenUiClock(),
     val isReady: Boolean = false,
 ) {

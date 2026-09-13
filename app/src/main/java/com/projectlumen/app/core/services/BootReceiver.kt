@@ -65,6 +65,13 @@ class BootReceiver : BroadcastReceiver() {
                     delayMinutes = if (settings.shizukuNativeEyeProtectionEnabled) 0L else 15L,
                 )
             }
+            // Schedule reminders depend on the user's own to-dos, not on any eye-care setting, so
+            // they are restored before the `settings == null` gate below. Shared with a schedule
+            // edit and with an exact-alarm permission change so all three take the same path.
+            // Isolated because a schedule failure must not cost the eye-care alarms their re-arm.
+            runCatching {
+                app.rescheduleScheduleReminders()
+            }.onFailure { throwable -> app.recordHandledFailure(throwable) }
             if (settings == null) return
             // A phase that fell due while the device was off has to be advanced before alarms are
             // re-armed; every stored trigger time is in the past by now and would be dropped.

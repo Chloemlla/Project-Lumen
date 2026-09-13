@@ -136,6 +136,7 @@ open class MainActivity : ComponentActivity() {
                             nativeProtectionSummary = app::nativeProtectionSummary,
                             uploadTelemetrySnapshot = { app.telemetry.uploadCurrentSnapshot(force = true) },
                             recordHandledFailure = { throwable -> app.recordHandledFailure(throwable) },
+                            rescheduleScheduleReminders = app::rescheduleScheduleReminders,
                             securityEvidence = { app.deviceSecurityGate.backendEvidence() },
                             runDeviceSecurityScan = { DeviceSecurityScanner(app).fullScan() },
                         ) as T

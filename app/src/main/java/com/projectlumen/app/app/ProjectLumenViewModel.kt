@@ -16,9 +16,12 @@ import com.projectlumen.app.core.database.entities.TipTemplateEntity
 import com.projectlumen.app.core.debug.MemoryHealthMonitor
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.enums.PlanTier
+import com.projectlumen.app.core.enums.ScheduleEditScope
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.repositories.DeviceInsightsRepository
+import com.projectlumen.app.core.repositories.SettingsRepository
+import com.projectlumen.app.core.schedule.ScheduleDraft
 import com.projectlumen.app.core.services.AuraAudioService
 import com.projectlumen.app.core.services.DataBackupService
 import com.projectlumen.app.core.services.ExportService
@@ -67,6 +70,7 @@ class ProjectLumenViewModel(
     nativeProtectionSummary: () -> String,
     private val uploadTelemetrySnapshot: suspend () -> Unit,
     private val recordHandledFailure: (Throwable) -> Unit,
+    private val rescheduleScheduleReminders: suspend () -> Unit,
     securityEvidence: () -> JSONObject?,
     private val runDeviceSecurityScan: suspend () -> DeviceSecurityScanner.SecurityAssessment,
 ) : ViewModel() {
@@ -151,6 +155,14 @@ class ProjectLumenViewModel(
         scope = reportingScope,
         settingsRepository = repositories.settings,
         tipTemplateRepository = repositories.tipTemplates,
+    )
+    private val scheduleEntry = ProjectLumenScheduleFeatureEntry(
+        scope = reportingScope,
+        repository = repositories.schedule,
+        // Re-materializes the window and re-arms the AlarmManager alarms. The application instance
+        // owns that work, so it arrives as a callback rather than being done here.
+        rearm = rescheduleScheduleReminders,
+        recordHandledFailure = recordHandledFailure,
     )
     private val sharingEntry = ProjectLumenSharingFeatureEntry(
         export = export,
@@ -448,6 +460,30 @@ class ProjectLumenViewModel(
     ) = templatesEntry.updateTemplateContent(template, titleText, subtitleText, showSkipButton)
     fun updateTemplateCountdownStyle(template: TipTemplateEntity, countdownStyle: String) =
         templatesEntry.updateTemplateCountdownStyle(template, countdownStyle)
+
+    // internal because the draft state type is internal, like remoteState above.
+    internal val scheduleDetailState = scheduleEntry.detailState
+
+    fun openScheduleDetail(id: Long) {
+        CrashBreadcrumbs.record("Action openScheduleDetail id=$id")
+        scheduleEntry.open(id)
+    }
+
+    fun closeScheduleDetail() = scheduleEntry.close()
+
+    fun updateScheduleDraft(transform: (ScheduleDraft) -> ScheduleDraft) =
+        scheduleEntry.updateDraft(transform)
+
+    fun requestSaveSchedule() = scheduleEntry.requestSave()
+
+    fun requestDeleteSchedule() = scheduleEntry.requestDelete()
+
+    fun confirmScheduleScope(scope: ScheduleEditScope) = scheduleEntry.confirmScope(scope)
+
+    fun dismissScheduleScopePrompt() = scheduleEntry.dismissScopePrompt()
+
+    fun setScheduleCompleted(id: Long, completed: Boolean) =
+        scheduleEntry.setCompleted(id, completed)
 
     fun shareStatistics() = reportIfThrows {
         sharingEntry.shareStatistics()

@@ -3,6 +3,8 @@ package com.projectlumen.app.app
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
+import com.projectlumen.app.core.database.entities.ScheduleOccurrenceEntity
+import com.projectlumen.app.core.insights.DeviceInsightsState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -61,6 +63,19 @@ internal class ProjectLumenStateStore(
         )
     }
 
+    private val deviceAndScheduleState = combine(
+        repositories.deviceInsights.observe(),
+        repositories.schedule.observeAll().catch { throwable ->
+            recordHandledFailure(throwable)
+            emit(emptyList())
+        }.distinctUntilChanged(),
+    ) { deviceInsights, scheduleTasks ->
+        DeviceAndScheduleSnapshot(
+            deviceInsights = deviceInsights,
+            scheduleTasks = scheduleTasks,
+        )
+    }
+
     private val dataState = combine(
         baseDataState,
         repositories.dailyGoals.observe().catch { throwable ->
@@ -75,13 +90,14 @@ internal class ProjectLumenStateStore(
             recordHandledFailure(throwable)
             emit(emptyList())
         }.distinctUntilChanged(),
-        repositories.deviceInsights.observe(),
-    ) { state, dailyGoal, entitlements, reminderPlans, deviceInsights ->
+        deviceAndScheduleState,
+    ) { state, dailyGoal, entitlements, reminderPlans, deviceAndSchedule ->
         state.copy(
             dailyGoal = dailyGoal ?: DailyGoalEntity(),
             entitlements = entitlements,
             reminderPlans = reminderPlans,
-            deviceInsights = deviceInsights,
+            deviceInsights = deviceAndSchedule.deviceInsights,
+            scheduleTasks = deviceAndSchedule.scheduleTasks,
             isReady = state.isReady && dailyGoal != null,
         )
     }
@@ -108,5 +124,10 @@ internal class ProjectLumenStateStore(
     private data class SettingsSnapshot(
         val settings: AppSettingsEntity?,
         val persistedReady: Boolean,
+    )
+
+    private data class DeviceAndScheduleSnapshot(
+        val deviceInsights: DeviceInsightsState,
+        val scheduleTasks: List<ScheduleOccurrenceEntity>,
     )
 }
