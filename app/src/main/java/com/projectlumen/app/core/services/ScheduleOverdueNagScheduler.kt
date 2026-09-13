@@ -67,6 +67,20 @@ class ScheduleOverdueNagScheduler(private val context: Context) {
         }
     }
 
+    /**
+     * Clears only the evening slot, leaving the interval slot armed.
+     *
+     * This exists for occurrences that stay overdue but leave the morning-ended subset — the case
+     * where an already-nagging to-do has its end time edited across noon. Such a row is still in the
+     * overdue set, so [rearmAll] never reaches the [cancel] pass for it, and without this its
+     * previously armed evening alarm would keep firing every night forever.
+     */
+    fun cancelEvening(occurrenceId: Long) {
+        val alarmManager = context.getSystemService(AlarmManager::class.java)
+        existingPendingIntent(occurrenceId, AlarmReceiver.ACTION_SCHEDULE_OVERDUE_EVENING)
+            ?.let(alarmManager::cancel)
+    }
+
     fun notificationIdFor(occurrenceId: Long): Int {
         return NotificationIds.SCHEDULE_OVERDUE_BASE +
             (occurrenceId % NotificationIds.SCHEDULE_OVERDUE_RANGE).toInt()
@@ -159,8 +173,8 @@ class ScheduleOverdueNagScheduler(private val context: Context) {
             // 21:30 + n * 15s. The interval loop staggers for the opposite reason: a dozen rounds
             // erupting the instant the switch is flipped is noise, and there is no configured clock
             // time for it to protect.
-            overdue.filter { occurrence -> ScheduleOverdueNag.endedInMorning(occurrence, zone) }
-                .forEach { occurrence ->
+            overdue.forEach { occurrence ->
+                if (ScheduleOverdueNag.endedInMorning(occurrence, zone)) {
                     scheduler.scheduleEvening(
                         occurrence.id,
                         ScheduleOverdueNag.nextEveningNagAt(
@@ -169,7 +183,15 @@ class ScheduleOverdueNagScheduler(private val context: Context) {
                             zoneId = zone,
                         ),
                     )
+                } else {
+                    // The overdue set is not a subset of the morning-ended set, so a row can be in
+                    // it while owing no evening slot. That is not just the ordinary afternoon case:
+                    // an already-nagging to-do whose end time is edited across noon lands here too,
+                    // and the cancel pass above skipped it because it is still overdue. Without this
+                    // branch its old evening alarm survives the edit and keeps firing every night.
+                    scheduler.cancelEvening(occurrence.id)
                 }
+            }
         }
     }
 }

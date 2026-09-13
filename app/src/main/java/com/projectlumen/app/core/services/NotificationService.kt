@@ -272,6 +272,10 @@ class NotificationService(private val context: Context) {
      * Re-posts the overdue nag on the same notification id every round. Re-alerting on each round
      * depends on [show] never setting `setOnlyAlertOnce(true)`: adding that flag there would turn
      * the whole nag into a single silent alert without any visible failure.
+     *
+     * The "check off" action is what lets the user end the chain from the notification instead of
+     * opening the app; it is safe to wire to the occurrence id per round because re-posting the same
+     * id replaces the previous action rather than stacking one per round.
      */
     fun showScheduleOverdue(occurrence: ScheduleOccurrenceEntity) {
         show(
@@ -281,7 +285,17 @@ class NotificationService(private val context: Context) {
             message = context.getString(R.string.schedule_overdue_message, formatClockTime(occurrence.endAt)),
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = false,
+            overdueOccurrenceId = occurrence.id,
         )
+    }
+
+    /**
+     * Dismisses the nag for one occurrence. Tapping an action button does **not** trigger the
+     * builder's `setAutoCancel(true)` — that only fires for the content intent — so the receiver
+     * has to clear the notification itself once the to-do has been checked off.
+     */
+    fun cancelScheduleOverdue(occurrenceId: Long) {
+        notificationManager.cancel(ScheduleOverdueNagScheduler(context).notificationIdFor(occurrenceId))
     }
 
     fun showUpdateAvailable(tagName: String, releaseName: String) {
@@ -512,6 +526,7 @@ class NotificationService(private val context: Context) {
         priority: Int,
         includeBreakActions: Boolean,
         fullScreen: Boolean = false,
+        overdueOccurrenceId: Long? = null,
     ) {
         if (!canPostNotifications()) return
         val builder = NotificationCompat.Builder(context, channel)
@@ -535,6 +550,13 @@ class NotificationService(private val context: Context) {
                 R.drawable.ic_launcher_foreground,
                 context.getString(R.string.skip_break),
                 actionPendingIntent(NotificationIds.SKIP_BREAK_ACTION, ReminderActionReceiver.ACTION_SKIP_BREAK),
+            )
+        }
+        if (overdueOccurrenceId != null) {
+            builder.addAction(
+                R.drawable.ic_launcher_foreground,
+                context.getString(R.string.schedule_overdue_complete),
+                overdueCompletePendingIntent(overdueOccurrenceId),
             )
         }
         try {
@@ -929,6 +951,23 @@ class NotificationService(private val context: Context) {
 
     private fun reminderActionIntent(action: String): Intent {
         return explicitReceiverIntent(action, ReminderActionReceiver::class.java)
+    }
+
+    // Request code is the occurrence's own notification id rather than a shared constant because
+    // PendingIntent identity is (requestCode, Intent.filterEquals) and filterEquals ignores extras:
+    // one shared code would make every occurrence's button the same PendingIntent, so the last one
+    // posted would win and tapping any nag would check off whichever to-do was posted most recently.
+    // It does not collide with the alarms, which reuse that id with a different action.
+    private fun overdueCompletePendingIntent(occurrenceId: Long): PendingIntent {
+        return PendingIntent.getBroadcast(
+            context,
+            ScheduleOverdueNagScheduler(context).notificationIdFor(occurrenceId),
+            explicitReceiverIntent(
+                AlarmReceiver.ACTION_SCHEDULE_OVERDUE_COMPLETE,
+                AlarmReceiver::class.java,
+            ).putExtra(ScheduleOverdueNagScheduler.EXTRA_OCCURRENCE_ID, occurrenceId),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun explicitReceiverIntent(action: String, receiverClass: Class<*>): Intent {

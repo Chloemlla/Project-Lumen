@@ -994,6 +994,7 @@
     <string name="schedule_overdue_nag_interval_hours">%1$d 小时</string>
     <string name="schedule_overdue_nag_interval_hours_minutes">%1$d 小时 %2$d 分钟</string>
     <string name="schedule_overdue_message">已逾期 · 原定 %1$s 结束</string>
+    <string name="schedule_overdue_complete">勾选完成</string>
     <string name="channel_schedule_reminder">日程提醒</string>
     <string name="channel_schedule_alarm">日程闹钟</string>
     <string name="channel_schedule_overdue">待办逾期提醒</string>

@@ -995,6 +995,7 @@
     <string name="schedule_overdue_nag_interval_hours">%1$d h</string>
     <string name="schedule_overdue_nag_interval_hours_minutes">%1$d h %2$d min</string>
     <string name="schedule_overdue_message">Overdue · was due %1$s</string>
+    <string name="schedule_overdue_complete">Check off</string>
     <string name="channel_schedule_reminder">Schedule reminders</string>
     <string name="channel_schedule_alarm">Schedule alarms</string>
     <string name="channel_schedule_overdue">Overdue to-do reminders</string>

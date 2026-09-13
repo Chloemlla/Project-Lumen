@@ -334,20 +334,31 @@ fun showScheduleOverdue(occurrence: ScheduleOccurrenceEntity) {
 
 ### 8.2 `ProjectLumenViewModel` 追加两个门面方法
 
+> 实际落地时三个 setter 都加了 `CrashBreadcrumbs.record(...)` 并在落库前 clamp（见 §13.8），下面按**最终代码**给出。
+
 ```kotlin
 fun setScheduleOverdueNagEnabled(enabled: Boolean) {
+    CrashBreadcrumbs.record("Action setScheduleOverdueNagEnabled=$enabled")
     updateSettings { it.copy(scheduleOverdueNagEnabled = enabled) }
     reportingScope.launch { rescheduleScheduleReminders() }
 }
 
 fun setScheduleOverdueNagIntervalMinutes(minutes: Int) {
     val clamped = ScheduleOverdueNag.clampIntervalMinutes(minutes)
+    CrashBreadcrumbs.record("Action setScheduleOverdueNagIntervalMinutes=$clamped")
     updateSettings { it.copy(scheduleOverdueNagIntervalMinutes = clamped) }
+    reportingScope.launch { rescheduleScheduleReminders() }
+}
+
+fun setScheduleOverdueNagEveningMinute(minute: Int) {
+    val clamped = minute.coerceIn(0, 1435)
+    CrashBreadcrumbs.record("Action setScheduleOverdueNagEveningMinute=$clamped")
+    updateSettings { it.copy(scheduleOverdueNagEveningMinute = clamped) }
     reportingScope.launch { rescheduleScheduleReminders() }
 }
 ```
 
-两个方法都必须**先落库再重排**：`rescheduleScheduleReminders()` 内部会重新读 `app_settings`，顺序颠倒会读到旧值。
+方法都必须**先落库再重排**：`rescheduleScheduleReminders()` 内部会重新读 `app_settings`，顺序颠倒会读到旧值。
 
 ### 8.3 新文件 `app/ProjectLumenScheduleOverdueSettings.kt`
 
@@ -473,7 +484,7 @@ internal fun ScheduleOverdueNagCard(settings: AppSettingsEntity, viewModel: Proj
 | K-5 | 同一实例的通知是**复用同一个 id 反复响**，不堆叠成多条 | 堆叠会让用户下拉栏被同一条待办塞满，反而更难找到真正需要处理的那条；反复响铃已满足「轰炸」 |
 | K-6 | 首轮轰炸在开启开关后 15 秒 × 序号 陆续到达 | 用户选了「历史遗留也一起催」，若同一刻全部触发会瞬间涌出十几条；错开是礼仪性让步，不影响后续按间隔循环 |
 | K-7 | 提醒的精确时刻由系统决定，可能有数分钟偏差 | 不精确闹钟的固有性质；对「每 2 小时催一次」没有实际影响 |
-| K-8 | 未做「通知内直接勾选完成」的动作按钮 | 需求只要求「直到用户手动勾选为止」，点击通知打开 App 即可完成；动作按钮属增量，若需要另行确认 |
+| K-8 | ~~未做「通知内直接勾选完成」的动作按钮~~ **已于 §14 补齐** | 原记录：需求只要求「直到用户手动勾选为止」，点击通知打开 App 即可完成。复核时判定这一步反而更贴合需求原文的「直到用户手动勾选为止」——在通知里直接勾选才是最短路径，故不再作为取舍保留 |
 
 ---
 
@@ -707,4 +718,108 @@ fun setScheduleOverdueNagEveningMinute(minute: Int) {
 | K-9 | 晚间补催不做错开，所有上午结束的逾期项在同一时刻响 | 那是「当天收尾」的固定时点，本该同时到达；错开会让它漂移到 21:31、21:32，反而破坏「9 点半」这个语义。与 K-6 的差异是有意的 |
 | K-10 | 已过今晚时刻时排到明晚，而不是立刻补一次 | 用户说的是「晚上 9 点半弹一下」，22:00 开机时立刻补一条会让人莫名其妙；间隔槽本来就会继续催，不会漏掉 |
 | K-11 | 晚间时刻与设置页既有时间项一样是 5 分钟粒度 | 与 `autoDarkStartMinute` / `autoDarkEndMinute` 复用同一套 `timeOfDayLabel` + `snapTimeMinute`，交互一致；21:30 本身就在 5 分钟网格上，粒度不会妨碍本需求 |
-| K-12 | 一条**已经逾期**的待办若被编辑成「结束时刻从上午改到下午」，它先前那枚晚间闹钟不会被撤销，仍会每晚催，直到下一轮 `rearmAll` 把它当普通逾期项处理 | `rearmAll` 的撤销集合是「不在 `overdue` 里」的项，而这条待办**仍在逾期集合内**，因此走不到 `cancel`；晚间槽是逾期集合的一个子集，撤销逻辑没有按子集细分。要修就得让 `cancel` 拆成「撤两枚 / 只撤晚间」，为这个很窄的场景增加一层结构。实际后果偏「多催一次」而非「漏催」，与需求方向一致，故记录不修。触发条件需同时满足：已被催过 → 编辑结束时刻跨过 12:00 → 且仍处于逾期 |
+| K-12 | ~~一条**已经逾期**的待办若被编辑成「结束时刻从上午改到下午」，它先前那枚晚间闹钟不会被撤销~~ **已于 §14 修复** | 原记录准确：`rearmAll` 的撤销集合是「不在 `overdue` 里」的项，仍在逾期集合内的行走不到 `cancel`。当时判断「要修就得让 `cancel` 拆成『撤两枚 / 只撤晚间』，为这个很窄的场景增加一层结构」——复核时认为拆出的正是一个**语义独立**的槽位操作（晚间槽本来就有独立生命周期），不是为窄场景打的补丁，故修 |
+
+---
+
+## 14. 增量：通知内勾选完成（第三轮）
+
+> 本节是**复核阶段**按「核对文档并补齐功能」追加的：把 §12 K-8 与 §13.12 K-12 两条记录在案的缺口补上。§1–§13 保持原样。
+
+### 14.1 需求出处
+
+- K-8 缺口对应 §0 D-2 的「直到用户手动勾选为止」。原设计把「手动勾选」限定在 App 内，但需求原文没有这个限定；通知里的动作按钮才是最直接的那条路径。
+- K-12 缺口对应 §0 D-3 的「隔一段时间持续不断弹」。一条改成下午结束的待办每晚仍被补催，属于「响了不该响的」。
+
+### 14.2 通知内勾选完成（补 K-8）
+
+**不新增 `<receiver>`**：§6.4 / C-20 的约束（避开 `ForegroundServiceArchitectureTest` 的守卫）继续成立。动作按钮复用已声明的 `.core.services.AlarmReceiver`。
+
+`AlarmReceiver` 追加：
+
+```kotlin
+const val ACTION_SCHEDULE_OVERDUE_COMPLETE = "com.projectlumen.app.action.SCHEDULE_OVERDUE_COMPLETE"
+```
+
+分支放在 `ACTION_SCHEDULE_OVERDUE_EVENING` 之后、眼护理 `reconcileNow` 之前，同样**必须提前返回**：
+
+```kotlin
+if (intent.action == ACTION_SCHEDULE_OVERDUE_COMPLETE) {
+    val occurrenceId = intent.getLongExtra(ScheduleOverdueNagScheduler.EXTRA_OCCURRENCE_ID, 0L)
+    if (occurrenceId != 0L) {
+        app.scheduleRepository.setCompleted(occurrenceId, true)
+        app.rescheduleScheduleReminders()
+        app.notifications.cancelScheduleOverdue(occurrenceId)
+    }
+    return@runCatching
+}
+```
+
+三行的分工：
+
+1. `setCompleted(id, true)` —— 与 `ProjectLumenScheduleFeatureEntry.setCompleted`（§6 UI 路径）落的是同一个 DAO 方法，勾选语义唯一。
+2. `rescheduleScheduleReminders()` —— 复用既有重排入口而不是就地 `cancel(id)`。勾选后该行掉出 `overdue` 集合，由 §4.3 第 7 步把两枚闹钟一起撤掉；就再写一处 cancel 会多出第二个「什么情况下该撤」的判定点。
+3. `cancelScheduleOverdue(id)` —— **必须显式调用**：builder 上的 `setAutoCancel(true)` 只在**点击内容意图**时生效，点动作按钮不触发它，否则勾完了通知还挂在栏里。
+
+`NotificationService` 相应追加：
+
+```kotlin
+fun cancelScheduleOverdue(occurrenceId: Long) {
+    notificationManager.cancel(ScheduleOverdueNagScheduler(context).notificationIdFor(occurrenceId))
+}
+```
+
+`show(...)` 追加一个**末尾默认参数** `overdueOccurrenceId: Long? = null`，非空时挂一个动作按钮。选默认参数而不是新开一个 builder：§7.2 的「反复响铃靠不设 `setOnlyAlertOnce`」这条不变量必须继续由同一个 builder 承担，复制一份 builder 就等于把这条不变量复制成两份，将来只在其中一份上加 flag 会很难发现。
+
+`R.string.schedule_overdue_complete`（`Check off` / `勾选完成`）两侧各 +1。
+
+> **request code 必须按实例取，不能共用常量**：`PendingIntent` 的身份是 `(requestCode, Intent.filterEquals)`，而 `filterEquals` **不看 extras**。若所有实例共用同一个 request code，它们就是同一个 PendingIntent，后一条通知会覆盖前一条的 extras——点任意一条的按钮都会去勾选「最近一次发通知的那条待办」。因此这里用 `notificationIdFor(occurrenceId)` 作 request code；它与同 id 的两枚闹钟不冲突，因为 action 不同（同 §4.1 的判据）。
+>
+> 动作按钮**不涉及**精确闹钟权限、不改动 `NotificationIds` 的 9900..10199 区段，也不新增渠道。
+
+### 14.3 撤销「不再需要晚间槽」的待办（修 K-12）
+
+`ScheduleOverdueNagScheduler` 追加：
+
+```kotlin
+fun cancelEvening(occurrenceId: Long)
+```
+
+它只撤 `ACTION_SCHEDULE_OVERDUE_EVENING` 那一枚，间隔槽保持不动——与 `cancel`（两枚一起撤）并列，二者不是包含关系。
+
+`rearmAll` 第 8b 步从 `filter` 改为 `forEach` + 分支：
+
+```kotlin
+overdue.forEach { occurrence ->
+    if (ScheduleOverdueNag.endedInMorning(occurrence, zone)) {
+        scheduler.scheduleEvening(occurrence.id, ScheduleOverdueNag.nextEveningNagAt(nowMillis, eveningMinute, zone))
+    } else {
+        scheduler.cancelEvening(occurrence.id)
+    }
+}
+```
+
+`else` 分支同时覆盖两种情况，这正是它值得存在的原因：普通「下午结束」的项每次 `rearmAll` 都会空撤一次（`existingPendingIntent` 返回 `null`，无副作用），而已催过又改到下午的项靠它把陈旧闹钟清掉。若只按 K-12 的场景写判断（例如加一个「之前是否属于上午集合」的状态），就需要额外持久化一份历史状态，而这里根本不需要。
+
+**错开规则不变**：`else` 分支不引入任何 `index` 依赖，§13.5 关于「晚间不错开」的理由继续成立。
+
+### 14.4 本节核对清单
+
+- [x] C-47 `AlarmReceiver.ACTION_SCHEDULE_OVERDUE_COMPLETE` 已定义，分支提前返回，未落到眼护理路径
+- [x] C-48 动作按钮的 request code 是 `notificationIdFor(occurrenceId)` 而非共享常量（否则 extras 互相覆盖，勾错条目）
+- [x] C-49 勾选后显式 `cancelScheduleOverdue`，未依赖 `setAutoCancel(true)`（该 flag 对动作按钮不生效）
+- [x] C-50 `show(...)` 未新增第二个 builder，也没有在任何路径上加 `setOnlyAlertOnce(true)`（§7.2 不变量保持）
+- [x] C-51 `cancelEvening` 只撤晚间槽；`cancel` 仍是两枚一起撤，`NAG_ACTIONS` 未改
+- [x] C-52 `rearmAll` 第 8b 步改为 `forEach` 分支，`else` 走 `cancelEvening`；晚间仍不错开
+- [x] C-53 `schedule_overdue_complete` 在 `values/` 与 `values-zh/` 两侧同时存在
+- [x] C-54 无新增 `<receiver>` / `<service>`，`AndroidManifest.xml` 未改动（§6.4 / C-20 继续成立）
+- [ ] C-55 提交已推送且 CI 全绿
+
+### 14.5 本节取舍
+
+| 编号 | 取舍 | 理由 |
+|---|---|---|
+| K-13 | 动作按钮只有「勾选完成」，没有「稍后提醒」 | 需求是「直到勾选为止」，「稍后提醒」等价于把间隔临时改小，属于新增语义；间隔槽本来就会按用户设定的间隔再响 |
+| K-14 | 勾选走 `rescheduleScheduleReminders()` 全量重排，而不是就地撤这一条的两枚闹钟 | 全量重排代价是遍历一次活跃日程（量级为百），换来的是「哪些情况该撤」只有一处判定；就地撤会引入第二处，且将来改动 `overdueItems` 口径时容易只改一处 |
+| K-15 | `cancelEvening` 与 `cancel` 并列存在，而不是给 `cancel` 加布尔参数 | 两个方法各自只有一个调用点，语义不同（「这个槽不该有」vs「这条不该有」）；布尔参数会让调用点读不出意图 |
+

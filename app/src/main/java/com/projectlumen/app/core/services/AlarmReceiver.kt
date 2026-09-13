@@ -74,6 +74,26 @@ class AlarmReceiver : BroadcastReceiver() {
                     }
                     return@runCatching
                 }
+                // The nag's own "check off" button. It is not an alarm, but it reaches the same
+                // user-owned to-do, so it takes the same early return: falling through would feed a
+                // button tap to the eye-care engine as a phase advance.
+                if (intent.action == ACTION_SCHEDULE_OVERDUE_COMPLETE) {
+                    val occurrenceId = intent.getLongExtra(
+                        ScheduleOverdueNagScheduler.EXTRA_OCCURRENCE_ID,
+                        0L,
+                    )
+                    if (occurrenceId != 0L) {
+                        app.scheduleRepository.setCompleted(occurrenceId, true)
+                        // Goes through the same path every other schedule write uses, so both nag
+                        // slots for this occurrence are cancelled by the completion rule rather than
+                        // by a second, parallel cancel here.
+                        app.rescheduleScheduleReminders()
+                        // An action tap never triggers setAutoCancel, so the notification has to be
+                        // dismissed explicitly or the checked-off to-do stays on screen.
+                        app.notifications.cancelScheduleOverdue(occurrenceId)
+                    }
+                    return@runCatching
+                }
                 val notifications = app.notifications
                 val settings = app.settingsRepository().getOrDefault()
                 val nowMillis = System.currentTimeMillis()
@@ -143,6 +163,10 @@ class AlarmReceiver : BroadcastReceiver() {
         // A second action, not a second request code: the two nag slots are distinguished by their
         // Intent action (see ScheduleOverdueNagScheduler), so these two constants must stay distinct.
         const val ACTION_SCHEDULE_OVERDUE_EVENING = "com.projectlumen.app.action.SCHEDULE_OVERDUE_EVENING"
+        // Not an alarm: this is the overdue notification's action button. It travels through this
+        // receiver only because the nag's PendingIntents already point here, so reusing it avoids
+        // declaring a new <receiver> in the manifest.
+        const val ACTION_SCHEDULE_OVERDUE_COMPLETE = "com.projectlumen.app.action.SCHEDULE_OVERDUE_COMPLETE"
 
         private val REMINDER_ACTIONS = setOf(ACTION_PRE_ALERT, ACTION_BREAK_DUE, ACTION_BREAK_DONE)
 
