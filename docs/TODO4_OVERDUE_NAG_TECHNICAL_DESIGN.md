@@ -416,7 +416,7 @@ internal fun ScheduleOverdueNagCard(settings: AppSettingsEntity, viewModel: Proj
 
 实现完成后逐条核对；每条要么 ✅ 已实现（附文件:行号），要么 ⏸ 挂起（附理由）。
 
-> **进度：29 / 30 已勾选**（C-30 待 CI 结论；C-31 ~ C-45 见 §13.11，其中 C-46 待 CI）。
+> **进度：30 / 30 已勾选**（C-30 已由 `9704962` 的 `Build Project Lumen Android` 结论 `success` 判定；C-31 ~ C-46 见 §13.11）。
 > 核对方式：逐文件读落盘代码 + `git diff`，**不采信子代理自述**。
 > 核对过程中发现并已修正的 3 条：**C-12**（`index` → `index + 1`，原写法会让每轮最该催的那条被静默丢弃）、文档 §13.6 关于 `armEveningSlot` 的表述失真（代码最终是单侧方案，文档一度写成双侧）、以及两处「控件数量变了但注释没跟」的失真。
 
@@ -458,7 +458,7 @@ internal fun ScheduleOverdueNagCard(settings: AppSettingsEntity, viewModel: Proj
 ### 11.5 纪律
 - [x] C-28 —— 卡片独立成 `ProjectLumenScheduleOverdueSettings.kt`，设置页只加 1 行调用（`:564`）
 - [x] C-29 —— 本轮未在本机执行任何 gradle / 构建 / 测试 / lint 命令
-- [ ] C-30 提交已推送且 CI（check-runs 逐 job）全绿 —— **待本次提交结论**
+- [x] C-30 提交已推送且 CI（check-runs 逐 job）全绿 —— `9704962` 的 `Build Project Lumen Android` run `34732440505` 结论 `success`（`3c02ac3` 那次是 `cancelled`，被 `9704962` 以 concurrency 顶掉；两者代码一致，`9704962` 仅改文档，故本次判定同样覆盖 `3c02ac3` 落盘的代码）
 
 ---
 
@@ -681,7 +681,7 @@ fun setScheduleOverdueNagEveningMinute(minute: Int) {
 
 ### 13.11 本节核对清单（与 §11 并行勾选）
 
-> **进度：15 / 16 已勾选**（C-46 需随 C-30 一起由 CI 判定）。
+> **进度：16 / 16 已勾选**（C-46 随 C-30 一起由 `9704962` 的 CI 结论判定）。
 
 - [x] C-31 `AppSettingsEntity.kt:117-118` —— 追加 `scheduleOverdueNagEveningMinute`，默认 `1290`
 - [x] C-32 `AppDatabase.kt:225` —— `MIGRATION_19_20` 第三列，`INTEGER NOT NULL DEFAULT 1290`；version 未再 bump，未新增迁移对象
@@ -698,7 +698,7 @@ fun setScheduleOverdueNagEveningMinute(minute: Int) {
 - [x] C-43 `ProjectLumenViewModel.kt:505-510` —— 先 `updateSettings` 再 `rescheduleScheduleReminders()`，且 `coerceIn(0, 1435)`
 - [x] C-44 `ScheduleOverdueNagTest.kt:156-236` —— N-11 ~ N-17 落地；N-17 断言 DST 切换后本地仍是 21:30，且偏移由 `-5` 变 `-4`
 - [x] C-45 `values/strings.xml:992-993` / `values-zh/strings.xml:991-992` —— 两侧新增同一键且位置对应，`schedule_overdue_nag_hint` 已修订
-- [ ] C-46 提交已推送且 CI 全绿 —— **待本次提交结论**（与 C-30 同批）
+- [x] C-46 提交已推送且 CI 全绿 —— 同 C-30，`9704962` 的 `Build Project Lumen Android` 结论 `success`
 
 ### 13.12 本节取舍
 
