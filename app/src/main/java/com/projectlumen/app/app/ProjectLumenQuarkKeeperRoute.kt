@@ -37,6 +37,11 @@ internal fun QuarkKeeperRoute(
     val snapshot = uiState.quarkKeeper
     val permissions = rememberPermissionRequirements()
     val quarkUnavailable by viewModel.quarkKeeperQuarkUnavailable.collectAsStateWithLifecycle()
+    // Raised by the feature entry on the foreground that follows a hand-off to Quark, not derived here:
+    // whether the user came back inside the window is a question about an instant, and the dashboard's
+    // minute-resolution clock could not answer it — nor should the screen be the one to consume the
+    // stamp, since it is not on screen at the moment the Activity resumes.
+    val returnConfirmation by viewModel.quarkKeeperReturnConfirmation.collectAsStateWithLifecycle()
     // Ticks on its own minute, like the dashboard's clock and for the same reason: `nowMillis` from the
     // app's shared 1 Hz clock would rebuild the statistics below once a second, and the module has no
     // resolution finer than a minute to justify it.
@@ -77,6 +82,7 @@ internal fun QuarkKeeperRoute(
         onOpenQuark = viewModel::openQuarkKeeperCheckIn,
         onRequestExactAlarm = { openExactAlarmSettings(context) },
         onRequestOverlay = { openOverlaySettings(context) },
+        onRequestBatteryOptimization = { openBatteryOptimizationSettings(context) },
         onOpenNotificationSettings = { openAppNotificationSettings(context) },
         sessionMessage = sessionMessage,
     )
@@ -88,6 +94,55 @@ internal fun QuarkKeeperRoute(
             onDismiss = viewModel::dismissQuarkKeeperQuarkUnavailable,
         )
     }
+
+    if (returnConfirmation) {
+        QuarkKeeperReturnConfirmationDialog(
+            // The dashboard's own check-in action, deliberately not a second path to the same write:
+            // the card answers "did it go through", and the answer to that is the check-in the button
+            // beside it performs. The session message is raised with it so the dashboard behind the
+            // card acknowledges the tap the same way it would have if the button had been pressed.
+            onConfirm = {
+                sessionMessage = checkedInMessage
+                viewModel.markQuarkKeeperCheckedIn()
+            },
+            onDismiss = viewModel::dismissQuarkKeeperReturnConfirmation,
+        )
+    }
+}
+
+/**
+ * The question the app owes the user after it handed them to Quark and they came back.
+ *
+ * Centred and dismissible rather than the forced overlay the trip started from: the forced overlay is
+ * a separate window this app put on top of everything, and it has already taken itself down — what is
+ * left is a question about what the user did while they were away, and a question needs a way out that
+ * is not an answer. Both ways out here are cheap, which is the point: "not yet" keeps the guard armed
+ * and costs one tap, and back or a tap outside reads as the same thing rather than trapping the user in
+ * a card they cannot close.
+ *
+ * The confirming button leads because the hand-off is what raised it: the user left for Quark in order
+ * to check in, so "yes" is the answer that matches the intent that got them here.
+ */
+@Composable
+private fun QuarkKeeperReturnConfirmationDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.quark_keeper_return_confirm_title)) },
+        text = { Text(stringResource(R.string.quark_keeper_return_confirm_message)) },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(stringResource(R.string.quark_keeper_return_confirm_done))
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text(stringResource(R.string.quark_keeper_return_confirm_pending))
+            }
+        },
+    )
 }
 
 /**

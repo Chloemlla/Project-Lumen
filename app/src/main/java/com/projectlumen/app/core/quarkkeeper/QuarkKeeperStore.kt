@@ -61,6 +61,10 @@ object QuarkKeeperStore {
             result = QuarkKeeperTodayStatus(
                 dateKey = dateKey,
                 checkedInAtMillis = nowMillis,
+                // The day is answered, so a question about whether it was answered has nothing left
+                // to ask: a hand-off stamp that outlived the check-in would raise the card over a day
+                // the user has already closed.
+                awaitingReturnAtMillis = 0L,
                 // The nag round survives a check-in and its undo: it counts how many times today has
                 // already been interrupted, and restarting the count would let a user who checks in
                 // and undoes the action be alerted from round one again.
@@ -85,7 +89,14 @@ object QuarkKeeperStore {
     fun undoCheckIn(dateKey: String, nowMillis: Long = System.currentTimeMillis()) {
         mutate { current ->
             val clearedToday = if (current.today.dateKey == dateKey) {
-                current.today.copy(checkedInAtMillis = 0L, snoozedUntilMillis = 0L)
+                // Back to "watching", not back to "waiting to be answered": an undo reopens the day, so
+                // the hand-off stamp has to go with the check-in. Keeping it would put the confirmation
+                // card on screen for a day the user has just un-answered.
+                current.today.copy(
+                    checkedInAtMillis = 0L,
+                    snoozedUntilMillis = 0L,
+                    awaitingReturnAtMillis = 0L,
+                )
             } else {
                 current.today
             }
@@ -116,6 +127,44 @@ object QuarkKeeperStore {
         }
     }
 
+    /**
+     * Records that the user was just handed off to Quark, which is what the return question is asked
+     * against.
+     *
+     * Only the instant is stored; whether it is still worth asking is derived by
+     * [QuarkKeeperClock.isReturnConfirmationOpen]. That split is deliberate — a stored "ask the user"
+     * flag would need something to clear it, and the thing that would have to clear it (the app coming
+     * back to the foreground) is exactly the event that is missing when the process was killed while
+     * the user was away. A stamp expires by arithmetic instead, so nothing has to run for it to stop
+     * being true.
+     */
+    fun markAwaitingReturn(nowMillis: Long = System.currentTimeMillis()) {
+        mutate { current ->
+            val dateKey = todayKey(nowMillis)
+            val today = if (current.today.dateKey == dateKey) {
+                current.today.copy(awaitingReturnAtMillis = nowMillis)
+            } else {
+                QuarkKeeperTodayStatus(dateKey = dateKey, awaitingReturnAtMillis = nowMillis)
+            }
+            current.copy(today = today)
+        }
+    }
+
+    /**
+     * Drops the hand-off stamp, ending the question.
+     *
+     * Today's row only, like [clearSnooze]: a stamp left behind by an earlier day is already absent
+     * through [currentToday], and rewriting today's row to clear it would erase today's check-in along
+     * with it.
+     */
+    fun clearAwaitingReturn(nowMillis: Long = System.currentTimeMillis()) {
+        val dateKey = todayKey(nowMillis)
+        mutate { current ->
+            if (current.today.dateKey != dateKey || current.today.awaitingReturnAtMillis == 0L) return@mutate current
+            current.copy(today = current.today.copy(awaitingReturnAtMillis = 0L))
+        }
+    }
+
     /** Counts one escalated round for today and returns the new total. */
     fun bumpNagRound(nowMillis: Long = System.currentTimeMillis()): Int {
         val dateKey = todayKey(nowMillis)
@@ -130,6 +179,33 @@ object QuarkKeeperStore {
             current.copy(today = today)
         }
         return round
+    }
+
+    /**
+     * Takes today's first nag round, reporting whether this call is the one that took it.
+     *
+     * [bumpNagRound] cannot answer "has today been alerted yet?" for a caller that has to decide before
+     * it acts: reading [QuarkKeeperTodayStatus.nagRound] and bumping afterwards leaves a window in which
+     * a second caller reads the same zero and raises an alert of its own. The guard is reached through
+     * broadcasts that arrive in pairs and are each handled on a dispatcher thread of their own — a boot
+     * with its locked-boot twin, a clock change with the timezone change beside it — so the decision has
+     * to be made while the row is held, which is what this does. The round is left untouched when the
+     * day has already been alerted, so one trigger counts as one interruption.
+     */
+    fun claimFirstNagRound(nowMillis: Long = System.currentTimeMillis()): Boolean {
+        val dateKey = todayKey(nowMillis)
+        var claimed = false
+        mutate { current ->
+            val today = if (current.today.dateKey == dateKey) {
+                current.today
+            } else {
+                QuarkKeeperTodayStatus(dateKey = dateKey)
+            }
+            if (today.nagRound != 0) return@mutate current
+            claimed = true
+            current.copy(today = today.copy(nagRound = 1))
+        }
+        return claimed
     }
 
     private fun mutate(transform: (QuarkKeeperSnapshot) -> QuarkKeeperSnapshot) {
@@ -166,6 +242,7 @@ object QuarkKeeperStore {
                     dateKey = mmkv.decodeString(KEY_TODAY_DATE, "").orEmpty(),
                     checkedInAtMillis = mmkv.decodeLong(KEY_TODAY_CHECKED_IN_AT, 0L),
                     snoozedUntilMillis = mmkv.decodeLong(KEY_TODAY_SNOOZED_UNTIL, 0L),
+                    awaitingReturnAtMillis = mmkv.decodeLong(KEY_TODAY_AWAITING_RETURN, 0L),
                     nagRound = mmkv.decodeInt(KEY_TODAY_NAG_ROUND, 0),
                 ),
                 records = decodeRecords(mmkv.decodeString(KEY_RECORDS, "").orEmpty()),
@@ -184,6 +261,7 @@ object QuarkKeeperStore {
         mmkv.encode(KEY_TODAY_DATE, snapshot.today.dateKey)
         mmkv.encode(KEY_TODAY_CHECKED_IN_AT, snapshot.today.checkedInAtMillis)
         mmkv.encode(KEY_TODAY_SNOOZED_UNTIL, snapshot.today.snoozedUntilMillis)
+        mmkv.encode(KEY_TODAY_AWAITING_RETURN, snapshot.today.awaitingReturnAtMillis)
         mmkv.encode(KEY_TODAY_NAG_ROUND, snapshot.today.nagRound)
         mmkv.encode(KEY_RECORDS, encodeRecords(snapshot.records))
     }
@@ -226,6 +304,7 @@ object QuarkKeeperStore {
     private const val KEY_TODAY_DATE = "today_date"
     private const val KEY_TODAY_CHECKED_IN_AT = "today_checked_in_at"
     private const val KEY_TODAY_SNOOZED_UNTIL = "today_snoozed_until"
+    private const val KEY_TODAY_AWAITING_RETURN = "today_awaiting_return"
     private const val KEY_TODAY_NAG_ROUND = "today_nag_round"
     private const val KEY_RECORDS = "records"
 }

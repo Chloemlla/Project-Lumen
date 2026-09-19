@@ -223,6 +223,7 @@ class ProjectLumenViewModel(
     val shizukuNetworkApps = appNetworkControlEntry.networkApps
     val appNetworkControlRecords = appNetworkControlEntry.records
     val quarkKeeperQuarkUnavailable = quarkKeeperEntry.quarkUnavailable
+    val quarkKeeperReturnConfirmation = quarkKeeperEntry.returnConfirmation
     val apiDiagnostics = ProjectLumenApiDiagnostics.traces
     val memoryHealth = MemoryHealthMonitor.snapshot
     val uiState = stateStore.uiState
@@ -551,6 +552,23 @@ class ProjectLumenViewModel(
         quarkKeeperEntry.undoCheckIn()
     }
 
+    /**
+     * The activity reached the foreground. Called from `MainActivity.onResume`, which is the only place
+     * the return from Quark is observable; the decision it drives lives in the feature entry.
+     */
+    fun onQuarkKeeperForeground() {
+        quarkKeeperEntry.onForeground()
+    }
+
+    fun dismissQuarkKeeperReturnConfirmation() {
+        CrashBreadcrumbs.record("Action dismissQuarkKeeperReturnConfirmation")
+        quarkKeeperEntry.dismissReturnConfirmation()
+    }
+
+    @Deprecated(
+        message = "Dead entry point: no caller in the UI. The live snooze is the forced overlay's " +
+            "button, which broadcasts QuarkKeeperReceiver.ACTION_SNOOZE. Kept until the next milestone.",
+    )
     fun snoozeQuarkKeeper() {
         CrashBreadcrumbs.record("Action snoozeQuarkKeeper")
         quarkKeeperEntry.snooze()

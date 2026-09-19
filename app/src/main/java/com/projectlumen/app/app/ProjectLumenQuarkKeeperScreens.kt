@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.BatterySaver
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.EventNote
 import androidx.compose.material.icons.outlined.EventRepeat
@@ -84,6 +85,7 @@ internal fun QuarkKeeperDashboardScreen(
     onOpenQuark: () -> Unit,
     onRequestExactAlarm: () -> Unit,
     onRequestOverlay: () -> Unit,
+    onRequestBatteryOptimization: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     sessionMessage: String?,
 ) {
@@ -212,7 +214,7 @@ internal fun QuarkKeeperDashboardScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     // The requirement flags are "needed", not "granted", so they invert here once
-                    // rather than in three call sites.
+                    // rather than in four call sites.
                     QuarkKeeperPermissionRow(
                         labelRes = R.string.quark_keeper_permission_notifications,
                         icon = Icons.Outlined.NotificationsActive,
@@ -230,6 +232,17 @@ internal fun QuarkKeeperDashboardScreen(
                         icon = Icons.Outlined.Lock,
                         granted = !permissions.overlay,
                         onGrant = onRequestOverlay,
+                    )
+                    // Last, and not because it is least important: the exemption is what keeps the two
+                    // alarms above from being deferred by Doze, so without it the other three rows can
+                    // all read "granted" while the reminder still arrives late. It is listed beside
+                    // them because it is the same kind of thing — a trip to a system screen the guard
+                    // cannot make on the user's behalf.
+                    QuarkKeeperPermissionRow(
+                        labelRes = R.string.quark_keeper_permission_battery,
+                        icon = Icons.Outlined.BatterySaver,
+                        granted = !permissions.batteryExemptionNeeded,
+                        onGrant = onRequestBatteryOptimization,
                     )
                 }
             }

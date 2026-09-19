@@ -80,4 +80,38 @@ class QuarkKeeperClockTest {
         assertFalse(QuarkKeeperClock.isSnoozeAllowed(settings, at(23, 30), zone))
         assertFalse(QuarkKeeperClock.isSnoozeAllowed(settings, at(23, 59), zone))
     }
+
+    /**
+     * The sixty seconds are the spec's, so they are written out rather than read from the constant: a
+     * window that quietly grew to two minutes would still pass a test that asked the code what its own
+     * window was.
+     *
+     * The boundary itself is closed. At exactly sixty seconds the return monitor fires and the forced
+     * alert takes the screen, so a card appearing at that same instant would be fighting the alert it is
+     * meant to spare the user.
+     */
+    @Test
+    fun returnConfirmationIsOpenForTheSixtySecondsAfterTheHandOff() {
+        val handOff = at(22, 30)
+        assertTrue(QuarkKeeperClock.isReturnConfirmationOpen(handOff, handOff + 5_000L))
+        assertTrue(QuarkKeeperClock.isReturnConfirmationOpen(handOff, handOff + 59_999L))
+        assertFalse(QuarkKeeperClock.isReturnConfirmationOpen(handOff, handOff + 60_000L))
+        assertFalse(QuarkKeeperClock.isReturnConfirmationOpen(handOff, handOff + 60_001L))
+    }
+
+    @Test
+    fun returnConfirmationIsClosedWhenNobodyWasSentToQuark() {
+        assertFalse(QuarkKeeperClock.isReturnConfirmationOpen(0L, at(22, 30)))
+    }
+
+    /**
+     * A stamp later than "now" means the system clock moved backwards under the guard. Without this the
+     * card would stay open for however long the device took to catch up, and indefinitely if the clock
+     * was set back by a year — a prompt with no way to expire is worse than no prompt.
+     */
+    @Test
+    fun returnConfirmationIsClosedWhenTheClockMovedBackwards() {
+        val handOff = at(22, 30)
+        assertFalse(QuarkKeeperClock.isReturnConfirmationOpen(handOff, handOff - 1_000L))
+    }
 }

@@ -18,8 +18,9 @@ import com.projectlumen.app.core.quarkkeeper.QuarkKeeperStore
  *
  * Being callable from anywhere is what forces the two non-obvious rules below. The day's nodes are
  * anchored on "the next occurrence of that minute" rather than on today, so a reconcile running at the
- * exact moment a node fires arms tomorrow instead of going quiet for a day; and the boot catch-up is
- * gated on the day's nag round, so a reconcile running right after an alert does not raise it again.
+ * exact moment a node fires arms tomorrow instead of going quiet for a day; and the boot catch-up takes
+ * the day's first nag round instead of reading it, so neither a reconcile running right after an alert
+ * nor two reconciles running side by side raise it again.
  */
 object QuarkKeeperCoordinator {
 
@@ -60,15 +61,29 @@ object QuarkKeeperCoordinator {
             QuarkKeeperAlertService.dismiss(context)
         } else {
             scheduler.scheduleDeadline(nextAt(settings.forcedMinuteOfDay, nowMillis))
+            // A snooze the user asked for has to outlive every reconcile between the tap and its own
+            // expiry. Only the receiver's "later" button used to arm this slot, so the in-app snooze
+            // wrote the stamp, showed "snoozed until …", and then nothing ever fired — the same action
+            // behaved differently depending on which surface it was taken from. Arming it here is what
+            // makes the two identical, and it is why the not-checked-in branch has to own the slot.
+            //
+            // Only a stamp still ahead of the clock is armed. An earlier round's stamp is left where it
+            // is: resurrecting it would fire a re-alert the user has already sat through, on a night
+            // where the deadline slot is about to interrupt them anyway.
+            if (today.snoozedUntilMillis > nowMillis) {
+                scheduler.scheduleSnooze(today.snoozedUntilMillis)
+            }
             // PRD edge case 1: the device booted after the deadline with the day still open. Without
             // this the first alert of the day would wait for tomorrow's deadline, and the streak would
             // break unannounced.
             //
-            // nagRound == 0 is what makes this a catch-up rather than a repeat: any round that actually
-            // alerts bumps the count, so a reconcile that runs after an alert stays quiet. That is also
-            // why every alert path goes through [fireForceAlert] instead of posting directly.
-            if (deadlineReached(settings, nowMillis) && today.nagRound == 0) {
-                fireForceAlert(app, nowMillis)
+            // The round is *claimed* here rather than read and acted on. Reading nagRound and firing
+            // afterwards lets two reconciles that overlap both see an unalerted day and both raise the
+            // alert; claiming it under the store's lock is what holds the "one boot, one compensation"
+            // rule, since the loser gets `false` and shows nothing. Every other alert path still goes
+            // through [fireForceAlert], which counts its round the same way.
+            if (deadlineReached(settings, nowMillis) && QuarkKeeperStore.claimFirstNagRound(nowMillis)) {
+                showForceAlert(app, nowMillis)
             }
         }
         // Always armed. This is the only thing that starts a new day, so skipping it when the day is
@@ -92,17 +107,27 @@ object QuarkKeeperCoordinator {
      * up, and the countdown.
      *
      * The round is counted *before* anything is shown. It records that the user has been interrupted,
-     * not that the interruption was delivered, and [reconcile] reads it as "the day has already been
-     * alerted". Counting it afterwards would let a refused overlay or a dropped notification make every
+     * not that the interruption was delivered, and it is what tells [reconcile] the day has already been
+     * alerted. Counting it afterwards would let a refused overlay or a dropped notification make every
      * later reconcile believe the day was never alerted and fire again.
      */
     suspend fun fireForceAlert(app: ProjectLumenApplication, nowMillis: Long = System.currentTimeMillis()) {
+        QuarkKeeperStore.bumpNagRound(nowMillis)
+        showForceAlert(app, nowMillis)
+    }
+
+    /**
+     * The visible half of [fireForceAlert], without the round.
+     *
+     * Split out for [reconcile]'s catch-up, which has already claimed the round to decide whether it
+     * may show anything at all — bumping again there would count one interruption as two.
+     */
+    private suspend fun showForceAlert(app: ProjectLumenApplication, nowMillis: Long) {
         val context = app.applicationContext
         val notifications = QuarkKeeperNotifications(context)
         // Before showForceAlert(), not before the overlay: posting to a channel that does not exist yet
         // drops the notification silently, and this is the one notification that cannot be missed.
         notifications.ensureChannels()
-        QuarkKeeperStore.bumpNagRound(nowMillis)
         val remaining = remainingHours(nowMillis)
         QuarkKeeperAlertService.show(context, remaining)
         // Posted on every round rather than only when the overlay reports failure. show() answers false

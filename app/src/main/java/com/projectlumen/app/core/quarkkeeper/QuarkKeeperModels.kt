@@ -62,9 +62,20 @@ data class QuarkKeeperTodayStatus(
     val dateKey: String = "",
     val checkedInAtMillis: Long = 0L,
     val snoozedUntilMillis: Long = 0L,
+    /**
+     * When the user was last handed off to Quark, or 0 when no hand-off is pending. Stored as the
+     * instant rather than a boolean so the question expires on its own: only the window in
+     * [QuarkKeeperClock.isReturnConfirmationOpen] decides whether it is still open, which means a
+     * process killed while the user was in Quark still comes back to a deadline instead of a prompt
+     * that never ends.
+     */
+    val awaitingReturnAtMillis: Long = 0L,
     val nagRound: Int = 0,
 ) {
     val checkedIn: Boolean get() = checkedInAtMillis > 0L
+
+    /** True while a hand-off is on record. Whether it is still worth asking is the clock's call. */
+    val awaitingReturn: Boolean get() = awaitingReturnAtMillis > 0L
 }
 
 /** One completed day. [checkedInAtMillis] is the instant the user confirmed it, kept to the minute. */
@@ -132,6 +143,15 @@ data class QuarkKeeperRemaining(val totalMinutes: Int) {
  */
 object QuarkKeeperClock {
 
+    /**
+     * How long the guard keeps asking "did the check-in go through?" after handing the user to Quark.
+     *
+     * The same number arms the return monitor that re-raises the alert and bounds the question the UI
+     * asks on the way back, so the two cannot drift into a state where the app is still asking about a
+     * hand-off whose alarm has already fired.
+     */
+    const val RETURN_CONFIRMATION_WINDOW_MILLIS = 60_000L
+
     fun zone(): ZoneId = ZoneId.systemDefault()
 
     fun minuteOfDay(nowMillis: Long, zoneId: ZoneId = zone()): Int {
@@ -173,5 +193,20 @@ object QuarkKeeperClock {
     /** True once the snooze chain must stop offering another round. */
     fun isSnoozeAllowed(settings: QuarkKeeperSettings, nowMillis: Long, zoneId: ZoneId = zone()): Boolean {
         return minuteOfDay(nowMillis, zoneId) < settings.snoozeCutoffMinuteOfDay
+    }
+
+    /**
+     * True while a recorded hand-off to Quark is recent enough to still be worth asking about.
+     *
+     * The elapsed time is required to be non-negative, not merely within the window: a user who moves
+     * the system clock backwards leaves [awaitingReturnAtMillis] in the future, and a plain
+     * `elapsed <= window` would read that as "just left" forever — the card would follow them into the
+     * next day. A future stamp is treated the same as an expired one, because the hand-off it describes
+     * cannot have happened yet.
+     */
+    fun isReturnConfirmationOpen(awaitingReturnAtMillis: Long, nowMillis: Long): Boolean {
+        if (awaitingReturnAtMillis <= 0L) return false
+        val elapsedMillis = nowMillis - awaitingReturnAtMillis
+        return elapsedMillis in 0L..RETURN_CONFIRMATION_WINDOW_MILLIS
     }
 }

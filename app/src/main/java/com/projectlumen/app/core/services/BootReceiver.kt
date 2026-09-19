@@ -11,11 +11,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Rebuild pending schedules after device boot / package replace.
+ * Rebuild pending schedules after device boot / package replace / a clock change.
  *
  * Android 15 force-stop cancels pending intents; when the app later leaves STOPPED state the
  * system may re-deliver BOOT_COMPLETED-like opportunities. We treat boot and package-replace as
  * recovery points to re-register alarms/workers.
+ *
+ * A clock change is the third kind, and it is here rather than in a receiver of its own because
+ * the reason is identical: every alarm this app arms is RTC-based, so a manual time change or a
+ * timezone change moves all of them at once and the recovery is the same sweep. The guard's
+ * check-in compensation rides along on the same call — it is the one part of the app whose whole
+ * job is tied to a wall-clock time, so a clock that moved is exactly when it has to re-decide.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -40,10 +46,21 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        /**
+         * The actions [restoreScheduledWork] is the right answer to.
+         *
+         * Anything reaching this receiver that is not listed here is ignored rather than restored:
+         * the component is exported to no one, so the list only ever has to be right about what the
+         * platform itself delivers. `ACTION_TIME_CHANGED` is the constant for the manifest's
+         * `android.intent.action.TIME_SET` — the two names differ, and the manifest carries the one
+         * the platform actually sends.
+         */
         fun isRecoveryAction(action: String?): Boolean {
             return action == Intent.ACTION_BOOT_COMPLETED ||
                 action == Intent.ACTION_LOCKED_BOOT_COMPLETED ||
                 action == Intent.ACTION_MY_PACKAGE_REPLACED ||
+                action == Intent.ACTION_TIME_CHANGED ||
+                action == Intent.ACTION_TIMEZONE_CHANGED ||
                 action == "android.intent.action.QUICKBOOT_POWERON"
         }
 
@@ -75,6 +92,9 @@ class BootReceiver : BroadcastReceiver() {
             // The guard's alarms are lost by the same reboot, and it does not depend on the user's
             // to-dos or on any eye-care setting, so it is restored here too rather than after the
             // `settings == null` gate. Isolated for the same reason as the schedule re-arm above.
+            // A clock change lands here as well, which is the case that matters most to the guard:
+            // its day is defined by wall-clock times, so a moved clock is the moment its stored
+            // decision about today has to be re-taken rather than trusted.
             runCatching {
                 app.reconcileQuarkKeeper()
             }.onFailure { throwable -> app.recordHandledFailure(throwable) }

@@ -136,6 +136,12 @@
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <!-- TIME_SET is the platform's action for a manual clock change; there is no
+                     ACTION_TIME_CHANGED string, that is only the name of the Java constant. Both are
+                     recovery points for the same reason the boot actions are: every alarm this app arms
+                     is RTC-based, so moving the clock moves all of them at once. -->
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
 

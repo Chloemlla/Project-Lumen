@@ -31,6 +31,7 @@ internal class ProjectLumenQuarkKeeperFeatureEntry(
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     private val _quarkUnavailable = MutableStateFlow(false)
+    private val _returnConfirmation = MutableStateFlow(false)
 
     /**
      * True once the user asked to check in and Quark could not be opened.
@@ -40,6 +41,16 @@ internal class ProjectLumenQuarkKeeperFeatureEntry(
      * raised it rather than being decided inside it.
      */
     val quarkUnavailable: StateFlow<Boolean> = _quarkUnavailable.asStateFlow()
+
+    /**
+     * True while the user is being asked whether the trip to Quark ended in a check-in.
+     *
+     * Raised by [onForeground] and lowered by either answer. It is a question about one hand-off, not a
+     * mode of the screen, so it cannot be derived from the stored stamp alone: the stamp outlives the
+     * question by design (it is what the next foreground reads), and a card rebuilt from it on every
+     * recomposition would come back after it had been answered.
+     */
+    val returnConfirmation: StateFlow<Boolean> = _returnConfirmation.asStateFlow()
 
     fun setEnabled(enabled: Boolean) {
         writeSettings { current -> current.copy(enabled = enabled) }
@@ -52,7 +63,12 @@ internal class ProjectLumenQuarkKeeperFeatureEntry(
 
     fun markCheckedIn() {
         guarded {
-            QuarkKeeperStore.markCheckedIn(now())
+            val nowMillis = now()
+            QuarkKeeperStore.markCheckedIn(nowMillis)
+            // Any check-in settles the return question, whichever button raised it: a stamp left behind
+            // would re-ask about a hand-off that is already answered on the next foreground.
+            QuarkKeeperStore.clearAwaitingReturn(nowMillis)
+            _returnConfirmation.value = false
             // Reconciling is what tears a still-open alert down, cancels tonight's remaining nodes and
             // re-arms tomorrow's. The in-app button owns no window, so there is nothing to dismiss here.
             reconcile()
@@ -76,7 +92,62 @@ internal class ProjectLumenQuarkKeeperFeatureEntry(
         }
     }
 
-    /** One more round of the alert after [QuarkKeeperSettings.snoozeMinutes]. */
+    /**
+     * The app reached the foreground; asks about a hand-off that may still be open.
+     *
+     * The Activity resuming is the only part of this cycle the app can honestly observe. The PRD's
+     * "the user went back to the launcher" fires no callback — a launcher is another app and this one is
+     * not told when its task is left — but leaving for Quark and coming back always resumes the host
+     * Activity, so that is where the question is asked. On every other foreground the stamp is absent
+     * and this is a read and nothing else.
+     *
+     * A stamp whose window has closed is dropped here rather than left for later: the spec's "silent
+     * reset" has to happen on the same foreground that would otherwise have shown the card, or the
+     * question would surface the next time the user opens the app for something unrelated. Nothing is
+     * reconciled — the stamp arms nothing, and the guard's own alarms were never touched by the trip.
+     */
+    fun onForeground() {
+        val nowMillis = now()
+        guarded {
+            val today = QuarkKeeperStore.currentToday(nowMillis)
+            val open = today.awaitingReturn &&
+                QuarkKeeperClock.isReturnConfirmationOpen(today.awaitingReturnAtMillis, nowMillis)
+            _returnConfirmation.value = open
+            if (today.awaitingReturn && !open) {
+                QuarkKeeperStore.clearAwaitingReturn(nowMillis)
+            }
+        }
+    }
+
+    /**
+     * The user answered "not yet": the card closes and the stamp goes.
+     *
+     * Deliberately the whole effect. The day is still open, so the guard stays armed and the user stays
+     * one tap from checking in — the answer only ends the question. Dropping the stamp is what keeps it
+     * ended: leaving it would raise the card again on the next foreground, which would read as the app
+     * refusing to take no for an answer.
+     */
+    fun dismissReturnConfirmation() {
+        guarded {
+            _returnConfirmation.value = false
+            QuarkKeeperStore.clearAwaitingReturn(now())
+        }
+    }
+
+    /**
+     * One more round of the alert after [QuarkKeeperSettings.snoozeMinutes].
+     *
+     * Unreachable from the UI, and kept only until the next milestone removes it. The live snooze is
+     * the forced overlay's own button, which broadcasts `QuarkKeeperReceiver.ACTION_SNOOZE` into the
+     * guard's receiver; that path owns the re-arm, the nag round and the alert window, none of which an
+     * in-app call can see. Anything that needs a snooze must go through it rather than through here, or
+     * the alert and the stored state will describe different days.
+     */
+    @Deprecated(
+        message = "Dead entry point: nothing in the UI calls it. The live snooze is the forced " +
+            "overlay's button, which broadcasts QuarkKeeperReceiver.ACTION_SNOOZE. Kept until the " +
+            "next milestone.",
+    )
     fun snooze() {
         guarded {
             val nowMillis = now()
@@ -92,7 +163,15 @@ internal class ProjectLumenQuarkKeeperFeatureEntry(
     }
 
     fun openCheckIn() {
-        _quarkUnavailable.value = !launchCheckIn()
+        val launched = launchCheckIn()
+        if (launched) {
+            // Stamped only once the hand-off actually happened: a stamp from a launch that failed would
+            // raise the return question on the next foreground for a trip the user never took. The stamp
+            // is also why the launch must come first — it is the instant the return window is measured
+            // from, and the window is only meaningful if the user really was sent away.
+            guarded { QuarkKeeperStore.markAwaitingReturn(now()) }
+        }
+        _quarkUnavailable.value = !launched
     }
 
     fun openStoreListing() {

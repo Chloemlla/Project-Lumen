@@ -34,6 +34,12 @@ import kotlinx.coroutines.launch
 open class MainActivity : ComponentActivity() {
     private val openLaunchRequest = mutableStateOf<LumenOpenLaunchRequest?>(null)
 
+    /**
+     * The same instance the Compose tree is given, held so the foreground callback below can reach it.
+     * Null while the crash gate is up, which is exactly when there is no guard state to ask about.
+     */
+    private var projectLumenViewModel: ProjectLumenViewModel? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Baseline-profile / managed emulators must keep the process alive even when startup
@@ -56,6 +62,7 @@ open class MainActivity : ComponentActivity() {
             } else {
                 null
             }
+            projectLumenViewModel = initialViewModel
             setContent {
                 ProjectLumenTheme(themeMode = AppThemeMode.SYSTEM, useDynamicColors = false) {
                     LumenCrashGate(
@@ -152,6 +159,23 @@ open class MainActivity : ComponentActivity() {
             app.recordCrash(throwable)
             null
         }
+    }
+
+    /**
+     * Where the return from Quark is observed, and the only place it can be.
+     *
+     * The hand-off leaves this app for another one, so what the guard needs to know afterwards is
+     * "we are the foreground app again" — and with a single Activity that is precisely this callback,
+     * for a cold start, a task switch back and a return from Quark alike. What it is deliberately not
+     * is a listener on the user leaving: no callback fires when someone walks away to the launcher,
+     * and a guard that claimed to watch for that would be describing something it cannot see. The
+     * decision the callback drives — show the return question, or drop a stamp whose 60-second window
+     * has closed — belongs to the guard, so only the event is reported from here.
+     */
+    override fun onResume() {
+        super.onResume()
+        runCatching { projectLumenViewModel?.onQuarkKeeperForeground() }
+            .onFailure { Log.e(TAG, "Quark Keeper return check failed", it) }
     }
 
     override fun onNewIntent(intent: Intent) {

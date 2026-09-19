@@ -3,6 +3,7 @@ package com.projectlumen.app.core.services
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.quarkkeeper.QuarkKeeperClock
 import com.projectlumen.app.core.quarkkeeper.QuarkKeeperLauncher
@@ -165,13 +166,20 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
      * That tear-down is what opens the gap this method closes: nothing confirms a check-in actually
      * happened, so the 60-second monitor below is the only thing between "opened Quark" and "cleared the
      * guard by opening Quark and backing out".
+     *
+     * The hand-off is stamped only when Quark actually opened. The stamp is what the return question is
+     * asked against, and the store-listing fallback below is not a check-in the user could confirm — a
+     * prompt there would ask about a trip that never started, and the only honest answers to it are both
+     * wrong.
      */
     private fun handleGoCheckIn(
         context: Context,
         scheduler: QuarkKeeperAlarmScheduler,
         nowMillis: Long,
     ) {
-        if (!QuarkKeeperLauncher.launchCheckIn(context)) {
+        if (QuarkKeeperLauncher.launchCheckIn(context)) {
+            QuarkKeeperStore.markAwaitingReturn(nowMillis)
+        } else {
             // Not a Toast: a broadcast receiver has no window to attach one to, and it would be dropped
             // silently on the devices that most need the message. The store listing is also the action
             // the user can actually take once told Quark is missing, and the notification tap that got
@@ -179,13 +187,24 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
             QuarkKeeperLauncher.openStoreListing(context)
         }
         // Armed whether or not Quark opened, so a launch that failed still leads back to the alert
-        // rather than letting the day quietly expire.
-        scheduler.scheduleReturnMonitor(nowMillis + RETURN_MONITOR_DELAY_MILLIS)
+        // rather than letting the day quietly expire. The delay is the clock's own window rather than a
+        // second 60 seconds kept here: the question the user is asked on the way back is bounded by that
+        // number, and two copies of it would eventually disagree about when the trip stopped counting.
+        scheduler.scheduleReturnMonitor(nowMillis + QuarkKeeperClock.RETURN_CONFIRMATION_WINDOW_MILLIS)
     }
 
     /**
      * The "later" button. Past the cutoff nothing is armed — that is the whole meaning of the cutoff,
      * and the alert stays up because there is still time to check in, just not to postpone.
+     *
+     * Refusing is not the same as ignoring, which is what the refused branch has to spell out. Only the
+     * overlay's own button is disabled past the cutoff; the copy in the notification shade is a
+     * PendingIntent that was armed while the button was still live, so a tap there arrives here with
+     * nothing on screen that would tell the user it did nothing. Silence would read as the postponement
+     * having been granted, and the guard would then appear to have stopped for the night — so the tap
+     * ends in the alert coming back instead, which both says "no" and puts the check-in back in front of
+     * the user. It is also why the refusal is logged: a simulated ACTION_SNOOZE past the cutoff has no
+     * other observable effect to test against.
      *
      * Reconciled on both branches: the refused path still has to leave the countdown correct, and the
      * accepted one has to keep it posted while the alert is off screen.
@@ -202,6 +221,14 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
             QuarkKeeperStore.setSnooze(snoozeUntilMillis, nowMillis)
             scheduler.scheduleSnooze(snoozeUntilMillis)
             QuarkKeeperAlertService.dismiss(context)
+        } else {
+            val minuteOfDay = QuarkKeeperClock.minuteOfDay(nowMillis)
+            Log.w(
+                TAG,
+                "Snooze refused at minute-of-day $minuteOfDay: the cutoff is " +
+                    "${settings.snoozeCutoffMinuteOfDay}, so the alert is being re-raised instead",
+            )
+            QuarkKeeperCoordinator.fireForceAlert(app, nowMillis)
         }
         QuarkKeeperCoordinator.reconcile(app, nowMillis)
     }
@@ -267,8 +294,8 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
         const val ACTION_OPEN_STORE = "com.projectlumen.app.action.QUARK_KEEPER_OPEN_STORE"
         const val ACTION_OPEN_WEB = "com.projectlumen.app.action.QUARK_KEEPER_OPEN_WEB"
 
-        /** How long the user is given to check in before the guard asks again. */
-        private const val RETURN_MONITOR_DELAY_MILLIS = 60_000L
+        /** Tag for the guard's own log lines; the refusal of a late snooze is the one that matters. */
+        private const val TAG = "QuarkKeeper"
 
         private const val MILLIS_PER_MINUTE = 60_000L
 
