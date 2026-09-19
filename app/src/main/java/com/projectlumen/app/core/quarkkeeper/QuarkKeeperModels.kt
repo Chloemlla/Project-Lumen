@@ -225,10 +225,15 @@ object QuarkKeeperClock {
      * `elapsed <= window` would read that as "just left" forever — the card would follow them into the
      * next day. A future stamp is treated the same as an expired one, because the hand-off it describes
      * cannot have happened yet.
+     *
+     * The window is half-open, and the upper bound belongs to the monitor rather than to the card. That
+     * same [RETURN_CONFIRMATION_WINDOW_MILLIS] is what arms the return monitor, so at exactly sixty
+     * seconds the forced alert takes the screen; a card that also counted itself open at that instant
+     * would be fighting the alert it exists to spare the user.
      */
     fun isReturnConfirmationOpen(awaitingReturnAtMillis: Long, nowMillis: Long): Boolean {
         if (awaitingReturnAtMillis <= 0L) return false
         val elapsedMillis = nowMillis - awaitingReturnAtMillis
-        return elapsedMillis in 0L..RETURN_CONFIRMATION_WINDOW_MILLIS
+        return elapsedMillis >= 0L && elapsedMillis < RETURN_CONFIRMATION_WINDOW_MILLIS
     }
 }
