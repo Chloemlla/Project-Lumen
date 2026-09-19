@@ -43,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -181,6 +182,17 @@ internal fun TimerCard(
     )
     val timerText = if (seconds > 0) compactTime(seconds) else fallbackText
     val running = seconds > 0
+    // Respect the system "remove animations" / battery setting: a duration scale of 0 means
+    // the user opted out of motion, so hold the ring static instead of pulsing.
+    val context = LocalContext.current
+    val motionEnabled = remember(context) {
+        android.provider.Settings.Global.getFloat(
+            context.contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) > 0f
+    }
+    val pulsing = running && motionEnabled
     val transition = rememberInfiniteTransition(label = "timerPulse")
     val pulseScale = transition.animateFloat(
         initialValue = 1f,
@@ -236,7 +248,7 @@ internal fun TimerCard(
                         modifier = Modifier
                             .padding(vertical = 56.dp)
                             .graphicsLayer {
-                                val pulse = if (running) pulseScale.value else 1f
+                                val pulse = if (pulsing) pulseScale.value else 1f
                                 scaleX = pulse
                                 scaleY = pulse
                             },
@@ -247,7 +259,7 @@ internal fun TimerCard(
                         modifier = Modifier
                             .size(210.dp)
                             .graphicsLayer {
-                                val pulse = if (running) pulseScale.value else 1f
+                                val pulse = if (pulsing) pulseScale.value else 1f
                                 scaleX = pulse
                                 scaleY = pulse
                             },
