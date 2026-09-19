@@ -5,6 +5,7 @@ import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.database.entities.ScheduleOccurrenceEntity
 import com.projectlumen.app.core.insights.DeviceInsightsState
+import com.projectlumen.app.core.quarkkeeper.QuarkKeeperStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -100,6 +101,11 @@ internal class ProjectLumenStateStore(
             scheduleTasks = deviceAndSchedule.scheduleTasks,
             isReady = state.isReady && dailyGoal != null,
         )
+    }.combine(QuarkKeeperStore.state) { state, quarkKeeper ->
+        // Chained rather than added to the combine above: that one is already at the largest typed
+        // overload, and the guard's flow has no failure mode to catch — the store answers with its
+        // last good snapshot, or with defaults when the file cannot be read at all.
+        state.copy(quarkKeeper = quarkKeeper)
     }
 
     val uiState = dataState.stateIn(

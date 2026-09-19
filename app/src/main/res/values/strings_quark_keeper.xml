@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Quark Keeper notification resources.
+
+  Kept in its own file rather than appended to strings.xml so a change to the guard's wording cannot
+  collide with an edit to the app-wide catalogue. Only the names the notification layer alone owns are
+  declared here: the alert, countdown and button labels are shared with the in-app surfaces and stay
+  in strings.xml alongside the rest of the guard's copy.
+-->
+<resources>
+    <string name="channel_quark_keeper_reminder">Check-in reminder</string>
+    <string name="quark_keeper_daily_reminder_title">Time to check in on Quark</string>
+    <string name="quark_keeper_daily_reminder_message">The daily check-in is still open, and a few seconds is all it takes.</string>
+    <!--
+      The duration phrase interpolated into quark_keeper_ongoing_message and quark_keeper_alert_message.
+      Both are only ever handed whole hours, so the sub-hour case needs its own wording: "0 h left"
+      would read as "too late" during the final hour, when the user can still check in.
+    -->
+    <string name="quark_keeper_remaining_hours">%1$d h</string>
+    <string name="quark_keeper_remaining_less_than_hour">less than an hour</string>
+
+    <!-- Quark Keeper: keeps a daily Quark check-in streak from breaking. -->
+    <string name="quark_keeper_title">Quark Keeper</string>
+    <string name="quark_keeper_settings_entry_title">Quark Keeper</string>
+    <string name="quark_keeper_settings_entry_summary">Forced alerts that keep the daily Quark check-in streak alive</string>
+    <string name="quark_keeper_section_status">Today</string>
+    <string name="quark_keeper_section_nodes">Reminder times</string>
+    <string name="quark_keeper_section_cycle">30-day cycle</string>
+    <string name="quark_keeper_section_stats">Statistics</string>
+    <string name="quark_keeper_section_history">Check-in log</string>
+    <string name="quark_keeper_section_permissions">Permissions and reliability</string>
+    <string name="quark_keeper_enabled">Enable the check-in guard</string>
+    <string name="quark_keeper_enabled_hint">Off by default. Once on, the guard shows a persistent countdown after the daily reminder time and takes over the screen at the deadline alert time until the day is checked in.</string>
+    <string name="quark_keeper_regular_time">Daily reminder time</string>
+    <string name="quark_keeper_forced_time">Deadline alert time</string>
+    <string name="quark_keeper_snooze_minutes">Snooze length</string>
+    <string name="quark_keeper_snooze_cutoff">Last snooze allowed</string>
+    <string name="quark_keeper_sound">Play a sound on the deadline alert</string>
+    <string name="quark_keeper_nodes_hint">The deadline alert time is kept at least %1$d minutes after the daily reminder time.</string>
+    <string name="quark_keeper_today_pending">Not checked in yet. About %1$s left before the streak breaks.</string>
+    <string name="quark_keeper_today_checked_in">Checked in at %1$s.</string>
+    <string name="quark_keeper_today_snoozed">Snoozed until %1$s.</string>
+    <string name="quark_keeper_today_disabled">The guard is off, so nothing is scheduled.</string>
+    <string name="quark_keeper_action_check_in">I have checked in</string>
+    <string name="quark_keeper_action_undo">Undo check-in</string>
+    <string name="quark_keeper_action_snooze">Remind me in %1$d min</string>
+    <string name="quark_keeper_action_go">Open Quark now</string>
+    <string name="quark_keeper_snooze_blocked">Snoozing is unavailable after %1$s.</string>
+    <string name="quark_keeper_cycle_progress">Cycle %1$d · day %2$d of %3$d</string>
+    <string name="quark_keeper_cycle_empty">No check-ins yet. The first one starts the cycle.</string>
+    <string name="quark_keeper_day_content_description">Day %1$d, %2$s</string>
+    <string name="quark_keeper_day_checked_in">checked in</string>
+    <string name="quark_keeper_day_missed">missed</string>
+    <string name="quark_keeper_day_pending">not checked in yet</string>
+    <string name="quark_keeper_day_upcoming">not started</string>
+    <string name="quark_keeper_milestone_content_description">Milestone day %1$d, about %2$d VIP days</string>
+    <string name="quark_keeper_milestone_badge">%1$d</string>
+    <string name="quark_keeper_stats_streak">Current streak</string>
+    <string name="quark_keeper_stats_longest">Longest streak</string>
+    <string name="quark_keeper_stats_total">Total check-in days</string>
+    <string name="quark_keeper_stats_vip">Estimated VIP days</string>
+    <string name="quark_keeper_estimate_notice">VIP days are estimated from the milestone rewards Quark publishes. The actual grant is decided by Quark.</string>
+    <string name="quark_keeper_history_empty">No check-ins recorded yet.</string>
+    <string name="quark_keeper_history_time">%1$02d:%2$02d</string>
+    <string name="quark_keeper_permission_exact_alarm">Exact alarms</string>
+    <string name="quark_keeper_permission_overlay">Display over other apps</string>
+    <string name="quark_keeper_permission_notifications">Notifications</string>
+    <string name="quark_keeper_permission_battery">Ignore battery optimization</string>
+    <string name="quark_keeper_permission_granted">Granted</string>
+    <string name="quark_keeper_permission_missing">Not granted</string>
+    <string name="quark_keeper_permission_grant">Grant</string>
+    <string name="quark_keeper_permission_hint">Without these the deadline alert can be delayed or silently dropped.</string>
+    <string name="quark_keeper_success_title">Checked in</string>
+    <string name="quark_keeper_success_message">The streak keeps going.</string>
+    <string name="quark_keeper_undo_message">Check-in undone. The guard is watching again.</string>
+    <string name="quark_keeper_quark_missing_title">Quark is not installed</string>
+    <string name="quark_keeper_quark_missing_message">Install Quark to check in, or open the web version in a browser.</string>
+    <string name="quark_keeper_quark_missing_install">Open app store</string>
+    <string name="quark_keeper_quark_missing_web">Open web version</string>
+    <string name="quark_keeper_quark_missing_cancel">Cancel</string>
+    <string name="quark_keeper_launch_failed">Nothing could open Quark. Try again from inside the app.</string>
+    <string name="quark_keeper_catch_up_message">The deadline passed while the device was off and the day is still not checked in.</string>
+    <string name="quark_keeper_dismiss">Dismiss</string>
+    <string name="channel_quark_keeper_ongoing">Check-in countdown</string>
+    <string name="channel_quark_keeper_alarm">Check-in deadline alert</string>
+    <string name="quark_keeper_ongoing_title">Check-in not done today</string>
+    <string name="quark_keeper_ongoing_message">%1$s left before the streak breaks</string>
+    <string name="quark_keeper_ongoing_checked_in">Checked in · %1$d-day streak</string>
+    <string name="quark_keeper_alert_title">Check-in deadline reached</string>
+    <string name="quark_keeper_alert_message">Quark is still not checked in today. %1$s left before the streak breaks.</string>
+    <string name="quark_keeper_alert_round">Alert %1$d</string>
+    <string name="quark_keeper_remaining_hours_minutes">%1$d h %2$d min</string>
+    <string name="quark_keeper_remaining_minutes">%1$d min</string>
+    <string name="quark_keeper_remaining_less_than_minute">less than a minute</string>
+    <string name="quark_keeper_notification_action_check_in">Done</string>
+    <string name="quark_keeper_notification_action_snooze">%1$d min</string>
+    <string name="quark_keeper_notification_action_go">Open Quark</string>
+    <string name="quark_keeper_overlay_running_title">Check-in alert active</string>
+    <string name="quark_keeper_overlay_running_message">Waiting for you to check in</string>
+    <string name="quark_keeper_overlay_title">Check-in deadline reached</string>
+    <string name="quark_keeper_overlay_message">Quark is still not checked in today. %1$s left.</string>
+    <string name="quark_keeper_overlay_streak">Streak at risk: %1$d</string>
+    <string name="quark_keeper_overlay_first_open">This would be day one</string>
+    <string name="quark_keeper_overlay_snooze_blocked">Snoozing is closed after %1$s</string>
+    <plurals name="quark_keeper_days_count">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+</resources>

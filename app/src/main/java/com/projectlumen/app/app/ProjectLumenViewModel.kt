@@ -19,6 +19,7 @@ import com.projectlumen.app.core.enums.PlanTier
 import com.projectlumen.app.core.enums.ScheduleEditScope
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
+import com.projectlumen.app.core.quarkkeeper.QuarkKeeperSettings
 import com.projectlumen.app.core.repositories.DeviceInsightsRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.schedule.ScheduleDraft
@@ -72,6 +73,11 @@ class ProjectLumenViewModel(
     private val uploadTelemetrySnapshot: suspend () -> Unit,
     private val recordHandledFailure: (Throwable) -> Unit,
     private val rescheduleScheduleReminders: suspend () -> Unit,
+    private val reconcileQuarkKeeper: suspend () -> Unit,
+    private val raiseQuarkKeeperAlert: suspend () -> Unit,
+    private val launchQuarkKeeperCheckIn: () -> Boolean,
+    private val launchQuarkKeeperStoreListing: () -> Unit,
+    private val launchQuarkKeeperWebCheckIn: () -> Unit,
     securityEvidence: () -> JSONObject?,
     private val runDeviceSecurityScan: suspend () -> DeviceSecurityScanner.SecurityAssessment,
 ) : ViewModel() {
@@ -165,6 +171,17 @@ class ProjectLumenViewModel(
         rearm = rescheduleScheduleReminders,
         recordHandledFailure = recordHandledFailure,
     )
+    private val quarkKeeperEntry = ProjectLumenQuarkKeeperFeatureEntry(
+        scope = reportingScope,
+        // Reconciling and re-raising the alert need the Application instance; the three launch calls
+        // need a Context. Both arrive as callbacks for the same reason the schedule re-arm above does.
+        reconcile = reconcileQuarkKeeper,
+        raiseAlert = raiseQuarkKeeperAlert,
+        launchCheckIn = launchQuarkKeeperCheckIn,
+        openStore = launchQuarkKeeperStoreListing,
+        openWeb = launchQuarkKeeperWebCheckIn,
+        recordHandledFailure = recordHandledFailure,
+    )
     private val sharingEntry = ProjectLumenSharingFeatureEntry(
         export = export,
         stateProvider = { stateStore.uiState.value },
@@ -205,6 +222,7 @@ class ProjectLumenViewModel(
     val shizukuState = shizuku.state
     val shizukuNetworkApps = appNetworkControlEntry.networkApps
     val appNetworkControlRecords = appNetworkControlEntry.records
+    val quarkKeeperQuarkUnavailable = quarkKeeperEntry.quarkUnavailable
     val apiDiagnostics = ProjectLumenApiDiagnostics.traces
     val memoryHealth = MemoryHealthMonitor.snapshot
     val uiState = stateStore.uiState
@@ -508,6 +526,43 @@ class ProjectLumenViewModel(
         updateSettings { it.copy(scheduleOverdueNagEveningMinute = clamped) }
         reportingScope.launch { rescheduleScheduleReminders() }
     }
+
+    // The guard's settings live in their own store rather than in app_settings, so each of these hands
+    // the edit to the feature entry, which persists it and then reconciles. Reconciling afterwards is
+    // what makes the change take effect on tonight's already-armed nodes instead of tomorrow's.
+
+    fun setQuarkKeeperEnabled(enabled: Boolean) {
+        CrashBreadcrumbs.record("Action setQuarkKeeperEnabled=$enabled")
+        quarkKeeperEntry.setEnabled(enabled)
+    }
+
+    fun setQuarkKeeperSettings(settings: QuarkKeeperSettings) {
+        CrashBreadcrumbs.record("Action setQuarkKeeperSettings")
+        quarkKeeperEntry.setSettings(settings)
+    }
+
+    fun markQuarkKeeperCheckedIn() {
+        CrashBreadcrumbs.record("Action markQuarkKeeperCheckedIn")
+        quarkKeeperEntry.markCheckedIn()
+    }
+
+    fun undoQuarkKeeperCheckIn() {
+        CrashBreadcrumbs.record("Action undoQuarkKeeperCheckIn")
+        quarkKeeperEntry.undoCheckIn()
+    }
+
+    fun snoozeQuarkKeeper() {
+        CrashBreadcrumbs.record("Action snoozeQuarkKeeper")
+        quarkKeeperEntry.snooze()
+    }
+
+    fun openQuarkKeeperCheckIn() = quarkKeeperEntry.openCheckIn()
+
+    fun openQuarkKeeperStoreListing() = quarkKeeperEntry.openStoreListing()
+
+    fun openQuarkKeeperWebCheckIn() = quarkKeeperEntry.openWebCheckIn()
+
+    fun dismissQuarkKeeperQuarkUnavailable() = quarkKeeperEntry.dismissQuarkUnavailable()
 
     fun shareStatistics() = reportIfThrows {
         sharingEntry.shareStatistics()

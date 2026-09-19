@@ -33,6 +33,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.ListAlt
 import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Settings
@@ -121,6 +122,7 @@ internal enum class Destination(
     SETTINGS("settings", R.string.nav_settings, Icons.Outlined.Settings),
     TRANSLATION("translation", R.string.nav_translation, Icons.Outlined.Translate, false),
     SCHEDULE("schedule", R.string.nav_schedule, Icons.Outlined.EventNote, false),
+    QUARK_KEEPER("quark_keeper", R.string.quark_keeper_title, Icons.Outlined.NotificationsActive, false),
     TEMPLATES("templates", R.string.nav_templates, Icons.Outlined.Style, false),
     ABOUT("about", R.string.nav_about, Icons.Outlined.Info, false),
     DEVELOPER("developer", R.string.nav_developer, Icons.Outlined.Code, false),
@@ -497,6 +499,7 @@ fun ProjectLumenApp(
                                     )
                                 },
                                 createSchedule = { navController.navigate(Destination.SCHEDULE.route) },
+                                openQuarkKeeper = { navController.navigate(Destination.QUARK_KEEPER.route) },
                             )
                         }
                         composable(Destination.BREAK.route) { BreakScreen(uiState, viewModel) }
@@ -520,6 +523,9 @@ fun ProjectLumenApp(
                             )
                         }
                         composable(Destination.STATS.route) { StatisticsScreen(uiState, viewModel) }
+                        composable(Destination.QUARK_KEEPER.route) {
+                            QuarkKeeperRoute(uiState = uiState, viewModel = viewModel)
+                        }
                         composable(Destination.SETTINGS.route) {
                             SettingsScreen(
                                 uiState = uiState,

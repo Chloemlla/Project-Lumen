@@ -53,6 +53,8 @@ import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
+import com.projectlumen.app.core.quarkkeeper.QuarkKeeperCalendar
+import com.projectlumen.app.core.time.todayKey
 
 private val BreakStartablePhases = setOf(
     ReminderPhase.WORKING.name,
@@ -73,6 +75,7 @@ internal fun HomeScreen(
     openTranslation: () -> Unit,
     openSchedule: (Long) -> Unit,
     createSchedule: () -> Unit,
+    openQuarkKeeper: () -> Unit,
 ) {
     val runtime = uiState.runtime
     val reminderActive = runtime.activeEngine == ActiveEngine.REMINDER.name &&
@@ -134,6 +137,22 @@ internal fun HomeScreen(
             onToggleCompleted = viewModel::setScheduleCompleted,
             onOpenSchedule = openSchedule,
             onCreateSchedule = createSchedule,
+        )
+        // Keyed on the date rather than on the clock: the statistics are a function of the log and
+        // "today", and keying them on `nowMillis` would rebuild the sort once a second for a figure the
+        // module only measures in days.
+        val quarkKeeperTodayKey = remember(uiState.nowMillis) { todayKey(uiState.nowMillis) }
+        val quarkKeeperStats = remember(uiState.quarkKeeper.records, quarkKeeperTodayKey) {
+            QuarkKeeperCalendar.buildStats(
+                uiState.quarkKeeper.records,
+                quarkKeeperTodayKey,
+                QuarkKeeperCalendar.anchorDateKey(uiState.quarkKeeper.records),
+            )
+        }
+        QuarkKeeperHomeCard(
+            snapshot = uiState.quarkKeeper,
+            stats = quarkKeeperStats,
+            onClick = openQuarkKeeper,
         )
         HomeConvenienceCard(
             uiState = uiState,

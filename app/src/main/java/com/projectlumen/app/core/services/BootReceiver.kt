@@ -72,6 +72,12 @@ class BootReceiver : BroadcastReceiver() {
             runCatching {
                 app.rescheduleScheduleReminders()
             }.onFailure { throwable -> app.recordHandledFailure(throwable) }
+            // The guard's alarms are lost by the same reboot, and it does not depend on the user's
+            // to-dos or on any eye-care setting, so it is restored here too rather than after the
+            // `settings == null` gate. Isolated for the same reason as the schedule re-arm above.
+            runCatching {
+                app.reconcileQuarkKeeper()
+            }.onFailure { throwable -> app.recordHandledFailure(throwable) }
             if (settings == null) return
             // A phase that fell due while the device was off has to be advanced before alarms are
             // re-armed; every stored trigger time is in the past by now and would be dropped.

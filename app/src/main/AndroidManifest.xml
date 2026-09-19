@@ -25,6 +25,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- The deadline alert has to buzz even with the device in the user's pocket, which is the whole
+         point of the "forced" node in the PRD. WAKE_LOCK is deliberately not declared: nothing in the
+         app acquires one, and the alert lights the screen through its full-screen intent instead. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
@@ -144,6 +148,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- No intent filter: every alarm and every alert button targets this receiver explicitly,
+             so nothing outside the app can drive it and there is no action to filter on. -->
+        <receiver
+            android:name=".core.services.QuarkKeeperReceiver"
+            android:exported="false" />
+
         <service
             android:name=".core.services.TimerForegroundService"
             android:exported="false"
@@ -183,6 +193,19 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Shows local-only developer diagnostics for camera, sensors, and foreground service health." />
+        </service>
+
+        <!-- The alert surface and the countdown are one service, not two: the same window that has to
+             interrupt the user is also what makes the countdown notification non-dismissible, and
+             splitting them would leave the countdown unowned between the evening reminder and the
+             deadline. -->
+        <service
+            android:name=".core.services.QuarkKeeperAlertService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Draws the deadline check-in alert on top of the current app and keeps the non-dismissible check-in countdown alive until the user answers it." />
         </service>
 
         <service

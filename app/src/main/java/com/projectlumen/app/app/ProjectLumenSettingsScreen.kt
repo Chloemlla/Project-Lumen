@@ -557,6 +557,13 @@ internal fun SettingsScreen(
             onExportReport = viewModel::shareMonthlyReportPdf,
         )
         ScheduleOverdueNagCard(settings = settings, viewModel = viewModel)
+        // The guard's tunables sit with the other timing rows rather than behind a link: they are the
+        // only thing about the feature a user has to set, and the guard's own dashboard — where the
+        // history and the day's state live — is reached from its home-screen card.
+        QuarkKeeperSettingsSection(
+            settings = uiState.quarkKeeper.settings,
+            onSettingsChange = viewModel::setQuarkKeeperSettings,
+        )
         SettingsScrollAnchors(
             targets = GeneralGrowthAnchors,
             scrollState = settingsScrollState,

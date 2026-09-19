@@ -27,6 +27,7 @@ import com.projectlumen.app.core.lifecycle.AppLifecycleCoordinator
 import com.projectlumen.app.core.preferences.EyeCarePreferencesDataStore
 import com.projectlumen.app.core.network.ClashPartnerCompat
 import com.projectlumen.app.core.mmkv.ProjectLumenMmkv
+import com.projectlumen.app.core.quarkkeeper.QuarkKeeperLauncher
 import com.projectlumen.app.core.security.AppIntegrityGuard
 import com.projectlumen.app.core.security.DeviceSecurityGate
 import com.projectlumen.app.core.security.SecureCredentialStore
@@ -36,6 +37,7 @@ import com.projectlumen.app.core.services.ExportService
 import com.projectlumen.app.core.services.ForegroundServiceController
 import com.projectlumen.app.core.services.ForegroundServiceFailureReporter
 import com.projectlumen.app.core.services.NotificationService
+import com.projectlumen.app.core.services.QuarkKeeperCoordinator
 import com.projectlumen.app.core.services.ScheduleAlarmRestore
 import com.projectlumen.app.core.services.ScheduleOverdueNagScheduler
 import com.projectlumen.app.core.services.ShizukuResilienceWorker
@@ -119,6 +121,45 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
         ScheduleAlarmRestore.rearm(this, scheduleRepository)
         ScheduleOverdueNagScheduler.rearmAll(this)
     }
+
+    /**
+     * The Quark guard's reconciliation point, in the same shape as [rescheduleScheduleReminders].
+     *
+     * Boot, an exact-alarm permission change, a cold start and every in-app action funnel through
+     * here so no caller has to know which alarm slot its change affected. Idempotent, and safe with
+     * the guard turned off — that is the case it uses to cancel the whole day's chain.
+     */
+    suspend fun reconcileQuarkKeeper() {
+        QuarkKeeperCoordinator.reconcile(this)
+    }
+
+    /**
+     * Re-raises one round of the deadline alert outside reconciliation.
+     *
+     * Only the paths whose day is still open but whose escalation has already been spent need this:
+     * [QuarkKeeperCoordinator.reconcile] stays deliberately silent once the day's nag round is above
+     * zero, so an undo after the deadline would otherwise leave the day unanswered and unannounced.
+     */
+    suspend fun raiseQuarkKeeperAlert() {
+        QuarkKeeperCoordinator.fireForceAlert(this)
+    }
+
+    /**
+     * Opens Quark's check-in board. True when it opened, false when Quark is not installed or has no
+     * launchable entry point — the in-app caller answers false with the install / web dialog, while
+     * the notification's own "go" button answers it by opening the store listing directly, because a
+     * broadcast receiver has no window to ask the question in.
+     */
+    fun openQuarkKeeperCheckIn(): Boolean = QuarkKeeperLauncher.launchCheckIn(this)
+
+    fun openQuarkKeeperStoreListing() {
+        QuarkKeeperLauncher.openStoreListing(this)
+    }
+
+    fun openQuarkKeeperWebCheckIn() {
+        QuarkKeeperLauncher.openWebCheckIn(this)
+    }
+
     val telemetry: EyeCareTelemetryReporter by lazy {
         EyeCareTelemetryReporter(
             context = this,
@@ -239,6 +280,17 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
                 }
             runCatching { deviceSecurityGate.startStartupScan(applicationScope) }
                 .onFailure { Log.e(TAG, "Device security startup scan failed to start", it) }
+            // The guard's alarms are re-armed from here as well as from boot: an update or a
+            // force-stop drops them without a BOOT_COMPLETED ever arriving, and a cold start after
+            // the deadline is where the day's catch-up alert has to be raised. Runs after
+            // initializeMmkvOrRecordCrash() in onCreate, which the guard's store reads through.
+            // Skipped outright when that initialization failed: every later MMKV access throws, so
+            // there is no stored decision to read and nowhere to persist one — and a reconcile against
+            // the default, disabled snapshot would cancel the day's chain instead of restoring it.
+            if (localStorageAvailable) {
+                runCatching { reconcileQuarkKeeper() }
+                    .onFailure { Log.w(TAG, "Quark Keeper startup reconcile failed", it) }
+            }
         }
     }
 

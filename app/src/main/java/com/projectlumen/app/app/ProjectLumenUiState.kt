@@ -12,6 +12,7 @@ import com.projectlumen.app.core.database.entities.RuntimeStateEntity
 import com.projectlumen.app.core.database.entities.ScheduleOccurrenceEntity
 import com.projectlumen.app.core.insights.DeviceInsightsState
 import com.projectlumen.app.core.database.entities.TipTemplateEntity
+import com.projectlumen.app.core.quarkkeeper.QuarkKeeperSnapshot
 
 /**
  * Snapshot-backed wall clock: the 1 Hz tick invalidates only the composables that actually read
@@ -40,6 +41,12 @@ data class ProjectLumenUiState(
     val reminderPlans: List<ReminderPlanEntity> = emptyList(),
     val deviceInsights: DeviceInsightsState = DeviceInsightsState(),
     val scheduleTasks: List<ScheduleOccurrenceEntity> = emptyList(),
+    /**
+     * The check-in guard's stored state. It rides the pipeline like every other feature rather than
+     * being read from `QuarkKeeperStore` inside composition, so a write made by the alarm receiver in
+     * another process-time slice reaches the screen without the screen knowing where it came from.
+     */
+    val quarkKeeper: QuarkKeeperSnapshot = QuarkKeeperSnapshot(),
     val clock: LumenUiClock = LumenUiClock(),
     val isReady: Boolean = false,
 ) {

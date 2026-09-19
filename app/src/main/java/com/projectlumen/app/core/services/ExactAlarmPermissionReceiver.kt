@@ -28,6 +28,13 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
                 runCatching {
                     app.rescheduleScheduleReminders()
                 }.onFailure { throwable -> app.recordHandledFailure(throwable) }
+                // The guard is scheduled on the same permission, in both directions: a revocation has
+                // to fall back to inexact alarms and a grant has to upgrade tonight's remaining nodes.
+                // Placed before the runtime lookup below, which returns early when there is no stored
+                // runtime state and would otherwise skip the guard entirely.
+                runCatching {
+                    app.reconcileQuarkKeeper()
+                }.onFailure { throwable -> app.recordHandledFailure(throwable) }
                 val settings = app.settingsRepository().getOrDefault()
                 val runtime = app.runtimeRepository().get() ?: return@runCatching
                 app.notifications.syncRuntimeAlarms(settings, runtime)

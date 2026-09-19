@@ -137,6 +137,11 @@ open class MainActivity : ComponentActivity() {
                             uploadTelemetrySnapshot = { app.telemetry.uploadCurrentSnapshot(force = true) },
                             recordHandledFailure = { throwable -> app.recordHandledFailure(throwable) },
                             rescheduleScheduleReminders = app::rescheduleScheduleReminders,
+                            reconcileQuarkKeeper = app::reconcileQuarkKeeper,
+                            raiseQuarkKeeperAlert = app::raiseQuarkKeeperAlert,
+                            launchQuarkKeeperCheckIn = app::openQuarkKeeperCheckIn,
+                            launchQuarkKeeperStoreListing = app::openQuarkKeeperStoreListing,
+                            launchQuarkKeeperWebCheckIn = app::openQuarkKeeperWebCheckIn,
                             securityEvidence = { app.deviceSecurityGate.backendEvidence() },
                             runDeviceSecurityScan = { DeviceSecurityScanner(app).fullScan() },
                         ) as T
