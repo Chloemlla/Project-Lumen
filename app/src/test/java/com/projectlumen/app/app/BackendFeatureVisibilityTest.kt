@@ -86,5 +86,6 @@ class BackendFeatureVisibilityTest {
         overlay = false,
         writeSettings = false,
         usageAccess = false,
+        batteryExemptionNeeded = false,
     )
 }

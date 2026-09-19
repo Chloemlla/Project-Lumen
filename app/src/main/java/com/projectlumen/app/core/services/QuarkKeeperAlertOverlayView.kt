@@ -51,9 +51,9 @@ internal object QuarkKeeperAlertOverlayView {
     fun create(
         context: Context,
         remainingText: String,
+        remainingMinutes: Int,
         snoozeAllowed: Boolean,
         snoozeMinutes: Int,
-        snoozeCutoffMinuteOfDay: Int,
         onGoCheckIn: () -> Unit,
         onSnooze: () -> Unit,
         onMarkDone: () -> Unit,
@@ -103,14 +103,12 @@ internal object QuarkKeeperAlertOverlayView {
                     context.getString(R.string.quark_keeper_action_snooze, snoozeMinutes)
                 } else {
                     // Past the cutoff the extra round could not be honoured before midnight, so the
-                    // button stays visible but inert. Removing it would leave the user wondering
-                    // whether the option had ever existed; leaving it live would promise a re-alert
-                    // the guard has already decided not to arm. The cutoff is named so the rule
-                    // reads as a clock time rather than as a broken button.
-                    context.getString(
-                        R.string.quark_keeper_overlay_snooze_blocked,
-                        minuteOfDayLabel(context, snoozeCutoffMinuteOfDay),
-                    )
+                    // button stays visible but inert. Hiding it outright would leave the user
+                    // wondering whether the option had ever existed, and a live button would promise a
+                    // re-alert the guard has already decided not to arm — so the alternative is
+                    // disabled, and says why. The figure is the time left in the day rather than the
+                    // cutoff itself: at the cutoff the day is what is running out.
+                    context.getString(R.string.quark_keeper_snooze_rejected, remainingMinutes)
                 },
                 style = ButtonStyle.OUTLINED,
                 enabled = snoozeAllowed,
@@ -292,15 +290,6 @@ internal object QuarkKeeperAlertOverlayView {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply { topMargin = dp(context, if (bold) 0f else 10f) }
         }
-    }
-
-    /**
-     * "23:30" for a minute of the day. Reuses the guard's shared clock format rather than pulling in
-     * a locale-aware formatter: the cutoff is a time the user picked in the same 24-hour style on the
-     * settings screen, and an AM/PM rendering here would contradict that screen.
-     */
-    private fun minuteOfDayLabel(context: Context, minuteOfDay: Int): String {
-        return context.getString(R.string.quark_keeper_history_time, minuteOfDay / 60, minuteOfDay % 60)
     }
 
     private fun dp(context: Context, value: Float): Int {

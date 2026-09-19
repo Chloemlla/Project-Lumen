@@ -1,6 +1,7 @@
 package com.projectlumen.app.app
 
 import android.content.Context
+import android.os.PowerManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -21,6 +22,12 @@ internal data class PermissionRequirements(
     val overlay: Boolean,
     val writeSettings: Boolean,
     val usageAccess: Boolean,
+    /**
+     * Names a missing exemption rather than a missing grant, which is why it reads inverted next
+     * to its siblings: true means the app is still subject to battery optimization. Callers get to
+     * treat every flag the same way ("true = still needs the user") instead of special-casing one.
+     */
+    val batteryExemptionNeeded: Boolean,
 )
 
 @Composable
@@ -53,5 +60,10 @@ private fun Context.permissionRequirements(): PermissionRequirements {
         overlay = needsOverlayPermission(this),
         writeSettings = needsWriteSettingsPermission(this),
         usageAccess = !hasUsageStatsAccess(),
+        // A missing PowerManager means we cannot tell, and an unanswerable question should not
+        // nag the user, so it reads as "already exempt".
+        batteryExemptionNeeded = getSystemService(PowerManager::class.java)
+            ?.let { !it.isIgnoringBatteryOptimizations(packageName) }
+            ?: false,
     )
 }

@@ -60,8 +60,12 @@
     <string name="quark_keeper_success_title">签到完成</string>
     <string name="quark_keeper_success_message">连续签到继续。</string>
     <string name="quark_keeper_undo_message">已撤销打卡，守护重新开始监控。</string>
-    <string name="quark_keeper_quark_missing_title">未检测到夸克 App</string>
-    <string name="quark_keeper_quark_missing_message">可安装夸克完成签到，或用浏览器打开网页版。</string>
+    <string name="quark_keeper_return_confirm_title">是否已完成签到？</string>
+    <string name="quark_keeper_return_confirm_message">刚才为你打开了夸克。确认一下，今天的监控就可以结束了。</string>
+    <string name="quark_keeper_return_confirm_done">已完成</string>
+    <string name="quark_keeper_return_confirm_pending">未完成</string>
+    <string name="quark_keeper_quark_missing_title">未检测到夸克系列应用</string>
+    <string name="quark_keeper_quark_missing_message">可安装夸克扫描王或夸克主端完成签到，也可用浏览器打开网页版。</string>
     <string name="quark_keeper_quark_missing_install">去应用商店</string>
     <string name="quark_keeper_quark_missing_web">打开网页版</string>
     <string name="quark_keeper_quark_missing_cancel">取消</string>
@@ -88,7 +92,7 @@
     <string name="quark_keeper_overlay_message">今日仍未完成夸克签到，距离断签还剩 %1$s。</string>
     <string name="quark_keeper_overlay_streak">连续 %1$d 天面临中断</string>
     <string name="quark_keeper_overlay_first_open">今天将是第 1 天</string>
-    <string name="quark_keeper_overlay_snooze_blocked">%1$s 之后不能再稍后提醒</string>
+    <string name="quark_keeper_snooze_rejected">距今日签到截止已不足 %1$d 分钟，无法推迟</string>
     <plurals name="quark_keeper_days_count">
         <item quantity="other">%1$d 天</item>
     </plurals>

@@ -73,8 +73,12 @@
     <string name="quark_keeper_success_title">Checked in</string>
     <string name="quark_keeper_success_message">The streak keeps going.</string>
     <string name="quark_keeper_undo_message">Check-in undone. The guard is watching again.</string>
-    <string name="quark_keeper_quark_missing_title">Quark is not installed</string>
-    <string name="quark_keeper_quark_missing_message">Install Quark to check in, or open the web version in a browser.</string>
+    <string name="quark_keeper_return_confirm_title">Did the check-in go through?</string>
+    <string name="quark_keeper_return_confirm_message">Quark was opened for you a moment ago. Confirm and today\'s monitoring can end.</string>
+    <string name="quark_keeper_return_confirm_done">Yes, done</string>
+    <string name="quark_keeper_return_confirm_pending">Not yet</string>
+    <string name="quark_keeper_quark_missing_title">No Quark app found</string>
+    <string name="quark_keeper_quark_missing_message">Install Quark Scan King or the Quark app to check in, or open the web version in a browser.</string>
     <string name="quark_keeper_quark_missing_install">Open app store</string>
     <string name="quark_keeper_quark_missing_web">Open web version</string>
     <string name="quark_keeper_quark_missing_cancel">Cancel</string>
@@ -101,7 +105,7 @@
     <string name="quark_keeper_overlay_message">Quark is still not checked in today. %1$s left.</string>
     <string name="quark_keeper_overlay_streak">Streak at risk: %1$d</string>
     <string name="quark_keeper_overlay_first_open">This would be day one</string>
-    <string name="quark_keeper_overlay_snooze_blocked">Snoozing is closed after %1$s</string>
+    <string name="quark_keeper_snooze_rejected">Less than %1$d minutes left today — postponing is no longer possible</string>
     <plurals name="quark_keeper_days_count">
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>

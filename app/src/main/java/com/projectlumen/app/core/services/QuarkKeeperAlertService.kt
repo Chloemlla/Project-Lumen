@@ -17,6 +17,7 @@ import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.quarkkeeper.QuarkKeeperClock
+import com.projectlumen.app.core.quarkkeeper.QuarkKeeperRemaining
 import com.projectlumen.app.core.quarkkeeper.QuarkKeeperStore
 
 /**
@@ -114,15 +115,19 @@ class QuarkKeeperAlertService : Service() {
         val windowManager = getSystemService(WindowManager::class.java) ?: return false
         val nowMillis = System.currentTimeMillis()
         val settings = QuarkKeeperStore.snapshot().settings
+        val remaining = QuarkKeeperClock.remainingUntilEndOfDay(nowMillis)
         val view = QuarkKeeperAlertOverlayView.create(
             context = this,
             // Precisely, from the clock: the alert lands at the deadline, when the remainder is
             // usually well under an hour, so the whole-hours figure the notification uses would read
             // as "0 h left" at the exact moment the day can still be saved.
-            remainingText = remainingLabel(nowMillis),
+            remainingText = remainingLabel(remaining),
+            // The same figure in minutes, for the disabled snooze button to state as its reason.
+            // Handed over as a number rather than derived from the label: the label is localized, and
+            // reading a count back out of it would mean parsing a sentence the translator owns.
+            remainingMinutes = remaining.totalMinutes,
             snoozeAllowed = QuarkKeeperClock.isSnoozeAllowed(settings, nowMillis),
             snoozeMinutes = settings.snoozeMinutes,
-            snoozeCutoffMinuteOfDay = settings.snoozeCutoffMinuteOfDay,
             onGoCheckIn = { dispatch(ACTION_GO_CHECK_IN) },
             onSnooze = { dispatch(ACTION_SNOOZE) },
             onMarkDone = { dispatch(ACTION_MARK_DONE) },
@@ -150,8 +155,7 @@ class QuarkKeeperAlertService : Service() {
      * alert fires close enough to midnight that minutes are the only meaningful unit, while the
      * notification posted alongside it is deliberately whole-hours.
      */
-    private fun remainingLabel(nowMillis: Long): String {
-        val remaining = QuarkKeeperClock.remainingUntilEndOfDay(nowMillis)
+    private fun remainingLabel(remaining: QuarkKeeperRemaining): String {
         return when {
             remaining.totalMinutes < 1 -> getString(R.string.quark_keeper_remaining_less_than_minute)
             remaining.hours < 1 -> getString(R.string.quark_keeper_remaining_minutes, remaining.minutes)

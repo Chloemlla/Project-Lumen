@@ -473,6 +473,22 @@ internal fun openWriteSettings(context: Context) {
     startSettingsActivity(context, intent)
 }
 
+/**
+ * Asks for the battery-optimization exemption directly, because the settings list alone makes the
+ * user hunt for the app. Some OEM builds refuse the request intent, and then the closest thing we
+ * can still offer is that list, so the fallback walks down to it before giving up on app details.
+ */
+@SuppressLint("BatteryLife")
+internal fun openBatteryOptimizationSettings(context: Context) {
+    val packageUri = "package:${context.packageName}".toUri()
+    val requestIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, packageUri)
+    runCatching { context.startActivity(requestIntent) }
+        .onFailure {
+            runCatching { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+                .onFailure { openAppDetailsSettings(context) }
+        }
+}
+
 private fun startSettingsActivity(context: Context, intent: Intent) {
     runCatching { context.startActivity(intent) }
         .recoverCatching {

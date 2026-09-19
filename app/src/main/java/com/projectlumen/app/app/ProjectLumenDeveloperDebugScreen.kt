@@ -1,10 +1,7 @@
 package com.projectlumen.app.app
 
-import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.os.PowerManager
-import android.provider.Settings
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.spring
@@ -66,7 +63,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.projectlumen.app.BuildConfig
 import com.projectlumen.app.ProjectLumenApplication
@@ -752,17 +748,6 @@ private fun developerShizukuContextLabel(state: ShizukuCapabilityState): String 
 private fun isIgnoringBatteryOptimizations(context: Context): Boolean {
     val powerManager = context.getSystemService(PowerManager::class.java)
     return powerManager.isIgnoringBatteryOptimizations(context.packageName)
-}
-
-@SuppressLint("BatteryLife")
-private fun openBatteryOptimizationSettings(context: Context) {
-    val packageUri = "package:${context.packageName}".toUri()
-    val requestIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, packageUri)
-    runCatching { context.startActivity(requestIntent) }
-        .onFailure {
-            runCatching { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
-                .onFailure { openAppDetailsSettings(context) }
-        }
 }
 
 private fun createDeveloperCrashPreview(context: Context): CrashReport {
