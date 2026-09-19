@@ -27,6 +27,11 @@ object NotificationIds {
     // Quark Keeper owns a contiguous block from 11001 up, kept above every schedule range: an id
     // here doubles as an alarm request code, so an overlap would let one guard cancel the other's
     // alarm rather than merely reuse a notification slot.
+    //
+    // One exception, and it is deliberate: QUARK_KEEPER_DAILY below is a notification id only. Every
+    // reminder node posts under it — the user wants "remind me at these times", not one shade entry
+    // per node — so the nodes take their own request codes from QUARK_KEEPER_REMINDER_SLOT_BASE
+    // instead of sharing 11001.
     const val QUARK_KEEPER_DAILY = 11001
     const val QUARK_KEEPER_DEADLINE = 11002
     const val QUARK_KEEPER_SNOOZE = 11003
@@ -48,4 +53,14 @@ object NotificationIds {
     // in-app undo reaches the store through its own feature entry — so it stays reserved for a
     // dashboard-side action and must never be attached to a notification.
     const val QUARK_KEEPER_ACTION_UNDO = 11011
+    /**
+     * Alarm request codes for the user's reminder nodes, one per entry of
+     * [com.projectlumen.app.core.quarkkeeper.QuarkKeeperSettings.reminders].
+     *
+     * A base plus an index rather than a fixed list: the nodes are user data, so the number of live
+     * slots changes, and the range has to be wide enough for the model's own cap. Add
+     * [com.projectlumen.app.core.quarkkeeper.QuarkKeeperSettings.MAX_REMINDERS] to the base to get the
+     * first free code above them.
+     */
+    const val QUARK_KEEPER_REMINDER_SLOT_BASE = 11012
 }

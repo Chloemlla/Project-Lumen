@@ -43,10 +43,10 @@ object QuarkKeeperCoordinator {
             QuarkKeeperAlertService.dismiss(context)
             return
         }
-        // Armed whether or not today is done, because it is what starts tomorrow. A user who checks in
-        // and never opens the app again still has to be reminded on the following evening, and the
+        // Armed whether or not today is done, because they are what starts tomorrow. A user who checks
+        // in and never opens the app again still has to be reminded on the following day, and the
         // midnight slot below is the only other thing keeping the chain alive.
-        scheduler.scheduleDaily(nextAt(settings.regularMinuteOfDay, nowMillis))
+        armReminders(scheduler, settings, nowMillis)
         if (today.checkedIn) {
             // The day is answered: every remaining node of today is noise. Tomorrow's are re-armed
             // above and by the midnight slot, so nothing here has to survive the rollover.
@@ -95,9 +95,11 @@ object QuarkKeeperCoordinator {
         // the new day's nodes have to be armed. The stored state is still date-keyed, so a midnight the
         // platform never delivers costs accuracy of presentation, never correctness of the day.
         scheduler.scheduleMidnight(QuarkKeeperClock.endOfDayMillis(nowMillis))
-        if (!today.checkedIn && QuarkKeeperClock.minuteOfDay(nowMillis) >= settings.regularMinuteOfDay) {
-            // Gated on the reminder node so the countdown appears as the evening starts rather than
-            // sitting there from midnight; before that it would describe a deadline nobody is near.
+        if (!today.checkedIn && QuarkKeeperClock.minuteOfDay(nowMillis) >= settings.countdownFromMinuteOfDay) {
+            // Gated on the day's first reminder so the countdown appears as the user's reminder window
+            // opens rather than sitting there from midnight; before that it would describe a deadline
+            // nobody is near. A list with nothing enabled falls back to the deadline itself, so the
+            // countdown still exists for the users who kept only the forced alert.
             notifications.showOngoing(remainingHours(nowMillis))
         }
     }
@@ -162,5 +164,35 @@ object QuarkKeeperCoordinator {
      */
     private fun remainingHours(nowMillis: Long): Int {
         return QuarkKeeperClock.remainingUntilEndOfDay(nowMillis).hours
+    }
+
+    /**
+     * Arms one slot per enabled reminder node, and clears the slots the list no longer fills.
+     *
+     * The sweep over the tail is not optional upkeep. A slot index is the node's position in the armed
+     * list, so an entry that is deleted or switched off shifts every later node down onto the code its
+     * neighbour held: the loop above re-arms index *n* of the shorter list for its own new time, but the
+     * codes between the new count and the old one stay armed with nothing left to overwrite them.
+     * Without the sweep a reminder the user just removed would still fire — for a time they can no
+     * longer see anywhere in the list, which is the one failure this list-shaped model has to avoid.
+     * Disabling an entry is the same case as deleting one, which is why the sweep counts armed nodes
+     * rather than the user's list: both leave fewer armed nodes than there are slots to fill.
+     *
+     * [nextAt] being strictly-next is what makes this safe to run in response to a node firing: the node
+     * that just fired resolves to tomorrow, so the reconcile it triggered cannot arm it again for the
+     * instant the user has already been reminded at.
+     */
+    private fun armReminders(
+        scheduler: QuarkKeeperAlarmScheduler,
+        settings: QuarkKeeperSettings,
+        nowMillis: Long,
+    ) {
+        val armedMinutes = settings.enabledReminderMinutes
+        armedMinutes.forEachIndexed { index, minuteOfDay ->
+            scheduler.scheduleReminder(index, nextAt(minuteOfDay, nowMillis))
+        }
+        for (index in armedMinutes.size until QuarkKeeperSettings.MAX_REMINDERS) {
+            scheduler.cancelReminder(index)
+        }
     }
 }

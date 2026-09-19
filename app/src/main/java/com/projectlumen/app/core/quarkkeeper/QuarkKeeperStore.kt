@@ -221,10 +221,17 @@ object QuarkKeeperStore {
         return runCatching {
             val settings = QuarkKeeperSettings(
                 enabled = mmkv.decodeBool(KEY_ENABLED, false),
-                regularMinuteOfDay = mmkv.decodeInt(
-                    KEY_REGULAR_MINUTE,
-                    QuarkKeeperSettings.DEFAULT_REGULAR_MINUTE_OF_DAY,
-                ),
+                // A missing key and an empty encoding are different answers, and only one of them is a
+                // default. Nothing stored means a guard nobody has configured yet, which starts on the
+                // three built-in nodes; an empty encoding means the user deleted every entry, and that
+                // list has to come back empty rather than being refilled behind their back. Asking
+                // whether the key exists is what keeps the two apart — the encoded form of an empty list
+                // is the empty string, so the value alone cannot tell them apart.
+                reminders = if (mmkv.containsKey(KEY_REMINDERS)) {
+                    decodeReminders(mmkv.decodeString(KEY_REMINDERS, "").orEmpty())
+                } else {
+                    QuarkKeeperSettings.DEFAULT_REMINDERS
+                },
                 forcedMinuteOfDay = mmkv.decodeInt(
                     KEY_FORCED_MINUTE,
                     QuarkKeeperSettings.DEFAULT_FORCED_MINUTE_OF_DAY,
@@ -253,7 +260,7 @@ object QuarkKeeperStore {
     private fun persist(snapshot: QuarkKeeperSnapshot) {
         val settings = snapshot.settings
         mmkv.encode(KEY_ENABLED, settings.enabled)
-        mmkv.encode(KEY_REGULAR_MINUTE, settings.regularMinuteOfDay)
+        mmkv.encode(KEY_REMINDERS, encodeReminders(settings.reminders))
         mmkv.encode(KEY_FORCED_MINUTE, settings.forcedMinuteOfDay)
         mmkv.encode(KEY_SNOOZE_MINUTES, settings.snoozeMinutes)
         mmkv.encode(KEY_SNOOZE_CUTOFF_MINUTE, settings.snoozeCutoffMinuteOfDay)
@@ -289,6 +296,55 @@ object QuarkKeeperStore {
             .toList()
     }
 
+    // "390|1" per line: the minute of day, then whether that node is on. Same trade as the log above —
+    // one readable line per entry, no serializer. The minute is a decimal number and the flag is 1 or 0,
+    // so neither can contain the delimiter.
+    private fun encodeReminders(reminders: List<QuarkKeeperReminder>): String {
+        return reminders.joinToString(separator = "\n") { reminder ->
+            "${reminder.minuteOfDay}$FIELD_SEPARATOR${if (reminder.enabled) 1 else 0}"
+        }
+    }
+
+    /**
+     * Reads back what [encodeReminders] wrote, dropping anything that cannot be read as a reminder.
+     *
+     * Only the minute is required. A line whose minute is missing or is not a number is dropped, the
+     * same way a broken row is dropped from the log: the minute is what an entry *is*, and an entry with
+     * no time could only be invented. The flag is the other way round — a line that carries a time but
+     * no readable flag (a truncated write, or a line from a writer that only ever stored times) is read
+     * as enabled, because a flag we cannot read is not evidence that the user muted the node, and the
+     * failure of guessing "off" is an alarm that silently never fires while the list still shows it.
+     *
+     * The list is deliberately left as-is rather than sorted, deduplicated or capped: [load] hands the
+     * whole snapshot to [QuarkKeeperSettings.sanitized], and clamping in two places is how the read path
+     * and the write path drift apart.
+     */
+    private fun decodeReminders(encoded: String): List<QuarkKeeperReminder> {
+        if (encoded.isBlank()) return emptyList()
+        return encoded.lineSequence()
+            .mapNotNull { line ->
+                val separatorIndex = line.indexOf(FIELD_SEPARATOR)
+                val minuteToken = if (separatorIndex >= 0) line.substring(0, separatorIndex) else line
+                val minuteOfDay = minuteToken.trim().toIntOrNull() ?: return@mapNotNull null
+                val enabled = if (separatorIndex >= 0) {
+                    // Matching on the exact tokens the encoder writes. Reading the flag back through a
+                    // Kotlin boolean parser instead would be a silent mismatch — those accept only the
+                    // words "true"/"false", so every "0" the encoder ever wrote would come back as an
+                    // unreadable token and land on the `else` arm, turning every muted node back on and
+                    // re-arming an alarm slot for it.
+                    when (line.substring(separatorIndex + 1).trim()) {
+                        "0" -> false
+                        "1" -> true
+                        else -> true
+                    }
+                } else {
+                    true
+                }
+                QuarkKeeperReminder(minuteOfDay = minuteOfDay, enabled = enabled)
+            }
+            .toList()
+    }
+
     private const val MMKV_ID = "quark_keeper"
     private const val FIELD_SEPARATOR = '|'
 
@@ -296,7 +352,11 @@ object QuarkKeeperStore {
     private const val MAX_STORED_DAYS = 730
 
     private const val KEY_ENABLED = "enabled"
-    private const val KEY_REGULAR_MINUTE = "regular_minute"
+
+    // Replaced `regular_minute`, the single-node key from when the guard had one reminder time. Nothing
+    // reads the old value: the guard and this list shipped in the same release, so no device can hold a
+    // `regular_minute` that ever took effect, and the stale key is just dead weight in the file.
+    private const val KEY_REMINDERS = "reminders"
     private const val KEY_FORCED_MINUTE = "forced_minute"
     private const val KEY_SNOOZE_MINUTES = "snooze_minutes"
     private const val KEY_SNOOZE_CUTOFF_MINUTE = "snooze_cutoff_minute"

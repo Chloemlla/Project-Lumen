@@ -5,11 +5,28 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 
 /**
+ * One configurable reminder node of the day.
+ *
+ * [minuteOfDay] is the local minute (`0..1439`) rather than an instant, for the same reason the rest of
+ * the settings are: the guard is a daily habit, so the alarm time must follow the user across travel
+ * and daylight-saving changes instead of sticking to an absolute instant.
+ *
+ * [enabled] is separate from deleting the entry on purpose. A reminder the user wants to mute for a
+ * while is not the same as one whose time they have forgotten, and a list that could only add and
+ * remove would make silencing a node cost the time they picked for it.
+ */
+data class QuarkKeeperReminder(
+    val minuteOfDay: Int,
+    val enabled: Boolean = true,
+)
+
+/**
  * User-visible configuration for the Quark check-in guard.
  *
- * Everything is expressed as a minute of the local day (`0..1439`) rather than a wall-clock
- * timestamp: the guard is a daily habit, so the alarm time must follow the user across travel and
- * daylight-saving changes instead of sticking to an absolute instant.
+ * [reminders] is a list rather than a single node because the guard's job starts long before the
+ * evening: a check-in habit needs a nudge in the morning and at noon to stand any chance of not
+ * becoming a scramble at 22:30. The list is what the settings screen edits and what the alarm layer
+ * arms one slot per enabled entry for.
  *
  * [snoozeCutoffMinuteOfDay] is separate from [forcedMinuteOfDay] on purpose — the forced alert may
  * legitimately fire late (a device that booted at 23:00 still needs the catch-up alert), while the
@@ -17,25 +34,58 @@ import java.time.ZonedDateTime
  */
 data class QuarkKeeperSettings(
     val enabled: Boolean = false,
-    val regularMinuteOfDay: Int = DEFAULT_REGULAR_MINUTE_OF_DAY,
+    val reminders: List<QuarkKeeperReminder> = DEFAULT_REMINDERS,
     val forcedMinuteOfDay: Int = DEFAULT_FORCED_MINUTE_OF_DAY,
     val snoozeMinutes: Int = DEFAULT_SNOOZE_MINUTES,
     val snoozeCutoffMinuteOfDay: Int = DEFAULT_SNOOZE_CUTOFF_MINUTE_OF_DAY,
     val soundEnabled: Boolean = true,
 ) {
+    /**
+     * The minutes that actually arm an alarm, ascending, one alarm slot each.
+     *
+     * Sorted here rather than relied on from the caller: the alarm layer assigns slot *n* to entry *n*
+     * of this list, so an unsorted list would arm a different slot every reconcile and leave the
+     * previous one to fire as well.
+     */
+    val enabledReminderMinutes: List<Int>
+        get() = reminders.filter { it.enabled }.map { it.minuteOfDay }.sorted()
+
+    /**
+     * The minute the evening begins as far as the countdown is concerned.
+     *
+     * The earliest enabled reminder, because that is the first moment the guard has told the user
+     * anything today, and a countdown posted before it would describe a deadline nobody has been
+     * reminded of yet. A list with nothing enabled falls back to the deadline so the countdown still
+     * exists for the users who kept only the forced alert.
+     */
+    val countdownFromMinuteOfDay: Int
+        get() = enabledReminderMinutes.firstOrNull() ?: forcedMinuteOfDay
+
     /** Clamps every field into its legal window; used on both read and write so stored garbage self-heals. */
     fun sanitized(): QuarkKeeperSettings {
-        // The regular node's ceiling keeps room for the forced node below: clamping to
-        // MAX_MINUTE_OF_DAY here instead would make the `coerceIn` on `forced` receive a minimum
-        // above its maximum, which throws.
-        val regular = regularMinuteOfDay.coerceIn(MIN_MINUTE_OF_DAY, MAX_MINUTE_OF_DAY - MIN_NODE_GAP_MINUTES)
-        // The forced node must stay after the regular one: with the order reversed the ongoing
-        // countdown would be posted for a node that already passed, and the alert would arrive
-        // before the user was ever given the gentle reminder.
-        val forced = forcedMinuteOfDay.coerceIn(regular + MIN_NODE_GAP_MINUTES, MAX_MINUTE_OF_DAY)
+        // The deadline is clamped on its own first, against constants rather than against the list
+        // below: it is the wall every reminder has to stay behind, so its bounds cannot depend on the
+        // values that are about to be clamped against it.
+        val forced = forcedMinuteOfDay.coerceIn(
+            MIN_MINUTE_OF_DAY + MIN_NODE_GAP_MINUTES,
+            MAX_MINUTE_OF_DAY,
+        )
+        // Every reminder is pulled back behind the deadline rather than the deadline being pushed back.
+        // `coerceIn` throws on an inverted range, so a list-dependent floor for `forced` would blow up
+        // the moment the two disagreed; and moving the deadline instead would silently undo the user's
+        // last edit while leaving the reminder where they could not see the conflict. The other
+        // direction is visible: a reminder that jumps to an earlier time is right there in the list.
+        val ceiling = forced - MIN_NODE_GAP_MINUTES
+        val reminders = reminders
+            .map { it.copy(minuteOfDay = it.minuteOfDay.coerceIn(MIN_MINUTE_OF_DAY, ceiling)) }
+            // Two entries driven onto the same minute by the clamp above collapse into one. The first
+            // wins its `enabled` flag, which is the entry the user can still see in the list order.
+            .distinctBy { it.minuteOfDay }
+            .sortedBy { it.minuteOfDay }
+            .take(MAX_REMINDERS)
         val cutoff = snoozeCutoffMinuteOfDay.coerceIn(forced, MAX_MINUTE_OF_DAY)
         return copy(
-            regularMinuteOfDay = regular,
+            reminders = reminders,
             forcedMinuteOfDay = forced,
             snoozeMinutes = snoozeMinutes.coerceIn(MIN_SNOOZE_MINUTES, MAX_SNOOZE_MINUTES),
             snoozeCutoffMinuteOfDay = cutoff,
@@ -43,17 +93,28 @@ data class QuarkKeeperSettings(
     }
 
     companion object {
-        const val DEFAULT_REGULAR_MINUTE_OF_DAY = 20 * 60
+        /**
+         * Morning, noon and night, all on. Three is the number that makes the guard's day legible —
+         * one before work, one at lunch, one as the evening starts — and each is one tap to silence.
+         */
+        val DEFAULT_REMINDERS: List<QuarkKeeperReminder> = listOf(
+            QuarkKeeperReminder(6 * 60 + 30),
+            QuarkKeeperReminder(12 * 60),
+            QuarkKeeperReminder(21 * 60 + 30),
+        )
+
         const val DEFAULT_FORCED_MINUTE_OF_DAY = 22 * 60 + 30
         const val DEFAULT_SNOOZE_MINUTES = 15
         const val DEFAULT_SNOOZE_CUTOFF_MINUTE_OF_DAY = 23 * 60 + 30
 
         const val MIN_MINUTE_OF_DAY = 0
         const val MAX_MINUTE_OF_DAY = 23 * 60 + 55
-        /** Smallest allowed distance between the regular node and the forced node. */
+        /** Smallest allowed distance between a reminder node and the forced node. */
         const val MIN_NODE_GAP_MINUTES = 30
         const val MIN_SNOOZE_MINUTES = 5
         const val MAX_SNOOZE_MINUTES = 60
+        /** Entries the list will hold. Each one is an alarm slot, so the cap is also a slot budget. */
+        const val MAX_REMINDERS = 6
     }
 }
 

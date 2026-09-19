@@ -13,12 +13,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Every entry point of the Quark check-in guard: the five alarm fires armed by
+ * Every entry point of the Quark check-in guard: the alarm fires armed by
  * [QuarkKeeperAlarmScheduler] and every notification button the guard posts.
  *
  * One receiver rather than several because all of them share the same three lines of setup — resolve
  * the application, read the stored day, re-arm — and because the manifest then declares one component
- * instead of a dozen. The actions stay distinct values, since that is what tells the fires apart.
+ * instead of a dozen. The actions stay distinct values, since that is what tells the fires apart, with
+ * one deliberate exception: the user's reminder nodes all carry [ACTION_DAILY_REMINDER], because they
+ * run the same branch and are told apart by request code instead.
  *
  * The day's rollover is not performed here. [QuarkKeeperStore] keys today's row by date, so a stale row
  * from yesterday already reads as "not checked in" through `currentToday()`, and every branch below
@@ -85,11 +87,18 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
     }
 
     /**
-     * The evening reminder, and the start of the escalation for tonight.
+     * A reminder node: one of the nudges the user asked for, and the start of the escalation for
+     * tonight.
      *
-     * [QuarkKeeperCoordinator.reconcile] does the re-arming, including tonight's deadline and the
-     * countdown notification: the reminder node is the one moment the guard is certain the user's day is
-     * still open and the evening has begun, which is exactly when both become due.
+     * This one path serves every node in the list — the guard does the same thing whichever of them
+     * fired, which is why they share an action — and it does not have to tell them apart. Any reminder
+     * is a moment the guard is certain the user's day is still open, which is exactly when tonight's
+     * deadline and the countdown become due.
+     *
+     * [QuarkKeeperCoordinator.reconcile] does that re-arming, and what it arms is the nodes still ahead
+     * rather than this one: the fired node resolves to tomorrow, its own minute no longer being in the
+     * future. Nothing here cancels the node's slot either — it is a single-shot alarm, already spent by
+     * the time this runs.
      */
     private suspend fun handleDailyReminder(
         app: ProjectLumenApplication,
