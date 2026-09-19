@@ -87,15 +87,15 @@ internal fun LegalHubScreen(
                 LegalRow(Icons.Outlined.Description, R.string.legal_center_user_agreement) {
                     onOpenDoc(LegalDocKey.TERMS)
                 }
-                HorizontalDivider()
+                HorizontalDivider(modifier = Modifier.padding(start = 40.dp))
                 LegalRow(Icons.Outlined.PrivacyTip, R.string.legal_center_privacy_policy) {
                     onOpenDoc(LegalDocKey.PRIVACY)
                 }
-                HorizontalDivider()
+                HorizontalDivider(modifier = Modifier.padding(start = 40.dp))
                 LegalRow(Icons.Outlined.WorkspacePremium, R.string.legal_center_membership_agreement) {
                     onOpenDoc(LegalDocKey.MEMBERSHIP)
                 }
-                HorizontalDivider()
+                HorizontalDivider(modifier = Modifier.padding(start = 40.dp))
                 @Suppress("DEPRECATION")
                 LegalRow(Icons.Outlined.ListAlt, R.string.legal_center_personal_info_collection) {
                     onOpenDoc(LegalDocKey.PERSONAL)
@@ -122,7 +122,7 @@ internal fun LegalHubScreen(
                 LegalRow(Icons.Outlined.Refresh, R.string.legal_center_withdraw_consent) {
                     showWithdrawConsentDialog = true
                 }
-                HorizontalDivider()
+                HorizontalDivider(modifier = Modifier.padding(start = 40.dp))
                 LegalRow(Icons.Outlined.CheckCircle, R.string.legal_center_withdraw_privacy_consent) {
                     showWithdrawPrivacyDialog = true
                 }
@@ -148,7 +148,7 @@ internal fun LegalHubScreen(
                 LegalRow(Icons.Outlined.Code, R.string.legal_center_oss_notice) {
                     viewModel.reopenOssNotice()
                 }
-                HorizontalDivider()
+                HorizontalDivider(modifier = Modifier.padding(start = 40.dp))
                 LegalRow(Icons.Outlined.Lock, R.string.legal_center_app_permissions) {
                     onOpenDoc(LegalDocKey.PERMISSIONS)
                 }

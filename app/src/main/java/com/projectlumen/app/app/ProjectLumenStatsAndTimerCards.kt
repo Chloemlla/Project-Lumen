@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,21 +72,25 @@ internal fun TodayStatsCard(stat: DailyEyeStatsEntity?) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(Icons.Outlined.BarChart, R.string.today_summary)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SmallMetric(R.string.working_time, stringResource(R.string.hours_short, ((stat?.workingSeconds ?: 0L) / 3600.0)))
-                SmallMetric(R.string.rest_time, minutesLabel(((stat?.restSeconds ?: 0L) / 60L).toInt()))
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SmallMetric(R.string.skip_count, (stat?.skipCount ?: 0).toString())
-                SmallMetric(R.string.completed_breaks, (stat?.completedBreakCount ?: 0).toString())
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SmallMetric(R.string.proximity_warnings, (stat?.proximityWarningCount ?: 0).toString())
-                SmallMetric(R.string.proximity_close_time, minutesLabel(((stat?.proximityCloseSeconds ?: 0L) / 60L).toInt()))
-            }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SmallMetric(R.string.eye_dry_warnings, (stat?.eyeDryWarningCount ?: 0).toString())
-                SmallMetric(R.string.low_light_warnings, (stat?.lowLightWarningCount ?: 0).toString())
+            if (stat == null) {
+                EmptyStateMessage(messageRes = R.string.home_today_stats_empty_hint)
+            } else {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SmallMetric(R.string.working_time, stringResource(R.string.hours_short, (stat.workingSeconds / 3600.0)))
+                    SmallMetric(R.string.rest_time, minutesLabel((stat.restSeconds / 60L).toInt()))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SmallMetric(R.string.skip_count, stat.skipCount.toString())
+                    SmallMetric(R.string.completed_breaks, stat.completedBreakCount.toString())
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SmallMetric(R.string.proximity_warnings, stat.proximityWarningCount.toString())
+                    SmallMetric(R.string.proximity_close_time, minutesLabel((stat.proximityCloseSeconds / 60L).toInt()))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SmallMetric(R.string.eye_dry_warnings, stat.eyeDryWarningCount.toString())
+                    SmallMetric(R.string.low_light_warnings, stat.lowLightWarningCount.toString())
+                }
             }
         }
     }
@@ -142,7 +147,10 @@ internal fun GoalProgressCard(uiState: ProjectLumenUiState) {
 
 @Composable
 internal fun GoalLine(label: String, value: String, progress: Float) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(
+        modifier = Modifier.semantics(mergeDescendants = true) { },
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, style = MaterialTheme.typography.bodyMedium)
             Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -193,7 +201,13 @@ internal fun TimerCard(
         elevation = lumenCardElevation(),
         border = lumenCardBorder(LumenCardEmphasis.Primary),
     ) {
-        Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(20.dp)
+                .semantics(mergeDescendants = true) { },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             Text(
                 label,
                 modifier = Modifier

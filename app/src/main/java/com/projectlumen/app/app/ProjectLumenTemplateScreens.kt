@@ -46,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -101,7 +102,8 @@ internal fun TemplatesScreen(uiState: ProjectLumenUiState, viewModel: ProjectLum
                         enabled = !locked && !isActiveTemplate,
                         onClickLabel = useTemplateLabel,
                         role = Role.Button,
-                    ) { viewModel.selectTemplate(template.id) }
+                        onClick = hapticClick(HapticFeedbackType.TextHandleMove) { viewModel.selectTemplate(template.id) },
+                    )
                     .semantics { selected = isActiveTemplate }
                     .border(2.dp, borderColor, LumenCardShape)
                     .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f)),

@@ -368,17 +368,6 @@ internal fun SettingsScreen(
             },
         )
     }
-    backupImportError?.let { message ->
-        StatusLine(
-            icon = Icons.Outlined.WarningAmber,
-            text = stringResource(R.string.backup_import_failed, message),
-        )
-        OutlinedButton(
-            onClick = { viewModel.clearBackupImportError() },
-        ) {
-            ButtonLabel(Icons.Outlined.Close, R.string.backup_import_dismiss)
-        }
-    }
     if (showGrowthConfiguredDialog) {
         AlertDialog(
             onDismissRequest = { showGrowthConfiguredDialog = false },
@@ -1005,12 +994,28 @@ internal fun SettingsScreen(
             viewModel = viewModel,
         )
         SettingsSection(R.string.section_data, Icons.Outlined.FileDownload) {
+            Text(
+                stringResource(R.string.settings_data_backup_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             LumenFlowRow {
                 Button(onClick = viewModel::shareBackup) {
                     ButtonLabel(Icons.Outlined.FileDownload, R.string.backup_export)
                 }
                 OutlinedButton(onClick = { backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) {
                     ButtonLabel(Icons.AutoMirrored.Outlined.OpenInNew, R.string.backup_import)
+                }
+            }
+            backupImportError?.let { message ->
+                StatusLine(
+                    icon = Icons.Outlined.WarningAmber,
+                    text = stringResource(R.string.backup_import_failed, message),
+                )
+                OutlinedButton(
+                    onClick = { viewModel.clearBackupImportError() },
+                ) {
+                    ButtonLabel(Icons.Outlined.Close, R.string.backup_import_dismiss)
                 }
             }
         }

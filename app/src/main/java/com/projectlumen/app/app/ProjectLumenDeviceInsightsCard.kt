@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -309,11 +311,13 @@ private const val DEVICE_INSIGHTS_LATE_NIGHT_CAUTION_MINUTES = 30
 
 @Composable
 private fun UsageAppRow(app: AppUsageSummary, maximumMillis: Long) {
+    val rowDescription = "${app.label}, ${appCategoryLabel(app.category)}, ${durationLabel(app.foregroundMillis)}"
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(LumenPreferenceShape)
             .background(lumenNestedContainerColor)
+            .semantics(mergeDescendants = true) { contentDescription = rowDescription }
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {

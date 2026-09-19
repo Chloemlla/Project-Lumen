@@ -999,5 +999,7 @@
     <string name="channel_schedule_reminder">Schedule reminders</string>
     <string name="channel_schedule_alarm">Schedule alarms</string>
     <string name="channel_schedule_overdue">Overdue to-do reminders</string>
+    <string name="home_today_stats_empty_hint">No data yet today — once a reminder is running, your stats fill in automatically.</string>
+    <string name="settings_data_backup_hint">A backup includes your settings, reminders, and stats. Importing replaces the current data.</string>
 
 </resources>

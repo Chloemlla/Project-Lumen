@@ -2,7 +2,6 @@
 
 package com.projectlumen.app.app
 
-import android.app.TimePickerDialog
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,7 +30,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -101,6 +102,7 @@ internal fun ScheduleDetailScreen(
     val zone = remember { ZoneId.systemDefault() }
     val context = LocalContext.current
     var dateField by remember { mutableStateOf<ScheduleTimeField?>(null) }
+    var timeField by remember { mutableStateOf<ScheduleTimeField?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     fun applyStart(startAt: Long) {
@@ -115,20 +117,6 @@ internal fun ScheduleDetailScreen(
             val duration = scheduleDuration(current.startAt, current.endAt)
             current.copy(endAt = if (endAt > current.startAt) endAt else current.startAt + duration)
         }
-    }
-
-    fun openTimePicker(field: ScheduleTimeField, millis: Long) {
-        val zoned = Instant.ofEpochMilli(millis).atZone(zone)
-        TimePickerDialog(
-            context,
-            { _, hour, minute ->
-                val picked = scheduleAtLocalTime(millis, hour, minute, zone)
-                if (field == ScheduleTimeField.START) applyStart(picked) else applyEnd(picked)
-            },
-            zoned.hour,
-            zoned.minute,
-            DateFormat.is24HourFormat(context),
-        ).show()
     }
 
     LumenPage {
@@ -176,7 +164,7 @@ internal fun ScheduleDetailScreen(
                 millis = draft.startAt,
                 allDay = draft.allDay,
                 onPickDate = { dateField = ScheduleTimeField.START },
-                onPickTime = { openTimePicker(ScheduleTimeField.START, draft.startAt) },
+                onPickTime = { timeField = ScheduleTimeField.START },
             )
             ScheduleMomentRow(
                 labelRes = R.string.schedule_end,
@@ -184,7 +172,7 @@ internal fun ScheduleDetailScreen(
                 millis = draft.endAt,
                 allDay = draft.allDay,
                 onPickDate = { dateField = ScheduleTimeField.END },
-                onPickTime = { openTimePicker(ScheduleTimeField.END, draft.endAt) },
+                onPickTime = { timeField = ScheduleTimeField.END },
             )
         }
 
@@ -337,6 +325,38 @@ internal fun ScheduleDetailScreen(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    timeField?.let { field ->
+        val fieldMillis = if (field == ScheduleTimeField.START) draft.startAt else draft.endAt
+        val zoned = Instant.ofEpochMilli(fieldMillis).atZone(zone)
+        val timePickerState = rememberTimePickerState(
+            initialHour = zoned.hour,
+            initialMinute = zoned.minute,
+            is24Hour = DateFormat.is24HourFormat(context),
+        )
+        AlertDialog(
+            onDismissRequest = { timeField = null },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val picked = scheduleAtLocalTime(fieldMillis, timePickerState.hour, timePickerState.minute, zone)
+                        timeField = null
+                        if (field == ScheduleTimeField.START) applyStart(picked) else applyEnd(picked)
+                    },
+                ) {
+                    Text(stringResource(R.string.schedule_save))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { timeField = null }) {
+                    Text(stringResource(R.string.schedule_cancel))
+                }
+            },
+            text = {
+                TimePicker(state = timePickerState)
+            },
+        )
     }
 
     if (showDeleteConfirm) {

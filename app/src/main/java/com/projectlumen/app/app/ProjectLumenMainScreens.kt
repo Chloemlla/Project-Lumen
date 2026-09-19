@@ -211,7 +211,7 @@ internal fun HomeScreen(
                     EmptyStateMessage(R.string.other_timer_running_hint)
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::stopAll,
+                        onClick = hapticClick { viewModel.stopAll() },
                     ) {
                         ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }
@@ -219,7 +219,7 @@ internal fun HomeScreen(
                 canStartReminder -> {
                     Button(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = { runReminderAction(viewModel::startReminder) },
+                        onClick = hapticClick { runReminderAction(viewModel::startReminder) },
                     ) {
                         ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_reminder)
                     }
@@ -228,20 +228,20 @@ internal fun HomeScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
                             modifier = Modifier.weight(1f),
-                            onClick = viewModel::pauseReminder,
+                            onClick = hapticClick { viewModel.pauseReminder() },
                         ) {
                             ButtonLabel(Icons.Outlined.Pause, R.string.pause)
                         }
                         OutlinedButton(
                             modifier = Modifier.weight(1f),
-                            onClick = viewModel::pauseForOneHour,
+                            onClick = hapticClick { viewModel.pauseForOneHour() },
                         ) {
                             ButtonLabel(Icons.Outlined.Schedule, R.string.silent_until)
                         }
                     }
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::stopAll,
+                        onClick = hapticClick { viewModel.stopAll() },
                     ) {
                         ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }
@@ -249,13 +249,13 @@ internal fun HomeScreen(
                 canResumeReminder -> {
                     Button(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = { runReminderAction(viewModel::resumeReminder) },
+                        onClick = hapticClick { runReminderAction(viewModel::resumeReminder) },
                     ) {
                         ButtonLabel(Icons.Outlined.Refresh, R.string.resume_now)
                     }
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::stopAll,
+                        onClick = hapticClick { viewModel.stopAll() },
                     ) {
                         ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }
@@ -263,7 +263,7 @@ internal fun HomeScreen(
                 timerActive -> {
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::stopAll,
+                        onClick = hapticClick { viewModel.stopAll() },
                     ) {
                         ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }
@@ -322,20 +322,20 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
                             modifier = Modifier.weight(1f),
-                            onClick = viewModel::startBreak,
+                            onClick = hapticClick { viewModel.startBreak() },
                         ) {
                             ButtonLabel(Icons.Outlined.Spa, R.string.start_break)
                         }
                         OutlinedButton(
                             modifier = Modifier.weight(1f),
-                            onClick = viewModel::skipBreak,
+                            onClick = hapticClick { viewModel.skipBreak() },
                         ) {
                             ButtonLabel(Icons.Outlined.SkipNext, R.string.skip_break)
                         }
                     }
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::stopAll,
+                        onClick = hapticClick { viewModel.stopAll() },
                     ) {
                         ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }
@@ -343,13 +343,13 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                 canStartBreak -> {
                     Button(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::startBreak,
+                        onClick = hapticClick { viewModel.startBreak() },
                     ) {
                         ButtonLabel(Icons.Outlined.Spa, R.string.start_break)
                     }
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::stopAll,
+                        onClick = hapticClick { viewModel.stopAll() },
                     ) {
                         ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }
@@ -357,13 +357,13 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                 canSkip -> {
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::skipBreak,
+                        onClick = hapticClick { viewModel.skipBreak() },
                     ) {
                         ButtonLabel(Icons.Outlined.SkipNext, R.string.skip_break)
                     }
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::stopAll,
+                        onClick = hapticClick { viewModel.stopAll() },
                     ) {
                         ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }
@@ -371,7 +371,7 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                 !reminderActive && runtime.activeEngine == ActiveEngine.IDLE.name -> {
                     Button(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = { runReminderAction(viewModel::startReminder) },
+                        onClick = hapticClick { runReminderAction(viewModel::startReminder) },
                     ) {
                         ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_reminder)
                     }
@@ -379,7 +379,7 @@ internal fun BreakScreen(uiState: ProjectLumenUiState, viewModel: ProjectLumenVi
                 timerActive -> {
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::stopAll,
+                        onClick = hapticClick { viewModel.stopAll() },
                     ) {
                         ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }
@@ -421,7 +421,7 @@ internal fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                 running -> {
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::stopPomodoro,
+                        onClick = hapticClick { viewModel.stopPomodoro() },
                     ) {
                         ButtonLabel(Icons.Outlined.Stop, R.string.stop_pomodoro)
                     }
@@ -429,7 +429,7 @@ internal fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                 canStartPomodoro -> {
                     Button(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = { runPomodoroAction(viewModel::startPomodoro) },
+                        onClick = hapticClick { runPomodoroAction(viewModel::startPomodoro) },
                     ) {
                         ButtonLabel(Icons.Outlined.PlayArrow, R.string.start_pomodoro)
                     }
@@ -437,7 +437,7 @@ internal fun PomodoroScreen(uiState: ProjectLumenUiState, viewModel: ProjectLume
                 timerActive -> {
                     OutlinedButton(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = viewModel::stopAll,
+                        onClick = hapticClick { viewModel.stopAll() },
                     ) {
                         ButtonLabel(Icons.Outlined.Stop, R.string.notification_action_stop)
                     }

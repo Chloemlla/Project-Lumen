@@ -39,8 +39,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,7 +86,8 @@ internal fun SettingsPrivacyPermissionCenter(
                 progress = { readinessScore / 100f },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(CircleShape),
+                    .clip(CircleShape)
+                    .clearAndSetSemantics { },
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
             if (nextTarget != null) {
@@ -306,6 +310,7 @@ private fun PermissionControlTileItem(
         PrivacyPermissionTone.Off -> Color.Transparent
     }
     val statusColor = privacyPermissionStatusColor(tone)
+    val haptics = LocalHapticFeedback.current
 
     Column(
         modifier = Modifier
@@ -317,7 +322,10 @@ private fun PermissionControlTileItem(
             .toggleable(
                 value = tile.checked,
                 role = Role.Switch,
-                onValueChange = onCheckedChange,
+                onValueChange = { checked ->
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onCheckedChange(checked)
+                },
             )
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
             .padding(12.dp),
@@ -432,9 +440,13 @@ private fun PrivacyPermissionRow(
                 )
             }
             if (switchChecked != null) {
+                val switchHaptics = LocalHapticFeedback.current
                 Switch(
                     checked = switchChecked,
-                    onCheckedChange = { onTargetCheckedChange(target, it) },
+                    onCheckedChange = {
+                        switchHaptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onTargetCheckedChange(target, it)
+                    },
                 )
             }
         }

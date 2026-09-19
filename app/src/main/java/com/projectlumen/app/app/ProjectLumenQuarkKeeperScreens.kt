@@ -187,13 +187,13 @@ internal fun QuarkKeeperDashboardScreen(
                         )
                     }
                     if (checkedToday) {
-                        OutlinedButton(onClick = onUndo) {
+                        OutlinedButton(onClick = hapticClick { onUndo() }) {
                             Text(stringResource(R.string.quark_keeper_action_undo))
                         }
                     } else {
                         Button(
                             modifier = Modifier.fillMaxWidth(),
-                            onClick = onMarkDone,
+                            onClick = hapticClick { onMarkDone() },
                         ) {
                             ButtonLabel(Icons.Outlined.CheckCircle, R.string.quark_keeper_action_check_in)
                         }

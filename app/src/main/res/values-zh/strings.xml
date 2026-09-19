@@ -998,5 +998,7 @@
     <string name="channel_schedule_reminder">日程提醒</string>
     <string name="channel_schedule_alarm">日程闹钟</string>
     <string name="channel_schedule_overdue">待办逾期提醒</string>
+    <string name="home_today_stats_empty_hint">今天还没有数据，开启提醒后会自动记录。</string>
+    <string name="settings_data_backup_hint">备份包含你的设置、提醒与统计数据；导入会覆盖当前数据。</string>
 
 </resources>

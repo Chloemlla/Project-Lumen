@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -58,7 +59,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,6 +78,12 @@ internal fun ProjectLumenOnboardingScreen(
     var pageIndex by rememberSaveable { mutableIntStateOf(0) }
     val page = pages[pageIndex.coerceIn(0, pages.lastIndex)]
     val progress = (pageIndex + 1).toFloat() / pages.size.toFloat()
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(300),
+        label = "onboardingProgress",
+    )
+    val stepCountDescription = stringResource(R.string.onboarding_step_count, pageIndex + 1, pages.size)
     val iconPulse by rememberInfiniteTransition(label = "onboardingIconPulse").animateFloat(
         initialValue = 0.96f,
         targetValue = 1.04f,
@@ -103,24 +113,28 @@ internal fun ProjectLumenOnboardingScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
-                        stringResource(R.string.onboarding_step_count, pageIndex + 1, pages.size),
+                        stepCountDescription,
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.weight(1f))
-                    TextButton(onClick = { onComplete(false) }) {
+                    TextButton(
+                        modifier = Modifier.heightIn(min = LumenMinTouchTargetHeight),
+                        onClick = hapticClick(HapticFeedbackType.TextHandleMove) { onComplete(false) },
+                    ) {
                         Icon(Icons.Outlined.SkipNext, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.onboarding_skip))
                     }
                 }
                 LinearProgressIndicator(
-                    progress = { progress },
+                    progress = { animatedProgress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(8.dp)
-                        .clip(CircleShape),
+                        .clip(CircleShape)
+                        .semantics { stateDescription = stepCountDescription },
                 )
             }
 
@@ -155,7 +169,7 @@ internal fun ProjectLumenOnboardingScreen(
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = LumenMinTouchTargetHeight),
-                        onClick = { pageIndex -= 1 },
+                        onClick = hapticClick(HapticFeedbackType.TextHandleMove) { pageIndex -= 1 },
                     ) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
@@ -166,7 +180,13 @@ internal fun ProjectLumenOnboardingScreen(
                     modifier = Modifier
                         .weight(1.6f)
                         .heightIn(min = LumenMinTouchTargetHeight),
-                    onClick = {
+                    onClick = hapticClick(
+                        if (pageIndex < pages.lastIndex) {
+                            HapticFeedbackType.TextHandleMove
+                        } else {
+                            HapticFeedbackType.LongPress
+                        },
+                    ) {
                         if (pageIndex < pages.lastIndex) {
                             pageIndex += 1
                         } else {

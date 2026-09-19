@@ -41,6 +41,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -85,17 +87,19 @@ internal fun smartWrapDisplayText(value: String): String {
 
 @Composable
 internal fun RowScope.SmallMetric(@StringRes labelRes: Int, value: String) {
+    val label = stringResource(labelRes)
     Column(
         modifier = Modifier
             .weight(1f)
             .clip(LumenPreferenceShape)
             .background(lumenNestedContainerColor)
             .animateContentSize(animationSpec = spring(stiffness = 420f, dampingRatio = 0.82f))
+            .semantics(mergeDescendants = true) { contentDescription = "$label, $value" }
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
-            stringResource(labelRes),
+            label,
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
@@ -134,6 +138,7 @@ internal fun MetricRow(label: String, value: String) {
             .fillMaxWidth()
             .clip(LumenPreferenceShape)
             .background(lumenNestedContainerColor)
+            .semantics(mergeDescendants = true) { contentDescription = "$label, $value" }
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
