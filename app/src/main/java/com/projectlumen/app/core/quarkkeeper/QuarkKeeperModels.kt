@@ -152,6 +152,8 @@ object QuarkKeeperClock {
      */
     const val RETURN_CONFIRMATION_WINDOW_MILLIS = 60_000L
 
+    private const val MILLIS_PER_MINUTE = 60_000L
+
     fun zone(): ZoneId = ZoneId.systemDefault()
 
     fun minuteOfDay(nowMillis: Long, zoneId: ZoneId = zone()): Int {
@@ -193,6 +195,26 @@ object QuarkKeeperClock {
     /** True once the snooze chain must stop offering another round. */
     fun isSnoozeAllowed(settings: QuarkKeeperSettings, nowMillis: Long, zoneId: ZoneId = zone()): Boolean {
         return minuteOfDay(nowMillis, zoneId) < settings.snoozeCutoffMinuteOfDay
+    }
+
+    /**
+     * When a snooze of [snoozeMinutes] asked for at [nowMillis] should actually expire.
+     *
+     * Capped at the end of today, because a snooze is a postponement *of today's alert*: the cutoff
+     * alone does not give that. The longest setting is an hour and the cutoff is half an hour before
+     * midnight, so a user who postpones at 23:29 is asking for 00:29 — an instant on a day that has not
+     * started, where the stored stamp belongs to a day that has ended. The alarm would then fire on the
+     * new day and, the new day being unchecked, raise the forced alert at half past midnight with a
+     * whole evening still ahead of it, having also spent the round the boot catch-up needed.
+     *
+     * The last millisecond of the day rather than midnight itself, so the fire can only ever land
+     * inside the day it was asked for. [isSnoozeAllowed] stays the separate, fixed line the spec fixes
+     * it at; this is the same "there is only so much of today left" applied continuously, not a second
+     * cutoff — before 23:30 a postponement is still always granted, just not past the day's end.
+     */
+    fun snoozeExpiry(nowMillis: Long, snoozeMinutes: Int, zoneId: ZoneId = zone()): Long {
+        val requested = nowMillis + snoozeMinutes * MILLIS_PER_MINUTE
+        return minOf(requested, endOfDayMillis(nowMillis, zoneId) - 1L)
     }
 
     /**

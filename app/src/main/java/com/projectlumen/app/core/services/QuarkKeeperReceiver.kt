@@ -49,6 +49,7 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
                     ACTION_MIDNIGHT_RESET -> handleMidnightReset(
                         app,
                         QuarkKeeperNotifications(appContext),
+                        QuarkKeeperAlarmScheduler(appContext),
                         nowMillis,
                     )
                     ACTION_RETURN_MONITOR -> handleReturnMonitor(app, nowMillis)
@@ -118,10 +119,18 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
      * Fires even past the snooze cutoff. After 23:30 the button is gone — there is no longer enough of
      * the day left to postpone into — but the alert itself is precisely what the user still needs, so
      * only the offer to postpone ends at the cutoff, never the guard.
+     *
+     * The stored row, not the alarm, decides whether that is what happened. An alarm is a request to
+     * look, and the look can arrive for a postponement that is no longer the day's: a delivery that
+     * drifts past midnight lands on a row whose snooze was never set, and a slot left armed by a
+     * postponement made yesterday would re-alert for a day the user has not been asked about yet. Both
+     * are the same answer — the day has no expired snooze of its own, so there is nothing to re-raise.
      */
     private suspend fun handleSnoozeExpired(app: ProjectLumenApplication, nowMillis: Long) {
         if (!QuarkKeeperStore.snapshot().settings.enabled) return
-        if (QuarkKeeperStore.currentToday(nowMillis).checkedIn) return
+        val today = QuarkKeeperStore.currentToday(nowMillis)
+        if (today.checkedIn) return
+        if (today.snoozedUntilMillis <= 0L || today.snoozedUntilMillis > nowMillis) return
         QuarkKeeperCoordinator.fireForceAlert(app, nowMillis)
     }
 
@@ -136,13 +145,20 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
      *
      * No `enabled` check: reconcile is what turns a disabled guard's leftover alarms off, and returning
      * early on that branch would leave the midnight slot armed forever.
+     *
+     * The snooze slot is cancelled here for the same reason the countdown is: reconcile declines to arm
+     * a snooze for the new day (its stamp is that day's, which is zero) but has nothing to cancel the
+     * one armed yesterday with. Left standing it would fire into the new day, which is the postponement
+     * the cutoff exists to stop — only across midnight instead of at 23:30.
      */
     private suspend fun handleMidnightReset(
         app: ProjectLumenApplication,
         notifications: QuarkKeeperNotifications,
+        scheduler: QuarkKeeperAlarmScheduler,
         nowMillis: Long,
     ) {
         notifications.cancelOngoing()
+        scheduler.cancelSnooze()
         QuarkKeeperCoordinator.reconcile(app, nowMillis)
     }
 
@@ -217,7 +233,7 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
     ) {
         val settings = QuarkKeeperStore.snapshot().settings
         if (QuarkKeeperClock.isSnoozeAllowed(settings, nowMillis)) {
-            val snoozeUntilMillis = nowMillis + settings.snoozeMinutes * MILLIS_PER_MINUTE
+            val snoozeUntilMillis = QuarkKeeperClock.snoozeExpiry(nowMillis, settings.snoozeMinutes)
             QuarkKeeperStore.setSnooze(snoozeUntilMillis, nowMillis)
             scheduler.scheduleSnooze(snoozeUntilMillis)
             QuarkKeeperAlertService.dismiss(context)
@@ -296,8 +312,6 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
 
         /** Tag for the guard's own log lines; the refusal of a late snooze is the one that matters. */
         private const val TAG = "QuarkKeeper"
-
-        private const val MILLIS_PER_MINUTE = 60_000L
 
         /**
          * An unknown action is ignored rather than treated as an error: the receiver is exported to no

@@ -114,4 +114,45 @@ class QuarkKeeperClockTest {
         val handOff = at(22, 30)
         assertFalse(QuarkKeeperClock.isReturnConfirmationOpen(handOff, handOff - 1_000L))
     }
+
+    @Test
+    fun snoozeExpiryIsTheRequestedDelayWhileTheDayHasRoomForIt() {
+        assertEquals(at(20, 5), QuarkKeeperClock.snoozeExpiry(at(20, 0), 5, zone))
+        assertEquals(at(23, 29), QuarkKeeperClock.snoozeExpiry(at(22, 30), 59, zone))
+    }
+
+    /**
+     * The cutoff is 23:30, but the longest snooze setting is an hour, so the cutoff alone does not keep
+     * a postponement inside the day. A user who postpones at 23:29 is asking for 00:29 — a row that
+     * belongs to today, stamped with an instant on tomorrow — and the alarm would then fire on the new
+     * day and raise the forced alert at half past midnight with the whole evening still ahead. The day's
+     * last millisecond is the honest maximum.
+     */
+    @Test
+    fun snoozeExpiryNeverLandsPastTheEndOfTheDay() {
+        val lastMillisecondOfDay = at(0, 0) + dayMillis - 1L
+        assertEquals(lastMillisecondOfDay, QuarkKeeperClock.snoozeExpiry(at(23, 29), 60, zone))
+        assertEquals(lastMillisecondOfDay, QuarkKeeperClock.snoozeExpiry(at(23, 59), 5, zone))
+    }
+
+    /**
+     * The cap can only shorten a snooze, never push it out: the last millisecond of the day is always
+     * still ahead of a "now" that is inside the day, so a granted postponement can never come back due
+     * at the instant it was taken.
+     */
+    @Test
+    fun snoozeExpiryStaysInTheFutureForAnyInstantInsideTheDay() {
+        for (minute in listOf(0, 20 * 60, 23 * 60 + 29, 23 * 60 + 59)) {
+            val now = at(minute / 60, minute % 60)
+            assertTrue(
+                "snooze asked for at minute $minute expired immediately",
+                QuarkKeeperClock.snoozeExpiry(now, 5, zone) > now,
+            )
+            assertTrue(
+                "snooze asked for at minute $minute expired immediately",
+                QuarkKeeperClock.snoozeExpiry(now, 60, zone) > now,
+            )
+            assertTrue(QuarkKeeperClock.snoozeExpiry(now, 60, zone) <= QuarkKeeperClock.endOfDayMillis(now, zone))
+        }
+    }
 }
