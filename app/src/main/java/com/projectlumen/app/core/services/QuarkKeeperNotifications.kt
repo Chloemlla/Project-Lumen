@@ -65,7 +65,14 @@ class QuarkKeeperNotifications(private val context: Context) {
                 NotificationChannel(
                     NotificationChannels.QUARK_KEEPER_ONGOING,
                     context.getString(R.string.channel_quark_keeper_ongoing),
-                    NotificationManager.IMPORTANCE_LOW,
+                    // High rather than low: the countdown is a state the user has to be able to see the
+                    // moment it becomes true, and a low-importance notification stays collapsed in the
+                    // shade until the user goes looking for it. That matters most on the evening the
+                    // device is only switched on after the reminder node — the catch-up then has nothing
+                    // but this notification to put in front of the user until the deadline alarm fires.
+                    // The alert that actually interrupts has its own channel above, so this one stays
+                    // silent: it becomes visible, it does not demand attention.
+                    NotificationManager.IMPORTANCE_HIGH,
                 ).apply {
                     description = context.getString(R.string.channel_quark_keeper_ongoing)
                     setSound(null, null)
@@ -157,7 +164,9 @@ class QuarkKeeperNotifications(private val context: Context) {
             channel = NotificationChannels.QUARK_KEEPER_ONGOING,
             title = context.getString(R.string.quark_keeper_ongoing_title),
             message = context.getString(R.string.quark_keeper_ongoing_message, remainingPhrase(remainingHours)),
-            priority = NotificationCompat.PRIORITY_LOW,
+            // Ignored from API 26 on, where the channel decides; kept in step with the channel's
+            // importance so the two do not read as contradicting each other.
+            priority = NotificationCompat.PRIORITY_HIGH,
             category = NotificationCompat.CATEGORY_SERVICE,
         )
             // setOngoing is what makes it non-dismissible. The action is the way out: a countdown the

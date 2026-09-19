@@ -42,5 +42,10 @@ object NotificationIds {
     const val QUARK_KEEPER_ACTION_GO_CHECK_IN = 11008
     const val QUARK_KEEPER_ACTION_SNOOZE = 11009
     const val QUARK_KEEPER_ACTION_MARK_DONE = 11010
+    // Undo is deliberately not one of the alert's buttons. It belongs to the dashboard, which is the
+    // only surface where the user can see which day they are about to reopen, and the guard's alerts
+    // exist to end the day rather than to offer a way back into it. Nothing posts this id today — the
+    // in-app undo reaches the store through its own feature entry — so it stays reserved for a
+    // dashboard-side action and must never be attached to a notification.
     const val QUARK_KEEPER_ACTION_UNDO = 11011
 }

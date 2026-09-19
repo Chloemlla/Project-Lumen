@@ -6,7 +6,9 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.view.WindowInsets
@@ -18,6 +20,7 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.quarkkeeper.QuarkKeeperClock
 import com.projectlumen.app.core.quarkkeeper.QuarkKeeperRemaining
+import com.projectlumen.app.core.quarkkeeper.QuarkKeeperSettings
 import com.projectlumen.app.core.quarkkeeper.QuarkKeeperStore
 
 /**
@@ -45,6 +48,13 @@ class QuarkKeeperAlertService : Service() {
     private lateinit var app: ProjectLumenApplication
     private lateinit var notifications: QuarkKeeperNotifications
     private var overlayView: View? = null
+
+    /**
+     * Drives the one scheduled rebuild the alert needs — the snooze cutoff — and is cleared whenever the
+     * window is rebuilt, so a service answering several alerts in a night never leaves an older timer to
+     * fire against a newer window.
+     */
+    private val cutoffHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
@@ -87,6 +97,7 @@ class QuarkKeeperAlertService : Service() {
     }
 
     override fun onDestroy() {
+        cutoffHandler.removeCallbacksAndMessages(null)
         removeOverlay()
         // Detach rather than let the platform cancel: this service shares its notification with the
         // guard's ongoing countdown, and the day is still unchecked-in when the alert is answered.
@@ -145,7 +156,30 @@ class QuarkKeeperAlertService : Service() {
         if (!added) return false
         overlayView = view
         forceImmersive(view)
+        scheduleSnoozeCutoffRebuild(settings, nowMillis)
         return true
+    }
+
+    /**
+     * Rebuilds the alert the moment the snooze cutoff arrives.
+     *
+     * The cutoff is a change to the screen the user is already looking at, not only to the next tap. An
+     * alert raised at the deadline and left alone crosses it while still on display, and a button still
+     * offering "remind me in 15 minutes" at 23:45 would promise a re-alert the guard has decided not to
+     * arm — the receiver would refuse it, so the screen would be lying until the user found out by
+     * tapping. Rebuilding the window is already how this service handles a figure that has moved, so the
+     * cutoff rides the same path.
+     *
+     * Scheduled only while a snooze is still on offer: [QuarkKeeperClock.nextOccurrenceOf] answers with
+     * tomorrow's cutoff once today's has passed, and a timer left running until then would rebuild the
+     * alert at a moment nobody asked for.
+     */
+    private fun scheduleSnoozeCutoffRebuild(settings: QuarkKeeperSettings, nowMillis: Long) {
+        cutoffHandler.removeCallbacksAndMessages(null)
+        if (!QuarkKeeperClock.isSnoozeAllowed(settings, nowMillis)) return
+        val delayMillis = QuarkKeeperClock.nextOccurrenceOf(settings.snoozeCutoffMinuteOfDay, nowMillis) - nowMillis
+        if (delayMillis <= 0L) return
+        cutoffHandler.postDelayed({ showOverlay() }, delayMillis)
     }
 
     /**
