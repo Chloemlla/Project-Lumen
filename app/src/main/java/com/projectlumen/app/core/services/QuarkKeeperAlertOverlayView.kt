@@ -32,6 +32,11 @@ import com.projectlumen.app.ui.theme.LumenTealDark
  * Every string is resolved here rather than handed in pre-formatted, so the caller only passes the
  * values that drive the wording (how much of the day is left, the snooze length) and the text itself
  * stays in the resource files where it can be translated.
+ *
+ * The check-in confirmation is the one place this view does not report a tap immediately. The other
+ * two buttons call back as they are pressed; "I have checked in" plays its animation first and then
+ * calls back, because the alert closes on the callback and a window that leaves at the instant of the
+ * tap would give the user who just answered a full-screen interrupt nothing back.
  */
 internal object QuarkKeeperAlertOverlayView {
 
@@ -63,64 +68,66 @@ internal object QuarkKeeperAlertOverlayView {
                 setColor(LumenSurfaceContainerDark.toArgb())
                 setStroke(dp(context, 1f), LumenOutlineVariantDark.toArgb())
             }
-            addView(
-                label(
-                    context = context,
-                    text = context.getString(R.string.quark_keeper_overlay_title),
-                    sizeSp = 24f,
-                    color = LumenOnSurfaceDark.toArgb(),
-                    bold = true,
-                ),
-            )
-            addView(
-                label(
-                    context = context,
-                    text = context.getString(R.string.quark_keeper_overlay_message, remainingText),
-                    sizeSp = 16f,
-                    color = LumenOnSurfaceVariantDark.toArgb(),
-                    bold = false,
-                ),
-            )
-            addView(
-                actionButton(
-                    context = context,
-                    text = context.getString(R.string.quark_keeper_action_go),
-                    style = ButtonStyle.FILLED,
-                    enabled = true,
-                    onClick = onGoCheckIn,
-                ),
-            )
-            addView(
-                actionButton(
-                    context = context,
-                    text = if (snoozeAllowed) {
-                        context.getString(R.string.quark_keeper_action_snooze, snoozeMinutes)
-                    } else {
-                        // Past the cutoff the extra round could not be honoured before midnight, so the
-                        // button stays visible but inert. Removing it would leave the user wondering
-                        // whether the option had ever existed; leaving it live would promise a re-alert
-                        // the guard has already decided not to arm. The cutoff is named so the rule
-                        // reads as a clock time rather than as a broken button.
-                        context.getString(
-                            R.string.quark_keeper_overlay_snooze_blocked,
-                            minuteOfDayLabel(context, snoozeCutoffMinuteOfDay),
-                        )
-                    },
-                    style = ButtonStyle.OUTLINED,
-                    enabled = snoozeAllowed,
-                    onClick = onSnooze,
-                ),
-            )
-            addView(
-                actionButton(
-                    context = context,
-                    text = context.getString(R.string.quark_keeper_action_check_in),
-                    style = ButtonStyle.TEXT,
-                    enabled = true,
-                    onClick = onMarkDone,
-                ),
-            )
         }
+        card.addView(
+            label(
+                context = context,
+                text = context.getString(R.string.quark_keeper_overlay_title),
+                sizeSp = 24f,
+                color = LumenOnSurfaceDark.toArgb(),
+                bold = true,
+            ),
+        )
+        card.addView(
+            label(
+                context = context,
+                text = context.getString(R.string.quark_keeper_overlay_message, remainingText),
+                sizeSp = 16f,
+                color = LumenOnSurfaceVariantDark.toArgb(),
+                bold = false,
+            ),
+        )
+        card.addView(
+            actionButton(
+                context = context,
+                text = context.getString(R.string.quark_keeper_action_go),
+                style = ButtonStyle.FILLED,
+                enabled = true,
+                onClick = onGoCheckIn,
+            ),
+        )
+        card.addView(
+            actionButton(
+                context = context,
+                text = if (snoozeAllowed) {
+                    context.getString(R.string.quark_keeper_action_snooze, snoozeMinutes)
+                } else {
+                    // Past the cutoff the extra round could not be honoured before midnight, so the
+                    // button stays visible but inert. Removing it would leave the user wondering
+                    // whether the option had ever existed; leaving it live would promise a re-alert
+                    // the guard has already decided not to arm. The cutoff is named so the rule
+                    // reads as a clock time rather than as a broken button.
+                    context.getString(
+                        R.string.quark_keeper_overlay_snooze_blocked,
+                        minuteOfDayLabel(context, snoozeCutoffMinuteOfDay),
+                    )
+                },
+                style = ButtonStyle.OUTLINED,
+                enabled = snoozeAllowed,
+                onClick = onSnooze,
+            ),
+        )
+        card.addView(
+            actionButton(
+                context = context,
+                text = context.getString(R.string.quark_keeper_action_check_in),
+                style = ButtonStyle.TEXT,
+                enabled = true,
+                // The only button whose tap is reported late: the confirmation replaces the card
+                // first and `onMarkDone` runs when it has been on screen long enough to read.
+                onClick = { playCheckInConfirmation(context, card, onMarkDone) },
+            ),
+        )
 
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -139,6 +146,66 @@ internal object QuarkKeeperAlertOverlayView {
                 ),
             )
         }
+    }
+
+    /**
+     * Replaces the alert with the check-in confirmation, then reports the tap.
+     *
+     * The guard's other two buttons close the alert as they are pressed, which is right for them — one
+     * hands the user to another app, the other buys time. This one is the user telling the guard it can
+     * stand down, and the alert closing on the same frame would mean a full-screen interrupt answered
+     * with no acknowledgement at all. So the card is swapped for the confirmation, the confirmation
+     * animates in, and only then does `onMarkDone` run and the window go away.
+     *
+     * Swapping the content rather than drawing over it is also what makes a double tap impossible: the
+     * buttons are gone before the first animation frame is drawn, so there is no second tap to consume
+     * and no need to disable anything.
+     *
+     * The dismissal is held for [SUCCESS_HOLD_MILLIS] after the entrance finishes. An animation that
+     * ends by deleting itself is not feedback; the check has to be readable before the alert leaves.
+     */
+    private fun playCheckInConfirmation(context: Context, card: LinearLayout, onMarkDone: () -> Unit) {
+        card.removeAllViews()
+        val confirmation = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            // A glyph rather than a drawable so it scales with the text under it; the app ships no
+            // standalone check asset, and this alert has no themed Activity to borrow one from.
+            addView(label(context, "✓", 52f, LumenTealDark.toArgb(), bold = true))
+            addView(
+                label(
+                    context = context,
+                    text = context.getString(R.string.quark_keeper_success_title),
+                    sizeSp = 24f,
+                    color = LumenOnSurfaceDark.toArgb(),
+                    bold = true,
+                ),
+            )
+            addView(
+                label(
+                    context = context,
+                    text = context.getString(R.string.quark_keeper_success_message),
+                    sizeSp = 16f,
+                    color = LumenOnSurfaceVariantDark.toArgb(),
+                    bold = false,
+                ),
+            )
+        }
+        card.addView(confirmation)
+
+        confirmation.alpha = 0f
+        confirmation.scaleX = SUCCESS_ENTER_SCALE
+        confirmation.scaleY = SUCCESS_ENTER_SCALE
+        confirmation.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(SUCCESS_ENTER_MILLIS)
+            .start()
+
+        // Posted on the card, not the confirmation: the card is the view that already has a window, and
+        // this delay is the only thing standing between the tap and the guard being told.
+        card.postDelayed(onMarkDone, SUCCESS_ENTER_MILLIS + SUCCESS_HOLD_MILLIS)
     }
 
     /** Three weights of action, which is all the alert needs; a fuller set would belong in a theme. */
@@ -239,6 +306,15 @@ internal object QuarkKeeperAlertOverlayView {
     private fun dp(context: Context, value: Float): Int {
         return (value * context.resources.displayMetrics.density).toInt()
     }
+
+    /** Long enough to read as motion rather than as a jump cut, short enough not to feel like a delay. */
+    private const val SUCCESS_ENTER_MILLIS = 260L
+
+    /** Held after the entrance finishes, so the check is readable before the alert leaves. */
+    private const val SUCCESS_HOLD_MILLIS = 850L
+
+    /** Starts just under full size; 1f would leave the whole entrance to opacity alone. */
+    private const val SUCCESS_ENTER_SCALE = 0.82f
 
     private val DISABLED_TEXT_COLOR = ColorUtils.setAlphaComponent(LumenOnSurfaceVariantDark.toArgb(), 120)
     private val DISABLED_FILL_COLOR = ColorUtils.setAlphaComponent(LumenOutlineVariantDark.toArgb(), 90)
