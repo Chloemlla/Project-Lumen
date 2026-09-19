@@ -75,6 +75,8 @@ class ProjectLumenViewModel(
     private val rescheduleScheduleReminders: suspend () -> Unit,
     private val reconcileQuarkKeeper: suspend () -> Unit,
     private val raiseQuarkKeeperAlert: suspend () -> Unit,
+    private val fireQuarkKeeperReminderNode: suspend () -> Unit,
+    private val fireQuarkKeeperDeadlineNode: suspend () -> Unit,
     private val launchQuarkKeeperCheckIn: () -> Boolean,
     private val launchQuarkKeeperStoreListing: () -> Unit,
     private val launchQuarkKeeperWebCheckIn: () -> Unit,
@@ -173,10 +175,13 @@ class ProjectLumenViewModel(
     )
     private val quarkKeeperEntry = ProjectLumenQuarkKeeperFeatureEntry(
         scope = reportingScope,
-        // Reconciling and re-raising the alert need the Application instance; the three launch calls
-        // need a Context. Both arrive as callbacks for the same reason the schedule re-arm above does.
+        // Reconciling and re-raising the alert need the Application instance, as do the two day nodes
+        // the developer buttons fire; the three launch calls need a Context. All of them arrive as
+        // callbacks for the same reason the schedule re-arm above does.
         reconcile = reconcileQuarkKeeper,
         raiseAlert = raiseQuarkKeeperAlert,
+        fireReminderNode = fireQuarkKeeperReminderNode,
+        fireDeadlineNode = fireQuarkKeeperDeadlineNode,
         launchCheckIn = launchQuarkKeeperCheckIn,
         openStore = launchQuarkKeeperStoreListing,
         openWeb = launchQuarkKeeperWebCheckIn,
@@ -581,6 +586,31 @@ class ProjectLumenViewModel(
     fun openQuarkKeeperWebCheckIn() = quarkKeeperEntry.openWebCheckIn()
 
     fun dismissQuarkKeeperQuarkUnavailable() = quarkKeeperEntry.dismissQuarkUnavailable()
+
+    /**
+     * Developer mode only: run one of the guard's day nodes by hand, so its effect can be seen without
+     * waiting for the time it is scheduled at.
+     *
+     * The developer-mode check is repeated here even though the screen only draws the buttons while the
+     * mode is on. It reads the same [ProjectLumenUiState.settings] the screen renders from, so the
+     * button and the gate can never disagree, and it keeps the capability attached to the capability
+     * rather than to one place that happens to offer it.
+     *
+     * Neither one bypasses the guard's own conditions — that is deliberate and is what the buttons are
+     * for. See `ProjectLumenQuarkKeeperFeatureEntry` for what each one honours.
+     */
+    fun triggerQuarkKeeperReminderNow() {
+        if (!uiState.value.settings.developerModeEnabled) return
+        CrashBreadcrumbs.record("Action triggerQuarkKeeperReminderNow")
+        quarkKeeperEntry.triggerReminderNow()
+    }
+
+    /** The deadline half of [triggerQuarkKeeperReminderNow]; it is not gated on the clock. */
+    fun triggerQuarkKeeperDeadlineNow() {
+        if (!uiState.value.settings.developerModeEnabled) return
+        CrashBreadcrumbs.record("Action triggerQuarkKeeperDeadlineNow")
+        quarkKeeperEntry.triggerDeadlineNow()
+    }
 
     fun shareStatistics() = reportIfThrows {
         sharingEntry.shareStatistics()

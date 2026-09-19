@@ -41,12 +41,11 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
                 val appContext = context.applicationContext
                 val nowMillis = System.currentTimeMillis()
                 when (action) {
-                    ACTION_DAILY_REMINDER -> handleDailyReminder(
-                        app,
-                        QuarkKeeperNotifications(appContext),
-                        nowMillis,
-                    )
-                    ACTION_DEADLINE_ALERT -> handleDeadlineAlert(app, nowMillis)
+                    // The two day nodes live on the coordinator rather than here, since the guard's
+                    // own screen fires them by hand in developer mode and the alarm must not be able
+                    // to run a different sequence than that button does.
+                    ACTION_DAILY_REMINDER -> QuarkKeeperCoordinator.fireReminderNode(app, nowMillis)
+                    ACTION_DEADLINE_ALERT -> QuarkKeeperCoordinator.fireDeadlineNode(app, nowMillis)
                     ACTION_SNOOZE_EXPIRED -> handleSnoozeExpired(app, nowMillis)
                     ACTION_MIDNIGHT_RESET -> handleMidnightReset(
                         app,
@@ -84,42 +83,6 @@ class QuarkKeeperReceiver : BroadcastReceiver() {
                 .onFailure { throwable -> app?.recordHandledFailure(throwable) }
             pendingResult.finish()
         }
-    }
-
-    /**
-     * A reminder node: one of the nudges the user asked for, and the start of the escalation for
-     * tonight.
-     *
-     * This one path serves every node in the list — the guard does the same thing whichever of them
-     * fired, which is why they share an action — and it does not have to tell them apart. Any reminder
-     * is a moment the guard is certain the user's day is still open, which is exactly when tonight's
-     * deadline and the countdown become due.
-     *
-     * [QuarkKeeperCoordinator.reconcile] does that re-arming, and what it arms is the nodes still ahead
-     * rather than this one: the fired node resolves to tomorrow, its own minute no longer being in the
-     * future. Nothing here cancels the node's slot either — it is a single-shot alarm, already spent by
-     * the time this runs.
-     */
-    private suspend fun handleDailyReminder(
-        app: ProjectLumenApplication,
-        notifications: QuarkKeeperNotifications,
-        nowMillis: Long,
-    ) {
-        if (!QuarkKeeperStore.snapshot().settings.enabled) return
-        if (QuarkKeeperStore.currentToday(nowMillis).checkedIn) return
-        notifications.ensureChannels()
-        notifications.showDailyReminder()
-        QuarkKeeperCoordinator.reconcile(app, nowMillis)
-    }
-
-    /** The deadline node: the first forced round of the night. */
-    private suspend fun handleDeadlineAlert(app: ProjectLumenApplication, nowMillis: Long) {
-        if (!QuarkKeeperStore.snapshot().settings.enabled) return
-        if (QuarkKeeperStore.currentToday(nowMillis).checkedIn) return
-        QuarkKeeperCoordinator.fireForceAlert(app, nowMillis)
-        // After the alert, never before: fireForceAlert bumps the day's nag round, and reconciling
-        // first would let the boot catch-up read a round of zero and raise the alert a second time.
-        QuarkKeeperCoordinator.reconcile(app, nowMillis)
     }
 
     /**

@@ -105,6 +105,53 @@ object QuarkKeeperCoordinator {
     }
 
     /**
+     * One reminder node firing: the nudge the user asked for, and the start of tonight's escalation.
+     *
+     * This path serves every node in the list — the guard does the same thing whichever of them fired,
+     * which is why they share an action — and it never has to tell them apart. Any reminder is a moment
+     * the guard is certain the user's day is still open, which is exactly when tonight's deadline and
+     * the countdown become due.
+     *
+     * The two refusals below are the guard's own preconditions, and returning before `ensureChannels()`
+     * is what makes them total: a node that fires for a day the user has already answered has to leave
+     * no trace at all, not even a channel whose existence would outlive the refusal.
+     *
+     * These two nodes belong on the coordinator rather than inside [QuarkKeeperReceiver] because the
+     * alarm is not the only thing that runs them: developer mode fires the same node by hand from the
+     * guard's own screen, and a second copy of this sequence is exactly how the two would drift apart.
+     *
+     * [reconcile] is what re-arms what is still ahead, and it arms the nodes *after* this one rather
+     * than this one itself: [nextAt] is strictly-next, so the minute that just fired resolves to
+     * tomorrow. Nothing here cancels the node's slot either — it is a single-shot alarm, already spent
+     * by the time this runs.
+     */
+    suspend fun fireReminderNode(app: ProjectLumenApplication, nowMillis: Long = System.currentTimeMillis()) {
+        if (!QuarkKeeperStore.snapshot().settings.enabled) return
+        if (QuarkKeeperStore.currentToday(nowMillis).checkedIn) return
+        val notifications = QuarkKeeperNotifications(app.applicationContext)
+        notifications.ensureChannels()
+        notifications.showDailyReminder()
+        reconcile(app, nowMillis)
+    }
+
+    /**
+     * The deadline node: one forced round of the night.
+     *
+     * Deliberately not gated on the clock. Everywhere else this runs because a deadline alarm has come
+     * due, but the one caller that is not an alarm — a developer asking to see the alert — would be
+     * useless if it could only be exercised after the deadline had passed. The two conditions it does
+     * check are the day's own, and every alert path in the guard shares them.
+     */
+    suspend fun fireDeadlineNode(app: ProjectLumenApplication, nowMillis: Long = System.currentTimeMillis()) {
+        if (!QuarkKeeperStore.snapshot().settings.enabled) return
+        if (QuarkKeeperStore.currentToday(nowMillis).checkedIn) return
+        fireForceAlert(app, nowMillis)
+        // After the alert, never before: fireForceAlert bumps the day's nag round, and reconciling
+        // first would let the boot catch-up read a round of zero and raise the alert a second time.
+        reconcile(app, nowMillis)
+    }
+
+    /**
      * Raises one round of the deadline alert: the full-screen surface, the notification that backs it
      * up, and the countdown.
      *

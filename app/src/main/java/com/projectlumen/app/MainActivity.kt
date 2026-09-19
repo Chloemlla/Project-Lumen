@@ -146,6 +146,8 @@ open class MainActivity : ComponentActivity() {
                             rescheduleScheduleReminders = app::rescheduleScheduleReminders,
                             reconcileQuarkKeeper = app::reconcileQuarkKeeper,
                             raiseQuarkKeeperAlert = app::raiseQuarkKeeperAlert,
+                            fireQuarkKeeperReminderNode = app::fireQuarkKeeperReminderNode,
+                            fireQuarkKeeperDeadlineNode = app::fireQuarkKeeperDeadlineNode,
                             launchQuarkKeeperCheckIn = app::openQuarkKeeperCheckIn,
                             launchQuarkKeeperStoreListing = app::openQuarkKeeperStoreListing,
                             launchQuarkKeeperWebCheckIn = app::openQuarkKeeperWebCheckIn,

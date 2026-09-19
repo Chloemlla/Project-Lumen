@@ -67,6 +67,10 @@ internal fun QuarkKeeperRoute(
         cycle = cycle,
         stats = stats,
         permissions = permissions,
+        // Read from the app's settings rather than from the guard's own store: developer mode belongs to
+        // the app, and the dashboard is offered the resulting boolean rather than the whole settings
+        // row — the same shape `ProjectLumenSettingsScreen` uses for its own developer-only section.
+        developerModeEnabled = uiState.settings.developerModeEnabled,
         onToggleEnabled = { enabled ->
             sessionMessage = null
             viewModel.setQuarkKeeperEnabled(enabled)
@@ -80,6 +84,8 @@ internal fun QuarkKeeperRoute(
             viewModel.undoQuarkKeeperCheckIn()
         },
         onOpenQuark = viewModel::openQuarkKeeperCheckIn,
+        onTriggerReminderNow = viewModel::triggerQuarkKeeperReminderNow,
+        onTriggerDeadlineNow = viewModel::triggerQuarkKeeperDeadlineNow,
         onRequestExactAlarm = { openExactAlarmSettings(context) },
         onRequestOverlay = { openOverlaySettings(context) },
         onRequestBatteryOptimization = { openBatteryOptimizationSettings(context) },

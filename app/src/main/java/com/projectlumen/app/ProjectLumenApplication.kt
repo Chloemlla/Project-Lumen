@@ -145,6 +145,24 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     /**
+     * Fires one of the guard's day nodes on the spot, for the developer-mode buttons on the guard's
+     * screen.
+     *
+     * Both are the very entry points the alarm receiver uses, the guard's own conditions included —
+     * there is no shortcut past them here. They are reached directly rather than by broadcasting the
+     * alarms' own actions, because the receiver hands its work to a detached scope and answers with
+     * `goAsync()`: correct for a fire nobody is waiting on, wrong for one the user just asked for and
+     * is watching.
+     */
+    suspend fun fireQuarkKeeperReminderNode() {
+        QuarkKeeperCoordinator.fireReminderNode(this)
+    }
+
+    suspend fun fireQuarkKeeperDeadlineNode() {
+        QuarkKeeperCoordinator.fireDeadlineNode(this)
+    }
+
+    /**
      * Opens Quark's check-in board. True when it opened, false when Quark is not installed or has no
      * launchable entry point — the in-app caller answers false with the install / web dialog, while
      * the notification's own "go" button answers it by opening the store listing directly, because a

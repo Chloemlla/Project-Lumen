@@ -16,6 +16,10 @@
     <string name="quark_keeper_section_stats">统计</string>
     <string name="quark_keeper_section_history">打卡日志</string>
     <string name="quark_keeper_section_permissions">权限与可靠性</string>
+    <string name="quark_keeper_dev_section">开发者调试</string>
+    <string name="quark_keeper_dev_trigger_reminder">立即触发一次日常提醒</string>
+    <string name="quark_keeper_dev_trigger_deadline">立即触发死线强制提醒</string>
+    <string name="quark_keeper_dev_trigger_hint">两个按钮都会走守护的真实链路：守护未开启或今日已签到时，点击不会有任何反应，这是预期行为，不是故障。</string>
     <string name="quark_keeper_enabled">启用签到守护</string>
     <string name="quark_keeper_enabled_hint">默认关闭。开启后，第一个提醒时间一到就会常驻显示倒计时，死线时间一到将全屏强制打断，直到你确认当天已签到。</string>
     <string name="quark_keeper_reminders_hint">每个时间都会独立提醒。暂时不需要时，关掉开关就能停止提醒，选好的时间仍然保留。</string>

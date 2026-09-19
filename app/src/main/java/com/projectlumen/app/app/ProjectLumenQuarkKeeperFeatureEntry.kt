@@ -16,14 +16,17 @@ import kotlinx.coroutines.launch
  *
  * The store is the only writer and [QuarkKeeperCoordinator.reconcile] is the only thing that makes the
  * armed alarms and the posted notifications match it, so every action below is "write, then
- * reconcile". That is also why the two calls that need an `Application` — reconciling and raising the
- * alert — arrive as callbacks: this class deliberately holds no Android dependency, exactly like the
- * ViewModel that constructs it. The same goes for the launcher calls, which need a `Context`.
+ * reconcile". That is also why the calls that need an `Application` — reconciling, raising the alert,
+ * and the two day nodes — arrive as callbacks: this class deliberately holds no Android dependency,
+ * exactly like the ViewModel that constructs it. The same goes for the launcher calls, which need a
+ * `Context`.
  */
 internal class ProjectLumenQuarkKeeperFeatureEntry(
     private val scope: CoroutineScope,
     private val reconcile: suspend () -> Unit,
     private val raiseAlert: suspend () -> Unit,
+    private val fireReminderNode: suspend () -> Unit,
+    private val fireDeadlineNode: suspend () -> Unit,
     private val launchCheckIn: () -> Boolean,
     private val openStore: () -> Unit,
     private val openWeb: () -> Unit,
@@ -186,6 +189,32 @@ internal class ProjectLumenQuarkKeeperFeatureEntry(
 
     fun dismissQuarkUnavailable() {
         _quarkUnavailable.value = false
+    }
+
+    /**
+     * Developer mode: run one reminder node now, gates and all.
+     *
+     * The gates are the reason the button is useful rather than a limitation of it. It exists so the
+     * reminder can be seen without waiting for its time, and a version that fired while the guard was
+     * off or the day was already answered would be demonstrating a state the guard can never actually
+     * be in. Nothing is written here: the node's own path owns the notification and the reconcile.
+     */
+    fun triggerReminderNow() {
+        guarded { fireReminderNode() }
+    }
+
+    /**
+     * Developer mode: run the deadline node now, gates and all.
+     *
+     * Unlike the alarm that normally runs this node, it is not gated on the clock — the alert's whole
+     * purpose is to be seen at 22:30, so a button that only worked after 22:30 would be useless for the
+     * case it exists for. The two conditions it does honour are the day's own, and it spends the day's
+     * nag round exactly as the real alert would. That is deliberate: the round records that the user was
+     * interrupted, so afterwards the guard behaves as it does after any other round, rather than being
+     * left in a state no real night produces.
+     */
+    fun triggerDeadlineNow() {
+        guarded { fireDeadlineNode() }
     }
 
     private fun writeSettings(transform: (QuarkKeeperSettings) -> QuarkKeeperSettings) {

@@ -29,6 +29,15 @@
     <string name="quark_keeper_section_stats">Statistics</string>
     <string name="quark_keeper_section_history">Check-in log</string>
     <string name="quark_keeper_section_permissions">Permissions and reliability</string>
+    <string name="quark_keeper_dev_section">Developer tools</string>
+    <string name="quark_keeper_dev_trigger_reminder">Fire a daily reminder now</string>
+    <string name="quark_keeper_dev_trigger_deadline">Fire the deadline alert now</string>
+    <!--
+      Shown above the two trigger buttons. Both run the guard's real chain, so a tap that appears to do
+      nothing is the chain declining rather than a broken button — the sentence exists so the developer
+      does not read that silence as a bug.
+    -->
+    <string name="quark_keeper_dev_trigger_hint">Both buttons run the guard\'s real chain, so a tap does nothing while the guard is off or today is already checked in — expected, not a failure.</string>
     <string name="quark_keeper_enabled">Enable the check-in guard</string>
     <string name="quark_keeper_enabled_hint">Off by default. Once on, the guard shows a persistent countdown after the first reminder time and takes over the screen at the deadline alert time until the day is checked in.</string>
     <string name="quark_keeper_reminders_hint">Each time reminds you on its own. Switch one off to stop the reminders without losing the time you picked.</string>

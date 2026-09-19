@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.BatterySaver
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.EventNote
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Lock
@@ -79,10 +80,13 @@ internal fun QuarkKeeperDashboardScreen(
     cycle: QuarkKeeperCycleSummary,
     stats: QuarkKeeperStats,
     permissions: PermissionRequirements,
+    developerModeEnabled: Boolean,
     onToggleEnabled: (Boolean) -> Unit,
     onMarkDone: () -> Unit,
     onUndo: () -> Unit,
     onOpenQuark: () -> Unit,
+    onTriggerReminderNow: () -> Unit,
+    onTriggerDeadlineNow: () -> Unit,
     onRequestExactAlarm: () -> Unit,
     onRequestOverlay: () -> Unit,
     onRequestBatteryOptimization: () -> Unit,
@@ -313,6 +317,45 @@ internal fun QuarkKeeperDashboardScreen(
                             )
                         }
                         QuarkKeeperCycleGrid(cycle = cycle, todayKey = todayDateKey)
+                    }
+                }
+            }
+
+            // Developer-only, and placed here rather than at the end of the page on purpose: the
+            // check-in log below is an unbounded lazy list — up to two years of days — so a block after
+            // it would be reachable only by scrolling past every entry.
+            //
+            // The buttons are deliberately left tappable with no `enabled` condition. They run the same
+            // chain a scheduled reminder runs, and that chain is what declines when the guard is off or
+            // the day is already checked in; disabling them here would hide exactly the behaviour a
+            // developer is trying to observe.
+            if (developerModeEnabled) {
+                item(key = "developer-triggers") {
+                    ActionCard {
+                        SectionHeader(Icons.Outlined.Code, R.string.quark_keeper_dev_section)
+                        Text(
+                            text = stringResource(R.string.quark_keeper_dev_trigger_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = onTriggerReminderNow,
+                        ) {
+                            ButtonLabel(
+                                Icons.Outlined.NotificationsActive,
+                                R.string.quark_keeper_dev_trigger_reminder,
+                            )
+                        }
+                        OutlinedButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = onTriggerDeadlineNow,
+                        ) {
+                            ButtonLabel(
+                                Icons.Outlined.WarningAmber,
+                                R.string.quark_keeper_dev_trigger_deadline,
+                            )
+                        }
                     }
                 }
             }
