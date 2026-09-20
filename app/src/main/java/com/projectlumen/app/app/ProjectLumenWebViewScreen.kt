@@ -142,6 +142,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -209,6 +211,7 @@ internal fun WebViewScreen(
     var expanded by remember { mutableStateOf(false) }
     var showCompatibilityDialog by remember { mutableStateOf(false) }
     val currentPageUrl = webView?.url ?: currentUrl
+    val loadingLabel = stringResource(R.string.webview_loading)
 
     LaunchedEffect(initialPageAllowed, initialPageUri) {
         if (!initialPageAllowed) {
@@ -253,7 +256,13 @@ internal fun WebViewScreen(
                 },
                 title = {
                     if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        // The title is blank on first paint, so the bar shows a spinner instead.
+                        // Without a label TalkBack announces a bare progress bar with no context.
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .semantics { contentDescription = loadingLabel },
+                        )
                     } else {
                         Text(
                             text = pageTitle.ifBlank { webView?.title.orEmpty() },

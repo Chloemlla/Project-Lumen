@@ -662,6 +662,7 @@
     <string name="webview_compatibility_title">兼容性提示</string>
     <string name="webview_compatibility_message">检测到系统 WebView 版本（%1$d）较低，可能无法正常显示文档。\n\n建议更新 Android System WebView，或从外部浏览器打开此页面。\n\n如果页面显示正常，可以忽略此提示。</string>
     <string name="webview_compatibility_action">兼容性提示</string>
+    <string name="webview_loading">正在加载页面…</string>
     <string name="webview_more_options">更多操作</string>
     <string name="webview_refresh">刷新页面</string>
     <string name="webview_copy_link">复制链接</string>

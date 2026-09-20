@@ -663,6 +663,7 @@
     <string name="webview_compatibility_title">Compatibility notice</string>
     <string name="webview_compatibility_message">The system WebView version (%1$d) is old and may not display documentation correctly.\n\nUpdate Android System WebView or open this page in an external browser.\n\nIgnore this notice if the page looks normal.</string>
     <string name="webview_compatibility_action">Compatibility notice</string>
+    <string name="webview_loading">Loading page…</string>
     <string name="webview_more_options">More options</string>
     <string name="webview_refresh">Refresh page</string>
     <string name="webview_copy_link">Copy link</string>
