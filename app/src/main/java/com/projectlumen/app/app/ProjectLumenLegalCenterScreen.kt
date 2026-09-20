@@ -162,7 +162,7 @@ internal fun LegalHubScreen(
             title = { Text(stringResource(R.string.legal_withdraw_consent_dialog_title)) },
             text = { Text(stringResource(R.string.legal_withdraw_consent_dialog_message)) },
             confirmButton = {
-                OutlinedButton(onClick = {
+                OutlinedButton(onClick = hapticClick {
                     viewModel.withdrawDataConsent()
                     context.showLumenToast(
                         context.getString(R.string.legal_withdraw_consent_success),
@@ -188,7 +188,7 @@ internal fun LegalHubScreen(
             title = { Text(stringResource(R.string.legal_withdraw_privacy_dialog_title)) },
             text = { Text(stringResource(R.string.legal_withdraw_privacy_dialog_message)) },
             confirmButton = {
-                OutlinedButton(onClick = {
+                OutlinedButton(onClick = hapticClick {
                     viewModel.withdrawPrivacyPolicyConsent()
                     context.showLumenToast(
                         context.getString(R.string.legal_withdraw_privacy_success),

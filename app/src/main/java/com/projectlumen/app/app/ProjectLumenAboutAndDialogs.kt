@@ -436,7 +436,7 @@ internal fun ConfirmExternalLinkButton(icon: ImageVector, @StringRes labelRes: I
             title = { Text(stringResource(R.string.about_external_link_prompt_title)) },
             text = { Text(stringResource(R.string.about_external_link_prompt_message)) },
             confirmButton = {
-                Button(onClick = {
+                Button(onClick = hapticClick {
                     pendingUrl = null
                     viewModel.navigateWebPage(targetUrl)
                 }) {
@@ -646,7 +646,7 @@ internal fun UpdateDialog(
                     }
                 },
                 confirmButton = {
-                    OutlinedButton(onClick = {
+                    OutlinedButton(onClick = hapticClick {
                         if (permissionGranted) {
                             onInstallDownloadedApk(candidate, currentState.file)
                         } else {
@@ -677,7 +677,7 @@ internal fun UpdateDialog(
             title = { Text(stringResource(R.string.about_external_link_prompt_title)) },
             text = { Text(stringResource(R.string.about_external_link_prompt_message)) },
             confirmButton = {
-                Button(onClick = {
+                Button(onClick = hapticClick {
                     pendingReleaseUrl = null
                     viewModel.navigateWebPage(url)
                 }) {

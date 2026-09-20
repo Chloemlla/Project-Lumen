@@ -638,10 +638,10 @@ internal fun EyeCareGrowthCapabilityCard(
                         )
                     }
                 }
-                Button(onClick = { pendingApply = EyeCareBulkApplyTarget.FamilyProfile }) {
+                Button(onClick = hapticClick { pendingApply = EyeCareBulkApplyTarget.FamilyProfile }) {
                     ButtonLabel(Icons.Outlined.Lock, R.string.eye_care_apply_family_profile)
                 }
-                Button(onClick = { pendingApply = EyeCareBulkApplyTarget.PersonalizedGuidance }) {
+                Button(onClick = hapticClick { pendingApply = EyeCareBulkApplyTarget.PersonalizedGuidance }) {
                     ButtonLabel(Icons.Outlined.Info, R.string.eye_care_apply_local_guidance)
                 }
             }
@@ -690,7 +690,7 @@ private fun EyeCareBulkApplyConfirmDialog(
         title = { Text(stringResource(R.string.eye_care_apply_confirm_title)) },
         text = { Text(stringResource(messageRes)) },
         confirmButton = {
-            Button(onClick = onConfirm) {
+            Button(onClick = hapticClick { onConfirm() }) {
                 Text(stringResource(confirmRes))
             }
         },

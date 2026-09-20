@@ -22,6 +22,7 @@
 - [x] **R24 (P1)** 统计页导出/分享三按钮（CSV / 图片 / 月度 PDF）加触觉。文件：`ProjectLumenMainScreens.kt`。（第二批）
 - [x] **R25 (P2)** 日程保存按钮、设置「导出备份 / 导入备份」加触觉。文件：`ProjectLumenScheduleScreens.kt`、`ProjectLumenSettingsScreen.kt`。（第二批）
 - [x] **R26 (P2)** 远程云卡片全部操作（请求验证码/校验码/立即同步/上传/恢复/刷新账号/健康检查/退出登录）与 Shizuku 快速动作、诊断上传加触觉。文件：`ProjectLumenRemoteCloudCard.kt`、`ProjectLumenShizukuSettingsSection.kt`。（第二批）
+- [x] **R29 (P2)** 收尾高风险确认按钮加触觉：外部链接跳转确认、安装已下载 APK、撤回数据/隐私同意、护眼方案批量套用（含确认弹窗）。取消/关闭按钮刻意不加（避免噪声）。文件：`ProjectLumenAboutAndDialogs.kt`、`ProjectLumenLegalCenterScreen.kt`、`ProjectLumenEyeCareInsights.kt`。（47a6819 之后一批）
 
 ## B. 无障碍（TalkBack / 语义）
 
@@ -32,6 +33,7 @@
 - [x] **R10 (P2)** 隐私就绪度进度条随 `MetricRow` 合并（进度条本身 `clearAndSetSemantics`，不再产生空节点）。文件：`ProjectLumenSettingsPrivacyCenter.kt`。（d43a4e3）
 - [x] **R11 (P2)** 引导页进度条补进度语义 / 步骤描述。文件：`ProjectLumenOnboardingScreen.kt`（并入 R3）。（d43a4e3）
 - [x] **R12 (P3)** 更新说明列表的裸「•」字形移出朗读（合并语义）。文件：`ProjectLumenBuildUpdateNotesScreen.kt`。（d43a4e3）
+- [x] **R28 (P2)** WebView 顶栏加载态：首屏标题为空时以裸 `CircularProgressIndicator` 顶替标题，读屏只读到无标签进度条。补 `contentDescription`（新增字符串 `webview_loading`，双语）。文件：`ProjectLumenWebViewScreen.kt`。（47a6819）
 
 ## C. 布局 / 状态 / 微文案
 
