@@ -148,11 +148,11 @@ internal fun RemoteCloudAccountCard(
                     LumenFlowRow {
                         Button(
                             enabled = !state.busy && normalizedEmail.isNotBlank(),
-                            onClick = { onStartEmailLogin(normalizedEmail) },
+                            onClick = hapticClick { onStartEmailLogin(normalizedEmail) },
                         ) {
                             ButtonLabel(Icons.Outlined.Person, R.string.remote_cloud_request_code)
                         }
-                        OutlinedButton(enabled = !state.busy, onClick = onCheckHealth) {
+                        OutlinedButton(enabled = !state.busy, onClick = hapticClick { onCheckHealth() }) {
                             ButtonLabel(Icons.Outlined.Refresh, R.string.remote_cloud_check_health)
                         }
                     }
@@ -172,7 +172,7 @@ internal fun RemoteCloudAccountCard(
                             }
                             Button(
                                 enabled = !state.busy && normalizedCode.isNotBlank(),
-                                onClick = { onVerifyEmailLogin(normalizedCode) },
+                                onClick = hapticClick { onVerifyEmailLogin(normalizedCode) },
                             ) {
                                 ButtonLabel(Icons.Outlined.CheckCircle, R.string.remote_cloud_verify_code)
                             }
@@ -184,24 +184,24 @@ internal fun RemoteCloudAccountCard(
             AnimatedVisibility(visible = state.signedIn) {
                 Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
                     LumenFlowRow {
-                        Button(enabled = !state.busy && cloudSyncAllowed, onClick = onSyncNow) {
+                        Button(enabled = !state.busy && cloudSyncAllowed, onClick = hapticClick { onSyncNow() }) {
                             ButtonLabel(Icons.Outlined.Sync, R.string.remote_cloud_sync_now)
                         }
-                        OutlinedButton(enabled = !state.busy && cloudSyncAllowed, onClick = onUploadBackup) {
+                        OutlinedButton(enabled = !state.busy && cloudSyncAllowed, onClick = hapticClick { onUploadBackup() }) {
                             ButtonLabel(Icons.Outlined.CloudUpload, R.string.remote_cloud_upload_backup)
                         }
-                        OutlinedButton(enabled = !state.busy && cloudSyncAllowed, onClick = onRestoreBackup) {
+                        OutlinedButton(enabled = !state.busy && cloudSyncAllowed, onClick = hapticClick { onRestoreBackup() }) {
                             ButtonLabel(Icons.Outlined.Refresh, R.string.remote_cloud_restore_backup)
                         }
                     }
                     LumenFlowRow {
-                        OutlinedButton(enabled = !state.busy, onClick = onRefreshAccount) {
+                        OutlinedButton(enabled = !state.busy, onClick = hapticClick { onRefreshAccount() }) {
                             ButtonLabel(Icons.Outlined.Refresh, R.string.remote_cloud_refresh_account)
                         }
-                        OutlinedButton(enabled = !state.busy, onClick = onCheckHealth) {
+                        OutlinedButton(enabled = !state.busy, onClick = hapticClick { onCheckHealth() }) {
                             ButtonLabel(Icons.Outlined.Refresh, R.string.remote_cloud_check_health)
                         }
-                        OutlinedButton(enabled = !state.busy, onClick = onSignOut) {
+                        OutlinedButton(enabled = !state.busy, onClick = hapticClick { onSignOut() }) {
                             ButtonLabel(Icons.Outlined.Lock, R.string.remote_cloud_sign_out)
                         }
                     }

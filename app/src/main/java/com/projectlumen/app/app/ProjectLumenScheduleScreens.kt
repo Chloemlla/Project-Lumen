@@ -268,7 +268,7 @@ internal fun ScheduleDetailScreen(
         ActionCard {
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                onClick = viewModel::requestSaveSchedule,
+                onClick = hapticClick { viewModel.requestSaveSchedule() },
             ) {
                 ButtonLabel(Icons.Outlined.Save, R.string.schedule_save)
             }

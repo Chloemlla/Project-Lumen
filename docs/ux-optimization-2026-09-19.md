@@ -18,6 +18,10 @@
 - [x] **R3 (P1)** 引导页 下一步/上一步用 `TextHandleMove`、完成用 `LongPress`。文件：`ProjectLumenOnboardingScreen.kt`。（d43a4e3）
 - [x] **R4 (P2)** 夸克「我已完成签到」/ 撤销、模板选中 加触觉。文件：`ProjectLumenQuarkKeeperScreens.kt`、`ProjectLumenTemplateScreens.kt`。（d43a4e3）
 - [x] **R5 (P2)** 隐私中心开关补触觉，与全局 `SwitchRow` 行为一致。文件：`ProjectLumenSettingsPrivacyCenter.kt`。（d43a4e3）
+- [x] **R23 (P1)** 翻译页主 CTA「翻译」与「刷新服务」加触觉（此前为 `onClick = ::translate` 方法引用，无法直接包装）。文件：`ProjectLumenTranslationScreen.kt`。（第二批）
+- [x] **R24 (P1)** 统计页导出/分享三按钮（CSV / 图片 / 月度 PDF）加触觉。文件：`ProjectLumenMainScreens.kt`。（第二批）
+- [x] **R25 (P2)** 日程保存按钮、设置「导出备份 / 导入备份」加触觉。文件：`ProjectLumenScheduleScreens.kt`、`ProjectLumenSettingsScreen.kt`。（第二批）
+- [x] **R26 (P2)** 远程云卡片全部操作（请求验证码/校验码/立即同步/上传/恢复/刷新账号/健康检查/退出登录）与 Shizuku 快速动作、诊断上传加触觉。文件：`ProjectLumenRemoteCloudCard.kt`、`ProjectLumenShizukuSettingsSection.kt`。（第二批）
 
 ## B. 无障碍（TalkBack / 语义）
 
@@ -42,6 +46,7 @@
 
 - [x] **R21 (P3)** 计时脉冲动画尊重系统「减少动态效果」(`ANIMATOR_DURATION_SCALE`)：`ANIMATOR_DURATION_SCALE == 0` 时静置计时圆环不再脉动。文件：`ProjectLumenStatsAndTimerCards.kt`。（第二批）
 - [x] **R20 (P3)** 无需改动 — 共享可折叠件 `SettingsSectionContent` 已同时具备 `animateContentSize`（卡片）与 `AnimatedVisibility`（内容淡入滑入），本已达标。
+- [ ] **R27 (P3，需产品决策)** 加载中指示器（`CircularProgressIndicator` / `LinearProgressIndicator`）的读屏播报：多数已在旁边带文案（如「翻译中」「正在同步」），朗读不静默；但少数（`ProjectLumenRemoteCloudCard.kt:105` 的同步进度条、`ProjectLumenWebViewScreen.kt:256`）仅有进度条本身。是否统一补 `stateDescription`，属全局无障碍规范，留待确认。
 - [ ] **R19 (P3，暂缓)** 引入 `LumenSpacing` 间距标度对象（仅新增、机会性采用，禁批量重写）。当前无硬编码颜色、间距散布也不影响体验，收益低、采用面广，按方法论「改动最小化」不做批量扫改。
 - [ ] **R22 (P3，需产品决策)** 主页统计区间「30 天」与「本月」（窗口 30 vs 31）。两者文案本已是不同字符串；删掉「30 天」这枚 chip 会移除一个用户可选区间，属功能改动而非纯文案打磨，不在本轮擅自删除，留待产品确认。
 

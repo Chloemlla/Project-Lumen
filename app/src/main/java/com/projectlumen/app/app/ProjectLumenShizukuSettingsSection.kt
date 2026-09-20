@@ -169,7 +169,7 @@ private fun ShizukuDiagnosticUploadSettings(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             LumenFlowRow {
-                Button(onClick = viewModel::uploadDiagnosticsNow) {
+                Button(onClick = hapticClick { viewModel.uploadDiagnosticsNow() }) {
                     ButtonLabel(Icons.Outlined.Refresh, R.string.upload_diagnostics_now)
                 }
             }
@@ -220,33 +220,33 @@ private fun ShizukuQuickActions(
 ) {
     ShizukuGroupTitle(R.string.shizuku_quick_actions)
     LumenFlowRow {
-        Button(onClick = {
+        Button(onClick = hapticClick {
             applyShizukuCorePreset(viewModel)
         }) {
             ButtonLabel(Icons.Outlined.CheckCircle, R.string.shizuku_quick_enable_core)
         }
-        OutlinedButton(onClick = {
+        OutlinedButton(onClick = hapticClick {
             applyShizukuSmartGuardPreset(viewModel)
         }) {
             ButtonLabel(Icons.Outlined.Schedule, R.string.shizuku_quick_smart_guards)
         }
-        OutlinedButton(onClick = {
+        OutlinedButton(onClick = hapticClick {
             applyShizukuComfortShieldPreset(viewModel)
         }) {
             ButtonLabel(Icons.Outlined.Spa, R.string.shizuku_quick_comfort_shield)
         }
         if (settings.shizukuNativeEyeProtectionEnabled || state.nativeEyeProtectionApplied) {
-            OutlinedButton(onClick = {
+            OutlinedButton(onClick = hapticClick {
                 disableShizukuNativeShield(viewModel)
             }) {
                 ButtonLabel(Icons.Outlined.Style, R.string.shizuku_quick_native_off)
             }
         }
-        OutlinedButton(onClick = viewModel::refreshShizukuState) {
+        OutlinedButton(onClick = hapticClick { viewModel.refreshShizukuState() }) {
             ButtonLabel(Icons.Outlined.Refresh, R.string.shizuku_refresh_status)
         }
         if (!state.ready) {
-            OutlinedButton(onClick = viewModel::requestShizukuAuthorization) {
+            OutlinedButton(onClick = hapticClick { viewModel.requestShizukuAuthorization() }) {
                 ButtonLabel(Icons.Outlined.Lock, R.string.shizuku_authorize)
             }
         }

@@ -184,7 +184,7 @@ internal fun TranslationScreen() {
                 .fillMaxWidth()
                 .heightIn(min = LumenMinTouchTargetHeight),
             enabled = !translating && trimmedText.isNotBlank() && serviceEnabled,
-            onClick = ::translate,
+            onClick = hapticClick { translate() },
         ) {
             if (translating) {
                 CircularProgressIndicator(
@@ -286,7 +286,7 @@ internal fun TranslationScreen() {
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             enabled = !loadingConfig,
-            onClick = ::refreshConfig,
+            onClick = hapticClick { refreshConfig() },
         ) {
             ButtonLabel(Icons.Outlined.Sync, R.string.translation_refresh_service)
         }

@@ -559,17 +559,17 @@ internal fun StatisticsScreen(uiState: ProjectLumenUiState, viewModel: ProjectLu
             if (hasExportableStats) {
                 LumenFlowRow {
                     Button(
-                        onClick = viewModel::shareStatistics,
+                        onClick = hapticClick { viewModel.shareStatistics() },
                     ) {
                         ButtonLabel(Icons.Outlined.FileDownload, R.string.export_csv)
                     }
                     OutlinedButton(
-                        onClick = viewModel::shareStatisticsImage,
+                        onClick = hapticClick { viewModel.shareStatisticsImage() },
                     ) {
                         ButtonLabel(Icons.Outlined.BarChart, R.string.share_stats_image)
                     }
                     OutlinedButton(
-                        onClick = viewModel::shareMonthlyReportPdf,
+                        onClick = hapticClick { viewModel.shareMonthlyReportPdf() },
                     ) {
                         ButtonLabel(Icons.Outlined.FileDownload, R.string.export_pdf_monthly)
                     }

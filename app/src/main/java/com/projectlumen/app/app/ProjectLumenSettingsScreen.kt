@@ -1000,10 +1000,10 @@ internal fun SettingsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             LumenFlowRow {
-                Button(onClick = viewModel::shareBackup) {
+                Button(onClick = hapticClick { viewModel.shareBackup() }) {
                     ButtonLabel(Icons.Outlined.FileDownload, R.string.backup_export)
                 }
-                OutlinedButton(onClick = { backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) {
+                OutlinedButton(onClick = hapticClick { backupImportLauncher.launch(arrayOf("application/json", "text/*", "*/*")) }) {
                     ButtonLabel(Icons.AutoMirrored.Outlined.OpenInNew, R.string.backup_import)
                 }
             }
