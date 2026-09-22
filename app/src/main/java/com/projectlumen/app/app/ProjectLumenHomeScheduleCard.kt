@@ -45,7 +45,10 @@ internal fun HomeScheduleCard(
     onOpenSchedule: (Long) -> Unit,
     onCreateSchedule: () -> Unit,
 ) {
-    val items = remember(tasks, nowMillis) { scheduleHomeItems(tasks, nowMillis) }
+    // The zone is a key because the window `scheduleHomeItems` derives is expressed in it: without it
+    // a zone change would keep showing the previous zone's day until the next clock tick.
+    val zone = LumenTimeZone.zoneId()
+    val items = remember(tasks, nowMillis, zone) { scheduleHomeItems(tasks, nowMillis) }
     ActionCard {
         SectionHeader(Icons.Outlined.EventNote, R.string.schedule_home_title)
         if (items.isEmpty()) {

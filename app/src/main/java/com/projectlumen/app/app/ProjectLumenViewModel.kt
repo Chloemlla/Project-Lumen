@@ -199,6 +199,7 @@ class ProjectLumenViewModel(
         backup = backup,
         settingsRepository = repositories.settings,
         runtimeEntry = runtimeEntry,
+        rearmSchedule = rescheduleScheduleReminders,
     )
     private val entitlementEntry = ProjectLumenEntitlementFeatureEntry(
         scope = reportingScope,

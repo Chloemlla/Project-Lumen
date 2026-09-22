@@ -16,6 +16,7 @@ import androidx.core.graphics.createBitmap
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.DailyEyeStatsEntity
 import com.projectlumen.app.core.database.entities.DailyPomodoroStatsEntity
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.io.File
 import java.io.FileOutputStream
 import java.time.LocalDate
@@ -220,7 +221,10 @@ class ExportService(
         eyeStats: List<DailyEyeStatsEntity>,
         pomodoroStats: List<DailyPomodoroStatsEntity>,
     ): PdfDocument {
-        val monthKey = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"))
+        // The stat dates were bucketed by `DateKeys.todayKey`, which reads the app zone, so the month
+        // this export covers has to be read in the same zone — otherwise a device on a different zone
+        // drops the days that fall on the other side of the month boundary.
+        val monthKey = LocalDate.now(LumenTimeZone.zoneId()).format(DateTimeFormatter.ofPattern("yyyy-MM"))
         val monthlyEyeStats = eyeStats.filter { it.statDate.startsWith(monthKey) }.sortedBy { it.statDate }
         val monthlyPomodoroStats = pomodoroStats.filter { it.statDate.startsWith(monthKey) }.sortedBy { it.statDate }
         val document = PdfDocument()

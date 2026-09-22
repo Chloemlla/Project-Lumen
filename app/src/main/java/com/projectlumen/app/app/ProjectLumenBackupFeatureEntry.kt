@@ -17,6 +17,7 @@ internal class ProjectLumenBackupFeatureEntry(
     private val backup: DataBackupService,
     private val settingsRepository: SettingsRepository,
     private val runtimeEntry: ProjectLumenRuntimeFeatureEntry,
+    private val rearmSchedule: suspend () -> Unit,
 ) {
     private val _importPreview = MutableStateFlow<BackupImportSummary?>(null)
     val importPreview = _importPreview.asStateFlow()
@@ -56,6 +57,10 @@ internal class ProjectLumenBackupFeatureEntry(
                 _importError.value = null
                 val settings = settingsRepository.getOrDefault()
                 runtimeEntry.applySettingsToActiveRuntime(settings, System.currentTimeMillis())
+                // Reading the restored row has already moved the app zone to the restored one, and the
+                // scheduled instants and alarms in place were built from the previous zone's wall
+                // clock, so they are stale until they are rebuilt from the new one.
+                rearmSchedule()
             }.onFailure(::handleImportFailure)
         }
     }
