@@ -79,13 +79,13 @@ Z-29…Z-31 是 `DatePicker` 返回值的解码约定（Material3 的 `DatePicke
 | F-5 | `app/ProjectLumenBuildUpdateNotesScreen.kt:116` | `ofLocalizedDateTime(MEDIUM)` | 是（MEDIUM 含秒） | 更新说明 |
 | F-6 | `app/ProjectLumenRemoteCloudCard.kt:222` | `yyyy-MM-dd HH:mm` | **否** | 云备份时间戳 |
 | F-7 | `app/ProjectLumenSettingsScreen.kt:1143` | `yyyy-MM-dd HH:mm` | **否** | 设置页时间戳 |
-| F-8 | `core/services/ExportService.kt:223` | `yyyy-MM` | — | 导出文件名（非时刻显示） |
+| F-8 | `core/services/ExportService.kt:223` | `yyyy-MM` | — | 月度导出：既是文件名，也是筛选用键（见 §2 T-10） | 改 |
 | F-9 | `core/services/NotificationService.kt:1085` | `HH:mm` | **否** | 通知正文时钟 |
 | F-10 | `app/ProjectLumenScheduleScreens.kt:78` | `HH:mm` | **否** | 日程列表时钟 |
 | F-11 | `app/ProjectLumenScheduleScreens.kt:611,613` | 纯日期 | — | 日程列表日期 |
 | F-12 | `app/ProjectLumenScheduleScreens.kt:618,620` | `yyyy年M月d日HH:mm` / `MMM d, yyyy HH:mm` | **否** | 日程列表日期+时钟 |
 
-F-8 是导出文件名中的月份键，不是"给用户看的时刻"，保持不动。
+F-8 初次清点时被判为"只是导出文件名"，因此列为不动。这个判断是错的：同一个 `monthKey` 还用来筛选 `statDate`（`ExportService.kt:224-225`），而 `statDate` 是 `DateKeys.todayKey` 按**应用时区**写的。它是数据选择键，必须与应用时区一致，详见 T-10。
 
 ### 1.3 墙钟设置与输入控件
 
@@ -175,6 +175,21 @@ F-8 是导出文件名中的月份键，不是"给用户看的时刻"，保持�
 - **与本次的关系**：`scheduleOverdueNagEveningSecond` 虽然也是本次新增的秒分量，但它的分钟兄弟列同样不在映射里，单独补它会得到"秒恢复了、分钟仍是默认"的半截结果，反而更难排查。
 - **建议改法**：**不在本次改**，另起一次改造把 `scheduleOverdueNag*` 四个字段一起补进两处映射（与 T-7 同一手法）。
 
+### T-9 ~ T-14 的实现期发现
+
+T-9…T-12 是 B1–B3 落地后、由一次独立的对抗性复查（`b978bb4..75214fa` 区间）找出来的**遗漏路径**——它们的共同特征是"代码里没有 `systemDefault` 字样，所以文本扫描扫不到"，只有按语义追"这个时刻是从哪个时区算出来的"才会暴露。T-13/T-14 是随之而来的两处可用性缺陷。编号接在 T-8 之后，便于与上文区分。
+
+| 编号 | 文件 | 类型 | 症状与根因 | 修复 commit |
+|---|---|---|---|---|
+| **T-9** | `app/ProjectLumenBackupFeatureEntry.kt`、`app/ProjectLumenViewModel.kt:197` | 功能缺陷 / 状态不一致 | 恢复备份会写回 `timeZoneOffsetSeconds`，`SettingsRepository` 随即把进程级 `LumenTimeZone` 切到恢复后的时区——但 `schedule_occurrences` 的行与已布下的 `AlarmManager` 闹钟仍是**旧时区**展开出来的绝对时刻，恢复流程里没有任何重算。与 T-2 同根因，只是触发点从"用户改时区"变成"恢复备份"。**改法**：给 `ProjectLumenBackupFeatureEntry` 注入 `rearmSchedule`（复用 `ProjectLumenViewModel` 里 T-2 用的同一个 `rescheduleScheduleReminders`），在 `applySettingsToActiveRuntime` 之后调用 | `4743c71` |
+| **T-10** | `core/services/ExportService.kt:227` | 功能缺陷 / 数据选择错误 | 月度 PDF 的 `monthKey` 用 `LocalDate.now()`（设备时区）算出，再拿它 `startsWith` 筛选 `statDate`——而 `statDate` 是 `DateKeys.todayKey` 按**应用时区**写进库的。两者不一致时（设备时区 ≠ 应用时区），月初/月末那几天的数据会被静默丢弃或错纳。**初版方案把这一处列为"只是文件名，不动"，是判断错误**（F-8 已同步更正） | `4743c71` |
+| **T-11** | `app/ProjectLumenEyeCareInsights.kt:725` | 功能缺陷 / 残留状态 | `applyFamilyEyeCareMode` 预设免打扰 `21:00–07:00` 时只写 `quietStartMinute = 1260` / `quietEndMinute = 420`，不动新加的秒分量。用户此前把秒调成 `21:00:30`，套用家长模式后窗口会变成 `21:00:30–07:00:xx`——预设声称的整点窗口被旧秒污染。**改法**：预设同时把两个秒分量显式置 0 | `4743c71` |
+| **T-12** | `app/ProjectLumenHomeScheduleCard.kt:51` | 功能缺陷 / 陈旧缓存 | `scheduleHomeItems` 的窗口日界由应用时区推出，但 `remember(tasks, nowMillis)` 的键里没有时区。时区一改，首页日程卡片会一直显示旧时区的那一天，直到下一次 `nowMillis` 跳动。**改法**：`LumenTimeZone.zoneId()` 进 `remember` 键 | `4743c71` |
+| **T-13** | `app/ProjectLumenFormControls.kt:255`（`NumberSlider`）、五个墙钟滑块 | 可用性 / 显示失真 | 滑块拖动过程中显示的是**原始数值**，所以时间滑块在读秒时会显示 `1320` 而不是 `22:00`。而且分钟滑块提交时经过 `snapTimeMinute` 吸附，若拖动中就按未吸附值给出标签，预览的会是一个**永远不会被存下来**的时刻。**改法**：`NumberSlider` 增 `liveValueLabel: ((Int) -> String)?`（默认 `null`，行为不变），拖动中改走它；五个分钟滑块传的 lambda 一律套 `snapTimeMinute`，秒滑块套 `* 60 + 已有秒`，所以预览值恒等于松手后真正落库的值。因拖拽回调里不能跑 `@Composable`（也就不能用 `stringResource`），新增 `rememberTimeOfDayFormatter()` 返回**普通函数**，`timeOfDayLabel` 改为委托它——格式串只有一个来源 | `5d7b461` |
+| **T-14** | `ProjectLumenSettingsScreen.kt`、`ProjectLumenSettingsTimingSections.kt`、`ProjectLumenScheduleOverdueSettings.kt`、`ProjectLumenScheduleScreens.kt` | 可用性 / 标签重复 | 秒滑块的标题沿用了分钟滑块的文案（`auto_dark_start` 等），同一组里出现两行同名控件，用户无从分辨哪行改分、哪行改秒。**改法**：秒行统一改用新的 `time_seconds`（"秒"/"Seconds"），并删掉只此一处使用的 `schedule_time_seconds` | `75214fa` |
+
+T-11 需要说明为什么只改了预设、没改设置滑块：滑块是用户**显式**在调秒，保留现有秒分量是正确行为（否则用户调分钟时秒会被悄悄清零）；而预设是"一键套用一整套值"，它承诺的就是整点窗口，所以必须把秒一并写死。
+
 ---
 
 ## 3. 与本次改造的边界（明确不动的部分）
@@ -184,7 +199,7 @@ F-8 是导出文件名中的月份键，不是"给用户看的时刻"，保持�
 - **不改 `DatePicker` 的 UTC 零点编码**：Z-29…Z-31（`scheduleUtcMidnightOf` / `scheduleStartOfDay` / `scheduleWithDate`）是 Material3 `DatePicker` 的取值约定，不是用户可见时刻。改它会让"选中的日期"漂一天。
 - **不引入 IANA 地区时区**：只有固定偏移。因此不存在夏令时分支，也不存在"同名时区历史偏移不同"。
 - **不引入"跟随系统"选项**：用户明确要"默认时区为+8"，默认值即 +8。跟随系统会让"默认"失去意义。
-- **不改导出文件名的月份键**（`ExportService.kt:223`）：那是文件名，不是给人看的时刻。
+- **月度导出的月份键改为跟随应用时区**（`ExportService.kt:223`）。它最初被列为"只是文件名，不动"，但同一个值也用于筛选按应用时区落库的 `statDate`，因此纳入本次范围（T-10）。文件名本身顺带跟随应用时区——这比跟随设备时区更符合"用户所处的那一天"。
 - **不动 `ReminderPlanEntity.quietStartMinute` / `quietEndMinute`**：这两个字段虽与免打扰同名，但 `rg quietStartMinute` 显示除了 `DataBackupService` 的导入导出映射之外**没有任何读取点**——`QuietHours` 只读 `AppSettingsEntity` 上的同名字段。它们是一组从未被消费的休眠列，既不影响任何墙钟行为，也就没有"支持秒"的对象。给它们加秒分量只会扩大迁移面而无收益。若将来计划级免打扰真正接上逻辑，届时再补。
 - **不重写通知层、不动后台提醒链路**：`LumenAlertOverlayService` / `LumenAlertPresenter`（刚完成的 A-1…A-5）只被动受益于 formatter 变化。
 - **不做与本次无关的重构**：33 处时区点只做"换成权威来源"这一件事，不顺手改结构。
@@ -203,13 +218,29 @@ F-8 是导出文件名中的月份键，不是"给用户看的时刻"，保持�
 
 ## 5. 修复去向核对表
 
-| 编号 | 修复批次 / commit | 状态 |
+| 编号 | 修复 commit | 状态 |
 |---|---|---|
-| T-1 | — | 待修 |
-| T-2 | — | 待修 |
-| T-3 | — | 待修 |
-| T-4 | — | 待修 |
-| T-5 | — | 待修 |
-| T-6 | — | 待修 |
-| T-7 | — | 待修 |
+| T-1 | `b978bb4`（`LumenTimeZone` + `timeZoneOffsetSeconds` + 迁移 20→21）、`eb6b520`（33 处解析点全部改读权威） | 已修 |
+| T-2 | `eb6b520`（设置 diff 里的时区分支 → `rearm`） | 已修 |
+| T-3 | `eb6b520`（`CLOCK_TIME_FORMATTER` → `HH:mm:ss`） | 已修 |
+| T-4 | `eb6b520`（列表 formatter 补秒；编辑器补秒滑块；`scheduleAtLocalTime` 加 `second`） | 已修 |
+| T-5 | `b978bb4`（5 个秒分量列 + 迁移）、`eb6b520`（`minute * 60 + second` 的比较与换算）、`75214fa`（滑块标签与对话框可达性） | 已修 |
+| T-6 | `eb6b520`（两处 pattern 补 `:ss`） | 已修 |
+| T-7 | `eb6b520`（四处 JSON 映射补 6 个新字段） | 已修 |
+| T-8 | — | **有意不修**（见 §2 T-8：`scheduleOverdueNag*` 整组不在映射里，属改造前既有缺陷，单独补秒分量会得到半截结果，另起一次改造统一补） |
+| T-9 | `4743c71` | 已修 |
+| T-10 | `4743c71` | 已修 |
+| T-11 | `4743c71` | 已修 |
+| T-12 | `4743c71` | 已修 |
+| T-13 | `5d7b461` | 已修 |
+| T-14 | `75214fa` | 已修 |
+| Z-34 | `eb6b520`（`nextEveningNagAt` 入参由分钟序数改为秒序数，两个调用点同步） | 已修 |
 | 方案本身 | 本文件 | — |
+
+提交序列（`main`，自旧到新）：`b978bb4` → `eb6b520` → `75214fa` → `5d7b461` → `4743c71`。
+
+**验证判据**：本地不跑任何构建/测试，唯一权威是 GitHub Actions 的 `Build Project Lumen Android`（`build.yml`：`testDebugUnitTest` + `lintDebug` + `assembleRelease`）。由于 `build.yml` 会取消被超越的排队运行，**必须核对 tip 提交**而非区间内任意一个。
+
+**已验证**：`eb6b520`（承载 T-1…T-7 与 Z-34 的实现）的 `Build Project Lumen Android` 与 `CodeQL` 均为 `success`。`b978bb4`（基座）的 `Build Project Lumen Android` 为 `success`。`75214fa` / `5d7b461` / `4743c71`（T-9…T-14，只改标签、滑块回调与三个遗漏路径）的结论以 tip 提交的运行为准。
+
+**已知的例外**：`eb6b520` 是唯一一个未签名提交（`%G?` = `N`）；其余为 `G`。原因是提交时 GPG agent 瞬时不可用，按 CLAUDE.md 的"签名失败可退回 `--no-gpg-sign`"处理，**不重写历史**。
