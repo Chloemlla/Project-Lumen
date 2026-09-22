@@ -8,6 +8,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.LocalCafe
@@ -18,12 +19,21 @@ import androidx.compose.material.icons.outlined.Spa
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.stringResource
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.enums.QuietMode
 import com.projectlumen.app.core.time.LumenTimeZone
+import com.projectlumen.app.ui.theme.LumenMonoFontFamily
+import java.time.Instant
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun SettingsReminderSection(settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
@@ -78,6 +88,7 @@ internal fun SettingsPomodoroSection(settings: AppSettingsEntity, viewModel: Pro
 
 @Composable
 internal fun SettingsQuietHoursSection(settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
+    val timeOfDay = rememberTimeOfDayFormatter()
     SettingsSection(R.string.section_quiet_hours, Icons.Outlined.Schedule, initiallyExpanded = false) {
         SwitchRow(R.string.quiet_hours, Icons.Outlined.Schedule, settings.quietHoursEnabled) {
             viewModel.updateSettings { current -> current.copy(quietHoursEnabled = it) }
@@ -88,16 +99,48 @@ internal fun SettingsQuietHoursSection(settings: AppSettingsEntity, viewModel: P
             exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
-                NumberSlider(R.string.quiet_start, Icons.Outlined.Schedule, settings.quietStartMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietStartMinute * 60 + settings.quietStartSecond)) {
+                NumberSlider(
+                    R.string.quiet_start,
+                    Icons.Outlined.Schedule,
+                    settings.quietStartMinute,
+                    0f..1435f,
+                    0,
+                    timeOfDayLabel(settings.quietStartMinute * 60 + settings.quietStartSecond),
+                    liveValueLabel = { timeOfDay(snapTimeMinute(it) * 60 + settings.quietStartSecond) },
+                ) {
                     viewModel.updateSettings { current -> current.copy(quietStartMinute = snapTimeMinute(it)) }
                 }
-                NumberSlider(R.string.time_seconds, Icons.Outlined.Schedule, settings.quietStartSecond, 0f..59f, 58, stringResource(R.string.seconds_value, settings.quietStartSecond)) {
+                NumberSlider(
+                    R.string.time_seconds,
+                    Icons.Outlined.Schedule,
+                    settings.quietStartSecond,
+                    0f..59f,
+                    58,
+                    stringResource(R.string.seconds_value, settings.quietStartSecond),
+                    liveValueLabel = { timeOfDay(settings.quietStartMinute * 60 + it) },
+                ) {
                     viewModel.updateSettings { current -> current.copy(quietStartSecond = it.coerceIn(0, 59)) }
                 }
-                NumberSlider(R.string.quiet_end, Icons.Outlined.Schedule, settings.quietEndMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietEndMinute * 60 + settings.quietEndSecond)) {
+                NumberSlider(
+                    R.string.quiet_end,
+                    Icons.Outlined.Schedule,
+                    settings.quietEndMinute,
+                    0f..1435f,
+                    0,
+                    timeOfDayLabel(settings.quietEndMinute * 60 + settings.quietEndSecond),
+                    liveValueLabel = { timeOfDay(snapTimeMinute(it) * 60 + settings.quietEndSecond) },
+                ) {
                     viewModel.updateSettings { current -> current.copy(quietEndMinute = snapTimeMinute(it)) }
                 }
-                NumberSlider(R.string.time_seconds, Icons.Outlined.Schedule, settings.quietEndSecond, 0f..59f, 58, stringResource(R.string.seconds_value, settings.quietEndSecond)) {
+                NumberSlider(
+                    R.string.time_seconds,
+                    Icons.Outlined.Schedule,
+                    settings.quietEndSecond,
+                    0f..59f,
+                    58,
+                    stringResource(R.string.seconds_value, settings.quietEndSecond),
+                    liveValueLabel = { timeOfDay(settings.quietEndMinute * 60 + it) },
+                ) {
                     viewModel.updateSettings { current -> current.copy(quietEndSecond = it.coerceIn(0, 59)) }
                 }
                 Text(stringResource(R.string.quiet_mode), style = MaterialTheme.typography.titleSmall)
@@ -113,7 +156,27 @@ internal fun SettingsQuietHoursSection(settings: AppSettingsEntity, viewModel: P
 
 @Composable
 internal fun SettingsTimeZoneSection(settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
-    SettingsSection(R.string.section_time_zone, Icons.Outlined.Schedule, initiallyExpanded = false) {
+    val offsetLabel = LumenTimeZone.label(settings.timeZoneOffsetSeconds)
+    SettingsSection(
+        R.string.section_time_zone,
+        Icons.Outlined.Schedule,
+        initiallyExpanded = false,
+        headerAccessory = {
+            // The section starts collapsed and the zone reaches every other time in the app, so the
+            // offset — and the clock it produces — have to be readable without opening it.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(SettingsPreferenceInnerGap),
+            ) {
+                Text(
+                    text = offsetLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                AppZoneClock()
+            }
+        },
+    ) {
         // The offset is stored in seconds but picked in minutes: no real zone is offset by a fraction
         // of a minute, and 15-minute steps are finer than the quarter-hour zones that do exist.
         NumberSlider(
@@ -122,11 +185,33 @@ internal fun SettingsTimeZoneSection(settings: AppSettingsEntity, viewModel: Pro
             settings.timeZoneOffsetSeconds / 60,
             -720f..840f,
             103,
-            LumenTimeZone.label(settings.timeZoneOffsetSeconds),
+            offsetLabel,
+            liveValueLabel = { LumenTimeZone.label(it * 60) },
         ) {
             viewModel.updateSettings { current -> current.copy(timeZoneOffsetSeconds = it * 60) }
         }
     }
+}
+
+/** The app zone's own wall clock, ticking, so a newly picked offset is visibly in effect. */
+@Composable
+private fun AppZoneClock() {
+    val zone = LumenTimeZone.zoneId()
+    val timeOfDay = rememberTimeOfDayFormatter()
+    var nowMillis by remember(zone) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(zone) {
+        while (true) {
+            nowMillis = System.currentTimeMillis()
+            delay(1_000L)
+        }
+    }
+    val secondOfDay = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalTime().toSecondOfDay()
+    Text(
+        text = timeOfDay(secondOfDay),
+        // Monospaced so the row does not twitch as the digits change width once a second.
+        style = MaterialTheme.typography.labelLarge.copy(fontFamily = LumenMonoFontFamily),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable

@@ -602,6 +602,7 @@ internal fun SettingsScreen(
             ) {
                 viewModel.updateSettings { current -> current.copy(useAutoDarkWindow = it) }
             }
+            val timeOfDay = rememberTimeOfDayFormatter()
             AnimatedVisibility(
                 visible = autoDarkWindowEnabled,
                 enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { -it / 4 },
@@ -615,16 +616,18 @@ internal fun SettingsScreen(
                         0f..1435f,
                         0,
                         timeOfDayLabel(settings.autoDarkStartMinute * 60 + settings.autoDarkStartSecond),
+                        liveValueLabel = { timeOfDay(snapTimeMinute(it) * 60 + settings.autoDarkStartSecond) },
                     ) {
                         viewModel.updateSettings { current -> current.copy(autoDarkStartMinute = snapTimeMinute(it)) }
                     }
                     NumberSlider(
-                        R.string.auto_dark_start,
+                        R.string.time_seconds,
                         Icons.Outlined.Schedule,
                         settings.autoDarkStartSecond,
                         0f..59f,
                         58,
                         stringResource(R.string.seconds_value, settings.autoDarkStartSecond),
+                        liveValueLabel = { timeOfDay(settings.autoDarkStartMinute * 60 + it) },
                     ) {
                         viewModel.updateSettings { current -> current.copy(autoDarkStartSecond = it.coerceIn(0, 59)) }
                     }
@@ -635,16 +638,18 @@ internal fun SettingsScreen(
                         0f..1435f,
                         0,
                         timeOfDayLabel(settings.autoDarkEndMinute * 60 + settings.autoDarkEndSecond),
+                        liveValueLabel = { timeOfDay(snapTimeMinute(it) * 60 + settings.autoDarkEndSecond) },
                     ) {
                         viewModel.updateSettings { current -> current.copy(autoDarkEndMinute = snapTimeMinute(it)) }
                     }
                     NumberSlider(
-                        R.string.auto_dark_end,
+                        R.string.time_seconds,
                         Icons.Outlined.Schedule,
                         settings.autoDarkEndSecond,
                         0f..59f,
                         58,
                         stringResource(R.string.seconds_value, settings.autoDarkEndSecond),
+                        liveValueLabel = { timeOfDay(settings.autoDarkEndMinute * 60 + it) },
                     ) {
                         viewModel.updateSettings { current -> current.copy(autoDarkEndSecond = it.coerceIn(0, 59)) }
                     }

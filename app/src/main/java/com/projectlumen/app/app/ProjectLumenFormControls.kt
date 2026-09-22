@@ -260,11 +260,15 @@ internal fun NumberSlider(
     steps: Int,
     valueLabel: String,
     labelMaxLines: Int = 2,
+    // Without this a drag shows the raw slider position, so a time-of-day slider reads "1320"
+    // mid-drag instead of the time it is about to store. Callers pass a plain formatter because a
+    // composable — and so `stringResource` — cannot run inside the drag callback.
+    liveValueLabel: ((Int) -> String)? = null,
     onValueChange: (Int) -> Unit,
 ) {
     var sliderValue by remember(value, range) { mutableFloatStateOf(value.toFloat().coerceIn(range.start, range.endInclusive)) }
     val liveValue = sliderValue.roundToInt()
-    val liveLabel = if (liveValue == value) valueLabel else liveValue.toString()
+    val liveLabel = if (liveValue == value) valueLabel else liveValueLabel?.invoke(liveValue) ?: liveValue.toString()
     Column(
         modifier = Modifier
             .fillMaxWidth()

@@ -13,6 +13,7 @@ import com.projectlumen.app.core.schedule.ScheduleOverdueNag
 
 @Composable
 internal fun ScheduleOverdueNagCard(settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
+    val timeOfDay = rememberTimeOfDayFormatter()
     SettingsSection(R.string.schedule_overdue_nag_section, Icons.Outlined.NotificationsActive) {
         SwitchRow(
             R.string.schedule_overdue_nag_enabled,
@@ -44,6 +45,7 @@ internal fun ScheduleOverdueNagCard(settings: AppSettingsEntity, viewModel: Proj
                 timeOfDayLabel(
                     settings.scheduleOverdueNagEveningMinute * 60 + settings.scheduleOverdueNagEveningSecond,
                 ),
+                liveValueLabel = { timeOfDay(snapTimeMinute(it) * 60 + settings.scheduleOverdueNagEveningSecond) },
             ) {
                 viewModel.setScheduleOverdueNagEveningMinute(snapTimeMinute(it))
             }
@@ -54,6 +56,7 @@ internal fun ScheduleOverdueNagCard(settings: AppSettingsEntity, viewModel: Proj
                 0f..59f,
                 58,
                 stringResource(R.string.seconds_value, settings.scheduleOverdueNagEveningSecond),
+                liveValueLabel = { timeOfDay(settings.scheduleOverdueNagEveningMinute * 60 + it) },
             ) {
                 viewModel.setScheduleOverdueNagEveningSecond(it)
             }

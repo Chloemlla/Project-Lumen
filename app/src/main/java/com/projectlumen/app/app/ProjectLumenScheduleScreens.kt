@@ -374,9 +374,18 @@ internal fun ScheduleDetailScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    // The picker has hour and minute dials only, so the time the dialog is about to
+                    // store is shown above it — which is also what makes the slider below read as
+                    // "the seconds of that time" rather than as an unrelated control.
+                    Text(
+                        text = timeOfDayLabel(
+                            timePickerState.hour * 3600 + timePickerState.minute * 60 + pickedSecond,
+                        ),
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
                     TimePicker(state = timePickerState)
                     Text(
-                        text = stringResource(R.string.time_seconds) + " " + "%02d".format(pickedSecond),
+                        text = stringResource(R.string.time_seconds),
                         style = MaterialTheme.typography.labelLarge,
                     )
                     Slider(

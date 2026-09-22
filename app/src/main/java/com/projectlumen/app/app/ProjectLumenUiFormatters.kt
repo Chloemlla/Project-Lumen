@@ -228,14 +228,21 @@ internal fun compactTime(totalSeconds: Long): String {
 internal fun minutesLabel(minutes: Int): String = stringResource(R.string.minutes_short, minutes)
 
 @Composable
-internal fun timeOfDayLabel(totalSeconds: Int): String {
+internal fun timeOfDayLabel(totalSeconds: Int): String = rememberTimeOfDayFormatter()(totalSeconds)
+
+/**
+ * [timeOfDayLabel] as a plain function, for the callers that need to format a candidate value from
+ * inside a slider's drag callback, where a composable — and therefore `stringResource` — cannot run.
+ */
+@Composable
+internal fun rememberTimeOfDayFormatter(): (Int) -> String {
+    val pattern = stringResource(R.string.time_value_seconds)
+    return remember(pattern) { { totalSeconds -> timeOfDayText(pattern, totalSeconds) } }
+}
+
+private fun timeOfDayText(pattern: String, totalSeconds: Int): String {
     val safeSeconds = totalSeconds.coerceIn(0, 86_399)
-    return stringResource(
-        R.string.time_value_seconds,
-        safeSeconds / 3600,
-        (safeSeconds / 60) % 60,
-        safeSeconds % 60,
-    )
+    return pattern.format(safeSeconds / 3600, (safeSeconds / 60) % 60, safeSeconds % 60)
 }
 
 internal fun snapTimeMinute(value: Int): Int {
