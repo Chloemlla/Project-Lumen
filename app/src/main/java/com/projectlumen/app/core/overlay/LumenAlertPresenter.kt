@@ -7,7 +7,8 @@ import com.projectlumen.app.core.toast.LumenToast
 import com.projectlumen.app.core.toast.LumenToastKind
 
 /**
- * The single gate that decides whether a reminder may pop over whatever the user is looking at.
+ * The single gate that decides whether anything of this app's may be drawn over what the user is
+ * looking at — a reminder ([present]) or the running timer's status ([presentStatus]).
  *
  * Two conditions have to hold, and both are deliberate:
  *

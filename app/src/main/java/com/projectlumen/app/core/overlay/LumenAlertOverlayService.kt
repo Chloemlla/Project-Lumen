@@ -21,13 +21,13 @@ import com.projectlumen.app.core.toast.LumenToast
 import com.projectlumen.app.core.toast.LumenToastKind
 
 /**
- * The top-level popup for a reminder that has to reach a user who is looking at another app.
+ * The window that draws a reminder — or the running timer's status — over whatever app the user has in
+ * front of them.
  *
- * Every reminder feature routes its background presentation here through [LumenAlertPresenter] — a
+ * Every reminder feature routes its background presentation here through [LumenAlertPresenter]: a
  * reminder is only useful if it is seen, and a shade entry is not seen. The window is a
- * [WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY] card drawn over the current app, tappable to
- * open the app, and taken down by itself after a few seconds so it never becomes something the user
- * has to clear.
+ * [WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY] card drawn over the current app and tappable
+ * to open the app, so that noticing it and acting on it are the same gesture.
  *
  * A foreground service rather than a plain overlay, for the same two reasons
  * [com.projectlumen.app.core.services.QuarkKeeperAlertService] is one: Android 10+ only lets a
@@ -37,8 +37,8 @@ import com.projectlumen.app.core.toast.LumenToastKind
  *
  * The card itself is [LumenToast.createAlertCard], deliberately the same view the in-app toast uses:
  * a reminder should not look like a different product depending on whether the app happened to be
- * open. What this service adds is the reach (it draws from a background-started service, so the
- * window actually lands), the duration, and the tap target.
+ * open. What this service adds is the reach (it draws from a background-started service, so the window
+ * actually lands), the duration, and the tap target.
  *
  * ## One window, two lifetimes
  *
