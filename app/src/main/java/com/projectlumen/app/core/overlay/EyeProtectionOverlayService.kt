@@ -18,10 +18,12 @@ import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.chloemlla.lumen.crash.CrashBreadcrumbs
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.services.ForegroundServiceController
+import com.projectlumen.app.core.toast.LumenToastKind
 import kotlin.math.max
 
 class EyeProtectionOverlayService : Service() {
@@ -211,13 +213,38 @@ class EyeProtectionOverlayService : Service() {
         private const val EXTRA_MESSAGE = "message"
         private const val EXTRA_DURATION_SECONDS = "durationSeconds"
 
+        /**
+         * Raises the full-screen rest window, and when it cannot be raised, says so instead of going
+         * quiet.
+         *
+         * Every caller treats this as fire-and-forget enforcement, so a silent false is the worst of
+         * the outcomes: the user has asked for hard enforcement, believes it is running, and nothing
+         * on screen disagrees. Two things happen here rather than at the five call sites, because all
+         * five need the same treatment and only one of them has a notification of its own to fall back
+         * on.
+         *
+         * - The refusal is recorded. The missing-permission case is the one nothing else reports:
+         *   `ForegroundServiceController.start` logs its own refusals, but a revoked overlay permission
+         *   is indistinguishable from the user simply never asking for a rest unless something says so.
+         * - The alert popup takes over. A weaker interruption the user can see beats a hard enforcement
+         *   they cannot — and where the popup also fails (the permission is missing, so nothing may be
+         *   drawn over another app) the callers' notifications are what remains.
+         *
+         * @return true only when the rest window is actually on screen. Callers that suppress another
+         *   reminder on the strength of a rest window being up must not suppress on a false.
+         */
         fun show(context: Context, title: String, message: String, durationSeconds: Int): Boolean {
-            if (!Settings.canDrawOverlays(context)) return false
-            val intent = Intent(context, EyeProtectionOverlayService::class.java)
-                .putExtra(EXTRA_TITLE, title)
-                .putExtra(EXTRA_MESSAGE, message)
-                .putExtra(EXTRA_DURATION_SECONDS, durationSeconds)
-            return ForegroundServiceController.start(context, intent)
+            if (Settings.canDrawOverlays(context)) {
+                val intent = Intent(context, EyeProtectionOverlayService::class.java)
+                    .putExtra(EXTRA_TITLE, title)
+                    .putExtra(EXTRA_MESSAGE, message)
+                    .putExtra(EXTRA_DURATION_SECONDS, durationSeconds)
+                if (ForegroundServiceController.start(context, intent)) return true
+            } else {
+                CrashBreadcrumbs.record("Forced-rest overlay blocked: overlay permission not granted")
+            }
+            LumenAlertPresenter.present(context, title, message, LumenToastKind.WARNING)
+            return false
         }
     }
 }
