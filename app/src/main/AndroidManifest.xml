@@ -192,6 +192,19 @@
                 android:value="Displays a full-screen eye-rest overlay when strict eye protection rules are triggered." />
         </service>
 
+        <!-- One service carries every background reminder popup, whatever the feature: the user
+             granted the overlay permission so that reminders reach them, and the permission is
+             useless from a broadcast receiver because the platform drops an overlay window added
+             from a background process that is not a foreground service. -->
+        <service
+            android:name=".core.overlay.LumenAlertOverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Pops a reminder card over the current app when a break, pomodoro, schedule reminder, or eye-care warning becomes due while the app is in the background." />
+        </service>
+
         <service
             android:name=".core.debug.DeveloperDebugOverlayService"
             android:exported="false"

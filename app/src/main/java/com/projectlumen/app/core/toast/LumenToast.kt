@@ -5,14 +5,12 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
@@ -22,7 +20,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
-import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -34,6 +31,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import com.projectlumen.app.R
 import com.projectlumen.app.core.constants.NotificationIds
+import com.projectlumen.app.core.overlay.LumenAlertPresenter
 import com.projectlumen.app.core.services.NotificationChannels
 import com.projectlumen.app.ui.theme.LumenCoral
 import com.projectlumen.app.ui.theme.LumenCoralDark
@@ -109,7 +107,6 @@ object LumenToast {
     private var currentActivity = WeakReference<Activity?>(null)
     @Volatile private var foreground = false
     private var foregroundView: View? = null
-    private var overlayView: View? = null
     private var dismissRunnable: Runnable? = null
 
     fun install(application: Application) {
@@ -140,6 +137,13 @@ object LumenToast {
         })
     }
 
+    /**
+     * True while one of this process's activities is started — the same signal [show] routes on, so
+     * that the background-alert gate and the toast router cannot disagree about what "background"
+     * means.
+     */
+    internal fun isAppForeground(): Boolean = foreground
+
     fun show(
         context: Context,
         message: CharSequence,
@@ -152,14 +156,10 @@ object LumenToast {
         mainHandler.post {
             dismissCurrentImmediately()
             val activity = currentActivity.get()
-            when {
-                foreground && activity != null && !activity.isFinishing && !activity.isDestroyed -> {
-                    showInActivity(activity, message, kind, duration, trailingIcon)
-                }
-                Settings.canDrawOverlays(appContext) -> {
-                    showOverlay(appContext, message, kind, duration, trailingIcon)
-                }
-                else -> showFallbackNotification(appContext, message, kind)
+            if (foreground && activity != null && !activity.isFinishing && !activity.isDestroyed) {
+                showInActivity(activity, message, kind, duration, trailingIcon)
+            } else {
+                showInBackground(appContext, message, kind)
             }
         }
     }
@@ -191,10 +191,22 @@ object LumenToast {
             runCatching { (view.parent as? ViewGroup)?.removeView(view) }
         }
         foregroundView = null
-        overlayView?.let { view ->
-            runCatching { view.context.getSystemService(WindowManager::class.java)?.removeView(view) }
-        }
-        overlayView = null
+    }
+
+    /**
+     * Background delivery goes through the alert overlay service rather than a window added from this
+     * context: a `TYPE_APPLICATION_OVERLAY` window added from a background broadcast is dropped by the
+     * platform, and the card has to be tappable to be worth showing. The notification stays as the
+     * fallback for the device that never granted the overlay permission.
+     */
+    private fun showInBackground(context: Context, message: CharSequence, kind: LumenToastKind) {
+        val presented = LumenAlertPresenter.present(
+            context = context,
+            title = context.getString(kind.titleRes),
+            message = message.toString(),
+            kind = kind,
+        )
+        if (!presented) showFallbackNotification(context, message, kind)
     }
 
     private fun showInActivity(
@@ -208,7 +220,7 @@ object LumenToast {
             ?: return showFallbackNotification(activity, message, kind)
 
         val metrics = ToastLayoutMetrics.from(activity)
-        val view = createToastView(activity, message, kind, trailingIcon, metrics)
+        val view = createToastView(activity, activity.getString(kind.titleRes), message, kind, trailingIcon, metrics)
         val params = FrameLayout.LayoutParams(
             metrics.toastWidthPx,
             FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -223,40 +235,6 @@ object LumenToast {
             animateOut(view) {
                 runCatching { root.removeView(view) }
                 if (foregroundView === view) foregroundView = null
-            }
-        }
-    }
-
-    private fun showOverlay(
-        context: Context,
-        message: CharSequence,
-        kind: LumenToastKind,
-        duration: Long,
-        trailingIcon: Boolean,
-    ) {
-        val windowManager = context.getSystemService(WindowManager::class.java) ?: return
-
-        val metrics = ToastLayoutMetrics.from(context)
-        val view = createToastView(context, message, kind, trailingIcon, metrics)
-        val params = WindowManager.LayoutParams(
-            metrics.toastWidthPx,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            y = metrics.topMarginPx
-        }
-        windowManager.addView(view, params)
-        overlayView = view
-        animateIn(view)
-        scheduleDismiss(duration) {
-            animateOut(view) {
-                runCatching { windowManager.removeView(view) }
-                if (overlayView === view) overlayView = null
             }
         }
     }
@@ -292,8 +270,34 @@ object LumenToast {
             .start()
     }
 
+    /**
+     * The card the background alert window draws, with the reminder's own title instead of the
+     * generic per-kind one a toast uses. Exposed so that
+     * [com.projectlumen.app.core.overlay.LumenAlertOverlayService] and the in-app toast cannot drift
+     * into two different looking products; the caller owns the window and the lifetime.
+     */
+    internal fun createAlertCard(
+        context: Context,
+        title: CharSequence,
+        message: CharSequence,
+        kind: LumenToastKind,
+    ): View {
+        return createToastView(
+            context = context,
+            title = title,
+            message = message,
+            kind = kind,
+            trailingIcon = false,
+            metrics = ToastLayoutMetrics.from(context),
+        )
+    }
+
+    /** Where a top-level card is placed: same width and status-bar offset as the in-app toast. */
+    internal fun layoutMetrics(context: Context): ToastLayoutMetrics = ToastLayoutMetrics.from(context)
+
     private fun createToastView(
         context: Context,
+        title: CharSequence,
         message: CharSequence,
         kind: LumenToastKind,
         trailingIcon: Boolean,
@@ -334,7 +338,7 @@ object LumenToast {
             clipToOutline = true
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             contentDescription = buildString {
-                append(context.getString(kind.titleRes))
+                append(title)
                 append(". ")
                 append(message)
             }
@@ -377,7 +381,7 @@ object LumenToast {
             gravity = Gravity.CENTER_VERTICAL
         }
         val titleView = TextView(context).apply {
-            text = context.getString(kind.titleRes)
+            text = title
             setTextSize(TypedValue.COMPLEX_UNIT_SP, metrics.titleSp)
             typeface = Typeface.create(Typeface.DEFAULT_BOLD, Typeface.BOLD)
             setTextColor(titleColor)
@@ -465,7 +469,7 @@ object LumenToast {
         return value * context.resources.displayMetrics.density
     }
 
-    private data class ToastLayoutMetrics(
+    internal data class ToastLayoutMetrics(
         val toastWidthPx: Int,
         val topMarginPx: Int,
         val darkTheme: Boolean,

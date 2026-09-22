@@ -110,7 +110,11 @@ class AlarmReceiver : BroadcastReceiver() {
                         }
                         ACTION_BREAK_DUE -> {
                             if (reconciledRuntime.reminderPhase == ReminderPhase.AWAITING_ACTION.name) {
-                                notifications.showReminderDue()
+                                notifications.showReminderDue(
+                                    // The forced-rest window below covers the screen; a popup card on
+                                    // top of it would obscure the message the user has to act on.
+                                    blockingOverlayShown = settings.globalOverlayEnabled,
+                                )
                             }
                         }
                         ACTION_BREAK_DONE -> {

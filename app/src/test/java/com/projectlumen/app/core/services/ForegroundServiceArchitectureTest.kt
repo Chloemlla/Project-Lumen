@@ -60,6 +60,7 @@ class ForegroundServiceArchitectureTest {
             "core/proximity/ProximityDetectionService.kt",
             "core/light/LightMonitorService.kt",
             "core/overlay/EyeProtectionOverlayService.kt",
+            "core/overlay/LumenAlertOverlayService.kt",
             "core/debug/DeveloperDebugOverlayService.kt",
             "core/services/QuarkKeeperAlertService.kt",
         )

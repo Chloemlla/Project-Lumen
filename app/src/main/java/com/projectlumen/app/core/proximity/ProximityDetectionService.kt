@@ -218,12 +218,18 @@ class ProximityDetectionService : Service() {
                 )
             }
         }
-        if (shouldWarn) app.notifications.showProximityWarning(ratioPercent)
-        if (blinkState.shouldWarn) app.notifications.showEyeDryWarning()
         val showDistanceOverlay = latestSettings.globalOverlayEnabled &&
             shouldWarn &&
             ratioPercent >= latestSettings.overlayStrictDistancePercent
         val showBlinkOverlay = latestSettings.globalOverlayEnabled && blinkState.shouldWarn
+        // The popup is suppressed for whichever warning is also raising the forced-rest window: two
+        // windows at the same coordinates would only hide each other's message.
+        if (shouldWarn) {
+            app.notifications.showProximityWarning(ratioPercent, blockingOverlayShown = showDistanceOverlay)
+        }
+        if (blinkState.shouldWarn) {
+            app.notifications.showEyeDryWarning(blockingOverlayShown = showBlinkOverlay)
+        }
         // Two back-to-back overlays would only restart the countdown and hide the first message.
         if (showDistanceOverlay || showBlinkOverlay) {
             EyeProtectionOverlayService.show(

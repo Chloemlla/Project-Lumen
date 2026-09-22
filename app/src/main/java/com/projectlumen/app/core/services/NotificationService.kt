@@ -24,6 +24,7 @@ import com.projectlumen.app.core.enums.ActiveEngine
 import com.projectlumen.app.core.enums.PomodoroPhase
 import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.ScheduleReminderMethod
+import com.projectlumen.app.core.overlay.LumenAlertPresenter
 import com.projectlumen.app.core.toast.LumenToast
 import com.projectlumen.app.core.toast.LumenToastKind
 import com.projectlumen.app.core.toast.showLumenToast
@@ -209,7 +210,11 @@ class NotificationService(private val context: Context) {
         return context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent()
     }
 
-    fun showReminderDue() {
+    /**
+     * @param blockingOverlayShown true when the caller is also raising the forced-rest window for this
+     *   same break, in which case the screen is already covered and the popup would be redundant.
+     */
+    fun showReminderDue(blockingOverlayShown: Boolean = false) {
         show(
             id = NotificationIds.BREAK_DUE,
             channel = NotificationChannels.REMINDER,
@@ -218,6 +223,8 @@ class NotificationService(private val context: Context) {
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = true,
             fullScreen = true,
+            alertKind = LumenToastKind.WARNING,
+            blockingOverlayShown = blockingOverlayShown,
         )
     }
 
@@ -229,6 +236,7 @@ class NotificationService(private val context: Context) {
             message = context.getString(R.string.pre_alert_notification_message),
             priority = NotificationCompat.PRIORITY_DEFAULT,
             includeBreakActions = false,
+            alertKind = LumenToastKind.TIMER,
         )
     }
 
@@ -240,6 +248,7 @@ class NotificationService(private val context: Context) {
             message = context.getString(R.string.break_done_message),
             priority = NotificationCompat.PRIORITY_DEFAULT,
             includeBreakActions = false,
+            alertKind = LumenToastKind.SUCCESS,
         )
     }
 
@@ -251,6 +260,7 @@ class NotificationService(private val context: Context) {
             message = message,
             priority = NotificationCompat.PRIORITY_DEFAULT,
             includeBreakActions = false,
+            alertKind = LumenToastKind.TIMER,
         )
     }
 
@@ -271,6 +281,11 @@ class NotificationService(private val context: Context) {
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = false,
             fullScreen = isAlarm,
+            // The alarm type is the user's own "this one must not be missed", which is exactly the
+            // case the full-screen intent used to promise and no longer delivers: since Android 14
+            // the platform denies USE_FULL_SCREEN_INTENT to non-alarm apps by default, so before the
+            // popup existed a backgrounded alarm reminder showed nothing at all.
+            alertKind = if (isAlarm) LumenToastKind.WARNING else LumenToastKind.TIMER,
         )
     }
 
@@ -292,6 +307,7 @@ class NotificationService(private val context: Context) {
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = false,
             overdueOccurrenceId = occurrence.id,
+            alertKind = LumenToastKind.WARNING,
         )
     }
 
@@ -406,7 +422,27 @@ class NotificationService(private val context: Context) {
             .build()
     }
 
-    fun showProximityWarning(ratioPercent: Int) {
+    /**
+     * The foreground notification for the background alert popup. It carries the reminder's own copy
+     * rather than a generic "showing an alert" line: it shares a channel with the other service
+     * placeholders, and a silent status entry that repeats the card is less confusing than one that
+     * describes the popup instead of the reminder.
+     */
+    fun buildAlertOverlayForegroundNotification(title: String, message: String): Notification {
+        return NotificationCompat.Builder(context, NotificationChannels.STATUS)
+            .setSmallIcon(R.drawable.ic_notification_lumen)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setContentIntent(openAppPendingIntent(NotificationIds.ALERT_OVERLAY))
+            .applyForegroundServiceDefaults()
+            .build()
+    }
+
+    /**
+     * @param blockingOverlayShown true when the caller is also raising the forced-rest window for this
+     *   same warning.
+     */
+    fun showProximityWarning(ratioPercent: Int, blockingOverlayShown: Boolean = false) {
         val message = context.getString(R.string.proximity_warning_message, ratioPercent)
         context.showLumenToast(
             message = LumenToast.richMessage(
@@ -425,10 +461,13 @@ class NotificationService(private val context: Context) {
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = true,
             fullScreen = true,
+            alertKind = LumenToastKind.WARNING,
+            blockingOverlayShown = blockingOverlayShown,
         )
     }
 
-    fun showEyeDryWarning() {
+    /** @param blockingOverlayShown true when the caller is also raising the forced-rest window. */
+    fun showEyeDryWarning(blockingOverlayShown: Boolean = false) {
         context.showLumenToast(
             message = context.getString(R.string.eye_dry_warning_message),
             kind = LumenToastKind.TIMER,
@@ -443,6 +482,8 @@ class NotificationService(private val context: Context) {
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = true,
             fullScreen = true,
+            alertKind = LumenToastKind.WARNING,
+            blockingOverlayShown = blockingOverlayShown,
         )
     }
 
@@ -464,6 +505,7 @@ class NotificationService(private val context: Context) {
             message = message,
             priority = NotificationCompat.PRIORITY_HIGH,
             includeBreakActions = false,
+            alertKind = LumenToastKind.WARNING,
         )
     }
 
@@ -535,6 +577,14 @@ class NotificationService(private val context: Context) {
     // Deliberately no setOnlyAlertOnce(true): the overdue nag re-posts on the same id every round
     // and relies on each notify() re-alerting (sound/vibration). Setting it would silently reduce
     // the whole nag chain to a single alert.
+    //
+    // Two independent deliveries, not one fallback for the other. The notification is the durable
+    // record — it survives the reminder, lands in the shade, and is the only path on a device that
+    // never granted the overlay permission. The popup is what makes the reminder *arrive*: a shade
+    // entry is invisible to someone looking at another app. `alertKind` is null for the few posts
+    // that are not reminders at all (an update notice), and `blockingOverlayShown` is set by callers
+    // that are already covering the screen with a full-screen forced-rest window, where a card on top
+    // would only obscure the thing the user has to act on.
     private fun show(
         id: Int,
         channel: String,
@@ -544,6 +594,33 @@ class NotificationService(private val context: Context) {
         includeBreakActions: Boolean,
         fullScreen: Boolean = false,
         overdueOccurrenceId: Long? = null,
+        alertKind: LumenToastKind? = null,
+        blockingOverlayShown: Boolean = false,
+    ) {
+        postNotification(
+            id = id,
+            channel = channel,
+            title = title,
+            message = message,
+            priority = priority,
+            includeBreakActions = includeBreakActions,
+            fullScreen = fullScreen,
+            overdueOccurrenceId = overdueOccurrenceId,
+        )
+        if (alertKind != null && !blockingOverlayShown) {
+            LumenAlertPresenter.present(context, title, message, alertKind)
+        }
+    }
+
+    private fun postNotification(
+        id: Int,
+        channel: String,
+        title: String,
+        message: String,
+        priority: Int,
+        includeBreakActions: Boolean,
+        fullScreen: Boolean,
+        overdueOccurrenceId: Long?,
     ) {
         if (!canPostNotifications()) return
         val builder = NotificationCompat.Builder(context, channel)

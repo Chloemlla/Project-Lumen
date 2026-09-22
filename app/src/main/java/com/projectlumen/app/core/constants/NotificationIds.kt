@@ -16,6 +16,8 @@ object NotificationIds {
     const val LOW_LIGHT_FOREGROUND = 9201
     const val LOW_LIGHT_WARNING = 9202
     const val OVERLAY_FOREGROUND = 9301
+    /** The foreground notification behind the background reminder popup. */
+    const val ALERT_OVERLAY = 9302
     const val DEVELOPER_DEBUG_FOREGROUND = 9401
     const val GLOBAL_TOAST = 9501
     const val SCHEDULE_REMINDER_BASE = 9600

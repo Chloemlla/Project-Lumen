@@ -338,6 +338,7 @@
     <string name="light_monitor_running_message">Project Lumen is watching room brightness.</string>
     <string name="overlay_running_title">Eye protection overlay is active</string>
     <string name="overlay_running_message">A full-screen rest block is currently displayed.</string>
+    <string name="alert_overlay_content_description">%1$s. %2$s. Tap to open Project Lumen.</string>
     <string name="overlay_countdown_seconds">%1$d s</string>
     <string name="overlay_break_title">Rest your eyes</string>
     <string name="overlay_break_message">Look away from the screen until the countdown ends.</string>

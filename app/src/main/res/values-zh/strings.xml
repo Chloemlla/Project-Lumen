@@ -338,6 +338,7 @@
     <string name="light_monitor_running_message">Project Lumen 正在监测房间亮度。</string>
     <string name="overlay_running_title">护眼遮罩已启动</string>
     <string name="overlay_running_message">当前正在显示全屏休息阻断。</string>
+    <string name="alert_overlay_content_description">%1$s。%2$s。点按打开 Project Lumen。</string>
     <string name="overlay_countdown_seconds">%1$d 秒</string>
     <string name="overlay_break_title">请休息眼睛</string>
     <string name="overlay_break_message">倒计时结束前，请离开屏幕并放松眼睛。</string>
