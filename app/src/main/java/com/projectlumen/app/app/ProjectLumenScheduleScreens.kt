@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Delete
@@ -368,12 +370,13 @@ internal fun ScheduleDetailScreen(
             },
             text = {
                 Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     TimePicker(state = timePickerState)
                     Text(
-                        text = stringResource(R.string.schedule_time_seconds) + " " + "%02d".format(pickedSecond),
+                        text = stringResource(R.string.time_seconds) + " " + "%02d".format(pickedSecond),
                         style = MaterialTheme.typography.labelLarge,
                     )
                     Slider(

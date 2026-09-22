@@ -315,6 +315,7 @@
     <string name="pomodoro_long_break">长休息时长</string>
     <string name="minutes_value">%1$d 分钟</string>
     <string name="seconds_value">%1$d 秒</string>
+    <string name="time_seconds">秒</string>
     <string name="percent_value">%1$d%%</string>
     <string name="kelvin_value">%1$d K</string>
     <string name="hours_short">%1$.1f 小时</string>
@@ -980,7 +981,6 @@
     <string name="schedule_summary_category">类型：%1$s</string>
     <string name="schedule_summary_reminder">提醒：%1$s</string>
     <string name="schedule_time_range">%1$s至%2$s</string>
-    <string name="schedule_time_seconds">秒</string>
     <string name="schedule_day_today">今天 %1$s</string>
     <string name="schedule_day_tomorrow">明天 %1$s</string>
     <string name="schedule_day_yesterday">昨天 %1$s</string>

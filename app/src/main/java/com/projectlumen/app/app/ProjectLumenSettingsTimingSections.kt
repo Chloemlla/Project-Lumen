@@ -91,13 +91,13 @@ internal fun SettingsQuietHoursSection(settings: AppSettingsEntity, viewModel: P
                 NumberSlider(R.string.quiet_start, Icons.Outlined.Schedule, settings.quietStartMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietStartMinute * 60 + settings.quietStartSecond)) {
                     viewModel.updateSettings { current -> current.copy(quietStartMinute = snapTimeMinute(it)) }
                 }
-                NumberSlider(R.string.quiet_start, Icons.Outlined.Schedule, settings.quietStartSecond, 0f..59f, 58, stringResource(R.string.seconds_value, settings.quietStartSecond)) {
+                NumberSlider(R.string.time_seconds, Icons.Outlined.Schedule, settings.quietStartSecond, 0f..59f, 58, stringResource(R.string.seconds_value, settings.quietStartSecond)) {
                     viewModel.updateSettings { current -> current.copy(quietStartSecond = it.coerceIn(0, 59)) }
                 }
                 NumberSlider(R.string.quiet_end, Icons.Outlined.Schedule, settings.quietEndMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietEndMinute * 60 + settings.quietEndSecond)) {
                     viewModel.updateSettings { current -> current.copy(quietEndMinute = snapTimeMinute(it)) }
                 }
-                NumberSlider(R.string.quiet_end, Icons.Outlined.Schedule, settings.quietEndSecond, 0f..59f, 58, stringResource(R.string.seconds_value, settings.quietEndSecond)) {
+                NumberSlider(R.string.time_seconds, Icons.Outlined.Schedule, settings.quietEndSecond, 0f..59f, 58, stringResource(R.string.seconds_value, settings.quietEndSecond)) {
                     viewModel.updateSettings { current -> current.copy(quietEndSecond = it.coerceIn(0, 59)) }
                 }
                 Text(stringResource(R.string.quiet_mode), style = MaterialTheme.typography.titleSmall)

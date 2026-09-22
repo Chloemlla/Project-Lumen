@@ -315,6 +315,7 @@
     <string name="pomodoro_long_break">Long break length</string>
     <string name="minutes_value">%1$d min</string>
     <string name="seconds_value">%1$d s</string>
+    <string name="time_seconds">Seconds</string>
     <string name="percent_value">%1$d%%</string>
     <string name="kelvin_value">%1$d K</string>
     <string name="hours_short">%1$.1f h</string>
@@ -981,7 +982,6 @@
     <string name="schedule_summary_category">Type: %1$s</string>
     <string name="schedule_summary_reminder">Reminder: %1$s</string>
     <string name="schedule_time_range">%1$s to %2$s</string>
-    <string name="schedule_time_seconds">Seconds</string>
     <string name="schedule_day_today">Today %1$s</string>
     <string name="schedule_day_tomorrow">Tomorrow %1$s</string>
     <string name="schedule_day_yesterday">Yesterday %1$s</string>
