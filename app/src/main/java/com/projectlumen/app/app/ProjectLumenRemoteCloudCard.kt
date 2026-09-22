@@ -33,8 +33,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -214,9 +214,9 @@ internal fun RemoteCloudAccountCard(
 private fun remoteCloudBackupLabel(uploadedAtMillis: Long): String {
     if (uploadedAtMillis <= 0L) return stringResource(R.string.not_set)
     return Instant.ofEpochMilli(uploadedAtMillis)
-        .atZone(ZoneId.systemDefault())
+        .atZone(LumenTimeZone.zoneId())
         .format(REMOTE_CLOUD_BACKUP_FORMATTER)
 }
 
 private val REMOTE_CLOUD_BACKUP_FORMATTER: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")

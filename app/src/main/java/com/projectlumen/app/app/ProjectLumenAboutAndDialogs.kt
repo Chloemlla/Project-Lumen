@@ -184,6 +184,7 @@ import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.services.BackupImportSummary
+import com.projectlumen.app.core.time.LumenTimeZone
 import com.projectlumen.app.core.toast.LumenToastKind
 import com.projectlumen.app.core.toast.showLumenToast
 import com.projectlumen.app.core.update.BuildMetadata
@@ -200,8 +201,6 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -524,8 +523,8 @@ internal fun UpdateDialog(
     val context = LocalContext.current
     var pendingReleaseUrl by remember { mutableStateOf<String?>(null) }
     val showReleaseInfo: @Composable (ReleaseInfo, BuildMetadata, UpdateCandidate?) -> Unit = { release, current, candidate ->
-        val publishTime = Instant.ofEpochMilli(release.publishedAtUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
-        val buildTime = Instant.ofEpochMilli(current.buildTimeUtcMillis).atZone(ZoneOffset.UTC).format(updateDialogTimeFormatter)
+        val publishTime = Instant.ofEpochMilli(release.publishedAtUtcMillis).atZone(LumenTimeZone.zoneId()).format(updateDialogTimeFormatter)
+        val buildTime = Instant.ofEpochMilli(current.buildTimeUtcMillis).atZone(LumenTimeZone.zoneId()).format(updateDialogTimeFormatter)
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.about_update_found, release.tagName))
             Text(stringResource(R.string.about_update_current_version, current.versionName, current.shortHash))

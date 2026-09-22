@@ -153,6 +153,9 @@ class ProjectLumenViewModel(
         stopDeveloperDebugService = stopDeveloperDebugService,
         startShizukuResilience = startShizukuResilience,
         stopShizukuResilience = stopShizukuResilience,
+        // A zone change moves every wall-clock occurrence, so the window has to be rebuilt the same
+        // way the schedule feature re-arms it.
+        rearmSchedule = rescheduleScheduleReminders,
         shizuku = shizuku,
     )
     private val appNetworkControlEntry = ProjectLumenAppNetworkControlFeatureEntry(
@@ -530,6 +533,13 @@ class ProjectLumenViewModel(
         val clamped = minute.coerceIn(0, 1435)
         CrashBreadcrumbs.record("Action setScheduleOverdueNagEveningMinute=$clamped")
         updateSettings { it.copy(scheduleOverdueNagEveningMinute = clamped) }
+        reportingScope.launch { rescheduleScheduleReminders() }
+    }
+
+    fun setScheduleOverdueNagEveningSecond(second: Int) {
+        val clamped = second.coerceIn(0, 59)
+        CrashBreadcrumbs.record("Action setScheduleOverdueNagEveningSecond=$clamped")
+        updateSettings { it.copy(scheduleOverdueNagEveningSecond = clamped) }
         reportingScope.launch { rescheduleScheduleReminders() }
     }
 

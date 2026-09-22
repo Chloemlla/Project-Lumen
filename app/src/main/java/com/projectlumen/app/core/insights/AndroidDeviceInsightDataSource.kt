@@ -14,6 +14,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.Process
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.time.ZoneId
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -23,7 +24,7 @@ internal class AndroidDeviceInsightDataSource(
     context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val nowMillis: () -> Long = System::currentTimeMillis,
-    private val zoneId: () -> ZoneId = ZoneId::systemDefault,
+    private val zoneId: () -> ZoneId = LumenTimeZone::zoneId,
 ) {
     private val appContext = context.applicationContext
     private val usageStatsManager = appContext.getSystemService(UsageStatsManager::class.java)

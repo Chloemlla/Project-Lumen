@@ -20,9 +20,9 @@ import com.projectlumen.app.core.repositories.EntitlementRepository
 import com.projectlumen.app.core.repositories.FeatureFlagRepository
 import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.repositories.StatisticsRepository
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.io.File
 import java.time.LocalDate
-import java.time.ZoneId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -191,12 +191,17 @@ class DataBackupService(
             statsWorkImagePath = json.optString("statsWorkImagePath", current.statsWorkImagePath),
             statsRestImagePath = json.optString("statsRestImagePath", current.statsRestImagePath),
             statsSkipImagePath = json.optString("statsSkipImagePath", current.statsSkipImagePath),
+            timeZoneOffsetSeconds = json.optInt("timeZoneOffsetSeconds", current.timeZoneOffsetSeconds),
             useAutoDarkWindow = json.optBoolean("useAutoDarkWindow", current.useAutoDarkWindow),
             autoDarkStartMinute = json.optInt("autoDarkStartMinute", current.autoDarkStartMinute),
+            autoDarkStartSecond = json.optInt("autoDarkStartSecond", current.autoDarkStartSecond),
             autoDarkEndMinute = json.optInt("autoDarkEndMinute", current.autoDarkEndMinute),
+            autoDarkEndSecond = json.optInt("autoDarkEndSecond", current.autoDarkEndSecond),
             quietHoursEnabled = json.optBoolean("quietHoursEnabled", current.quietHoursEnabled),
             quietStartMinute = json.optInt("quietStartMinute", current.quietStartMinute),
+            quietStartSecond = json.optInt("quietStartSecond", current.quietStartSecond),
             quietEndMinute = json.optInt("quietEndMinute", current.quietEndMinute),
+            quietEndSecond = json.optInt("quietEndSecond", current.quietEndSecond),
             quietMode = json.optString("quietMode", current.quietMode),
             notificationEnabled = json.optBoolean("notificationEnabled", current.notificationEnabled),
             keepAliveEnabled = json.optBoolean("keepAliveEnabled", current.keepAliveEnabled),
@@ -332,7 +337,7 @@ class DataBackupService(
             // local midnight to write the same day; a malformed date skips like a blank one.
             val dateMillis = runCatching {
                 LocalDate.parse(imported.statDate)
-                    .atStartOfDay(ZoneId.systemDefault())
+                    .atStartOfDay(LumenTimeZone.zoneId())
                     .toInstant()
                     .toEpochMilli()
             }.getOrNull() ?: continue
@@ -365,7 +370,7 @@ class DataBackupService(
             val imported = array.optJSONObject(index)?.toPomodoroStats() ?: continue
             val dateMillis = runCatching {
                 LocalDate.parse(imported.statDate)
-                    .atStartOfDay(ZoneId.systemDefault())
+                    .atStartOfDay(LumenTimeZone.zoneId())
                     .toInstant()
                     .toEpochMilli()
             }.getOrNull() ?: continue
@@ -454,12 +459,17 @@ class DataBackupService(
         .put("statsWorkImagePath", statsWorkImagePath)
         .put("statsRestImagePath", statsRestImagePath)
         .put("statsSkipImagePath", statsSkipImagePath)
+        .put("timeZoneOffsetSeconds", timeZoneOffsetSeconds)
         .put("useAutoDarkWindow", useAutoDarkWindow)
         .put("autoDarkStartMinute", autoDarkStartMinute)
+        .put("autoDarkStartSecond", autoDarkStartSecond)
         .put("autoDarkEndMinute", autoDarkEndMinute)
+        .put("autoDarkEndSecond", autoDarkEndSecond)
         .put("quietHoursEnabled", quietHoursEnabled)
         .put("quietStartMinute", quietStartMinute)
+        .put("quietStartSecond", quietStartSecond)
         .put("quietEndMinute", quietEndMinute)
+        .put("quietEndSecond", quietEndSecond)
         .put("quietMode", quietMode)
         .put("notificationEnabled", notificationEnabled)
         .put("keepAliveEnabled", keepAliveEnabled)

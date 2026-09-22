@@ -23,6 +23,7 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.DailyGoalEntity
 import com.projectlumen.app.core.enums.QuietMode
+import com.projectlumen.app.core.time.LumenTimeZone
 
 @Composable
 internal fun SettingsReminderSection(settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
@@ -87,11 +88,17 @@ internal fun SettingsQuietHoursSection(settings: AppSettingsEntity, viewModel: P
             exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { -it / 4 },
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(SettingsPreferenceItemGap)) {
-                NumberSlider(R.string.quiet_start, Icons.Outlined.Schedule, settings.quietStartMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietStartMinute)) {
+                NumberSlider(R.string.quiet_start, Icons.Outlined.Schedule, settings.quietStartMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietStartMinute * 60 + settings.quietStartSecond)) {
                     viewModel.updateSettings { current -> current.copy(quietStartMinute = snapTimeMinute(it)) }
                 }
-                NumberSlider(R.string.quiet_end, Icons.Outlined.Schedule, settings.quietEndMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietEndMinute)) {
+                NumberSlider(R.string.quiet_start, Icons.Outlined.Schedule, settings.quietStartSecond, 0f..59f, 58, stringResource(R.string.seconds_value, settings.quietStartSecond)) {
+                    viewModel.updateSettings { current -> current.copy(quietStartSecond = it.coerceIn(0, 59)) }
+                }
+                NumberSlider(R.string.quiet_end, Icons.Outlined.Schedule, settings.quietEndMinute, 0f..1435f, 0, timeOfDayLabel(settings.quietEndMinute * 60 + settings.quietEndSecond)) {
                     viewModel.updateSettings { current -> current.copy(quietEndMinute = snapTimeMinute(it)) }
+                }
+                NumberSlider(R.string.quiet_end, Icons.Outlined.Schedule, settings.quietEndSecond, 0f..59f, 58, stringResource(R.string.seconds_value, settings.quietEndSecond)) {
+                    viewModel.updateSettings { current -> current.copy(quietEndSecond = it.coerceIn(0, 59)) }
                 }
                 Text(stringResource(R.string.quiet_mode), style = MaterialTheme.typography.titleSmall)
                 LumenFlowRow {
@@ -100,6 +107,24 @@ internal fun SettingsQuietHoursSection(settings: AppSettingsEntity, viewModel: P
                     QuietModeChip(R.string.quiet_mode_record_only, QuietMode.RECORD_ONLY, settings, viewModel)
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun SettingsTimeZoneSection(settings: AppSettingsEntity, viewModel: ProjectLumenViewModel) {
+    SettingsSection(R.string.section_time_zone, Icons.Outlined.Schedule, initiallyExpanded = false) {
+        // The offset is stored in seconds but picked in minutes: no real zone is offset by a fraction
+        // of a minute, and 15-minute steps are finer than the quarter-hour zones that do exist.
+        NumberSlider(
+            R.string.time_zone_offset,
+            Icons.Outlined.Schedule,
+            settings.timeZoneOffsetSeconds / 60,
+            -720f..840f,
+            103,
+            LumenTimeZone.label(settings.timeZoneOffsetSeconds),
+        ) {
+            viewModel.updateSettings { current -> current.copy(timeZoneOffsetSeconds = it * 60) }
         }
     }
 }

@@ -8,6 +8,9 @@ import java.time.LocalTime
 import java.time.ZoneId
 
 object QuietHours {
+    /** Both stored boundaries are wall-clock seconds of day, so a day's worth is the whole range. */
+    private const val SECONDS_PER_DAY = 86_400L
+
     fun mode(settings: AppSettingsEntity): QuietMode? {
         if (!settings.quietHoursEnabled) return null
         return QuietMode.entries.firstOrNull { it.name == settings.quietMode } ?: QuietMode.PAUSE_TIMER
@@ -15,14 +18,14 @@ object QuietHours {
 
     fun isActive(settings: AppSettingsEntity, nowMillis: Long): Boolean {
         if (!settings.quietHoursEnabled) return false
-        val start = settings.quietStartMinute.coerceIn(0, 1439)
-        val end = settings.quietEndMinute.coerceIn(0, 1439)
+        val start = startSecondOfDay(settings)
+        val end = endSecondOfDay(settings)
         if (start == end) return false
-        val currentMinute = localMinuteOfDay(nowMillis)
+        val currentSecond = localSecondOfDay(nowMillis)
         return if (start < end) {
-            currentMinute in start until end
+            currentSecond in start until end
         } else {
-            currentMinute >= start || currentMinute < end
+            currentSecond >= start || currentSecond < end
         }
     }
 
@@ -49,31 +52,35 @@ object QuietHours {
     }
 
     private fun activeBoundary(settings: AppSettingsEntity, nowMillis: Long, wantStart: Boolean): Long {
-        val zone = ZoneId.systemDefault()
+        val zone = LumenTimeZone.zoneId()
         val now = Instant.ofEpochMilli(nowMillis).atZone(zone)
-        val startMinute = settings.quietStartMinute.coerceIn(0, 1439)
-        val endMinute = settings.quietEndMinute.coerceIn(0, 1439)
-        val currentMinute = now.hour * 60 + now.minute
+        val startSecond = startSecondOfDay(settings)
+        val endSecond = endSecondOfDay(settings)
+        val currentSecond = now.hour * 3600 + now.minute * 60 + now.second
         val date = now.toLocalDate()
-        return if (startMinute < endMinute) {
-            if (wantStart) minuteAt(date, startMinute, zone) else minuteAt(date, endMinute, zone)
-        } else if (currentMinute >= startMinute) {
-            if (wantStart) minuteAt(date, startMinute, zone) else minuteAt(date.plusDays(1), endMinute, zone)
+        return if (startSecond < endSecond) {
+            if (wantStart) secondAt(date, startSecond, zone) else secondAt(date, endSecond, zone)
+        } else if (currentSecond >= startSecond) {
+            if (wantStart) secondAt(date, startSecond, zone) else secondAt(date.plusDays(1), endSecond, zone)
         } else {
-            if (wantStart) minuteAt(date.minusDays(1), startMinute, zone) else minuteAt(date, endMinute, zone)
+            if (wantStart) secondAt(date.minusDays(1), startSecond, zone) else secondAt(date, endSecond, zone)
         }
     }
 
-    private fun localMinuteOfDay(nowMillis: Long): Int {
-        val offsetSeconds = ZoneId.systemDefault().rules
-            .getOffset(Instant.ofEpochMilli(nowMillis))
-            .totalSeconds
-        val localSeconds = nowMillis.floorDiv(1000L) + offsetSeconds
-        return (localSeconds.mod(86_400L) / 60L).toInt()
+    /** The boundary the user picked, as seconds of day: the minute field plus its second component. */
+    private fun startSecondOfDay(settings: AppSettingsEntity): Int =
+        (settings.quietStartMinute * 60 + settings.quietStartSecond).coerceIn(0, 86_399)
+
+    private fun endSecondOfDay(settings: AppSettingsEntity): Int =
+        (settings.quietEndMinute * 60 + settings.quietEndSecond).coerceIn(0, 86_399)
+
+    private fun localSecondOfDay(nowMillis: Long): Int {
+        val localSeconds = nowMillis.floorDiv(1000L) + LumenTimeZone.offsetSeconds
+        return localSeconds.mod(SECONDS_PER_DAY).toInt()
     }
 
-    private fun minuteAt(date: LocalDate, minuteOfDay: Int, zone: ZoneId): Long {
-        val time = LocalTime.of(minuteOfDay / 60, minuteOfDay % 60)
+    private fun secondAt(date: LocalDate, secondOfDay: Int, zone: ZoneId): Long {
+        val time = LocalTime.ofSecondOfDay(secondOfDay.toLong())
         return date.atTime(time).atZone(zone).toInstant().toEpochMilli()
     }
 }

@@ -177,6 +177,7 @@ import com.projectlumen.app.core.enums.ReminderPhase
 import com.projectlumen.app.core.enums.TemplateBackgroundType
 import com.projectlumen.app.core.i18n.LocaleController
 import com.projectlumen.app.core.services.BackupImportSummary
+import com.projectlumen.app.core.time.LumenTimeZone
 import com.projectlumen.app.core.update.BuildMetadata
 import com.projectlumen.app.core.update.ReleaseAsset
 import com.projectlumen.app.core.update.ReleaseInfo
@@ -190,8 +191,6 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.time.Instant
-import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
@@ -230,26 +229,34 @@ internal fun compactTime(totalSeconds: Long): String {
 internal fun minutesLabel(minutes: Int): String = stringResource(R.string.minutes_short, minutes)
 
 @Composable
-internal fun timeOfDayLabel(totalMinutes: Int): String {
-    val safeMinutes = totalMinutes.coerceIn(0, 1439)
-    return stringResource(R.string.time_value, safeMinutes / 60, safeMinutes % 60)
+internal fun timeOfDayLabel(totalSeconds: Int): String {
+    val safeSeconds = totalSeconds.coerceIn(0, 86_399)
+    return stringResource(
+        R.string.time_value_seconds,
+        safeSeconds / 3600,
+        (safeSeconds / 60) % 60,
+        safeSeconds % 60,
+    )
 }
 
 internal fun snapTimeMinute(value: Int): Int {
     return (((value.coerceIn(0, 1435) + 2) / 5) * 5).coerceIn(0, 1435)
 }
 
-internal fun isAutoDarkActive(nowMillis: Long, startMinute: Int, endMinute: Int): Boolean {
-    val offsetSeconds = ZoneId.systemDefault().rules
-        .getOffset(Instant.ofEpochMilli(nowMillis))
-        .totalSeconds
-    val currentMinute = ((nowMillis.floorDiv(1000L) + offsetSeconds).mod(86_400L) / 60L).toInt()
-    val start = snapTimeMinute(startMinute)
-    val end = snapTimeMinute(endMinute)
+internal fun isAutoDarkActive(
+    nowMillis: Long,
+    startMinute: Int,
+    endMinute: Int,
+    startSecond: Int = 0,
+    endSecond: Int = 0,
+): Boolean {
+    val currentSecond = (nowMillis.floorDiv(1000L) + LumenTimeZone.offsetSeconds).mod(86_400L).toInt()
+    val start = (startMinute * 60 + startSecond).coerceIn(0, 86_399)
+    val end = (endMinute * 60 + endSecond).coerceIn(0, 86_399)
     return when {
         start == end -> false
-        start < end -> currentMinute in start until end
-        else -> currentMinute >= start || currentMinute < end
+        start < end -> currentSecond in start until end
+        else -> currentSecond >= start || currentSecond < end
     }
 }
 

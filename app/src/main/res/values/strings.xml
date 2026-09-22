@@ -321,7 +321,8 @@
     <string name="minutes_short">%1$d m</string>
     <string name="not_set">Not set</string>
     <string name="minutes_compact">%1$02d:%2$02d</string>
-    <string name="time_value">%1$02d:%2$02d</string>
+    <string name="time_value_seconds">%1$02d:%2$02d:%3$02d</string>
+    <string name="time_zone_offset">Time zone offset</string>
     <string name="channel_reminder">Eye reminders</string>
     <string name="channel_pomodoro">Pomodoro</string>
     <string name="channel_status">Running status</string>
@@ -439,6 +440,7 @@
     <string name="today_goals">Today goals</string>
     <string name="section_goals">Goals</string>
     <string name="section_quiet_hours">Quiet hours</string>
+    <string name="section_time_zone">Time zone</string>
     <string name="section_data">Data</string>
     <string name="section_pro">Pro</string>
     <string name="daily_rest_goal">Daily rest goal</string>
@@ -979,6 +981,7 @@
     <string name="schedule_summary_category">Type: %1$s</string>
     <string name="schedule_summary_reminder">Reminder: %1$s</string>
     <string name="schedule_time_range">%1$s to %2$s</string>
+    <string name="schedule_time_seconds">Seconds</string>
     <string name="schedule_day_today">Today %1$s</string>
     <string name="schedule_day_tomorrow">Tomorrow %1$s</string>
     <string name="schedule_day_yesterday">Yesterday %1$s</string>

@@ -41,9 +41,21 @@ internal fun ScheduleOverdueNagCard(settings: AppSettingsEntity, viewModel: Proj
                 settings.scheduleOverdueNagEveningMinute,
                 0f..1435f,
                 0,
-                timeOfDayLabel(settings.scheduleOverdueNagEveningMinute),
+                timeOfDayLabel(
+                    settings.scheduleOverdueNagEveningMinute * 60 + settings.scheduleOverdueNagEveningSecond,
+                ),
             ) {
                 viewModel.setScheduleOverdueNagEveningMinute(snapTimeMinute(it))
+            }
+            NumberSlider(
+                R.string.schedule_overdue_nag_evening_time,
+                Icons.Outlined.Schedule,
+                settings.scheduleOverdueNagEveningSecond,
+                0f..59f,
+                58,
+                stringResource(R.string.seconds_value, settings.scheduleOverdueNagEveningSecond),
+            ) {
+                viewModel.setScheduleOverdueNagEveningSecond(it)
             }
         }
         Text(

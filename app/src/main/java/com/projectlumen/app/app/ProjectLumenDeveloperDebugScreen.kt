@@ -728,7 +728,7 @@ private fun memoryTrimLabel(snapshot: MemoryHealthSnapshot): String {
 private fun timestampLabel(value: Long): String {
     return if (value > 0L) {
         java.time.Instant.ofEpochMilli(value)
-            .atZone(java.time.ZoneId.systemDefault())
+            .atZone(com.projectlumen.app.core.time.LumenTimeZone.zoneId())
             .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
     } else {
         "-"

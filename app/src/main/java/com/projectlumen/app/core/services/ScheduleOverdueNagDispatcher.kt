@@ -4,7 +4,7 @@ import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.database.entities.ScheduleOccurrenceEntity
 import com.projectlumen.app.core.schedule.ScheduleOverdueNag
-import java.time.ZoneId
+import com.projectlumen.app.core.time.LumenTimeZone
 
 /**
  * Turns one fired overdue-nag alarm into a notification, then re-arms the slot that fired.
@@ -56,8 +56,9 @@ object ScheduleOverdueNagDispatcher {
             occurrenceId,
             ScheduleOverdueNag.nextEveningNagAt(
                 nowMillis,
-                settings.scheduleOverdueNagEveningMinute.coerceIn(0, 1435),
-                ZoneId.systemDefault(),
+                (settings.scheduleOverdueNagEveningMinute * 60 +
+                    settings.scheduleOverdueNagEveningSecond).coerceIn(0, 86_399),
+                LumenTimeZone.zoneId(),
             ),
         )
     }

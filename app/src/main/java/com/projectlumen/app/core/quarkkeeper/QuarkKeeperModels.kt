@@ -1,5 +1,6 @@
 package com.projectlumen.app.core.quarkkeeper
 
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -215,7 +216,7 @@ object QuarkKeeperClock {
 
     private const val MILLIS_PER_MINUTE = 60_000L
 
-    fun zone(): ZoneId = ZoneId.systemDefault()
+    fun zone(): ZoneId = LumenTimeZone.zoneId()
 
     fun minuteOfDay(nowMillis: Long, zoneId: ZoneId = zone()): Int {
         val time = ZonedDateTime.ofInstant(Instant.ofEpochMilli(nowMillis), zoneId)

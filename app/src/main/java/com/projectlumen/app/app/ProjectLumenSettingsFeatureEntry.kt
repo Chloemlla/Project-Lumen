@@ -28,6 +28,7 @@ internal class ProjectLumenSettingsFeatureEntry(
     private val stopDeveloperDebugService: () -> Unit,
     private val startShizukuResilience: () -> Unit,
     private val stopShizukuResilience: () -> Unit,
+    private val rearmSchedule: suspend () -> Unit,
     private val shizuku: ShizukuCapabilityManager,
 ) {
     fun applyStartupMonitoring(settings: AppSettingsEntity) {
@@ -68,6 +69,9 @@ internal class ProjectLumenSettingsFeatureEntry(
                 )
             runtimeEntry.applySettingsToActiveRuntime(updated, nowMillis)
             if (shouldRescheduleProximity) scheduleProximityMonitoring()
+            // Occurrences and the alarms built from them are in the zone they were materialized in,
+            // so the existing rows still point at the old zone's wall-clock time until they are rebuilt.
+            if (current.timeZoneOffsetSeconds != updated.timeZoneOffsetSeconds) rearmSchedule()
             applyLightMonitoringSettings(updated)
             applyDeveloperDebugSettings(updated)
             applyShizukuResilienceSettings(updated)

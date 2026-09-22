@@ -52,6 +52,7 @@ import com.projectlumen.app.core.repositories.SettingsRepository
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityManager
 import com.projectlumen.app.core.shizuku.ShizukuDeviceDiagnostics
 import com.projectlumen.app.core.shizuku.ShizukuInstalledApp
+import com.projectlumen.app.core.time.LumenTimeZone
 import com.projectlumen.app.core.time.todayKey
 import com.projectlumen.app.openapi.LumenOpenContracts
 import com.projectlumen.app.openapi.sanitizeLumenOpenSourceApp
@@ -60,7 +61,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
-import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
@@ -362,7 +362,7 @@ class EyeCareTelemetryReporter(
     }
 
     private fun scenarioStatus(luxLevel: Int, nowMillis: Long): String {
-        val hour = Instant.ofEpochMilli(nowMillis).atZone(ZoneId.systemDefault()).hour
+        val hour = Instant.ofEpochMilli(nowMillis).atZone(LumenTimeZone.zoneId()).hour
         return when {
             luxLevel == 0 && (hour >= 23 || hour < 6) -> "late_night_low_light"
             luxLevel == 0 -> "low_light"

@@ -1,11 +1,10 @@
 package com.projectlumen.app.core.time
 
 import java.time.Instant
-import java.time.ZoneId
 
 fun todayKey(nowMillis: Long = System.currentTimeMillis()): String {
     return Instant.ofEpochMilli(nowMillis)
-        .atZone(ZoneId.systemDefault())
+        .atZone(LumenTimeZone.zoneId())
         .toLocalDate()
         .toString()
 }

@@ -62,6 +62,9 @@
 | Z-31 | `app/ProjectLumenScheduleScreens.kt:672` | `DatePicker` 的 UTC 零点编码 | 编码约定 | **不改** |
 | Z-32 | `app/ProjectLumenDeveloperDebugScreen.kt:732` | 调试页格式化（已带秒） | 显示 | 仅时区 |
 | Z-33 | `app/ProjectLumenShizukuSettingsSection.kt:573` | Shizuku 时间格式化（用 `updateDialogTimeFormatter`，已带秒） | 显示 | 仅时区 |
+| Z-34 | `core/schedule/ScheduleOverdueNag.kt:104` | 逾期催办"晚间补催"时刻的构造（**实施时新发现，§1.1 原清单漏列**） | 解释 | 改（入参分钟 → 秒） |
+
+Z-34 说明：`nextEveningNagAt(nowMillis, eveningMinute, zoneId)` 原本收"当日分钟序数"，是 T-5 五个墙钟边界之外的第六处，§1.1 首次清点时漏掉了它（因为它在 `core/schedule/` 而不是跟着设置读取，容易被当成纯计算）。要让晚间补催真正支持秒，必须把它的入参单位从分钟改成秒（`eveningSecondOfDay`，`0..86399`）。该函数只有两个生产调用点（`ScheduleOverdueNagScheduler:181`、`ScheduleOverdueNagDispatcher:57`），都已同步；`ScheduleOverdueNagTest` 的三个用例只把实参由 `1290` 改成 `1290 * 60`（同一时刻 21:30:00），断言一字未动。
 
 Z-29…Z-31 是 `DatePicker` 返回值的解码约定（Material3 的 `DatePicker` 以 UTC 零点表达"某一天"），与用户可见时刻无关，改动会引入日期漂移，故保持 UTC。
 
@@ -162,6 +165,16 @@ F-8 是导出文件名中的月份键，不是"给用户看的时刻"，保持�
 - **根因**：JSON 映射是显式白名单，与实体字段无编译期关联。
 - **建议改法**：在四处映射里按同类字段的既有位置补上新字段。
 
+### T-8　逾期催办整组设置从未进入备份（实施 B2 时发现的相邻缺陷，本次不修）
+
+- **编号**：T-8
+- **文件**：`core/services/DataBackupService.kt`（`app_settings` 的导入 / 导出映射）
+- **类型**：功能缺陷 / 数据完整性
+- **症状**：`scheduleOverdueNagEnabled`、`scheduleOverdueNagIntervalMinutes`、`scheduleOverdueNagEveningMinute`、`scheduleOverdueNagEveningSecond` 在 `DataBackupService` 的导入与导出映射里**一个都没有**（`rg scheduleOverdueNag` 在该文件零命中）。备份→换机恢复后，用户的逾期催办设置整组回到默认值。
+- **根因**：JSON 映射是手写白名单（与 T-7 同一根因），新增字段时漏掉了这一组。这不是本次改造引入的，改造前就已如此。
+- **与本次的关系**：`scheduleOverdueNagEveningSecond` 虽然也是本次新增的秒分量，但它的分钟兄弟列同样不在映射里，单独补它会得到"秒恢复了、分钟仍是默认"的半截结果，反而更难排查。
+- **建议改法**：**不在本次改**，另起一次改造把 `scheduleOverdueNag*` 四个字段一起补进两处映射（与 T-7 同一手法）。
+
 ---
 
 ## 3. 与本次改造的边界（明确不动的部分）
@@ -172,6 +185,7 @@ F-8 是导出文件名中的月份键，不是"给用户看的时刻"，保持�
 - **不引入 IANA 地区时区**：只有固定偏移。因此不存在夏令时分支，也不存在"同名时区历史偏移不同"。
 - **不引入"跟随系统"选项**：用户明确要"默认时区为+8"，默认值即 +8。跟随系统会让"默认"失去意义。
 - **不改导出文件名的月份键**（`ExportService.kt:223`）：那是文件名，不是给人看的时刻。
+- **不动 `ReminderPlanEntity.quietStartMinute` / `quietEndMinute`**：这两个字段虽与免打扰同名，但 `rg quietStartMinute` 显示除了 `DataBackupService` 的导入导出映射之外**没有任何读取点**——`QuietHours` 只读 `AppSettingsEntity` 上的同名字段。它们是一组从未被消费的休眠列，既不影响任何墙钟行为，也就没有"支持秒"的对象。给它们加秒分量只会扩大迁移面而无收益。若将来计划级免打扰真正接上逻辑，届时再补。
 - **不重写通知层、不动后台提醒链路**：`LumenAlertOverlayService` / `LumenAlertPresenter`（刚完成的 A-1…A-5）只被动受益于 formatter 变化。
 - **不做与本次无关的重构**：33 处时区点只做"换成权威来源"这一件事，不顺手改结构。
 

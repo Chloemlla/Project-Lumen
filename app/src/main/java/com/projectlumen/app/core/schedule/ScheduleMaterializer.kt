@@ -3,6 +3,7 @@ package com.projectlumen.app.core.schedule
 import com.projectlumen.app.core.database.daos.ScheduleOccurrencesDao
 import com.projectlumen.app.core.database.daos.ScheduleSeriesDao
 import com.projectlumen.app.core.database.entities.ScheduleOccurrenceEntity
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.time.ZoneId
 
 /**
@@ -15,7 +16,7 @@ import java.time.ZoneId
 class ScheduleMaterializer(
     private val seriesDao: ScheduleSeriesDao,
     private val occurrencesDao: ScheduleOccurrencesDao,
-    private val zoneId: ZoneId = ZoneId.systemDefault(),
+    private val zoneId: () -> ZoneId = LumenTimeZone::zoneId,
 ) {
     suspend fun materializeAll(nowMillis: Long = System.currentTimeMillis()) {
         seriesDao.getActive().forEach { series -> materializeSeries(series.id, nowMillis) }
@@ -28,7 +29,7 @@ class ScheduleMaterializer(
 
         val from = nowMillis - PAST_WINDOW_DAYS * MILLIS_PER_DAY
         val to = nowMillis + FUTURE_WINDOW_DAYS * MILLIS_PER_DAY
-        val expected = ScheduleRecurrenceExpander.expand(series, from, to, zoneId)
+        val expected = ScheduleRecurrenceExpander.expand(series, from, to, zoneId())
         val existing = occurrencesDao.getOriginalStartAts(seriesId).toHashSet()
         val duration = series.endAt - series.startAt
 

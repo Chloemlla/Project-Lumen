@@ -2,6 +2,7 @@ package com.projectlumen.app.core.schedule
 
 import com.projectlumen.app.core.database.entities.ScheduleSeriesEntity
 import com.projectlumen.app.core.enums.ScheduleRecurrence
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.YearMonth
@@ -32,7 +33,7 @@ object ScheduleRecurrenceExpander {
         series: ScheduleSeriesEntity,
         fromMillis: Long,
         toMillis: Long,
-        zoneId: ZoneId = ZoneId.systemDefault(),
+        zoneId: ZoneId = LumenTimeZone.zoneId(),
         limit: Int = MAX_OCCURRENCES_PER_SERIES,
     ): List<Long> {
         if (limit <= 0 || toMillis <= fromMillis) return emptyList()

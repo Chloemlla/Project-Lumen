@@ -7,7 +7,7 @@ import android.content.Intent
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.constants.NotificationIds
 import com.projectlumen.app.core.schedule.ScheduleOverdueNag
-import java.time.ZoneId
+import com.projectlumen.app.core.time.LumenTimeZone
 
 /**
  * Arms the repeating "you never checked this off" alarms that wake [AlarmReceiver] for one overdue
@@ -30,8 +30,8 @@ import java.time.ZoneId
  * touch the exact-alarm permission: a nag that repeats every couple of hours does not need
  * second-level precision, and staying inexact removes the need to degrade when the permission is
  * revoked. Doze allows one such alarm roughly every 9 minutes, which is why the smallest
- * user-selectable interval is 5 minutes. The same reasoning covers the evening slot — precise to the
- * second is equally meaningless for "sometime around 21:30".
+ * user-selectable interval is 5 minutes. The same reasoning covers the evening slot: it stays inexact
+ * even though the configured evening time now carries a seconds component.
  *
  * The request code is the notification id, derived from the occurrence id, so re-arming the same
  * occurrence replaces its pending alarm instead of stacking duplicates.
@@ -149,8 +149,9 @@ class ScheduleOverdueNagScheduler(private val context: Context) {
             }
             // Resolved once, not per occurrence: a sweep that runs across midnight would otherwise
             // judge "morning" and "next evening" against two different local days.
-            val zone = ZoneId.systemDefault()
-            val eveningMinute = settings.scheduleOverdueNagEveningMinute.coerceIn(0, 1435)
+            val zone = LumenTimeZone.zoneId()
+            val eveningSecond = (settings.scheduleOverdueNagEveningMinute * 60 +
+                settings.scheduleOverdueNagEveningSecond).coerceIn(0, 86_399)
             val overdue = ScheduleOverdueNag.overdueItems(all, nowMillis)
             val overdueIds = overdue.mapTo(mutableSetOf()) { occurrence -> occurrence.id }
             // Completed, not-yet-due and past-the-age-cap occurrences keep no alarm: whichever of
@@ -179,7 +180,7 @@ class ScheduleOverdueNagScheduler(private val context: Context) {
                         occurrence.id,
                         ScheduleOverdueNag.nextEveningNagAt(
                             nowMillis = nowMillis,
-                            eveningMinute = eveningMinute,
+                            eveningSecondOfDay = eveningSecond,
                             zoneId = zone,
                         ),
                     )

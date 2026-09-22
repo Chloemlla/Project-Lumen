@@ -28,6 +28,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -36,6 +37,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -56,6 +58,7 @@ import com.projectlumen.app.core.enums.ScheduleEditScope
 import com.projectlumen.app.core.enums.ScheduleRecurrence
 import com.projectlumen.app.core.enums.ScheduleReminderMethod
 import com.projectlumen.app.core.schedule.ScheduleDraft
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalTime
@@ -64,6 +67,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /** Sentinel stored in `reminderMinutesBefore` for "do not remind me". */
 internal const val SCHEDULE_REMINDER_NONE = -1
@@ -75,7 +79,7 @@ private const val SCHEDULE_MIN_DURATION_MILLIS = 5L * 60L * 1000L
 private const val SCHEDULE_DEFAULT_START_HOUR = 9
 private const val SCHEDULE_DEFAULT_REPEAT_DAYS = 30L
 
-private val ScheduleTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+private val ScheduleTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
 
 private enum class ScheduleTimeField { START, END, REPEAT_UNTIL }
 
@@ -99,7 +103,7 @@ internal fun ScheduleDetailScreen(
     }
     val draftState = state ?: return
     val draft = draftState.draft
-    val zone = remember { ZoneId.systemDefault() }
+    val zone = LumenTimeZone.zoneId()
     val context = LocalContext.current
     var dateField by remember { mutableStateOf<ScheduleTimeField?>(null) }
     var timeField by remember { mutableStateOf<ScheduleTimeField?>(null) }
@@ -147,6 +151,7 @@ internal fun ScheduleDetailScreen(
                         val startAt = scheduleAtLocalTime(
                             current.startAt,
                             SCHEDULE_DEFAULT_START_HOUR,
+                            0,
                             0,
                             zone,
                         )
@@ -335,12 +340,20 @@ internal fun ScheduleDetailScreen(
             initialMinute = zoned.minute,
             is24Hour = DateFormat.is24HourFormat(context),
         )
+        // Material's time picker has hour and minute dials only, so the second is edited beside it.
+        var pickedSecond by remember(fieldMillis) { mutableIntStateOf(zoned.second) }
         AlertDialog(
             onDismissRequest = { timeField = null },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val picked = scheduleAtLocalTime(fieldMillis, timePickerState.hour, timePickerState.minute, zone)
+                        val picked = scheduleAtLocalTime(
+                            fieldMillis,
+                            timePickerState.hour,
+                            timePickerState.minute,
+                            pickedSecond,
+                            zone,
+                        )
                         timeField = null
                         if (field == ScheduleTimeField.START) applyStart(picked) else applyEnd(picked)
                     },
@@ -354,7 +367,23 @@ internal fun ScheduleDetailScreen(
                 }
             },
             text = {
-                TimePicker(state = timePickerState)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TimePicker(state = timePickerState)
+                    Text(
+                        text = stringResource(R.string.schedule_time_seconds) + " " + "%02d".format(pickedSecond),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Slider(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = pickedSecond.toFloat(),
+                        onValueChange = { pickedSecond = it.roundToInt() },
+                        valueRange = 0f..59f,
+                        steps = 58,
+                    )
+                }
             },
         )
     }
@@ -497,7 +526,7 @@ private fun ScheduleMomentRow(
 
 @Composable
 internal fun scheduleDayLabel(startAt: Long, nowMillis: Long): String {
-    val zone = remember { ZoneId.systemDefault() }
+    val zone = LumenTimeZone.zoneId()
     val startDate = remember(startAt, zone) {
         Instant.ofEpochMilli(startAt).atZone(zone).toLocalDate()
     }
@@ -527,7 +556,7 @@ internal fun scheduleTimeRangeLabel(startAt: Long, endAt: Long, allDay: Boolean)
 @Composable
 internal fun scheduleDateTimeLabel(millis: Long): String {
     val locale = LocalConfiguration.current.locales[0]
-    val zone = remember { ZoneId.systemDefault() }
+    val zone = LumenTimeZone.zoneId()
     return remember(millis, locale, zone) {
         runCatching {
             Instant.ofEpochMilli(millis).atZone(zone).format(scheduleDateTimeFormatter(locale))
@@ -538,7 +567,7 @@ internal fun scheduleDateTimeLabel(millis: Long): String {
 @Composable
 internal fun scheduleDateLabel(millis: Long): String {
     val locale = LocalConfiguration.current.locales[0]
-    val zone = remember { ZoneId.systemDefault() }
+    val zone = LumenTimeZone.zoneId()
     return remember(millis, locale, zone) {
         runCatching {
             Instant.ofEpochMilli(millis).atZone(zone).format(scheduleDateFormatter(locale))
@@ -548,7 +577,7 @@ internal fun scheduleDateLabel(millis: Long): String {
 
 @Composable
 private fun scheduleTimeOfDayLabel(millis: Long): String {
-    val zone = remember { ZoneId.systemDefault() }
+    val zone = LumenTimeZone.zoneId()
     return remember(millis, zone) {
         Instant.ofEpochMilli(millis).atZone(zone).format(ScheduleTimeFormatter)
     }
@@ -615,9 +644,9 @@ private fun scheduleDateFormatter(locale: Locale): DateTimeFormatter =
 
 private fun scheduleDateTimeFormatter(locale: Locale): DateTimeFormatter =
     if (locale.language == Locale.CHINESE.language) {
-        DateTimeFormatter.ofPattern("yyyy年M月d日HH:mm", locale)
+        DateTimeFormatter.ofPattern("yyyy年M月d日HH:mm:ss", locale)
     } else {
-        DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm", locale)
+        DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm:ss", locale)
     }
 
 private fun scheduleDuration(startAt: Long, endAt: Long): Long =
@@ -652,9 +681,9 @@ private fun scheduleDefaultRepeatUntil(startAt: Long, zone: ZoneId): Long =
         .toInstant()
         .toEpochMilli()
 
-private fun scheduleAtLocalTime(millis: Long, hour: Int, minute: Int, zone: ZoneId): Long =
+private fun scheduleAtLocalTime(millis: Long, hour: Int, minute: Int, second: Int, zone: ZoneId): Long =
     Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
-        .atTime(hour, minute)
+        .atTime(hour, minute, second)
         .atZone(zone)
         .toInstant()
         .toEpochMilli()

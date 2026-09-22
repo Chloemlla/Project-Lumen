@@ -63,6 +63,7 @@ import com.projectlumen.app.core.network.ClashPartnerCompat
 import com.projectlumen.app.core.enums.AppThemeMode
 import com.projectlumen.app.core.enums.PlanTier
 import com.projectlumen.app.core.i18n.LocaleController
+import com.projectlumen.app.core.time.LumenTimeZone
 import kotlinx.coroutines.launch
 
 private enum class GrowthConfigTarget {
@@ -613,9 +614,19 @@ internal fun SettingsScreen(
                         settings.autoDarkStartMinute,
                         0f..1435f,
                         0,
-                        timeOfDayLabel(settings.autoDarkStartMinute),
+                        timeOfDayLabel(settings.autoDarkStartMinute * 60 + settings.autoDarkStartSecond),
                     ) {
                         viewModel.updateSettings { current -> current.copy(autoDarkStartMinute = snapTimeMinute(it)) }
+                    }
+                    NumberSlider(
+                        R.string.auto_dark_start,
+                        Icons.Outlined.Schedule,
+                        settings.autoDarkStartSecond,
+                        0f..59f,
+                        58,
+                        stringResource(R.string.seconds_value, settings.autoDarkStartSecond),
+                    ) {
+                        viewModel.updateSettings { current -> current.copy(autoDarkStartSecond = it.coerceIn(0, 59)) }
                     }
                     NumberSlider(
                         R.string.auto_dark_end,
@@ -623,9 +634,19 @@ internal fun SettingsScreen(
                         settings.autoDarkEndMinute,
                         0f..1435f,
                         0,
-                        timeOfDayLabel(settings.autoDarkEndMinute),
+                        timeOfDayLabel(settings.autoDarkEndMinute * 60 + settings.autoDarkEndSecond),
                     ) {
                         viewModel.updateSettings { current -> current.copy(autoDarkEndMinute = snapTimeMinute(it)) }
+                    }
+                    NumberSlider(
+                        R.string.auto_dark_end,
+                        Icons.Outlined.Schedule,
+                        settings.autoDarkEndSecond,
+                        0f..59f,
+                        58,
+                        stringResource(R.string.seconds_value, settings.autoDarkEndSecond),
+                    ) {
+                        viewModel.updateSettings { current -> current.copy(autoDarkEndSecond = it.coerceIn(0, 59)) }
                     }
                 }
             }
@@ -669,6 +690,7 @@ internal fun SettingsScreen(
         SettingsPreAlertSection(settings = settings, viewModel = viewModel)
         SettingsPomodoroSection(settings = settings, viewModel = viewModel)
         SettingsQuietHoursSection(settings = settings, viewModel = viewModel)
+        SettingsTimeZoneSection(settings = settings, viewModel = viewModel)
         SettingsGoalsSection(dailyGoal = uiState.dailyGoal, viewModel = viewModel)
         SettingsScrollAnchors(
             targets = NotificationPermissionAnchors,
@@ -1139,8 +1161,8 @@ private fun SettingsRemoteAnalysisConsentCard(
 
 private fun formatRemoteConsentTime(epochMillis: Long): String = runCatching {
     java.time.Instant.ofEpochMilli(epochMillis)
-        .atZone(java.time.ZoneId.systemDefault())
-        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+        .atZone(LumenTimeZone.zoneId())
+        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
 }.getOrNull().orEmpty()
 
 

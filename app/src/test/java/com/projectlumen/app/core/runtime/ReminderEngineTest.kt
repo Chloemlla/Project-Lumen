@@ -3,9 +3,9 @@ package com.projectlumen.app.core.runtime
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.enums.QuietMode
 import com.projectlumen.app.core.enums.ReminderPhase
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -126,7 +126,7 @@ class ReminderEngineTest {
 
     @Test
     fun pauseTimerQuietHoursDefersNextWorkCycle() {
-        val zone = ZoneId.systemDefault()
+        val zone = LumenTimeZone.zoneId()
         val now = LocalDate.of(2026, 1, 1)
             .atTime(LocalTime.of(22, 10))
             .atZone(zone)
@@ -148,7 +148,7 @@ class ReminderEngineTest {
 
     @Test
     fun recordOnlyQuietHoursRecordsWorkWithoutStartingBreak() {
-        val zone = ZoneId.systemDefault()
+        val zone = LumenTimeZone.zoneId()
         val start = LocalDate.of(2026, 1, 1)
             .atTime(LocalTime.of(22, 5))
             .atZone(zone)

@@ -28,9 +28,9 @@ import com.projectlumen.app.core.overlay.LumenAlertPresenter
 import com.projectlumen.app.core.toast.LumenToast
 import com.projectlumen.app.core.toast.LumenToastKind
 import com.projectlumen.app.core.toast.showLumenToast
+import com.projectlumen.app.core.time.LumenTimeZone
 import com.projectlumen.app.core.time.QuietHours
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicReference
 
@@ -1038,7 +1038,7 @@ class NotificationService(private val context: Context) {
     }
 
     private fun formatClockTime(millis: Long): String {
-        return Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).format(CLOCK_TIME_FORMATTER)
+        return Instant.ofEpochMilli(millis).atZone(LumenTimeZone.zoneId()).format(CLOCK_TIME_FORMATTER)
     }
 
     private fun actionPendingIntent(id: Int, action: String): PendingIntent {
@@ -1082,7 +1082,7 @@ class NotificationService(private val context: Context) {
         const val LIVE_UPDATE_PROGRESS_BUCKET = 10
         const val LIVE_UPDATE_CHRONOMETER_MIN_MILLIS = 2 * 60_000L
         const val FULL_SCREEN_REQUEST_CODE_OFFSET = 100
-        val CLOCK_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+        val CLOCK_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
 
         val reminderNotificationIds = listOf(
             NotificationIds.PRE_ALERT,

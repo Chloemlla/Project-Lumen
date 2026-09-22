@@ -12,8 +12,8 @@ import com.projectlumen.app.R
 import com.projectlumen.app.core.api.BackendCapabilityDecision
 import com.projectlumen.app.core.api.BackendConnectivityState
 import com.projectlumen.app.core.api.BackendHealthStatus
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -94,7 +94,7 @@ private fun backendEffectiveStatusLabel(decision: BackendCapabilityDecision): St
 private fun backendTimestampLabel(value: Long): String {
     if (value <= 0L) return stringResource(R.string.backend_connectivity_never)
     return Instant.ofEpochMilli(value)
-        .atZone(ZoneId.systemDefault())
+        .atZone(LumenTimeZone.zoneId())
         .format(BACKEND_TIMESTAMP_FORMATTER)
 }
 

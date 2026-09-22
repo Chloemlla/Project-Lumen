@@ -198,7 +198,7 @@ class ScheduleOverdueNagTest {
     fun nextEveningNagIsTodayWhenStillAhead() {
         val nowMillis = at(shanghai, 2026, 5, 12, 9, 0)
 
-        val result = ScheduleOverdueNag.nextEveningNagAt(nowMillis, 1290, shanghai)
+        val result = ScheduleOverdueNag.nextEveningNagAt(nowMillis, 1290 * 60, shanghai)
 
         assertEquals(at(shanghai, 2026, 5, 12, 21, 30), result)
     }
@@ -208,7 +208,7 @@ class ScheduleOverdueNagTest {
     fun nextEveningNagRollsToTomorrowWhenAlreadyPast() {
         val nowMillis = at(shanghai, 2026, 5, 12, 22, 0)
 
-        val result = ScheduleOverdueNag.nextEveningNagAt(nowMillis, 1290, shanghai)
+        val result = ScheduleOverdueNag.nextEveningNagAt(nowMillis, 1290 * 60, shanghai)
 
         assertEquals(at(shanghai, 2026, 5, 13, 21, 30), result)
     }
@@ -225,7 +225,7 @@ class ScheduleOverdueNagTest {
         val nowMillis = at(newYork, 2026, 3, 7, 23, 0)
         assertEquals(ZoneOffset.ofHours(-5), ZonedDateTime.ofInstant(Instant.ofEpochMilli(nowMillis), newYork).offset)
 
-        val result = ScheduleOverdueNag.nextEveningNagAt(nowMillis, 1290, newYork)
+        val result = ScheduleOverdueNag.nextEveningNagAt(nowMillis, 1290 * 60, newYork)
 
         val resultLocal = Instant.ofEpochMilli(result).atZone(newYork)
         assertEquals(LocalTime.of(21, 30), resultLocal.toLocalTime())

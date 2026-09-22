@@ -34,9 +34,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
+import com.projectlumen.app.core.time.LumenTimeZone
 import com.projectlumen.app.core.update.BuildUpdateNotes
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -111,7 +111,7 @@ private fun BuildUpdateNotesIdentityCard(notes: BuildUpdateNotes) {
     val buildTime = remember(notes.buildTimeUtcMillis, locale.toLanguageTag()) {
         runCatching {
             Instant.ofEpochMilli(notes.buildTimeUtcMillis)
-                .atZone(ZoneId.systemDefault())
+                .atZone(LumenTimeZone.zoneId())
                 .format(
                     DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
                         .withLocale(locale),

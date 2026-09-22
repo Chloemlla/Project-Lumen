@@ -321,7 +321,8 @@
     <string name="minutes_short">%1$d 分钟</string>
     <string name="not_set">未设置</string>
     <string name="minutes_compact">%1$02d:%2$02d</string>
-    <string name="time_value">%1$02d:%2$02d</string>
+    <string name="time_value_seconds">%1$02d:%2$02d:%3$02d</string>
+    <string name="time_zone_offset">时区偏移</string>
     <string name="channel_reminder">用眼提醒</string>
     <string name="channel_pomodoro">番茄钟</string>
     <string name="channel_status">运行状态</string>
@@ -439,6 +440,7 @@
     <string name="today_goals">今日目标</string>
     <string name="section_goals">目标</string>
     <string name="section_quiet_hours">静默时段</string>
+    <string name="section_time_zone">时区</string>
     <string name="section_data">数据</string>
     <string name="section_pro">专业版</string>
     <string name="daily_rest_goal">每日休息目标</string>
@@ -978,6 +980,7 @@
     <string name="schedule_summary_category">类型：%1$s</string>
     <string name="schedule_summary_reminder">提醒：%1$s</string>
     <string name="schedule_time_range">%1$s至%2$s</string>
+    <string name="schedule_time_seconds">秒</string>
     <string name="schedule_day_today">今天 %1$s</string>
     <string name="schedule_day_tomorrow">明天 %1$s</string>
     <string name="schedule_day_yesterday">昨天 %1$s</string>

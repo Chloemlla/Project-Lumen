@@ -155,16 +155,22 @@ fun ProjectLumenApp(
     val autoDarkActive by remember(
         uiState.clock,
         uiState.settings.autoDarkStartMinute,
+        uiState.settings.autoDarkStartSecond,
         uiState.settings.autoDarkEndMinute,
+        uiState.settings.autoDarkEndSecond,
     ) {
         val clock = uiState.clock
         val startMinute = uiState.settings.autoDarkStartMinute
+        val startSecond = uiState.settings.autoDarkStartSecond
         val endMinute = uiState.settings.autoDarkEndMinute
+        val endSecond = uiState.settings.autoDarkEndSecond
         derivedStateOf {
             isAutoDarkActive(
                 nowMillis = clock.nowMillis,
                 startMinute = startMinute,
                 endMinute = endMinute,
+                startSecond = startSecond,
+                endSecond = endSecond,
             )
         }
     }

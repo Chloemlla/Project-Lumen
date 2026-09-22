@@ -41,8 +41,8 @@ import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.AppSettingsEntity
 import com.projectlumen.app.core.shizuku.ShizukuCapabilityState
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.time.Instant
-import java.time.ZoneId
 
 @Composable
 internal fun ShizukuAdvancedSettingsSection(
@@ -571,6 +571,6 @@ private fun shizukuForegroundLabel(state: ShizukuCapabilityState): String {
 private fun shizukuCheckedAtLabel(lastCheckedAt: Long): String {
     if (lastCheckedAt <= 0L) return stringResource(R.string.shizuku_checked_never)
     return Instant.ofEpochMilli(lastCheckedAt)
-        .atZone(ZoneId.systemDefault())
+        .atZone(LumenTimeZone.zoneId())
         .format(updateDialogTimeFormatter)
 }

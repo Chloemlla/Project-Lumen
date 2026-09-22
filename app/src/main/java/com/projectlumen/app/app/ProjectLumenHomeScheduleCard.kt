@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.projectlumen.app.R
 import com.projectlumen.app.core.database.entities.ScheduleOccurrenceEntity
 import com.projectlumen.app.core.enums.ScheduleRecurrence
+import com.projectlumen.app.core.time.LumenTimeZone
 import java.time.Instant
 import java.time.ZoneId
 
@@ -137,7 +138,7 @@ private fun scheduleHomeSecondaryLabel(task: ScheduleOccurrenceEntity, nowMillis
 internal fun scheduleHomeItems(
     tasks: List<ScheduleOccurrenceEntity>,
     nowMillis: Long,
-    zoneId: ZoneId = ZoneId.systemDefault(),
+    zoneId: ZoneId = LumenTimeZone.zoneId(),
 ): List<ScheduleOccurrenceEntity> {
     val today = Instant.ofEpochMilli(nowMillis).atZone(zoneId).toLocalDate()
     val todayStart = today.atStartOfDay(zoneId).toInstant().toEpochMilli()

@@ -94,16 +94,16 @@ object ScheduleOverdueNag {
     }
 
     /**
-     * The next instant at which [eveningMinute] (minutes from local midnight) comes around in
+     * The next instant at which [eveningSecondOfDay] (seconds from local midnight) comes around in
      * [zoneId]: today's if it is still ahead of [nowMillis], otherwise tomorrow's.
      *
      * Built from `LocalTime` + `ZoneId` rather than by adding 24 hours of milliseconds, so a DST
-     * transition in between keeps the nag pinned to the configured wall-clock minute instead of
+     * transition in between keeps the nag pinned to the configured wall-clock second instead of
      * drifting it by an hour.
      */
-    fun nextEveningNagAt(nowMillis: Long, eveningMinute: Int, zoneId: ZoneId): Long {
-        val minuteOfDay = eveningMinute.coerceIn(0, 1435)
-        val evening = LocalTime.of(minuteOfDay / 60, minuteOfDay % 60)
+    fun nextEveningNagAt(nowMillis: Long, eveningSecondOfDay: Int, zoneId: ZoneId): Long {
+        val secondOfDay = eveningSecondOfDay.coerceIn(0, 86_399)
+        val evening = LocalTime.ofSecondOfDay(secondOfDay.toLong())
         val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
         val today = now.toLocalDate().atTime(evening).atZone(zoneId)
         val next = if (today.toInstant().toEpochMilli() <= nowMillis) {
