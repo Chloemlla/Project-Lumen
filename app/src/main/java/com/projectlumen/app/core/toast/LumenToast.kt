@@ -220,7 +220,15 @@ object LumenToast {
             ?: return showFallbackNotification(activity, message, kind)
 
         val metrics = ToastLayoutMetrics.from(activity)
-        val view = createToastView(activity, activity.getString(kind.titleRes), message, kind, trailingIcon, metrics)
+        val card = createToastView(
+            context = activity,
+            title = activity.getString(kind.titleRes),
+            message = message,
+            kind = kind,
+            trailingIcon = trailingIcon,
+            metrics = metrics,
+        )
+        val view = card.root
         val params = FrameLayout.LayoutParams(
             metrics.toastWidthPx,
             FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -271,17 +279,18 @@ object LumenToast {
     }
 
     /**
-     * The card the background alert window draws, with the reminder's own title instead of the
-     * generic per-kind one a toast uses. Exposed so that
-     * [com.projectlumen.app.core.overlay.LumenAlertOverlayService] and the in-app toast cannot drift
-     * into two different looking products; the caller owns the window and the lifetime.
+     * The card the background overlay window draws — the reminder card and the running-status chip
+     * both use it, with the caller's own title instead of the generic per-kind one a toast uses.
+     * Exposed so that [com.projectlumen.app.core.overlay.LumenAlertOverlayService] and the in-app
+     * toast cannot drift into two different looking products; the caller owns the window and the
+     * lifetime.
      */
     internal fun createAlertCard(
         context: Context,
         title: CharSequence,
         message: CharSequence,
         kind: LumenToastKind,
-    ): View {
+    ): AlertCard {
         return createToastView(
             context = context,
             title = title,
@@ -302,7 +311,7 @@ object LumenToast {
         kind: LumenToastKind,
         trailingIcon: Boolean,
         metrics: ToastLayoutMetrics,
-    ): View {
+    ): AlertCard {
         val darkTheme = metrics.darkTheme
         val accent = kind.accentColor(darkTheme)
         val surface = if (darkTheme) LumenSurfaceContainerDark.toArgb() else LumenSurface.toArgb()
@@ -426,7 +435,25 @@ object LumenToast {
             root.addView(iconChip, iconParams)
             root.addView(textColumn, textParams)
         }
-        return root
+        return AlertCard(root, titleView, messageView)
+    }
+
+    /**
+     * A built card: the window root plus its two text slots.
+     *
+     * The slots are handed out because a card can outlive the content it was built with — the
+     * background status chip is refreshed on every tick, and tearing the window down and adding it
+     * back would flicker where setting two strings does not.
+     */
+    internal class AlertCard(
+        val root: View,
+        private val titleView: TextView,
+        private val messageView: TextView,
+    ) {
+        fun update(title: CharSequence, message: CharSequence) {
+            titleView.text = title
+            messageView.text = message
+        }
     }
 
     private fun showFallbackNotification(context: Context, message: CharSequence, kind: LumenToastKind) {

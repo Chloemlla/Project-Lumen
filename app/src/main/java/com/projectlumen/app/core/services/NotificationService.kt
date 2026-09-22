@@ -423,16 +423,18 @@ class NotificationService(private val context: Context) {
     }
 
     /**
-     * The foreground notification for the background alert popup. It carries the reminder's own copy
-     * rather than a generic "showing an alert" line: it shares a channel with the other service
-     * placeholders, and a silent status entry that repeats the card is less confusing than one that
-     * describes the popup instead of the reminder.
+     * The foreground notification behind the background popup.
+     *
+     * It describes the popup rather than repeating the reminder's copy, because one service carries
+     * both the reminder card and the running-status chip: a line quoting whichever happened to start
+     * the service would be wrong for the other, and for the chip it would sit next to the timer's own
+     * Live Update on the same channel saying something different.
      */
-    fun buildAlertOverlayForegroundNotification(title: String, message: String): Notification {
+    fun buildAlertOverlayForegroundNotification(): Notification {
         return NotificationCompat.Builder(context, NotificationChannels.STATUS)
             .setSmallIcon(R.drawable.ic_notification_lumen)
-            .setContentTitle(title)
-            .setContentText(message)
+            .setContentTitle(context.getString(R.string.alert_overlay_running_title))
+            .setContentText(context.getString(R.string.alert_overlay_running_message))
             .setContentIntent(openAppPendingIntent(NotificationIds.ALERT_OVERLAY))
             .applyForegroundServiceDefaults()
             .build()
@@ -510,9 +512,13 @@ class NotificationService(private val context: Context) {
     }
 
     fun showOngoingStatus(state: RuntimeStateEntity) {
-        if (!canPostNotifications()) return
         val nowMillis = System.currentTimeMillis()
         val content = ongoingLiveUpdateContent(state, nowMillis)
+        // The chip is driven before the dedupe below rather than behind it. That dedupe exists so the
+        // shade does not re-post a byte-identical notification, but the chip also has to appear when
+        // the app drops into the background mid-phase, and nothing in the status text changes then.
+        LumenAlertPresenter.presentStatus(context, content.title, content.message)
+        if (!canPostNotifications()) return
         if (!shouldPublishLiveUpdate(content)) return
         try {
             notificationManager.notify(
@@ -528,6 +534,7 @@ class NotificationService(private val context: Context) {
         lastPublishedLiveUpdateSignature.set(null)
         lastPublishedLiveUpdate.set(null)
         notificationManager.cancel(NotificationIds.FOREGROUND_TIMER)
+        LumenAlertPresenter.clearStatus(context)
     }
 
     fun cancelAllScheduled() {

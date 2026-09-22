@@ -23,6 +23,14 @@ import com.projectlumen.app.core.toast.LumenToastKind
 object LumenAlertPresenter {
 
     /**
+     * Whether the app was last asked to show the running status over another app. Only used to keep
+     * [clearStatus] from tearing a service down on every tick while the app is on screen and no chip
+     * was ever raised.
+     */
+    @Volatile
+    private var statusRequested = false
+
+    /**
      * Pops [message] over the current app when the app is in the background and the overlay
      * permission is held.
      *
@@ -36,7 +44,7 @@ object LumenAlertPresenter {
         title: String,
         message: String,
         kind: LumenToastKind = LumenToastKind.INFO,
-        autoDismissSeconds: Int = LumenAlertOverlayService.DEFAULT_AUTO_DISMISS_SECONDS,
+        autoDismissSeconds: Int = LumenAlertOverlayService.ALERT_AUTO_DISMISS_SECONDS,
     ): Boolean {
         if (LumenToast.isAppForeground()) return false
         if (!Settings.canDrawOverlays(context)) return false
@@ -45,5 +53,34 @@ object LumenAlertPresenter {
             CrashBreadcrumbs.record("Background alert overlay refused while foreground=false: $title")
         }
         return raised
+    }
+
+    /**
+     * Mirrors the running status onto the current app, or takes it down when it does not apply.
+     *
+     * This is called on the timer's own tick rather than only when the status text changes, because
+     * the chip has to *appear* when the app drops into the background, and no change in the text marks
+     * that moment. Re-publishing identical text costs one in-process service start, and the card
+     * updates in place — see [LumenAlertOverlayService].
+     *
+     * A refusal is not recorded, unlike [present]: a reminder is a one-off that would otherwise be
+     * lost silently, whereas this is re-asked every second and so repairs itself.
+     *
+     * @return true if the chip is up.
+     */
+    fun presentStatus(context: Context, title: String, message: String): Boolean {
+        if (LumenToast.isAppForeground() || !Settings.canDrawOverlays(context)) {
+            clearStatus(context)
+            return false
+        }
+        statusRequested = true
+        return LumenAlertOverlayService.showStatus(context, title, message)
+    }
+
+    /** Takes the status chip down, at the end of a timer or when the app comes back on screen. */
+    fun clearStatus(context: Context) {
+        if (!statusRequested) return
+        statusRequested = false
+        LumenAlertOverlayService.dismiss(context)
     }
 }
