@@ -55,12 +55,22 @@ data class AppSettingsEntity(
     val statsWorkImagePath: String = "",
     val statsRestImagePath: String = "",
     val statsSkipImagePath: String = "",
+    /**
+     * Seconds east of UTC that every time in this app is shown and interpreted in (default +08:00).
+     * A fixed offset rather than an IANA region — see `com.projectlumen.app.core.time.LumenTimeZone`.
+     */
+    val timeZoneOffsetSeconds: Int = 28_800,
     val useAutoDarkWindow: Boolean = false,
     val autoDarkStartMinute: Int = 1080,
+    /** Seconds past [autoDarkStartMinute], 0..59. Kept apart from the minute so neither field's unit changes. */
+    val autoDarkStartSecond: Int = 0,
     val autoDarkEndMinute: Int = 360,
+    val autoDarkEndSecond: Int = 0,
     val quietHoursEnabled: Boolean = false,
     val quietStartMinute: Int = 1320,
+    val quietStartSecond: Int = 0,
     val quietEndMinute: Int = 420,
+    val quietEndSecond: Int = 0,
     val quietMode: String = QuietMode.PAUSE_TIMER.name,
     val notificationEnabled: Boolean = true,
     val keepAliveEnabled: Boolean = true,
@@ -116,4 +126,5 @@ data class AppSettingsEntity(
     val scheduleOverdueNagIntervalMinutes: Int = 120,
     /** Evening follow-up time for to-dos that ended in the morning, as minutes from midnight (21:30). */
     val scheduleOverdueNagEveningMinute: Int = 1290,
+    val scheduleOverdueNagEveningSecond: Int = 0,
 )
