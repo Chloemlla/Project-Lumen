@@ -45,7 +45,7 @@ Orientation / resize locks may be ignored on large screens; opt-out properties a
 - `minSdk = 29` (>= 24), so Manifest no longer declares `usesCleartextTraffic`.
 - Domain policy lives only in `res/xml/network_security_config.xml`.
 - Base config and production hosts force `cleartextTrafficPermitted="false"`.
-- Production hosts remain HTTPS-only (`eye.chloemlla.com`, `tts.chloemlla.com`).
+- Production hosts remain HTTPS-only (`eye.chloemlla.com`, `chloemlla.com`).
 
 ### 5. Local network permission (targetSdk 37)
 `ACCESS_LOCAL_NETWORK` becomes required for LAN/mDNS access when targetSdk >= 37.

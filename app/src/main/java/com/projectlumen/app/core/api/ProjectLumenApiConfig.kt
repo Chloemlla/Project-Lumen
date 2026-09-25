@@ -3,9 +3,9 @@ package com.projectlumen.app.core.api
 import com.projectlumen.app.BuildConfig
 
 object ProjectLumenApiConfig {
-    const val DEFAULT_BASE_URL = "https://tts.chloemlla.com/api/lumen"
-    private const val DEFAULT_HOST_ROOT = "https://tts.chloemlla.com"
-    const val DEFAULT_TRANSLATION_BASE_URL = "https://tts.chloemlla.com"
+    const val DEFAULT_BASE_URL = "https://chloemlla.com/api/lumen"
+    private const val DEFAULT_HOST_ROOT = "https://chloemlla.com"
+    const val DEFAULT_TRANSLATION_BASE_URL = "https://chloemlla.com"
     const val REQUEST_TIMEOUT_MILLIS = 6_000
 
     val baseUrl: String

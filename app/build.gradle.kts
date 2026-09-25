@@ -74,14 +74,14 @@ android {
         ?: providers.gradleProperty("PROJECT_LUMEN_API_BASE_URL")
             .orNull
             ?.takeIf { it.isNotBlank() }
-        ?: "https://tts.chloemlla.com/api/lumen"
+        ?: "https://chloemlla.com/api/lumen"
     val projectLumenTranslationApiBaseUrl = providers.environmentVariable("PROJECT_LUMEN_TRANSLATION_API_BASE_URL")
         .orNull
         ?.takeIf { it.isNotBlank() }
         ?: providers.gradleProperty("PROJECT_LUMEN_TRANSLATION_API_BASE_URL")
             .orNull
             ?.takeIf { it.isNotBlank() }
-        ?: "https://tts.chloemlla.com"
+        ?: "https://chloemlla.com"
     val projectLumenTelemetryAccessToken = providers.environmentVariable("PROJECT_LUMEN_TELEMETRY_ACCESS_TOKEN")
         .orNull
         ?.takeIf { it.isNotBlank() }

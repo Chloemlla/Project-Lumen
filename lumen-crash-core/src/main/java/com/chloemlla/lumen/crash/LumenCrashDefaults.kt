@@ -11,7 +11,7 @@ object LumenCrashDefaults {
     const val SHARE_DIRECTORY_NAME: String = "lumen-crash-share"
 
     /** Default HTTPS base URL for the Lumen crash-report backend. */
-    const val DEFAULT_CRASH_BACKEND_BASE_URL: String = "https://tts.chloemlla.com"
+    const val DEFAULT_CRASH_BACKEND_BASE_URL: String = "https://chloemlla.com"
 
     /** Default path of the anonymous crash-report upload endpoint. */
     const val DEFAULT_CRASH_BACKEND_ENDPOINT_PATH: String = "/api/crash-sdk/v1/crash-report"

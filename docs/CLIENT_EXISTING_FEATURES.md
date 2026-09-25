@@ -484,7 +484,7 @@
 
 默认翻译服务：
 
-- `https://tts.chloemlla.com`
+- `https://chloemlla.com`
 
 相关源码：
 
