@@ -835,6 +835,16 @@
     <string name="remote_cloud_restore_backup">Restore backup</string>
     <string name="remote_cloud_verify_purchase">Verify purchase</string>
 
+    <string name="ip_verification_title">Confirm your network</string>
+    <string name="ip_verification_message">The server needs a quick check before this device can keep syncing. Finish the check below to continue.</string>
+    <string name="ip_verification_load_failed">The check could not be loaded. Check your connection and try again.</string>
+    <string name="ip_verification_failed">The check did not finish. Try it again.</string>
+    <string name="ip_verification_submitting">Verifying…</string>
+    <string name="ip_verification_retry">Try again</string>
+    <string name="ip_verification_close">Later</string>
+    <string name="ip_verification_banned_title">Network blocked</string>
+    <string name="ip_verification_banned_message">The server blocked this network, so syncing is unavailable here. There is nothing to confirm — try another connection.</string>
+
     <string name="oss_notice_title">Open source notice</string>
     <string name="oss_notice_intro">Please read this notice before using Project Lumen. It covers the official source, free distribution, project license, and third-party credits.</string>
     <string name="oss_notice_repo_title">Official open-source repository</string>

@@ -342,6 +342,9 @@ fun ProjectLumenApp(
                 )
                 return@ProjectLumenTheme
             }
+            // Synapse 首访闸门要求人机验证时弹在这里：拦截器只上报挑战、不阻塞等用户，
+            // 验证通过后的访问令牌在服务端给的 TTL（默认 40 分钟）内始终复用。
+            ProjectLumenIpVerificationGate()
             if (
                 ProjectLumenAutomaticFirstOpenGateHost(
                     viewModel = viewModel,

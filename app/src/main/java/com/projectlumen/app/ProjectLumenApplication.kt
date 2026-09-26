@@ -13,6 +13,7 @@ import com.projectlumen.app.core.api.BackendCommunicationBlockedException
 import com.projectlumen.app.core.api.BackendConnectivityController
 import com.projectlumen.app.core.api.MmkvBackendConnectivityPersistence
 import com.projectlumen.app.core.api.ProjectLumenApiClient
+import com.projectlumen.app.core.api.ProjectLumenClientIdentity
 import com.chloemlla.lumen.crash.LumenCrash
 import com.chloemlla.lumen.crash.CrashBreadcrumbs
 import com.chloemlla.lumen.crash.CrashReport
@@ -247,6 +248,12 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
                 CrashBreadcrumbs.record("Application.onCreate")
             }.onFailure { Log.e(TAG, "LumenCrash install failed in onCreate", it) }
             initializeMmkvOrRecordCrash()
+            // 官方客户端身份与首访闸门共用一个安装标识。这里只存下一步取数 lambda：
+            // deviceInstallationId() 会碰 MMKV + Keystore，不能拉上冷启动主线程（见
+            // startBackgroundStartupWork 里的预热）。
+            ProjectLumenClientIdentity.installDeviceIdProvider {
+                runCatching { secureCredentials.deviceInstallationId() }.getOrNull()
+            }
             startBackgroundStartupWork()
             runCatching { notifications.ensureChannels() }
             runCatching { LumenToast.install(this) }

@@ -20,11 +20,16 @@ internal object SecureOkHttpFactory {
      * proxy, and force [Proxy.NO_PROXY] so the JVM / system [java.net.ProxySelector]
      * cannot layer an extra HTTP proxy on top of the tunnel. Process binding
      * already covers socket routing for OkHttp / WebView / HttpURLConnection.
+     *
+     * `withIpVerification` 为 true 时，给同源请求挂上 Synapse 首访闸门需要的
+     * `X-Fingerprint` / `X-IP-Verification-Token`，见 [ProjectLumenIpVerificationInterceptor]。
+     * 闸门自己的引导请求必须走 false，否则会自我递归。
      */
     fun create(
         baseUrl: String,
         certificatePins: String,
         requireCertificatePins: Boolean = false,
+        withIpVerification: Boolean = false,
     ): OkHttpClient {
         val url = baseUrl.toHttpUrl()
         if (url.scheme != "https") {
@@ -33,9 +38,9 @@ internal object SecureOkHttpFactory {
         // Key on the current VPN binding too: the cache stays bounded, but a client built
         // after Clash connects/disconnects still picks up the matching proxy decision.
         val skipProxy = ClashPartnerCompat.shouldSkipManualProxy()
-        val cacheKey = "$baseUrl|$certificatePins|$requireCertificatePins|$skipProxy"
+        val cacheKey = "$baseUrl|$certificatePins|$requireCertificatePins|$skipProxy|$withIpVerification"
         return clients.computeIfAbsent(cacheKey) {
-            buildClient(url, certificatePins, requireCertificatePins, skipProxy)
+            buildClient(url, certificatePins, requireCertificatePins, skipProxy, withIpVerification)
         }
     }
 
@@ -44,6 +49,7 @@ internal object SecureOkHttpFactory {
         certificatePins: String,
         requireCertificatePins: Boolean,
         skipProxy: Boolean,
+        withIpVerification: Boolean,
     ): OkHttpClient {
         val pins = CertificatePinPolicy.parse(certificatePins)
         if (requireCertificatePins && pins.isEmpty()) {
@@ -52,6 +58,13 @@ internal object SecureOkHttpFactory {
         recordPinningDiagnostics(url.host, certificatePins, pins)
 
         return OkHttpClient.Builder().apply {
+            if (withIpVerification) {
+                // 闸门挂在主机根路径上（/api/ip-verification），所以存下去的是 origin 而不是
+                // 带 /api/lumen 后缀的 baseUrl；引导请求从这里拿不带拦截器的客户端。
+                val root = HttpUrl.Builder().scheme(url.scheme).host(url.host).port(url.port).build()
+                ProjectLumenIpVerification.install(root, certificatePins)
+                addInterceptor(ProjectLumenIpVerificationInterceptor(root))
+            }
             if (pins.isNotEmpty()) {
                 certificatePinner(
                     CertificatePinner.Builder().apply {

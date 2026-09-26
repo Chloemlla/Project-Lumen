@@ -33,6 +33,8 @@ class ProjectLumenTranslationApiClient(
         baseUrl = baseUrl,
         certificatePins = ProjectLumenApiConfig.translationCertificatePins,
         requireCertificatePins = false,
+        // 翻译接口与主后端同源（chloemlla.com），闸门开着时一样要带指纹/令牌。
+        withIpVerification = true,
     ),
 ) {
     suspend fun fetchConfig(): TranslationConfig = request(
@@ -88,7 +90,11 @@ class ProjectLumenTranslationApiClient(
             .url(url)
             .method(method, requestBody)
             .header("Accept", "application/json")
-            .header("User-Agent", USER_AGENT)
+            .header("User-Agent", ProjectLumenClientIdentity.USER_AGENT)
+        // 与主后端请求保持同一套官方客户端身份，否则服务器只能看到一个没有设备标识的客户端。
+        ProjectLumenClientIdentity.headers().forEach { (name, value) ->
+            requestBuilder.header(name, value)
+        }
         ProjectLumenRequestSigner.headers(method, url, bodyText)
             .forEach { (name, value) -> requestBuilder.header(name, value) }
 
@@ -138,7 +144,6 @@ class ProjectLumenTranslationApiClient(
     }
 
     private companion object {
-        private const val USER_AGENT = "Project-Lumen-Android"
         private const val MAX_RESPONSE_BYTES = 1024L * 1024L
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }

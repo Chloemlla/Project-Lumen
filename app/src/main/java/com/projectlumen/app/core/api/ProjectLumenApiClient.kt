@@ -22,6 +22,7 @@ class ProjectLumenApiClient(
     private val httpClient: OkHttpClient = SecureOkHttpFactory.create(
         baseUrl = ProjectLumenApiConfig.normalizeApiBaseUrl(baseUrl),
         certificatePins = ProjectLumenApiConfig.apiCertificatePins,
+        withIpVerification = true,
     ),
     private val backendGate: BackendCapabilityGate = AllowAllBackendCapabilityGate,
     private val deviceSecurityGate: DeviceSecurityGate? = null,
@@ -323,7 +324,12 @@ class ProjectLumenApiClient(
             .url(url)
             .method(method, requestBody)
             .header("Accept", "application/json")
-            .header("User-Agent", USER_AGENT)
+            .header("User-Agent", ProjectLumenClientIdentity.USER_AGENT)
+        // 官方客户端身份：少了这几个头，后端只能从 user-agent 反推，
+        // 「设备与会话」里就只剩一个未知客户端，撤销也认不出是哪台机器。
+        ProjectLumenClientIdentity.headers().forEach { (name, value) ->
+            requestBuilder.header(name, value)
+        }
         accessToken
             ?.takeIf { it.isNotBlank() }
             ?.let { requestBuilder.header("Authorization", "Bearer $it") }
@@ -431,7 +437,6 @@ class ProjectLumenApiClient(
     }
 
     private companion object {
-        private const val USER_AGENT = "Project-Lumen-Android"
         private const val BYTES_PER_MB = 1024L * 1024L
         private const val MAX_RESPONSE_BYTES = 8L * 1024L * 1024L
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
