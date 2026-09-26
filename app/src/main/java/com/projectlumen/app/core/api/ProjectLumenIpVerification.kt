@@ -116,7 +116,11 @@ internal object ProjectLumenIpVerification {
      */
     fun pageBaseUrl(): String {
         val root = apiRoot ?: return ""
-        val port = if (root.port == root.defaultPort) "" else ":${root.port}"
+        val defaultPort = when (root.scheme) {
+            "https" -> 443
+            else -> 80
+        }
+        val port = if (root.port == defaultPort) "" else ":${root.port}"
         return "${root.scheme}://${root.host}$port"
     }
 
@@ -331,8 +335,9 @@ internal object ProjectLumenIpVerification {
 
     /** 不带本闸门的客户端：引导请求必须走这条，否则自我递归。 */
     private fun bootstrapClient(root: HttpUrl): OkHttpClient {
+        // HttpUrl 在端口等于方案默认值时不会把端口写回字符串，所以直接用 root 的规范形式。
         return SecureOkHttpFactory.create(
-            baseUrl = "${root.scheme}://${root.host}:${root.port}",
+            baseUrl = root.toString().trimEnd('/'),
             certificatePins = certificatePins,
         )
     }
