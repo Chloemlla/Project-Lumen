@@ -58,10 +58,14 @@ object LumenCrash {
     fun install(application: Application, config: LumenCrashConfig) {
         AuthorIntegrity.verifyOrThrow("install")
         packageName = application.packageName
-        appContext = application.applicationContext
+        // Hosts install from Application.attachBaseContext(), where the framework has not published
+        // the process Application yet and getApplicationContext() is still null. The Application
+        // instance is already a usable Context, so it is the fallback for this window.
+        val installContext = application.crashInstallContext()
+        appContext = installContext
         synchronized(installLock) {
             installedConfig.set(config)
-            storeRef.set(CrashReportStore(application.applicationContext))
+            storeRef.set(CrashReportStore(installContext))
             installUncaughtExceptionHandler(application)
             restartWatchdog(application, config)
             CrashBreadcrumbs.record(
@@ -264,7 +268,9 @@ object LumenCrash {
                         saveReport(report, config, awaitUploadMillis = CRASH_UPLOAD_AWAIT_MILLIS)
                     } else {
                         startupCrashReport = report
-                        runCatching { CrashReportStore(application.applicationContext).save(report) }
+                        runCatching {
+                            CrashReportStore(application.crashInstallContext()).save(report)
+                        }
                     }
                 }
             }
@@ -327,7 +333,7 @@ object LumenCrash {
         if (!config.priorExitCaptureEnabled) return
         if (!PriorExitCrashCollector.isSupported()) return
         val report = runCatching {
-            PriorExitCrashCollector(application.applicationContext) { config.toAppInfo() }.collect()
+            PriorExitCrashCollector(application.crashInstallContext()) { config.toAppInfo() }.collect()
         }.getOrNull() ?: return
         // Never clobber a pending real crash/watchdog report with a derived PRIOR_EXIT report.
         if (runCatching { store().load() != null }.getOrDefault(false)) return

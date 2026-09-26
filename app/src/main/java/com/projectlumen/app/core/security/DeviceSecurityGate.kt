@@ -21,7 +21,19 @@ import java.util.concurrent.atomic.AtomicBoolean
  * [backendEvidence] are sent during device registration so the backend can
  * refuse high-impact operations for the same installation.
  */
-class DeviceSecurityGate(context: Context) {
+class DeviceSecurityGate(
+    context: Context,
+    /**
+     * Hands CRooot failures to the crash reporter.
+     *
+     * Defaults to a no-op so the gate stays constructible without the crash SDK (tests, tools), but
+     * the app wires this to `LumenCrash.recordNonFatal` — CRooot's native probe failures never reach
+     * the uncaught-exception handler or the process-exit history, so this is their only way in.
+     */
+    private val crashReporter: (Throwable) -> Unit = {},
+    /** Records a bounded diagnostic line; the app wires this to `CrashBreadcrumbs.record`. */
+    private val breadcrumbRecorder: (String) -> Unit = {},
+) {
     enum class State {
         UNKNOWN,
         SCANNING,
@@ -37,7 +49,7 @@ class DeviceSecurityGate(context: Context) {
     }
 
     private val appContext = context.applicationContext
-    private val scanner = DeviceSecurityScanner(appContext)
+    private val scanner = DeviceSecurityScanner(appContext, failureReporter = ::reportCroootFailure)
     private val scanInFlight = AtomicBoolean(false)
     private val _state = MutableStateFlow(State.UNKNOWN)
     private val _assessment = MutableStateFlow<DeviceSecurityScanner.SecurityAssessment?>(null)
@@ -87,6 +99,44 @@ class DeviceSecurityGate(context: Context) {
         _assessment.value = result
         _state.value = classify(result)
         Log.i(TAG, "Device security state=${_state.value}")
+        recordCroootDiagnostics(result)
+    }
+
+    /**
+     * Persists a CRooot failure the SDK handled internally (a timed-out scan, a probe killed by the
+     * app seccomp policy, a detector that could not run) so the next crash report carries it.
+     */
+    private fun reportCroootFailure(failure: CroootFailure) {
+        Log.w(TAG, failure.breadcrumb())
+        runCatching { breadcrumbRecorder(failure.breadcrumb()) }
+        runCatching { crashReporter(failure.asThrowable()) }
+            .onFailure { Log.e(TAG, "Failed to report the CRooot failure.", it) }
+    }
+
+    /**
+     * Records the verdict plus every CRooot-side failure signal as breadcrumbs. CRooot reports probe
+     * failures inside its own result instead of throwing, so without this the only trace of a blocked
+     * or unavailable probe is logcat, which no crash report carries.
+     */
+    private fun recordCroootDiagnostics(result: DeviceSecurityScanner.SecurityAssessment) {
+        val digest = result.rawResult?.let(CroootFailureDigest::describe).orEmpty()
+        val line = buildString {
+            append("CRooot scan state=")
+            append(_state.value)
+            append(" completed=")
+            append(result.completed)
+            append(" rooted=")
+            append(result.rooted)
+            result.errorMessage?.takeIf { it.isNotBlank() }?.let { error ->
+                append(" error=")
+                append(error)
+            }
+            if (digest.isNotEmpty()) {
+                append(" failures=")
+                append(digest.joinToString("; "))
+            }
+        }
+        runCatching { breadcrumbRecorder(line) }
     }
 
     /**

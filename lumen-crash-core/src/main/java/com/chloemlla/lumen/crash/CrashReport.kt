@@ -365,25 +365,33 @@ fun CrashReport.toJson(): JSONObject {
     }
 }
 
+/**
+ * Maps an `ApplicationExitInfo` reason code to its constant name.
+ *
+ * The values are the ones published in the Android reference for `ApplicationExitInfo`
+ * (`REASON_UNKNOWN` = 0 … `REASON_ANOMALY` = 18). Keep this table in step with the reference
+ * rather than with the ordering of the constants in the platform source: a table that is off by
+ * one labels a native crash as a permission change and a system reap as a native crash.
+ */
 internal fun processExitReasonName(code: Int): String = when (code) {
+    0 -> "REASON_UNKNOWN"
     1 -> "REASON_EXIT_SELF"
     2 -> "REASON_SIGNALED"
     3 -> "REASON_LOW_MEMORY"
     4 -> "REASON_CRASH"
-    5 -> "REASON_PERMISSION_CHANGE"
-    6 -> "REASON_EXCEPTION"
-    7 -> "REASON_USER_REQUESTED"
-    8 -> "REASON_USER_STOPPED"
-    9 -> "REASON_OTHER"
-    10 -> "REASON_ANR"
-    11 -> "REASON_DEPENDENCY_DIED"
-    12 -> "REASON_DEADLOCK"
-    13 -> "REASON_CRASH_NATIVE"
-    14 -> "REASON_SUSPENDED"
-    15 -> "REASON_INITIALIZATION_FAILURE"
-    16 -> "REASON_QUIET"
-    17 -> "REASON_MEMORY_PRESSURE"
-    18 -> "REASON_FREEZER"
-    19 -> "REASON_PACKAGE_UPDATED"
+    5 -> "REASON_CRASH_NATIVE"
+    6 -> "REASON_ANR"
+    7 -> "REASON_INITIALIZATION_FAILURE"
+    8 -> "REASON_PERMISSION_CHANGE"
+    9 -> "REASON_EXCESSIVE_RESOURCE_USAGE"
+    10 -> "REASON_USER_REQUESTED"
+    11 -> "REASON_USER_STOPPED"
+    12 -> "REASON_DEPENDENCY_DIED"
+    13 -> "REASON_OTHER"
+    14 -> "REASON_FREEZER"
+    15 -> "REASON_PACKAGE_STATE_CHANGE"
+    16 -> "REASON_PACKAGE_UPDATED"
+    17 -> "REASON_MEMORY_LIMITER"
+    18 -> "REASON_ANOMALY"
     else -> "UNKNOWN($code)"
 }

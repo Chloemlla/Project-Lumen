@@ -22,12 +22,8 @@ class CrashReportStore private constructor(
     private val lock = Any()
 
     constructor(context: Context) : this(
-        externalTargetsProvider = context.applicationContext.let { appContext ->
-            { resolveExternalTargets(appContext) }
-        },
-        legacyPrivateTargetsProvider = context.applicationContext.let { appContext ->
-            { resolveLegacyPrivateTargets(appContext) }
-        },
+        externalTargetsProvider = externalTargetProvider(context),
+        legacyPrivateTargetsProvider = legacyPrivateTargetProvider(context),
     )
 
     internal constructor(
@@ -145,6 +141,21 @@ class CrashReportStore private constructor(
     private companion object {
         const val DIR_NAME = "lumen-crash"
         const val FILE_NAME = "crash_report.json"
+
+        /**
+         * Captures the application context once, so the returned provider never holds the caller's
+         * context (which can be an Activity) and never re-reads a context that may still be
+         * unpublished when the host installs from `Application.attachBaseContext`.
+         */
+        fun externalTargetProvider(context: Context): () -> List<File> {
+            val appContext = context.crashInstallContext()
+            return { resolveExternalTargets(appContext) }
+        }
+
+        fun legacyPrivateTargetProvider(context: Context): () -> List<File> {
+            val appContext = context.crashInstallContext()
+            return { resolveLegacyPrivateTargets(appContext) }
+        }
 
         fun resolveExternalTargets(appContext: Context): List<File> {
             val dirs = listOfNotNull(

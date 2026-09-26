@@ -99,7 +99,16 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
             }
         }
     val secureCredentials: SecureCredentialStore by lazy { SecureCredentialStore(this) }
-    val deviceSecurityGate: DeviceSecurityGate by lazy { DeviceSecurityGate(this) }
+    val deviceSecurityGate: DeviceSecurityGate by lazy {
+        DeviceSecurityGate(
+            this,
+            // CRooot's native probes die in fork()ed helper processes, so neither the uncaught
+            // exception handler nor the process-exit history can see them; the gate hands every
+            // CRooot failure here instead of letting it stay in logcat.
+            crashReporter = { throwable -> recordHandledFailure(throwable) },
+            breadcrumbRecorder = { event -> CrashBreadcrumbs.record(event) },
+        )
+    }
     val openApiController: LumenOpenRuntimeController by lazy { LumenOpenRuntimeController(this) }
     val scheduleRepository: ScheduleRepository by lazy {
         ScheduleRepository(

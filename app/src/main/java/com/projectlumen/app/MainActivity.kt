@@ -152,7 +152,17 @@ open class MainActivity : ComponentActivity() {
                             launchQuarkKeeperStoreListing = app::openQuarkKeeperStoreListing,
                             launchQuarkKeeperWebCheckIn = app::openQuarkKeeperWebCheckIn,
                             securityEvidence = { app.deviceSecurityGate.backendEvidence() },
-                            runDeviceSecurityScan = { DeviceSecurityScanner(app).fullScan() },
+                            runDeviceSecurityScan = {
+                                // The developer-triggered scan reports its CRooot failures through
+                                // the same crash-reporter path as the startup scan.
+                                DeviceSecurityScanner(
+                                    app,
+                                    failureReporter = { failure ->
+                                        CrashBreadcrumbs.record(failure.breadcrumb())
+                                        app.recordHandledFailure(failure.asThrowable())
+                                    },
+                                ).fullScan()
+                            },
                         ) as T
                     }
                 },

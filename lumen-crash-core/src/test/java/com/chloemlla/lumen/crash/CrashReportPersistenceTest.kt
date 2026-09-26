@@ -145,10 +145,32 @@ class CrashReportPersistenceTest {
 
     @Test
     fun processExitReasonNamesMatchApplicationExitInfoConstants() {
-        assertEquals("REASON_CRASH_NATIVE", processExitReasonName(13))
-        assertEquals("REASON_ANR", processExitReasonName(10))
-        assertEquals("REASON_SIGNALED", processExitReasonName(2))
-        assertEquals("REASON_CRASH", processExitReasonName(4))
+        // Values from the Android reference for ApplicationExitInfo. The previous expectations
+        // (13 -> REASON_CRASH_NATIVE, 10 -> REASON_ANR) encoded the off-by-one table and hid it.
+        val expected = mapOf(
+            0 to "REASON_UNKNOWN",
+            1 to "REASON_EXIT_SELF",
+            2 to "REASON_SIGNALED",
+            3 to "REASON_LOW_MEMORY",
+            4 to "REASON_CRASH",
+            5 to "REASON_CRASH_NATIVE",
+            6 to "REASON_ANR",
+            7 to "REASON_INITIALIZATION_FAILURE",
+            8 to "REASON_PERMISSION_CHANGE",
+            9 to "REASON_EXCESSIVE_RESOURCE_USAGE",
+            10 to "REASON_USER_REQUESTED",
+            11 to "REASON_USER_STOPPED",
+            12 to "REASON_DEPENDENCY_DIED",
+            13 to "REASON_OTHER",
+            14 to "REASON_FREEZER",
+            15 to "REASON_PACKAGE_STATE_CHANGE",
+            16 to "REASON_PACKAGE_UPDATED",
+            17 to "REASON_MEMORY_LIMITER",
+            18 to "REASON_ANOMALY",
+        )
+        expected.forEach { (code, name) ->
+            assertEquals("reason $code", name, processExitReasonName(code))
+        }
         assertEquals("UNKNOWN(99)", processExitReasonName(99))
     }
 

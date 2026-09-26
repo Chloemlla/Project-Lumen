@@ -29,7 +29,17 @@ import kotlinx.coroutines.withTimeout
  * if (assessment.rooted) { /* device is likely rooted */ }
  * ```
  */
-class DeviceSecurityScanner(private val context: Context) {
+class DeviceSecurityScanner(
+    private val context: Context,
+    /**
+     * Receives CRooot failures so they reach the crash reporter instead of only logcat.
+     *
+     * CRooot's sacrificial probes run in `fork()`ed helper processes, so their deaths are invisible
+     * to both the Java uncaught-exception handler and `ActivityManager`'s process-exit history.
+     * Defaults to a no-op so a scanner without a crash reporter still behaves as before.
+     */
+    private val failureReporter: ((CroootFailure) -> Unit)? = null,
+) {
 
     /** Result of a CRooot device-security scan, distilled for consumption by Lumen's security layer. */
     data class SecurityAssessment(
@@ -100,6 +110,7 @@ class DeviceSecurityScanner(private val context: Context) {
             includeHardware = true,
             includeDuckFeatures = true,
         ),
+        phase: CroootScanPhase = CroootScanPhase.MANUAL,
     ): SecurityAssessment = scanMutex.withLock {
         withContext(Dispatchers.Default) {
             try {
@@ -108,15 +119,37 @@ class DeviceSecurityScanner(private val context: Context) {
                 }
                 distill(result)
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                Log.w(TAG, "CRooot scan timed out after ${scanTimeoutMs}ms.", e)
+                Log.w(TAG, "CRooot ${phase.label} scan timed out after ${scanTimeoutMs}ms.", e)
+                reportFailure(
+                    CroootFailure(
+                        phase = phase,
+                        options = options,
+                        throwable = null,
+                        message = "timed out after ${scanTimeoutMs}ms",
+                    ),
+                )
                 SecurityAssessment.timeout()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                Log.e(TAG, "CRooot scan failed.", e)
+                Log.e(TAG, "CRooot ${phase.label} scan failed.", e)
+                reportFailure(
+                    CroootFailure(
+                        phase = phase,
+                        options = options,
+                        throwable = e,
+                        message = "${e::class.java.simpleName}: ${e.message ?: "no message"}",
+                    ),
+                )
                 SecurityAssessment.failed(e)
             }
         }
+    }
+
+    /** Never lets a failing reporter break the scan that is already reporting its failure. */
+    private fun reportFailure(failure: CroootFailure) {
+        runCatching { failureReporter?.invoke(failure) }
+            .onFailure { Log.e(TAG, "CRooot failure reporter threw.", it) }
     }
 
     /**
@@ -124,10 +157,11 @@ class DeviceSecurityScanner(private val context: Context) {
      * Suitable for cold-start or background checks.
      */
     suspend fun quickScan(): SecurityAssessment = scan(
-        CRoootScanOptions(
+        options = CRoootScanOptions(
             includeHardware = false,
             includeDuckFeatures = false,
         ),
+        phase = CroootScanPhase.QUICK,
     )
 
     /**
@@ -135,10 +169,11 @@ class DeviceSecurityScanner(private val context: Context) {
      * Suitable for user-initiated security checks.
      */
     suspend fun fullScan(): SecurityAssessment = scan(
-        CRoootScanOptions(
+        options = CRoootScanOptions(
             includeHardware = true,
             includeDuckFeatures = true,
         ),
+        phase = CroootScanPhase.FULL,
     )
 
     private fun distill(result: CRoootScanResult): SecurityAssessment {

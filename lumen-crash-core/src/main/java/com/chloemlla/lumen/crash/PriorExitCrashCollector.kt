@@ -11,6 +11,12 @@ import android.os.Build
  *
  * The report is produced at most once: a persisted marker records the last processed exit
  * timestamp, so a crash is only reported on the launch right after it, never on every launch.
+ *
+ * [MAX_ENTRIES] asks for more records than the platform ring buffer holds. CRooot's isolated
+ * probe processes (`TeeGrantDomainGranteeService`, `SelinuxContextValidityCarrierService`,
+ * `VirtualizationIsolatedProbeService`) are reaped as `REASON_OTHER` / `ISOLATED NOT NEEDED`
+ * several times per scan, and those records are newer than any real crash, so a narrow window
+ * hides the crash this collector exists to find. The reason filter below still excludes them.
  */
 internal class PriorExitCrashCollector(
     private val appContext: Context,
@@ -22,10 +28,14 @@ internal class PriorExitCrashCollector(
             val activityManager =
                 appContext.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
                     ?: return@runCatching null
+            // The signature is getHistoricalProcessExitReasons(packageName, pid, maxNum): pid must
+            // be 0 to mean "every process that belonged to this package", and maxNum carries the
+            // window size. Passing the window as pid silently filtered to a single process id and
+            // made this collector return null on every launch.
             val exits = activityManager.getHistoricalProcessExitReasons(
                 appContext.packageName,
-                MAX_ENTRIES,
-                0,
+                /* pid = */ 0,
+                /* maxNum = */ MAX_ENTRIES,
             ) ?: return@runCatching null
             if (exits.isEmpty()) return@runCatching null
 
@@ -84,7 +94,7 @@ internal class PriorExitCrashCollector(
         fun isSupported(): Boolean =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
 
-        private const val MAX_ENTRIES = 8
+        private const val MAX_ENTRIES = 32
         private const val MAX_TRACE_BYTES = 128 * 1024
         private const val PREFS_NAME = "lumen_crash_prior_exit"
         private const val KEY_LAST_PROCESSED_TS = "last_processed_timestamp_millis"
