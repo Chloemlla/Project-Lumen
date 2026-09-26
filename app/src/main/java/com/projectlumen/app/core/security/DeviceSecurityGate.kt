@@ -137,6 +137,9 @@ class DeviceSecurityGate(
             }
         }
         runCatching { breadcrumbRecorder(line) }
+        // Bounded labels and counts only (no paths, digests or identifiers), so this stays safe to
+        // keep in logcat next to the existing state line.
+        Log.i(TAG, line)
     }
 
     /**
