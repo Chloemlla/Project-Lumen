@@ -189,7 +189,7 @@ android {
         buildConfigField("String", "OPEN_API_TRUSTED_SIGNATURE_SHA256", "\"${projectLumenBuildConfigString(projectLumenOpenApiTrustedSignatureSha256)}\"")
 
         applicationId = projectLumenApplicationId
-        // CRooot 0.1.0 uses API 29 App Zygote and declares Android 10 as its floor.
+        // CRooot 0.1.1 uses API 29 App Zygote and declares Android 10 as its floor.
         minSdk = 29
         targetSdk = 37
         versionCode = projectLumenVersionCode
@@ -338,7 +338,7 @@ kapt {
 
 dependencies {
     implementation(project(":lumen-crash"))
-    implementation("com.chloemlla.crooot:crooot-sdk:0.1.0")
+    implementation("com.chloemlla.crooot:crooot-sdk:0.1.1")
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)

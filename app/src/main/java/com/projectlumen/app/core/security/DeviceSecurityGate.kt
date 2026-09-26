@@ -180,7 +180,7 @@ class DeviceSecurityGate(
             .put("selinuxEnforcing", current.selinuxEnforcing)
             .put("teeAttestationOk", current.teeAttestationOk)
             .put("observedAt", System.currentTimeMillis())
-            .put("scannerVersion", "crooot-0.1.0")
+            .put("scannerVersion", "crooot-0.1.1")
     }
 
     /**
