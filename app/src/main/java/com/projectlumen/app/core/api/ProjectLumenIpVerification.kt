@@ -19,7 +19,7 @@ import org.json.JSONObject
  *
  * 与 Synapse-Client 的 `SynapseIpVerificationInterceptor`、网页端
  * `frontend/src/utils/ipVerification.ts` 同语义：
- *  - 闸门开启时所有 `/api/**` 都要带 `X-Fingerprint`（服务端要求
+ *  - 闸门开启时服务根下的 `/api/` 路径全部要带 `X-Fingerprint`（服务端要求
  *    `^[a-zA-Z0-9_-]{8,200}$`）与 `X-IP-Verification-Token`；
  *  - 干净 IP 由服务端直接签发 `issuedBy: "auto"` 的令牌，不打扰用户；
  *  - 被标记的 IP 回 `requiresVerification: true`，这时才把 [challenge] 抛给界面渲染
