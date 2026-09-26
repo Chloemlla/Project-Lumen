@@ -834,6 +834,16 @@
     <string name="remote_cloud_restore_backup">恢复备份</string>
     <string name="remote_cloud_verify_purchase">校验购买</string>
 
+    <string name="ip_verification_title">确认网络环境</string>
+    <string name="ip_verification_message">服务器需要先确认本机网络，之后才能继续同步。请完成下面的验证。</string>
+    <string name="ip_verification_load_failed">验证组件加载失败，请检查网络后重试。</string>
+    <string name="ip_verification_failed">验证未完成，请重试。</string>
+    <string name="ip_verification_submitting">正在验证…</string>
+    <string name="ip_verification_retry">重试</string>
+    <string name="ip_verification_close">稍后</string>
+    <string name="ip_verification_banned_title">当前网络已被拦截</string>
+    <string name="ip_verification_banned_message">服务器已拦截当前网络，这里无法继续同步。这不是验证问题，换一个网络再试。</string>
+
     <string name="oss_notice_title">开源说明</string>
     <string name="oss_notice_intro">使用 Project Lumen 前请先阅读本说明。内容包括官方开源地址、永久免费与防骗提示、本项目开源协议，以及第三方依赖鸣谢。</string>
     <string name="oss_notice_repo_title">官方开源仓库</string>
