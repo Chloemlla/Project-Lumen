@@ -1264,7 +1264,7 @@ Config:
 
 | Field | Default | Notes |
 |---|---|---|
-| `pasteUploadEnabled` | `true` | Disable to hide the upload-link share option |
+| `pasteUploadEnabled` | `true` | Disable to hide the “Copy shareable link” share option |
 | `pasteUploadBaseUrl` | `https://paste.gentoo.zip` | Must be HTTPS; trailing slash is ignored |
 
 On success the SDK copies the link to the clipboard and shows a dialog with Copy / Open / Share actions. Upload is best-effort: network, integrity, or endpoint failures only toast an error and leave text/file share available; they must not process-kill the crash UI. Redirects are followed manually and only to HTTPS — never downgraded to `http`. Library manifest merges `INTERNET` permission into hosts.
