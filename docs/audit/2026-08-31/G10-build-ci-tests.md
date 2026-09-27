@@ -99,7 +99,7 @@
   // :127-133  PROJECT_LUMEN_OPEN_API_TRUSTED_SIGNATURE_SHA256
   ?: ""                                              // ← 空串
   // :68-81    API_BASE_URL / TRANSLATION_API_BASE_URL
-  ?: "https://tts.chloemlla.com/api/lumen" / "https://tts.chloemlla.com"   // ← 真实生产域名
+  ?: "https://chloemlla.com/api/lumen" / "https://chloemlla.com"   // ← 真实生产域名
   ```
   结论：**没有把真密钥提交进仓库**（`project-lumen-local-request-signing-key` 是占位字符串，不是可用凭据），也**不会导致签名恒失败**（APK 签名走 `signingConfigs`，与这些值无关）。真正的问题是三条 fail-open：
   1. 该字面量会经 `:175` 编译进 `liblumen_security.so`，成为 APK 里所有人可读的 HMAC 密钥。secret 未配置/为空时构建照常成功，产出的 release 包对后端的请求签名可被任意第三方伪造。

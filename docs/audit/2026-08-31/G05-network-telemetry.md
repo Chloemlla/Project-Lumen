@@ -341,5 +341,5 @@
 **有意的设计（勿"修正"）**
 - **翻译客户端故意不接 `BackendCapabilityGate`**：`BackendCommunicationArchitectureTest:55-58`（`recoveryPathsAndBackgroundCollectorsRemainExplicitlySeparated`）显式断言 `ProjectLumenTranslationScreen.kt` 不含 `BackendCapability`——翻译被定义为独立于主后端健康度的恢复路径。给它加熔断会让测试失败，也违背设计意图。
 - `AllowAllBackendCapabilityGate` 作为默认参数只服务于测试与独立构造场景；生产装配（`ProjectLumenApplication.kt:79`、`:102`）一律传 `backendConnectivity`，且有测试断言全仓库只有 `ProjectLumenApplication` 构造 `ProjectLumenApiClient`。
-- `ProjectLumenApiConfig.normalizeApiBaseUrl` 把裸主机根（`https://tts.chloemlla.com`）纠正为带 `/api/lumen` 前缀的完整 base URL，是为了兼容 CI 里可能只配主机的情形，逻辑正确。
+- `ProjectLumenApiConfig.normalizeApiBaseUrl` 把裸主机根（`https://chloemlla.com`）纠正为带 `/api/lumen` 前缀的完整 base URL，是为了兼容 CI 里可能只配主机的情形，逻辑正确。
 - `LifecycleLockPolicy.antiUninstallIntent` 注释明确"仅策略元数据，客户端从不阻止卸载或隐藏控件"——这是合规上的重要约束，任何改动都不要让它真的去干预卸载。

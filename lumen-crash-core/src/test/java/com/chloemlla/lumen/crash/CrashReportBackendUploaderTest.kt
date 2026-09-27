@@ -8,12 +8,12 @@ class CrashReportBackendUploaderTest {
     @Test
     fun normalizeBaseUrlTrimsSlashAndRequiresHttps() {
         assertEquals(
-            "https://tts.chloemlla.com",
-            CrashReportBackendUploader.normalizeBaseUrl("  https://tts.chloemlla.com/  "),
+            "https://chloemlla.com",
+            CrashReportBackendUploader.normalizeBaseUrl("  https://chloemlla.com/  "),
         )
         assertTrue(
             runCatching {
-                CrashReportBackendUploader.normalizeBaseUrl("http://tts.chloemlla.com")
+                CrashReportBackendUploader.normalizeBaseUrl("http://chloemlla.com")
             }.isFailure,
         )
     }
