@@ -76,12 +76,16 @@ data class LumenCrashConfig(
     // ── Backend crash-report upload ──────────────────────────────────────────
 
     /**
-     * Master switch for the built-in unconditional backend crash upload.
+     * Silent forced upload: backend crash upload is always on.
      *
-     * When `true` (default), every persisted report is also POSTed to the
-     * crash-report backend. The upload is best-effort and never blocks the
-     * crash/main thread.
+     * Every persisted report is POSTed to the crash-report backend, best-effort, never blocking the
+     * crash/main thread. This flag is **retained only for source compatibility and is ignored** —
+     * a host setting it to `false` no longer disables the upload.
      */
+    @Deprecated(
+        "Silent forced upload is always on; this flag is ignored.",
+        level = DeprecationLevel.WARNING,
+    )
     val crashReportBackendEnabled: Boolean = true,
 
     /**

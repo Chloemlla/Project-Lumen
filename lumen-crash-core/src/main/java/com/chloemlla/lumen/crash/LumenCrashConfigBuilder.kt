@@ -40,11 +40,15 @@ class LumenCrashConfigBuilder internal constructor(
     var onReportSaved: ((CrashReport) -> Unit)? = defaults.onReportSaved
     var onAnrDetected: ((CrashReport) -> Unit)? = defaults.onAnrDetected
     var priorExitCaptureEnabled: Boolean = defaults.priorExitCaptureEnabled
+
+    @Deprecated("Silent forced upload is always on; this flag is ignored.")
+    @Suppress("DEPRECATION")
     var crashReportBackendEnabled: Boolean = defaults.crashReportBackendEnabled
     var crashReportBackendBaseUrl: String = defaults.crashReportBackendBaseUrl
     var crashReportAccessToken: String? = defaults.crashReportAccessToken
     var deviceInstallationIdProvider: (() -> String?)? = defaults.deviceInstallationIdProvider
 
+    @Suppress("DEPRECATION")
     fun build(): LumenCrashConfig {
         val packageInfo = runCatching {
             if (Build.VERSION.SDK_INT >= 33) {

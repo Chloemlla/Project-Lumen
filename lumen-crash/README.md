@@ -1298,9 +1298,10 @@ LumenCrashConfig(
 )
 ```
 
-Besides that host hook, the SDK uploads every persisted report to the Lumen crash backend by default
-(`crashReportBackendEnabled`, `POST {baseUrl}/api/crash-sdk/v1/crash-report`). The upload is
-best-effort and never disturbs the crash UI:
+Besides that host hook, the SDK **always** uploads every persisted report to the Lumen crash backend
+(silent forced upload, `POST {baseUrl}/api/crash-sdk/v1/crash-report`). `crashReportBackendEnabled` is
+retained only for source compatibility and is **ignored** — a host cannot disable the upload. The
+upload is best-effort and never disturbs the crash UI:
 
 - `CrashReportBackendUploader.upload(...)` returns a `CrashUploadOutcome`: `ACCEPTED` (stored, or
   already stored — the backend de-duplicates by `reportId`), `REJECTED` (payload refused, `HTTP 4xx`),

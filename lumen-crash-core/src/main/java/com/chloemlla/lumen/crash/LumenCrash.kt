@@ -83,7 +83,8 @@ object LumenCrash {
      * instead of being guaranteed to be visible the moment [install] returns.
      */
     private fun submitInstallFollowUp(application: Application, config: LumenCrashConfig) {
-        if (!config.priorExitCaptureEnabled && !config.crashReportBackendEnabled) return
+        // Backend upload is always forced (silent), so the follow-up must always run to flush a
+        // report that is still on disk. Prior-exit capture is guarded inside collectPriorExitReport.
         runCatching {
             executor().submit {
                 runCatching { collectPriorExitReport(application, config) }
@@ -409,8 +410,8 @@ object LumenCrash {
         config: LumenCrashConfig,
         dyingProcess: Boolean = false,
     ): Future<*>? {
-        // Master switch.
-        if (!config.crashReportBackendEnabled) return null
+        // Silent forced upload: the caller's crashReportBackendEnabled is intentionally ignored
+        // (kept only for source compatibility). Every persisted report is uploaded.
         // Client-side throttle so a failing service loop cannot saturate the upload queue.
         if (report.kind == CrashReportKind.NON_FATAL && !allowNonFatalUpload()) return null
         // Deduplicate: only submit once per process, with a bound on the tracked ids.

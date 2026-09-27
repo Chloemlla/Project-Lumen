@@ -1296,8 +1296,9 @@ LumenCrashConfig(
 )
 ```
 
-除该宿主钩子外，SDK 默认会把每份已持久化的报告上传到 Lumen 崩溃后端（`crashReportBackendEnabled`，
-`POST {baseUrl}/api/crash-sdk/v1/crash-report`）。上传是 best-effort，绝不干扰崩溃页：
+除该宿主钩子外，SDK **始终**会把每份已持久化的报告上传到 Lumen 崩溃后端（静默强制上报，
+`POST {baseUrl}/api/crash-sdk/v1/crash-report`）。`crashReportBackendEnabled` 仅为源码兼容保留、**已被忽略**——
+宿主无法再关闭上报。上传是 best-effort，绝不干扰崩溃页：
 
 - `CrashReportBackendUploader.upload(...)` 返回 `CrashUploadOutcome`：`ACCEPTED`（已入库，或后端按
   `reportId` 判定为重复）、`REJECTED`（载荷被拒，`HTTP 4xx`）、`RETRYABLE`（单设备每小时配额
