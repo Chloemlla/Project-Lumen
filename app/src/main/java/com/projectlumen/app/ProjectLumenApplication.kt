@@ -6,6 +6,7 @@ import android.app.ApplicationExitInfo
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Process
 import android.util.Log
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.projectlumen.app.core.api.BackendCapability
@@ -65,7 +66,18 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter {
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val applicationScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
+    // Evaluated only after super.attachBaseContext(): this Context already has a package name,
+    // whereas applicationContext can still be null. Isolated services may retain the package
+    // process name, so their distinct UID must also exclude them from host startup.
+    private val isHostProcess: Boolean by lazy {
+        AppStartupProcessPolicy.shouldInitializeHost(
+            packageName = packageName,
+            processName = Application.getProcessName(),
+            uid = Process.myUid(),
+            applicationUid = applicationInfo.uid,
+        )
+    }
     val database: AppDatabase by lazy { AppDatabase.create(this) }
     val eyeCarePreferences: EyeCarePreferencesDataStore by lazy { EyeCarePreferencesDataStore(this) }
     val notifications: NotificationService by lazy { NotificationService(this) }
@@ -89,6 +101,8 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
     val crashReports: CrashReportStore
         get() {
+            // Guard both SDK re-installation and the last-resort shared store below.
+            check(isHostProcess) { "Host crash reports are only available in the default app process." }
             if (!LumenCrash.isInstalled()) {
                 runCatching { installLumenCrashSdk() }
             }
@@ -102,9 +116,8 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     val deviceSecurityGate: DeviceSecurityGate by lazy {
         DeviceSecurityGate(
             this,
-            // CRooot's native probes die in fork()ed helper processes, so neither the uncaught
-            // exception handler nor the process-exit history can see them; the gate hands every
-            // CRooot failure here instead of letting it stay in logcat.
+            // Recovered probe restrictions do not produce tombstones. Explicit diagnostics
+            // complement prior-exit capture, which can expose fatal fork children on Android 12+.
             crashReporter = { throwable -> recordHandledFailure(throwable) },
             breadcrumbRecorder = { event -> CrashBreadcrumbs.record(event) },
         )
@@ -232,6 +245,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
+        if (!isHostProcess) return
         runCatching {
             installLumenCrashSdk()
             CrashBreadcrumbs.record("Application.attachBaseContext")
@@ -240,6 +254,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
 
     override fun onCreate() {
         super.onCreate()
+        if (!isHostProcess) return
         appContext = this
         // ClashPartnerCompat.start does cross-process ContentProvider queries + process VPN
         // binding — moved to the IO startup work below, never on the cold-start main thread.
@@ -282,6 +297,7 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
+        if (!isHostProcess) return
         // Debug.getMemoryInfo walks /proc/self/smaps; the main thread must not pay for it while
         // the system is already under memory pressure.
         applicationScope.launch {
@@ -329,6 +345,8 @@ class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter 
     }
 
     private fun installLumenCrashSdk() {
+        // The main-process SDK still collects auxiliary process crashes through prior-exit history.
+        if (!isHostProcess) return
         if (LumenCrash.isInstalled()) return
         val appName = runCatching { getString(R.string.app_name) }.getOrDefault("Project Lumen")
         // Keep product copy + telemetry hook; metadata can still be explicit for BuildConfig.

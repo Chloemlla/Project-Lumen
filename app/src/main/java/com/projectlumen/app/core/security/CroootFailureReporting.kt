@@ -30,11 +30,9 @@ enum class CroootScanPhase {
 /**
  * A CRooot failure the crash reporter should persist.
  *
- * CRooot's sacrificial native probes run in `fork()`ed helper processes, so a probe the app seccomp
- * policy kills with `SIGSYS` never reaches the Java uncaught-exception handler and never appears in
- * `ActivityManager`'s process-exit history. Scan-level failures and the probe failures CRooot
- * reports back in its own result have to be handed to the crash reporter explicitly or they exist
- * only in logcat.
+ * Fork-child signals do not reach the host Java handler. Android 12+ can surface fatal child
+ * tombstones through prior-exit, but recovered restrictions and scan-level failures do not produce
+ * such tombstones. Hand those failures to the crash reporter explicitly, not only logcat.
  */
 data class CroootFailure(
     /** The scan that failed. */

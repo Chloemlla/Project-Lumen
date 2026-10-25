@@ -34,8 +34,8 @@ class DeviceSecurityScanner(
     /**
      * Receives CRooot failures so they reach the crash reporter instead of only logcat.
      *
-     * CRooot's sacrificial probes run in `fork()`ed helper processes, so their deaths are invisible
-     * to both the Java uncaught-exception handler and `ActivityManager`'s process-exit history.
+     * Fork-child signals do not reach the host Java handler. Android 12+ can expose their fatal
+     * tombstones through prior-exit, but handled/restricted probes still need explicit reporting.
      * Defaults to a no-op so a scanner without a crash reporter still behaves as before.
      */
     private val failureReporter: ((CroootFailure) -> Unit)? = null,

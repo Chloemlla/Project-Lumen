@@ -75,17 +75,30 @@ internal class PriorExitCrashCollector(
 
     private fun traceText(exitInfo: ApplicationExitInfo): String {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return ""
-        val input = exitInfo.traceInputStream ?: return ""
         return runCatching {
+            val input = exitInfo.traceInputStream ?: return@runCatching ""
             input.use { stream ->
-                val buffer = ByteArray(MAX_TRACE_BYTES)
+                val buffer = ByteArray(MAX_TRACE_BYTES + 1)
                 var total = 0
                 while (total < buffer.size) {
                     val count = stream.read(buffer, total, buffer.size - total)
                     if (count < 0) break
-                    total += count
+                    if (count == 0) {
+                        val byte = stream.read()
+                        if (byte < 0) break
+                        buffer[total++] = byte.toByte()
+                    } else {
+                        total += count
+                    }
                 }
-                String(buffer, 0, total, Charsets.UTF_8)
+                val size = minOf(total, MAX_TRACE_BYTES)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    exitInfo.reason == ApplicationExitInfo.REASON_CRASH_NATIVE
+                ) {
+                    NativeTombstoneTrace.decode(buffer.copyOf(size), truncated = total > size)
+                } else {
+                    String(buffer, 0, size, Charsets.UTF_8)
+                }
             }
         }.getOrDefault("")
     }

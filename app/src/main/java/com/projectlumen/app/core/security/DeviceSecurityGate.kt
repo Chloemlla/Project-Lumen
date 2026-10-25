@@ -2,6 +2,7 @@ package com.projectlumen.app.core.security
 
 import android.content.Context
 import android.util.Log
+import com.chloemlla.crooot.CRoootSdk
 import com.projectlumen.app.core.api.BackendCapability
 import com.projectlumen.app.core.api.BackendCommunicationBlockedException
 import kotlinx.coroutines.CoroutineScope
@@ -27,8 +28,8 @@ class DeviceSecurityGate(
      * Hands CRooot failures to the crash reporter.
      *
      * Defaults to a no-op so the gate stays constructible without the crash SDK (tests, tools), but
-     * the app wires this to `LumenCrash.recordNonFatal` — CRooot's native probe failures never reach
-     * the uncaught-exception handler or the process-exit history, so this is their only way in.
+     * the app wires this to `LumenCrash.recordNonFatal`. Handled/restricted probes need explicit
+     * diagnostics; Android 12+ can also expose fatal fork-child tombstones through prior-exit.
      */
     private val crashReporter: (Throwable) -> Unit = {},
     /** Records a bounded diagnostic line; the app wires this to `CrashBreadcrumbs.record`. */
@@ -180,7 +181,7 @@ class DeviceSecurityGate(
             .put("selinuxEnforcing", current.selinuxEnforcing)
             .put("teeAttestationOk", current.teeAttestationOk)
             .put("observedAt", System.currentTimeMillis())
-            .put("scannerVersion", "crooot-0.1.1")
+            .put("scannerVersion", "crooot-${CRoootSdk.SDK_VERSION}")
     }
 
     /**
