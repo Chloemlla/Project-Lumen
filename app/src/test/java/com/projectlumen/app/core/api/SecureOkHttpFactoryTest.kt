@@ -10,7 +10,7 @@ class SecureOkHttpFactoryTest {
     fun createRejectsHttpBaseUrls() {
         assertThrows(IllegalArgumentException::class.java) {
             SecureOkHttpFactory.create(
-                baseUrl = "http://eye.chloemlla.com/api",
+                baseUrl = "http://chloemlla.com/api/lumen",
                 certificatePins = "",
             )
         }
@@ -23,11 +23,11 @@ class SecureOkHttpFactoryTest {
         assertTrue(!ClashPartnerCompat.shouldSkipManualProxy())
 
         val client = SecureOkHttpFactory.create(
-            baseUrl = "https://eye.chloemlla.com/api",
+            baseUrl = "https://chloemlla.com/api/lumen",
             certificatePins = "",
         )
 
-        assertTrue(client.certificatePinner.findMatchingPins("eye.chloemlla.com").isEmpty())
+        assertTrue(client.certificatePinner.findMatchingPins("chloemlla.com").isEmpty())
         // No process binding in unit tests → system proxy selector stays available.
         assertTrue(client.proxy == null)
     }
@@ -36,7 +36,7 @@ class SecureOkHttpFactoryTest {
     fun createCanRequireExplicitCertificatePins() {
         assertThrows(IllegalArgumentException::class.java) {
             SecureOkHttpFactory.create(
-                baseUrl = "https://eye.chloemlla.com/api",
+                baseUrl = "https://chloemlla.com/api/lumen",
                 certificatePins = "",
                 requireCertificatePins = true,
             )

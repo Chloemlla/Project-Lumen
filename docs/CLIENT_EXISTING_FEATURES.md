@@ -717,7 +717,7 @@ Intent 能力：
 
 默认 API：
 
-- `https://eye.chloemlla.com/api`
+- `https://chloemlla.com/api/lumen`
 
 相关源码：
 

@@ -18,7 +18,7 @@ Project Lumen 当前已经不是单纯的本地倒计时工具，而是一个以
 - Java 21 / Kotlin 2.4.10 / Android Gradle Plugin 8.13.2。
 - `compileSdk = 37`、`targetSdk = 37`、`minSdk = 29`（CRooot SDK 的 Android 10 / API 29 下限）。
 - 当前应用版本来源为 `app/application.version`，现值 `1.0.1`。
-- 通过 `BuildConfig.API_BASE_URL` 默认连接 `https://eye.chloemlla.com/api`。
+- 通过 `BuildConfig.API_BASE_URL` 默认连接 `https://chloemlla.com/api/lumen`。
 
 当前后端：
 
@@ -455,7 +455,7 @@ Plus 发布最低要求：
 商业发布前必须完成：
 
 - HTTPS：
-  - `eye.chloemlla.com` 生产 API 必须使用 HTTPS。
+  - `chloemlla.com` 生产 API 必须使用 HTTPS。
   - Android 生产配置移除对生产域的明文 HTTP 依赖。
   - GitHub 版如仍需要 HTTP 调试，应通过 debug/flavor 区分。
 - 配置：
