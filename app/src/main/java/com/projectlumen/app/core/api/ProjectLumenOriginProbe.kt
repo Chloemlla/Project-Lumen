@@ -21,7 +21,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * 出口探测上报（Synapse `/api/ip-risk/*`）在 Project-Lumen 侧的实现。
+ * 出口探测上报（Synapse `/api/ip-risk/echo` + `/report`）在 Project-Lumen 侧的实现。
  *
  * 服务端那套「客户端出口探测」原本只由网页端 `ClientOriginProbe` 驱动：浏览器先 GET
  * `/api/ip-risk/echo` 拿一次性会话（`probeId` / `probeKey` / `nonce`），再把本机观测与

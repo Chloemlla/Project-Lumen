@@ -23,7 +23,7 @@ import java.net.URLEncoder
  * **路径契约**：端点相对路径一律**不带版本段**（`health`、`auth/email/start`、`me`…），
  * 基址由 [ProjectLumenApiConfig.baseUrl] 提供，规范值是 `https://chloemlla.com/api/lumen`。
  * 历史包袱：这里曾统一写成 `v1/...`（老后端是 `/api/v1/...`，换基址时只改了一半），
- * 而 Synapse 服务端把整个子系统挂在 `/api/lumen` 上，两者一拼就是 `…/api/lumen/v1/*` ——
+ * 而 Synapse 服务端把整个子系统挂在 `/api/lumen` 上，两者一拼就是 `…/api/lumen/v1/…` ——
  * 服务端只有 `/api/lumen/v1` 兼容别名还没有的年代里，除 `health` 外**每个**请求都是
  * Express 兜底 404（用户看到的就是一句 `Project Lumen API request failed with HTTP 404`）。
  * 无版本段的写法在两侧服务端上都成立，所以新版本不再依赖服务端先发布。
@@ -379,7 +379,7 @@ class ProjectLumenApiClient(
         val cancellationHandle = coroutineContext.job.invokeOnCompletion { call.cancel() }
         try {
             call.execute().use { response ->
-                // 第一次真正和后端握手成功之后，顺带上报一次出口探测（Synapse /api/ip-risk/*）。
+                // 第一次真正和后端握手成功之后，顺带上报一次出口探测（Synapse /api/ip-risk 的上报端点）。
                 // 纯旁路：整进程只尝试一次，内部吞掉所有错误，绝不改变这里的控制流。
                 ProjectLumenOriginProbe.reportOnceAsync(resolvedBaseUrl)
                 val responseText = readResponseText(response)

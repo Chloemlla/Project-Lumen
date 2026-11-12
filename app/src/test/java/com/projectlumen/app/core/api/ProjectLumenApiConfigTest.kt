@@ -7,7 +7,7 @@ import org.junit.Test
  * 基址归一化：CI 变量 / 手填地址少一段或多一段时，**不能**静默把整台客户端的请求打偏。
  *
  * 线上事故（2026-11-11）：`PROJECT_LUMEN_API_BASE_URL` 被写成 `https://chloemlla.com/api`
- * 这类形态时，`…/api/health` 恰好通、`…/api/v1/*` 落进 Synapse 蜜罐拿到 200 假数据，
+ * 这类形态时，`…/api/health` 恰好通、`…/api/v1/…` 落进 Synapse 蜜罐拿到 200 假数据，
  * 其余全 404 —— 面板上表现为「检查服务正常、业务一个都不通」。
  */
 class ProjectLumenApiConfigTest {

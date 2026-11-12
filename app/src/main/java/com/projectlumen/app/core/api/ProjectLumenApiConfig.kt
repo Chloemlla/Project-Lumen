@@ -32,7 +32,7 @@ object ProjectLumenApiConfig {
      *
      * 线上排障（2026-11-11）里，`PROJECT_LUMEN_API_BASE_URL` 写成 `https://chloemlla.com/api`
      * 这类少一段的形态并不会报错，只会把**整台客户端**的请求打偏：
-     * `…/api/health` 恰好通（服务端真有这个端点），`…/api/v1/*` 落进 Synapse 的蜜罐拿到
+     * `…/api/health` 恰好通（服务端真有这个端点），`…/api/v1/…` 落进 Synapse 的蜜罐拿到
      * 200 假数据，其余全 404 —— 面板上是「检查服务说好的、业务一个都不通」。
      * 所以这里按结构归一而不是只比一个字面量：
      *
