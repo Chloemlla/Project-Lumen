@@ -95,7 +95,8 @@ internal object ProjectLumenOriginProbe {
         // 没有主密钥时后端固定 403，不发这个注定被拒的请求。
         if (!config.optBoolean("hmacEnabled", false)) return false
 
-        val echo = requestJson(client, origin, endpointPath(config.optString("echoPath"), ECHO_PATH)) ?: return false        val observed = echo.optJSONObject("data") ?: return false
+        val echo = requestJson(client, origin, endpointPath(config.optString("echoPath"), ECHO_PATH)) ?: return false
+        val observed = echo.optJSONObject("data") ?: return false
         val probe = echo.optJSONObject("probe") ?: return false
         val probeId = probe.optText("probeId") ?: return false
         val nonce = probe.optText("nonce") ?: return false
