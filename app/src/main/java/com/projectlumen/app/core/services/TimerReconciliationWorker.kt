@@ -4,10 +4,10 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.enums.ActiveEngine
+import com.projectlumen.app.core.work.WorkScheduler
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 
@@ -60,15 +60,11 @@ class TimerReconciliationWorker(
             val request = OneTimeWorkRequestBuilder<TimerReconciliationWorker>()
                 .setInitialDelay(15L, TimeUnit.MINUTES)
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                UNIQUE_WORK,
-                ExistingWorkPolicy.REPLACE,
-                request,
-            )
+            WorkScheduler.enqueue(context, UNIQUE_WORK, ExistingWorkPolicy.REPLACE, request)
         }
 
         fun cancel(context: Context) {
-            WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK)
+            WorkScheduler.cancel(context, UNIQUE_WORK)
         }
     }
 }

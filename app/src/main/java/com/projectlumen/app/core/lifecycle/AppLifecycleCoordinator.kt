@@ -50,7 +50,10 @@ class AppLifecycleCoordinator(
             // Android 15 force-stop cancels pending intents; if we detect a force-stop start,
             // rebuild alarms/workers before normal foreground resume work.
             if (wasForceStoppedSinceLastStart()) {
-                BootReceiver.restoreScheduledWork(app)
+                // Isolated: the recovery sweep touches Room, AlarmManager and WorkManager, and a
+                // failure in any of them must not cost this resume pass its pause-time accounting.
+                runCatching { BootReceiver.restoreScheduledWork(app) }
+                    .onFailure { throwable -> app.recordHandledFailure(throwable) }
                 app.deviceControl.onForceStopRecovered()
             }
             val nowMillis = System.currentTimeMillis()

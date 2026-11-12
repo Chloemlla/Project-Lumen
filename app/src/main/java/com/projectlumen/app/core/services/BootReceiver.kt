@@ -3,9 +3,9 @@ package com.projectlumen.app.core.services
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.UserManager
 import com.projectlumen.app.ProjectLumenApplication
 import com.projectlumen.app.core.enums.ActiveEngine
+import com.projectlumen.app.core.work.WorkScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -28,8 +28,9 @@ class BootReceiver : BroadcastReceiver() {
         if (!isRecoveryAction(intent.action)) return
         // LOCKED_BOOT_COMPLETED arrives before the first unlock, when credential-encrypted storage
         // (Room, MMKV, DataStore) cannot be opened yet; the later BOOT_COMPLETED is the real
-        // recovery point.
-        if (!isStorageUnlocked(context)) return
+        // recovery point. WorkScheduler owns the same predicate: it is also what stops "schedule
+        // the proximity worker" from touching WorkManager's database in that window.
+        if (!WorkScheduler.isStorageUnlocked(context)) return
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             val app = context.applicationContext as? ProjectLumenApplication
@@ -39,10 +40,6 @@ class BootReceiver : BroadcastReceiver() {
             }.onFailure { throwable -> app?.recordHandledFailure(throwable) }
             pendingResult.finish()
         }
-    }
-
-    private fun isStorageUnlocked(context: Context): Boolean {
-        return context.getSystemService(UserManager::class.java)?.isUserUnlocked != false
     }
 
     companion object {

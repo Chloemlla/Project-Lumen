@@ -4,11 +4,11 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.chloemlla.lumen.crash.CrashBreadcrumbs
 import com.projectlumen.app.ProjectLumenApplication
+import com.projectlumen.app.core.work.WorkScheduler
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 
@@ -93,10 +93,11 @@ class ProximityDetectionWorker(
             val request = OneTimeWorkRequestBuilder<ProximityDetectionWorker>()
                 .setInitialDelay(delay.coerceAtLeast(0).toLong(), TimeUnit.SECONDS)
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                UNIQUE_SAMPLE_WORK,
-                if (keepExisting) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE,
-                request,
+            WorkScheduler.enqueue(
+                context = context,
+                uniqueName = UNIQUE_SAMPLE_WORK,
+                policy = if (keepExisting) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE,
+                request = request,
             )
         }
 
@@ -104,29 +105,18 @@ class ProximityDetectionWorker(
             val request = OneTimeWorkRequestBuilder<ProximityDetectionWorker>()
                 .setInputData(workDataOf(KEY_EVENT_TRIGGER to true))
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                UNIQUE_EVENT_WORK,
-                ExistingWorkPolicy.KEEP,
-                request,
-            )
+            WorkScheduler.enqueue(context, UNIQUE_EVENT_WORK, ExistingWorkPolicy.KEEP, request)
         }
 
         fun enqueueCalibration(context: Context) {
             val request = OneTimeWorkRequestBuilder<ProximityDetectionWorker>()
                 .setInputData(workDataOf(KEY_CALIBRATE to true))
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                UNIQUE_CALIBRATION_WORK,
-                ExistingWorkPolicy.REPLACE,
-                request,
-            )
+            WorkScheduler.enqueue(context, UNIQUE_CALIBRATION_WORK, ExistingWorkPolicy.REPLACE, request)
         }
 
         fun cancel(context: Context) {
-            val workManager = WorkManager.getInstance(context)
-            workManager.cancelUniqueWork(UNIQUE_SAMPLE_WORK)
-            workManager.cancelUniqueWork(UNIQUE_EVENT_WORK)
-            workManager.cancelUniqueWork(UNIQUE_CALIBRATION_WORK)
+            WorkScheduler.cancel(context, UNIQUE_SAMPLE_WORK, UNIQUE_EVENT_WORK, UNIQUE_CALIBRATION_WORK)
         }
 
         private fun backoffSeconds(intervalSeconds: Int): Int =

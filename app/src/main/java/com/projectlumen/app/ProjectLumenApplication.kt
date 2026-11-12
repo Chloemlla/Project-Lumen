@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Process
 import android.util.Log
 import androidx.lifecycle.ProcessLifecycleOwner
+import androidx.work.Configuration
 import com.projectlumen.app.core.api.BackendCapability
 import com.projectlumen.app.core.api.BackendCommunicationBlockedException
 import com.projectlumen.app.core.api.BackendConnectivityController
@@ -65,7 +66,18 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-class ProjectLumenApplication : Application(), ForegroundServiceFailureReporter {
+class ProjectLumenApplication : Application(), Configuration.Provider, ForegroundServiceFailureReporter {
+    /**
+     * WorkManager's documented way back from a skipped eager initializer.
+     *
+     * `androidx.startup.InitializationProvider` (and therefore `WorkManagerInitializer`) is not
+     * `directBootAware`, so a process the platform creates before the user's first unlock after a
+     * reboot never initializes WorkManager — and it never will for the rest of that process's life.
+     * `WorkManager.getInstance` consults this provider when its static instance is still missing and
+     * initializes itself instead of throwing "WorkManager is not initialized properly". The eager
+     * initializer keeps using the exact same default configuration, so nothing else changes.
+     */
+    override val workManagerConfiguration: Configuration by lazy { Configuration.Builder().build() }
     private val applicationScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     // Evaluated only after super.attachBaseContext(): this Context already has a package name,
     // whereas applicationContext can still be null. Isolated services may retain the package
