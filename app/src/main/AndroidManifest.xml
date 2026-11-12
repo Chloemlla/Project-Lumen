@@ -236,6 +236,22 @@
             </intent-filter>
         </service>
 
+        <!-- WorkManager 走按需初始化：ProjectLumenApplication 实现了 Configuration.Provider。
+             androidx.startup 的 InitializationProvider 不是 directBootAware，重启后未解锁就起来的
+             进程里它根本不会跑，于是那个 eager 初始化器只在正常启动时生效；把它单独摘掉，
+             首次 WorkManager.getInstance() 会自己按 Provider 初始化（lint 的
+             RemoveWorkManagerInitializer 也是这条要求）。其余 initializer 仍然保留。 -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

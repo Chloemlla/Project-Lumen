@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * The single choke point for every WorkManager touch in the app.
  *
- * WorkManager is normally initialized by `androidx.startup.InitializationProvider` before
+ * WorkManager used to be initialized eagerly by `androidx.startup.InitializationProvider` before
  * `Application.onCreate`, but that initializer is not `directBootAware`: a process the platform
  * creates before the user's first unlock after a reboot (this app's `BootReceiver` is
  * `directBootAware` and takes `LOCKED_BOOT_COMPLETED`) never runs it, and the process keeps that
@@ -25,9 +25,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  * monitoring silently stayed dead until the next successful enqueue.
  *
  * Three layers keep that from recurring:
- *  - [ProjectLumenApplication] implements `Configuration.Provider`, so a skipped eager initializer
- *    is repaired by the first `getInstance` call instead of failing (WorkManager's own documented
- *    remedy for "the initializer never ran");
+ *  - the eager `WorkManagerInitializer` is dropped from the merged manifest (`tools:node="remove"`
+ *    on its meta-data) and [ProjectLumenApplication] implements `Configuration.Provider`, so
+ *    initialization happens on the first `getInstance` call in every process instead of depending
+ *    on a content provider that may never run — which is also what the `RemoveWorkManagerInitializer`
+ *    lint (fatal in release) requires once a Provider is present;
  *  - this helper refuses to touch WorkManager while credential-encrypted storage is still locked —
  *    its database lives there, and a half-initialized WorkManager is worse than none;
  *  - every failure is contained here: a WorkManager problem is logged, breadcrumbed and reported
