@@ -17,6 +17,17 @@ import org.json.JSONObject
 import java.io.IOException
 import java.net.URLEncoder
 
+/**
+ * Project Lumen 云端 API 客户端。
+ *
+ * **路径契约**：端点相对路径一律**不带版本段**（`health`、`auth/email/start`、`me`…），
+ * 基址由 [ProjectLumenApiConfig.baseUrl] 提供，规范值是 `https://chloemlla.com/api/lumen`。
+ * 历史包袱：这里曾统一写成 `v1/...`（老后端是 `/api/v1/...`，换基址时只改了一半），
+ * 而 Synapse 服务端把整个子系统挂在 `/api/lumen` 上，两者一拼就是 `…/api/lumen/v1/*` ——
+ * 服务端只有 `/api/lumen/v1` 兼容别名还没有的年代里，除 `health` 外**每个**请求都是
+ * Express 兜底 404（用户看到的就是一句 `Project Lumen API request failed with HTTP 404`）。
+ * 无版本段的写法在两侧服务端上都成立，所以新版本不再依赖服务端先发布。
+ */
 class ProjectLumenApiClient(
     private val baseUrl: String = ProjectLumenApiConfig.baseUrl,
     private val httpClient: OkHttpClient = SecureOkHttpFactory.create(
@@ -38,7 +49,7 @@ class ProjectLumenApiClient(
     suspend fun startEmailLogin(email: String): EmailLoginStart = request(
         capability = BackendCapability.ACCOUNT_SESSION,
         method = "POST",
-        path = "v1/auth/email/start",
+        path = "auth/email/start",
         body = JSONObject().put("email", email),
     ) { it.toEmailLoginStart() }
 
@@ -50,7 +61,7 @@ class ProjectLumenApiClient(
     ): AuthSession = request(
         capability = BackendCapability.ACCOUNT_SESSION,
         method = "POST",
-        path = "v1/auth/email/verify",
+        path = "auth/email/verify",
         body = JSONObject()
             .put("email", email)
             .put("requestId", requestId)
@@ -64,7 +75,7 @@ class ProjectLumenApiClient(
     ): AuthSession = request(
         capability = BackendCapability.ACCOUNT_SESSION,
         method = "POST",
-        path = "v1/auth/session/refresh",
+        path = "auth/session/refresh",
         body = JSONObject()
             .put("refreshToken", refreshToken)
             .put("deviceInstallationId", deviceInstallationId),
@@ -73,7 +84,7 @@ class ProjectLumenApiClient(
     suspend fun fetchMe(accessToken: String): ProjectLumenApiUser = request(
         capability = BackendCapability.ACCOUNT_SESSION,
         method = "GET",
-        path = "v1/me",
+        path = "me",
         accessToken = accessToken,
     ) { it.getJSONObject("user").toApiUser() }
 
@@ -88,7 +99,7 @@ class ProjectLumenApiClient(
     ): RemoteDeviceRegistrationResult = request(
         capability = BackendCapability.DEVICE_REGISTRATION,
         method = "POST",
-        path = "v1/devices/register",
+        path = "devices/register",
         accessToken = accessToken,
         body = JSONObject()
             .put("deviceInstallationId", deviceInstallationId)
@@ -102,14 +113,14 @@ class ProjectLumenApiClient(
     suspend fun fetchEntitlements(accessToken: String): RemoteEntitlementSnapshot = request(
         capability = BackendCapability.ENTITLEMENTS_PURCHASE,
         method = "GET",
-        path = "v1/entitlements",
+        path = "entitlements",
         accessToken = accessToken,
     ) { it.toEntitlementSnapshot() }
 
     suspend fun fetchFeatureFlags(accessToken: String): RemoteFeatureFlagSnapshot = request(
         capability = BackendCapability.REMOTE_CONFIG,
         method = "GET",
-        path = "v1/config/feature-flags",
+        path = "config/feature-flags",
         accessToken = accessToken,
     ) { it.toRemoteFeatureFlagSnapshot() }
 
@@ -120,7 +131,7 @@ class ProjectLumenApiClient(
     ): RemoteConfigSyncSnapshot = request(
         capability = BackendCapability.REMOTE_CONFIG,
         method = "GET",
-        path = "v1/config/sync?cursor=$cursor&version=$version&channel=${queryEncode(channel)}",
+        path = "config/sync?cursor=$cursor&version=$version&channel=${queryEncode(channel)}",
     ) { it.toRemoteConfigSyncSnapshot() }
 
     suspend fun checkRemoteRelease(
@@ -155,7 +166,7 @@ class ProjectLumenApiClient(
     ): RemotePurchaseVerification = request(
         capability = BackendCapability.ENTITLEMENTS_PURCHASE,
         method = "POST",
-        path = "v1/purchases/google/verify",
+        path = "purchases/google/verify",
         accessToken = accessToken,
         body = JSONObject()
             .put("productId", productId)
@@ -169,7 +180,7 @@ class ProjectLumenApiClient(
     ): RemoteSyncChangesPage = request(
         capability = BackendCapability.CLOUD_SYNC,
         method = "GET",
-        path = "v1/sync/changes?since=$sinceCursor",
+        path = "sync/changes?since=$sinceCursor",
         accessToken = accessToken,
     ) { it.toSyncChangesPage() }
 
@@ -181,7 +192,7 @@ class ProjectLumenApiClient(
     ): RemoteSyncPushResult = request(
         capability = BackendCapability.CLOUD_SYNC,
         method = "POST",
-        path = "v1/sync/push",
+        path = "sync/push",
         accessToken = accessToken,
         body = JSONObject()
             .put("deviceInstallationId", deviceInstallationId)
@@ -195,7 +206,7 @@ class ProjectLumenApiClient(
     ): RemoteTelemetryUploadResult = request(
         capability = BackendCapability.TELEMETRY,
         method = "POST",
-        path = "v1/telemetry",
+        path = "telemetry",
         accessToken = accessToken,
         body = upload.toJson(),
     ) { it.toTelemetryUploadResult() }
@@ -206,7 +217,7 @@ class ProjectLumenApiClient(
     ): RemoteFaceAnalysisFrameUploadResult = request(
         capability = BackendCapability.FACE_ANALYSIS,
         method = "POST",
-        path = "v1/face-analysis/frames",
+        path = "face-analysis/frames",
         accessToken = accessToken,
         body = upload.toJson(),
     ) { it.toFaceAnalysisFrameUploadResult() }
@@ -233,7 +244,7 @@ class ProjectLumenApiClient(
     ): VisionSessionStartResult = request(
         capability = BackendCapability.DEVICE_CONTROL,
         method = "POST",
-        path = "v1/device-control/vision/sessions",
+        path = "device-control/vision/sessions",
         accessToken = accessToken,
         body = request.toJson(),
     ) { it.toVisionSessionStartResult() }
@@ -244,7 +255,7 @@ class ProjectLumenApiClient(
     ): VisionHeartbeatResult = request(
         capability = BackendCapability.DEVICE_CONTROL,
         method = "POST",
-        path = "v1/device-control/vision/heartbeat",
+        path = "device-control/vision/heartbeat",
         accessToken = accessToken,
         body = request.toJson(),
     ) { it.toVisionHeartbeatResult() }
@@ -255,7 +266,7 @@ class ProjectLumenApiClient(
     ): VisionFrameUploadResult = request(
         capability = BackendCapability.DEVICE_CONTROL,
         method = "POST",
-        path = "v1/device-control/vision/frames",
+        path = "device-control/vision/frames",
         accessToken = accessToken,
         body = request.toJson(),
     ) { it.toVisionFrameUploadResult() }
@@ -266,7 +277,7 @@ class ProjectLumenApiClient(
     ): VisionFrameUploadResult = request(
         capability = BackendCapability.DEVICE_CONTROL,
         method = "POST",
-        path = "v1/device-control/vision/surface-frames",
+        path = "device-control/vision/surface-frames",
         accessToken = accessToken,
         body = request.toJson(),
     ) { it.toVisionFrameUploadResult() }
@@ -277,7 +288,7 @@ class ProjectLumenApiClient(
     ): LifecycleEventResult = request(
         capability = BackendCapability.DEVICE_CONTROL,
         method = "POST",
-        path = "v1/device-control/lifecycle/events",
+        path = "device-control/lifecycle/events",
         accessToken = accessToken,
         body = request.toJson(),
     ) { it.toLifecycleEventResult() }
@@ -289,7 +300,7 @@ class ProjectLumenApiClient(
     ): RemoteBackupMetadata = request(
         capability = BackendCapability.CLOUD_BACKUP,
         method = "POST",
-        path = "v1/backups",
+        path = "backups",
         accessToken = accessToken,
         body = JSONObject()
             .put("deviceInstallationId", deviceInstallationId)
@@ -301,7 +312,7 @@ class ProjectLumenApiClient(
     suspend fun fetchLatestBackup(accessToken: String): RemoteBackup? = request(
         capability = BackendCapability.CLOUD_BACKUP,
         method = "GET",
-        path = "v1/backups/latest",
+        path = "backups/latest",
         accessToken = accessToken,
     ) { it.optRemoteBackup() }
 
@@ -368,6 +379,9 @@ class ProjectLumenApiClient(
         val cancellationHandle = coroutineContext.job.invokeOnCompletion { call.cancel() }
         try {
             call.execute().use { response ->
+                // 第一次真正和后端握手成功之后，顺带上报一次出口探测（Synapse /api/ip-risk/*）。
+                // 纯旁路：整进程只尝试一次，内部吞掉所有错误，绝不改变这里的控制流。
+                ProjectLumenOriginProbe.reportOnceAsync(resolvedBaseUrl)
                 val responseText = readResponseText(response)
                 if (response.code !in 200..299) {
                     val message = parseErrorMessage(responseText, response.code)
