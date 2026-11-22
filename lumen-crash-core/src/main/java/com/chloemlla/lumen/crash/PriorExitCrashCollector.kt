@@ -47,12 +47,15 @@ internal class PriorExitCrashCollector(
             ) ?: return@runCatching emptyList()
             if (exits.isEmpty()) return@runCatching emptyList()
 
+            // REASON_ANOMALY (18) is a system-internal constant that is absent from the public
+            // android.jar, so it cannot be referenced here. REASON_INITIALIZATION_FAILURE covers
+            // the remaining "died during startup" case that shell hosts hit.
             val capturedReasons = setOf(
                 ApplicationExitInfo.REASON_CRASH_NATIVE,
                 ApplicationExitInfo.REASON_SIGNALED,
                 ApplicationExitInfo.REASON_CRASH,
                 ApplicationExitInfo.REASON_ANR,
-                ApplicationExitInfo.REASON_ANOMALY,
+                ApplicationExitInfo.REASON_INITIALIZATION_FAILURE,
             )
             // Defensive ordering: newest first regardless of the framework's ordering.
             val eligible = exits
