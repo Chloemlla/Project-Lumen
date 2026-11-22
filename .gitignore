@@ -19,3 +19,4 @@ __pycache__/
 *.pyc
 *.zip
 *.7z
+.sync-audit/
