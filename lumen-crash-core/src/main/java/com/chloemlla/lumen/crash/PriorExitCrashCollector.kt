@@ -40,11 +40,14 @@ internal class PriorExitCrashCollector(
             // be 0 to mean "every process that belonged to this package", and maxNum carries the
             // window size. Passing the window as pid silently filtered to a single process id and
             // made this collector return null on every launch.
+            // orEmpty() rather than `?: emptyList()`: the SDK pins the return type to a
+            // non-nullable platform type, so an elvis here is dead code plus a permanent compiler
+            // warning, while orEmpty() still absorbs a null handed back by an odd framework.
             val exits = activityManager.getHistoricalProcessExitReasons(
                 appContext.packageName,
                 /* pid = */ 0,
                 /* maxNum = */ MAX_ENTRIES,
-            ) ?: return@runCatching emptyList()
+            ).orEmpty()
             if (exits.isEmpty()) return@runCatching emptyList()
 
             // REASON_ANOMALY (18) is a system-internal constant that is absent from the public
@@ -79,7 +82,7 @@ internal class PriorExitCrashCollector(
                 CrashReport.fromPriorExit(
                     exitTimestampMillis = entry.timestamp,
                     appInfo = info,
-                    exitProcessName = entry.processName ?: "",
+                    exitProcessName = entry.processName.orEmpty(),
                     reasonCode = entry.reason,
                     description = describe(entry),
                     trace = traceText(entry),

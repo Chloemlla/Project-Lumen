@@ -104,7 +104,9 @@ class LumenCrashConfigBuilder internal constructor(
 
     private fun resolveAppLabel(): String? {
         val appInfo: ApplicationInfo = application.applicationInfo
-        val label = application.packageManager.getApplicationLabel(appInfo)
+        // getApplicationLabel() is @NonNull in the platform stubs; the nullable local keeps the
+        // blank/null guard honest without tripping "unnecessary safe call".
+        val label: CharSequence? = application.packageManager.getApplicationLabel(appInfo)
         return label?.toString()?.takeIf { it.isNotBlank() }
     }
 }

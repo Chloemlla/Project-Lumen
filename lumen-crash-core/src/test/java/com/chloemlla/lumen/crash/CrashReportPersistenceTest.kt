@@ -48,7 +48,7 @@ class CrashReportPersistenceTest {
     fun storeSavesLoadsClearsAndRemovesLegacyCopies() = withTemporaryStore { root, store ->
         val report = sampleReport()
         val legacy = File(root, "legacy/crash_report.json").apply {
-            parentFile.mkdirs()
+            parentFile!!.mkdirs()
             writeText("stale", Charsets.UTF_8)
         }
 
@@ -68,7 +68,7 @@ class CrashReportPersistenceTest {
         try {
             val external = File(root, "external/crash_report.json")
             val legacy = File(root, "legacy/crash_report.json").apply {
-                parentFile.mkdirs()
+                parentFile!!.mkdirs()
                 writeText(sampleReport().toJson().toString(), Charsets.UTF_8)
             }
             val store = CrashReportStore(
