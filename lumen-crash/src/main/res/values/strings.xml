@@ -54,13 +54,13 @@
     <string name="lumen_crash_report_title_anr">App stopped responding</string>
     <string name="lumen_crash_report_message_anr">The main thread was blocked long enough for the system to treat the app as unresponsive. The thread dump below shows what it was doing.</string>
     <string name="lumen_crash_report_title_renderer">Web page process restarted</string>
-    <string name="lumen_crash_report_message_renderer">The WebView renderer process died while the app shell kept running. The page is usually responsible, so the record below comes from the system's exit log rather than a JVM exception.</string>
+    <string name="lumen_crash_report_message_renderer">The WebView renderer process died while the app shell kept running. The page is usually responsible, so the record below comes from the system\'s exit log rather than a JVM exception.</string>
     <string name="lumen_crash_report_title_rust">Native layer aborted</string>
-    <string name="lumen_crash_report_message_rust">Native code aborted the process, which is what a Rust panic escaping the app entry point does. The record below is the platform's; symbolization needs the matching ABI and debug symbols.</string>
+    <string name="lumen_crash_report_message_rust">Native code aborted the process, which is what a Rust panic escaping the app entry point does. The record below is the platform\'s; symbolization needs the matching ABI and debug symbols.</string>
     <string name="lumen_crash_report_title_external">Failure reported by the app runtime</string>
-    <string name="lumen_crash_report_message_external">This failure was reported by the app's own runtime (script or native layer), not by the JVM crash handler. The details below are exactly what that runtime supplied.</string>
+    <string name="lumen_crash_report_message_external">This failure was reported by the app\'s own runtime (script or native layer), not by the JVM crash handler. The details below are exactly what that runtime supplied.</string>
     <string name="lumen_crash_report_title_prior_exit">Previous session ended unexpectedly</string>
-    <string name="lumen_crash_report_message_prior_exit">The last time the app was running it exited abnormally. The system's record of that exit is shown below.</string>
+    <string name="lumen_crash_report_message_prior_exit">The last time the app was running it exited abnormally. The system\'s record of that exit is shown below.</string>
 
     <string name="lumen_crash_report_component_rust_native">Rust / native</string>
     <string name="lumen_crash_report_component_native">Native</string>
