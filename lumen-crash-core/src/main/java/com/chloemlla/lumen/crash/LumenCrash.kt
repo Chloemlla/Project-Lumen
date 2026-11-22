@@ -87,7 +87,13 @@ object LumenCrash {
         // report that is still on disk. Prior-exit capture is guarded inside collectPriorExitReport.
         runCatching {
             executor().submit {
-                runCatching { collectPriorExitReport(application, config) }
+                runCatching { collectPriorExitReports(application, config) }
+                // Host-observed failures (Rust panic hook, JS errors) are dropped into a directory;
+                // converting them here means a host that never calls loadPendingReport() still
+                // surfaces them.
+                config.externalInboxDirectory?.let { directory ->
+                    runCatching { CrashExternalInbox.ingest(directory) }
+                }
                 // Capture-only hosts never call loadPendingReport(), so a stored report would
                 // otherwise sit on disk until the next crash overwrote it.
                 val pending = runCatching { store().load() }.getOrNull()
@@ -212,6 +218,58 @@ object LumenCrash {
         watchdogRef.get()?.markStartupComplete()
     }
 
+    /**
+     * Records a failure the host observed outside the JVM: a JS `window.onerror`, a Rust panic
+     * hook line, a Flutter `FlutterError`, or a native log line.
+     *
+     * The SDK cannot see that process's stack, so the host supplies the message and (optionally)
+     * a stack trace. Returns null when the SDK is not installed or the input is unusable; it never
+     * throws, because it is meant to be called from a WebView/JS bridge or a panic hook.
+     *
+     * [claimPendingSlot] makes the report block the next launch with the crash screen. Use it for
+     * post-mortem evidence (the process died) and leave it false for errors the host recovered
+     * from — otherwise a JS error storm would fill the pending-report slot.
+     */
+    fun recordExternalFailure(
+        source: String,
+        message: String,
+        stackTrace: String? = null,
+        occurredAtMillis: Long = 0L,
+        threadName: String? = null,
+        claimPendingSlot: Boolean = false,
+    ): CrashReport? {
+        val config = installedConfig.get() ?: return null
+        val report = runCatching {
+            CrashReport.fromExternal(
+                source = source,
+                message = message,
+                stackTrace = stackTrace,
+                occurredAtMillis = occurredAtMillis,
+                threadName = threadName,
+                appInfo = config.toAppInfo(),
+            )
+        }.getOrNull() ?: return null
+        CrashBreadcrumbs.record("External failure captured: ${report.externalSource}")
+        if (claimPendingSlot && pendingSlotAvailable()) {
+            saveReport(report, config)
+        } else {
+            runCatching { config.onReportSaved?.invoke(report) }
+            submitBackendUpload(report, config)
+        }
+        return report
+    }
+
+    /**
+     * Checks whether the single pending-report slot is free.
+     *
+     * Mirrors the guard in [collectPriorExitReports]: a derived report must never overwrite a real
+     * crash that the user has not seen yet.
+     */
+    private fun pendingSlotAvailable(): Boolean {
+        if (startupCrashReport != null) return false
+        return runCatching { store().load() == null }.getOrDefault(false)
+    }
+
     /** Stops background detection. The uncaught exception handler remains installed. */
     fun stopWatchdog() {
         watchdogRef.getAndSet(null)?.stop()
@@ -330,15 +388,33 @@ object LumenCrash {
         return runCatching { store().load()?.kind == CrashReportKind.CRASH }.getOrDefault(false)
     }
 
-    private fun collectPriorExitReport(application: Application, config: LumenCrashConfig) {
+    /**
+     * Converts every unreported previous-process death into a report.
+     *
+     * Only a death of the app's own process may take the pending slot. A WebView renderer death
+     * (`:sandboxed_process0`) or a secondary process death is uploaded and handed to
+     * [LumenCrashConfig.onReportSaved] instead: the shell kept running, and a full-screen crash
+     * report for a renderer restart is a false alarm on exactly the hosts this SDK targets.
+     */
+    private fun collectPriorExitReports(application: Application, config: LumenCrashConfig) {
         if (!config.priorExitCaptureEnabled) return
         if (!PriorExitCrashCollector.isSupported()) return
-        val report = runCatching {
+        val reports = runCatching {
             PriorExitCrashCollector(application.crashInstallContext()) { config.toAppInfo() }.collect()
-        }.getOrNull() ?: return
-        // Never clobber a pending real crash/watchdog report with a derived PRIOR_EXIT report.
-        if (runCatching { store().load() != null }.getOrDefault(false)) return
-        saveReport(report, config)
+        }.getOrDefault(emptyList())
+        if (reports.isEmpty()) return
+        var slotClaimed = !pendingSlotAvailable()
+        for (report in reports) {
+            val claimsSlot = !slotClaimed &&
+                PriorExitClassification.isMainProcess(packageName, report.processName)
+            if (claimsSlot) {
+                slotClaimed = true
+                saveReport(report, config)
+            } else {
+                runCatching { config.onReportSaved?.invoke(report) }
+                submitBackendUpload(report, config)
+            }
+        }
     }
 
     private fun saveReport(
@@ -353,7 +429,7 @@ object LumenCrash {
                 // persisted diagnostic report through onCrashSaved.
                 runCatching { config.onCrashSaved?.invoke(report) }
                 runCatching { config.onReportSaved?.invoke(report) }
-                if (report.kind != CrashReportKind.CRASH) {
+                if (report.kind.isWatchdogKind()) {
                     runCatching { config.onAnrDetected?.invoke(report) }
                 }
             }
@@ -412,8 +488,13 @@ object LumenCrash {
     ): Future<*>? {
         // Silent forced upload: the caller's crashReportBackendEnabled is intentionally ignored
         // (kept only for source compatibility). Every persisted report is uploaded.
-        // Client-side throttle so a failing service loop cannot saturate the upload queue.
-        if (report.kind == CrashReportKind.NON_FATAL && !allowNonFatalUpload()) return null
+        // Client-side throttle so a failing service loop — or a JS error storm reported through
+        // recordExternalFailure — cannot saturate the upload queue.
+        if ((report.kind == CrashReportKind.NON_FATAL || report.kind == CrashReportKind.EXTERNAL) &&
+            !allowNonFatalUpload()
+        ) {
+            return null
+        }
         // Deduplicate: only submit once per process, with a bound on the tracked ids.
         if (uploadedReportIds.size >= MAX_TRACKED_REPORT_IDS) {
             uploadedReportIds.clear()

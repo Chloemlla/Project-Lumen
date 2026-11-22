@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import java.io.File
 
 /**
  * Builder for the short install path.
@@ -40,6 +41,7 @@ class LumenCrashConfigBuilder internal constructor(
     var onReportSaved: ((CrashReport) -> Unit)? = defaults.onReportSaved
     var onAnrDetected: ((CrashReport) -> Unit)? = defaults.onAnrDetected
     var priorExitCaptureEnabled: Boolean = defaults.priorExitCaptureEnabled
+    var externalInboxDirectory: File? = defaults.externalInboxDirectory
 
     @Deprecated("Silent forced upload is always on; this flag is ignored.")
     @Suppress("DEPRECATION")
@@ -92,6 +94,7 @@ class LumenCrashConfigBuilder internal constructor(
             onReportSaved = onReportSaved,
             onAnrDetected = onAnrDetected,
             priorExitCaptureEnabled = priorExitCaptureEnabled,
+            externalInboxDirectory = externalInboxDirectory,
             crashReportBackendEnabled = crashReportBackendEnabled,
             crashReportBackendBaseUrl = crashReportBackendBaseUrl,
             crashReportAccessToken = crashReportAccessToken,

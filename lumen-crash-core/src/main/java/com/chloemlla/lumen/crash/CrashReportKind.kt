@@ -13,7 +13,16 @@ enum class CrashReportKind(val wireValue: String) {
     PRIOR_EXIT("prior_exit"),
 
     /** A throwable the host caught and recovered from; the process kept running. */
-    NON_FATAL("non_fatal");
+    NON_FATAL("non_fatal"),
+
+    /**
+     * A failure the host reported itself: a JS `window.onerror`, a Rust panic hook line, a
+     * Flutter `FlutterError`, or a file dropped into [CrashExternalInbox].
+     *
+     * The SDK did not observe the death, so the report carries whatever the host supplied and
+     * attributes it through [CrashReport.component].
+     */
+    EXTERNAL("external");
 
     companion object {
         fun fromWireValue(value: String?): CrashReportKind {
@@ -21,3 +30,9 @@ enum class CrashReportKind(val wireValue: String) {
         }
     }
 }
+
+/** True for reports the watchdog produced rather than an uncaught throwable. */
+internal fun CrashReportKind.isWatchdogKind(): Boolean =
+    this == CrashReportKind.ANR ||
+        this == CrashReportKind.STARTUP_HANG ||
+        this == CrashReportKind.FREEZE

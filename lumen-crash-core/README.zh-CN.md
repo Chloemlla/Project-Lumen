@@ -143,3 +143,37 @@ LumenCrash.markStartupComplete()
 
 启动报告使用 `CrashReportKind.STARTUP_HANG`；主 Looper 报告使用
 `CrashReportKind.FREEZE`。没有 `kind` 或 `durationMillis` 的既有 JSON 仍按普通崩溃报告加载。
+
+## WebView 套壳宿主（Tauri / Capacitor / 纯 WebView）
+
+套壳应用的失败经常不在未捕获异常处理器里：Rust panic 直接 `abort()`、WebView 渲染进程
+（`:sandboxed_process0`）死亡、主线程卡在 JNI 里触发 ANR、JS 未捕获异常。因此报告新增
+`CrashReport.component`（`rust_native` / `native` / `webview_renderer` / `webview` / `java` /
+`anr` / `host_external` / `unknown`），并在系统提供时带上 `exitStatus` 与 `nativeLibraries`。
+
+上一次进程退出采集现在会读取该包**所有进程**的退出记录，一次上报最多 5 条未上报的死亡。
+只有应用自身进程的死亡会占用唯一的"待展示槽位"；渲染进程或子进程死亡只上传并回调
+`onReportSaved`，不会让壳还活着的应用在下次启动被一整屏崩溃报告挡住。
+
+宿主自己观察到的失败可以主动送进来：
+
+```kotlin
+// 直接调用（例如 JS 桥）。不抛异常；未安装时返回 null。
+LumenCrash.recordExternalFailure(
+    source = "webview.js",
+    message = "TypeError: x is undefined",
+    stackTrace = jsStack,          // 可为空
+    claimPendingSlot = false,      // 只有"进程已死"的证据才传 true
+)
+
+// 或者把文件丢进目录（Rust panic hook、原生日志）：
+LumenCrash.install(this) {
+    externalInboxDirectory = File(filesDir, "crash-inbox")
+}
+```
+
+收件箱文件格式：`*.json`（`message`、`stackTrace`、`source`、`timestampMillis`、`thread`）
+或 `*.txt`/`*.log`（首行是消息，其余是栈）。只有成功生成报告后才会删除文件。
+
+Tauri 架构说明、Rust panic hook 与 JS 处理器写法、诊断剧本见
+[docs/tauri-android-crash-analysis.md](../docs/tauri-android-crash-analysis.md)。

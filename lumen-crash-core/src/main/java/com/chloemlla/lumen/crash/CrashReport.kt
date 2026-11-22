@@ -40,6 +40,14 @@ data class CrashReport(
     val kind: CrashReportKind = CrashReportKind.CRASH,
     val durationMillis: Long = 0L,
     val exitReason: String? = null,
+    /** Which runtime produced the failure; see [CrashComponent]. */
+    val component: CrashComponent = CrashComponent.UNKNOWN,
+    /** Signal number (or `exit()` status) reported by `ApplicationExitInfo`; 0 when unknown. */
+    val exitStatus: Int = 0,
+    /** Library names found in the stack/tombstone, used as a symbolization hint. */
+    val nativeLibraries: List<String> = emptyList(),
+    /** Who supplied the failure when [kind] is [CrashReportKind.EXTERNAL]. */
+    val externalSource: String? = null,
 ) {
     fun toClipboardText(): String {
         AuthorIntegrity.verifyOrThrow("export-clipboard")
@@ -49,12 +57,20 @@ data class CrashReport(
         ) {
             appendLine("Report ID: $reportId")
             appendLine("Report type: ${kind.wireValue}")
+            appendLine("Component: ${component.wireValue}")
+            externalSource?.let { appendLine("Captured by: $it") }
             appendLine("Crash time: $crashedAtText")
             if (durationMillis > 0L) {
                 appendLine("Unresponsive duration: ${durationMillis} ms")
             }
             if (exitReason != null) {
                 appendLine("Exit reason: $exitReason")
+            }
+            if (exitStatus > 0) {
+                appendLine("Exit status: ${ExitSignals.describe(exitStatus) ?: exitStatus.toString()}")
+            }
+            if (nativeLibraries.isNotEmpty()) {
+                appendLine("Native libraries: ${nativeLibraries.joinToString()}")
             }
             appendLine("Exception type: $exceptionType")
             appendLine("Root cause: $rootCause")
@@ -88,6 +104,7 @@ data class CrashReport(
             val stackTrace = sanitize(throwable.stackTraceText())
             val exceptionType = throwable::class.java.name
             val rootCause = sanitize(root.message?.takeIf { it.isNotBlank() } ?: root::class.java.name)
+            val process = processName()
             return CrashReport(
                 reportId = reportId(nowMillis, exceptionType, rootCause, stackTrace, kind),
                 crashedAtMillis = nowMillis,
@@ -95,7 +112,7 @@ data class CrashReport(
                 exceptionType = exceptionType,
                 rootCause = rootCause,
                 threadName = Thread.currentThread().name,
-                processName = processName(),
+                processName = process,
                 systemInfo = buildSystemInfo(appInfo),
                 stackTrace = stackTrace,
                 recentEvents = CrashBreadcrumbs.snapshot(),
@@ -103,6 +120,8 @@ data class CrashReport(
                 authorUrl = author.authorUrl,
                 authorFingerprint = author.authorFingerprint,
                 kind = kind,
+                component = CrashComponentClassifier.classify(kind, process, exceptionType, stackTrace),
+                nativeLibraries = NativeLibraries.extract(stackTrace),
             )
         }
 
@@ -120,6 +139,7 @@ data class CrashReport(
             val rootCause = sanitize(
                 throwable.message?.takeIf { it.isNotBlank() } ?: throwable::class.java.name,
             )
+            val process = processName()
             return CrashReport(
                 reportId = reportId(nowMillis, exceptionType, rootCause, stackTrace, kind),
                 crashedAtMillis = nowMillis,
@@ -127,7 +147,7 @@ data class CrashReport(
                 exceptionType = exceptionType,
                 rootCause = rootCause,
                 threadName = Thread.currentThread().name,
-                processName = processName(),
+                processName = process,
                 systemInfo = "Crash report construction failed: ${reportFailure::class.java.name}\n" +
                     buildSystemInfo(appInfo),
                 stackTrace = stackTrace,
@@ -136,6 +156,8 @@ data class CrashReport(
                 authorUrl = author.authorUrl,
                 authorFingerprint = author.authorFingerprint,
                 kind = kind,
+                component = CrashComponentClassifier.classify(kind, process, exceptionType, stackTrace),
+                nativeLibraries = NativeLibraries.extract(stackTrace),
             )
         }
 
@@ -159,7 +181,8 @@ data class CrashReport(
                 CrashReportKind.FREEZE -> "com.chloemlla.lumen.crash.MainThreadFreeze"
                 CrashReportKind.CRASH,
                 CrashReportKind.NON_FATAL,
-                CrashReportKind.PRIOR_EXIT -> error("Unreachable crash watchdog kind")
+                CrashReportKind.PRIOR_EXIT,
+                CrashReportKind.EXTERNAL -> error("Unreachable crash watchdog kind")
             }
             val rootCause = when (kind) {
                 CrashReportKind.ANR, CrashReportKind.FREEZE ->
@@ -168,9 +191,11 @@ data class CrashReport(
                     "Application did not report its first rendered frame within $duration ms"
                 CrashReportKind.CRASH,
                 CrashReportKind.NON_FATAL,
-                CrashReportKind.PRIOR_EXIT -> error("Unreachable crash watchdog kind")
+                CrashReportKind.PRIOR_EXIT,
+                CrashReportKind.EXTERNAL -> error("Unreachable crash watchdog kind")
             }
             val stackTrace = sanitize(threadDump).ifBlank { "<thread dump unavailable>" }
+            val process = processName()
             return CrashReport(
                 reportId = reportId(nowMillis, exceptionType, rootCause, stackTrace, kind),
                 crashedAtMillis = nowMillis,
@@ -178,7 +203,7 @@ data class CrashReport(
                 exceptionType = exceptionType,
                 rootCause = rootCause,
                 threadName = mainThread.name.ifBlank { "main" },
-                processName = processName(),
+                processName = process,
                 systemInfo = buildSystemInfo(appInfo),
                 stackTrace = stackTrace,
                 recentEvents = CrashBreadcrumbs.snapshot(),
@@ -187,6 +212,8 @@ data class CrashReport(
                 authorFingerprint = author.authorFingerprint,
                 kind = kind,
                 durationMillis = duration,
+                component = CrashComponentClassifier.classify(kind, process, exceptionType, stackTrace),
+                nativeLibraries = NativeLibraries.extract(stackTrace),
             )
         }
 
@@ -197,6 +224,7 @@ data class CrashReport(
             reasonCode: Int,
             description: String,
             trace: String,
+            exitStatus: Int = 0,
         ): CrashReport {
             AuthorIntegrity.verifyOrThrow("from-prior-exit")
             val author = AuthorIntegrity.verifiedAuthorBlock()
@@ -204,6 +232,13 @@ data class CrashReport(
             val exceptionType = reasonName
             val rootCause = description.ifBlank { reasonName }
             val stackTrace = sanitize(trace).ifBlank { "<exit trace unavailable>" }
+            val process = exitProcessName.ifBlank { "unknown" }
+            // Only a signaled death carries a meaningful signal; an ANR is also delivered as
+            // SIGKILL by the system, which would read as "killed by SIGKILL" and add nothing.
+            val signalText = when (reasonCode) {
+                2, 5 -> ExitSignals.describe(exitStatus)
+                else -> null
+            }
             return CrashReport(
                 reportId = reportId(exitTimestampMillis, exceptionType, rootCause, stackTrace, CrashReportKind.PRIOR_EXIT),
                 crashedAtMillis = exitTimestampMillis,
@@ -211,7 +246,7 @@ data class CrashReport(
                 exceptionType = exceptionType,
                 rootCause = rootCause,
                 threadName = "previous-process",
-                processName = exitProcessName.ifBlank { "unknown" },
+                processName = process,
                 systemInfo = buildSystemInfo(appInfo),
                 stackTrace = stackTrace,
                 recentEvents = CrashBreadcrumbs.snapshot(),
@@ -219,7 +254,72 @@ data class CrashReport(
                 authorUrl = author.authorUrl,
                 authorFingerprint = author.authorFingerprint,
                 kind = CrashReportKind.PRIOR_EXIT,
-                exitReason = listOfNotNull(reasonName, description.takeIf { it.isNotBlank() }).joinToString(" / "),
+                exitReason = listOfNotNull(
+                    reasonName,
+                    signalText,
+                    description.takeIf { it.isNotBlank() },
+                ).joinToString(" / "),
+                component = CrashComponentClassifier.classify(
+                    CrashReportKind.PRIOR_EXIT,
+                    process,
+                    exceptionType,
+                    stackTrace,
+                ),
+                exitStatus = exitStatus,
+                nativeLibraries = NativeLibraries.extract(stackTrace),
+            )
+        }
+
+        /**
+         * Builds a report from failure data the host observed itself (JS error, Rust panic hook
+         * line, Flutter error, native log line). See [LumenCrash.recordExternalFailure].
+         */
+        fun fromExternal(
+            source: String,
+            message: String,
+            stackTrace: String?,
+            occurredAtMillis: Long,
+            threadName: String?,
+            appInfo: CrashAppInfo,
+        ): CrashReport {
+            AuthorIntegrity.verifyOrThrow("from-external")
+            val author = AuthorIntegrity.verifiedAuthorBlock()
+            val safeSource = sanitize(source).trim().take(EXTERNAL_SOURCE_MAX_CHARS).ifBlank { "host" }
+            val safeMessage = sanitize(message).trim().take(ROOT_CAUSE_MAX_CHARS)
+                .ifBlank { "External failure reported by $safeSource" }
+            val safeStack = sanitize(stackTrace.orEmpty()).trim().take(STACK_TRACE_MAX_CHARS)
+            val time = if (occurredAtMillis > 0L) occurredAtMillis else System.currentTimeMillis()
+            val process = processName()
+            return CrashReport(
+                reportId = reportId(
+                    time,
+                    "ExternalFailure",
+                    "$safeSource|$safeMessage",
+                    safeStack,
+                    CrashReportKind.EXTERNAL,
+                ),
+                crashedAtMillis = time,
+                crashedAtText = formatTime(time),
+                exceptionType = "ExternalFailure",
+                rootCause = safeMessage,
+                threadName = threadName?.trim()?.takeIf { it.isNotBlank() }
+                    ?: Thread.currentThread().name,
+                processName = process,
+                systemInfo = buildSystemInfo(appInfo),
+                stackTrace = safeStack.ifBlank { "<no stack trace supplied by $safeSource>" },
+                recentEvents = CrashBreadcrumbs.snapshot(),
+                authorName = author.authorName,
+                authorUrl = author.authorUrl,
+                authorFingerprint = author.authorFingerprint,
+                kind = CrashReportKind.EXTERNAL,
+                component = CrashComponentClassifier.classify(
+                    CrashReportKind.EXTERNAL,
+                    process,
+                    "ExternalFailure",
+                    safeStack,
+                ),
+                nativeLibraries = NativeLibraries.extract(safeStack),
+                externalSource = safeSource,
             )
         }
 
@@ -307,6 +407,9 @@ data class CrashReport(
 
         private const val BYTES_PER_MEBIBYTE = 1024L * 1024L
         private const val REPORT_ID_HEX_LENGTH = 12
+        private const val ROOT_CAUSE_MAX_CHARS = 1_024
+        private const val STACK_TRACE_MAX_CHARS = 32 * 1024
+        private const val EXTERNAL_SOURCE_MAX_CHARS = 120
     }
 }
 
@@ -337,6 +440,17 @@ fun crashReportFromJson(json: JSONObject): CrashReport {
         kind = CrashReportKind.fromWireValue(json.optString("kind").takeIf { it.isNotBlank() }),
         durationMillis = json.optLong("durationMillis", 0L).coerceAtLeast(0L),
         exitReason = json.optString("exitReason").takeIf { it.isNotBlank() },
+        component = CrashComponent.fromWireValue(
+            json.optString("component").takeIf { it.isNotBlank() },
+        ),
+        exitStatus = json.optInt("exitStatus", 0).coerceAtLeast(0),
+        nativeLibraries = buildList {
+            val libraries = json.optJSONArray("nativeLibraries") ?: return@buildList
+            for (index in 0 until libraries.length()) {
+                libraries.optString(index).takeIf { it.isNotBlank() }?.let(::add)
+            }
+        },
+        externalSource = json.optString("externalSource").takeIf { it.isNotBlank() },
     )
 }
 
@@ -359,6 +473,14 @@ fun CrashReport.toJson(): JSONObject {
         put("kind", kind.wireValue)
         put("durationMillis", durationMillis.coerceAtLeast(0L))
         exitReason?.let { put("exitReason", it) }
+        put("component", component.wireValue)
+        if (exitStatus > 0) put("exitStatus", exitStatus)
+        if (nativeLibraries.isNotEmpty()) {
+            put("nativeLibraries", JSONArray().apply {
+                nativeLibraries.forEach { library -> put(library) }
+            })
+        }
+        externalSource?.let { put("externalSource", it) }
         put("authorName", author.authorName)
         put("authorUrl", author.authorUrl)
         put("authorFingerprint", author.authorFingerprint)

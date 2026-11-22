@@ -48,6 +48,21 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 Text("Force crash")
                             }
+                            Button(
+                                onClick = {
+                                    // Demonstrates the WebView-shell channel: a failure the SDK
+                                    // never sees as a throwable becomes a normal report.
+                                    LumenCrash.recordExternalFailure(
+                                        source = "sample.js",
+                                        message = "TypeError: sample handler failed",
+                                        stackTrace = "at app.js:12:5
+at run.js:3:1",
+                                        claimPendingSlot = true,
+                                    )
+                                },
+                            ) {
+                                Text("Report external failure")
+                            }
                         }
                     }
                 }

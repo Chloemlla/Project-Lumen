@@ -82,6 +82,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.chloemlla.lumen.crash.AuthorIntegrity
 import com.chloemlla.lumen.crash.CrashAuthorAttribution
+import com.chloemlla.lumen.crash.CrashComponent
+import com.chloemlla.lumen.crash.CrashReportKind
 import com.chloemlla.lumen.crash.CrashReportPasteUploader
 import com.chloemlla.lumen.crash.CrashReport
 import com.chloemlla.lumen.crash.LumenCrash
@@ -120,10 +122,11 @@ fun LumenCrashReportScreen(
     val activity = context.findActivity()
     val windowSizeClass = if (activity != null) calculateWindowSizeClass(activity) else null
     val config = LumenCrash.configOrNull()
-    val title = config?.reportTitle?.takeIf { it.isNotBlank() }
-        ?: stringResource(R.string.lumen_crash_report_title)
-    val message = config?.reportMessage?.takeIf { it.isNotBlank() }
-        ?: stringResource(R.string.lumen_crash_report_message)
+    // A single default copy for every report trains users to ignore the screen. The heading now
+    // says which runtime failed, while a host-supplied reportTitle/reportMessage still wins.
+    val defaultCopy = crashReportCopy(report)
+    val title = config?.reportTitle?.takeIf { it.isNotBlank() } ?: defaultCopy.first
+    val message = config?.reportMessage?.takeIf { it.isNotBlank() } ?: defaultCopy.second
 
     var stackExpanded by rememberSaveable(report.crashedAtMillis) { mutableStateOf(false) }
     var shareOptionsVisible by rememberSaveable(report.crashedAtMillis) { mutableStateOf(false) }
@@ -201,6 +204,36 @@ fun LumenCrashReportScreen(
                     dense = layout.denseControls,
                     contentPadding = layout.controlPadding,
                 )
+                CrashReportInfoTile(
+                    label = stringResource(R.string.lumen_crash_report_component),
+                    value = stringResource(componentLabelRes(report.component)),
+                    dense = layout.denseControls,
+                    contentPadding = layout.controlPadding,
+                )
+                report.exitReason?.let { exitReason ->
+                    CrashReportInfoTile(
+                        label = stringResource(R.string.lumen_crash_report_exit_reason),
+                        value = exitReason,
+                        dense = layout.denseControls,
+                        contentPadding = layout.controlPadding,
+                    )
+                }
+                report.externalSource?.let { source ->
+                    CrashReportInfoTile(
+                        label = stringResource(R.string.lumen_crash_report_captured_by),
+                        value = source,
+                        dense = layout.denseControls,
+                        contentPadding = layout.controlPadding,
+                    )
+                }
+                if (report.nativeLibraries.isNotEmpty()) {
+                    CrashReportInfoTile(
+                        label = stringResource(R.string.lumen_crash_report_native_libraries),
+                        value = report.nativeLibraries.joinToString("\n"),
+                        dense = layout.denseControls,
+                        contentPadding = layout.controlPadding,
+                    )
+                }
                 CrashReportInfoTile(
                     label = stringResource(R.string.lumen_crash_report_thread),
                     value = report.threadName,
@@ -1469,6 +1502,48 @@ private fun openHttpsUrl(context: Context, url: String) {
             Toast.LENGTH_SHORT,
         ).show()
     }
+}
+
+/**
+ * Heading and body copy for the screen, keyed on what actually failed.
+ *
+ * A WebView-shell host has four very different failure surfaces (JS layer, WebView renderer
+ * process, native/Rust layer, JVM) and a single "Crash report saved" heading hides the one fact
+ * the person holding the phone needs.
+ */
+@Composable
+private fun crashReportCopy(report: CrashReport): Pair<String, String> {
+    val rendererDeath = report.component == CrashComponent.WEBVIEW_RENDERER
+    val titleRes = when {
+        rendererDeath -> R.string.lumen_crash_report_title_renderer
+        report.kind == CrashReportKind.EXTERNAL -> R.string.lumen_crash_report_title_external
+        report.component == CrashComponent.RUST_NATIVE -> R.string.lumen_crash_report_title_rust
+        report.kind == CrashReportKind.ANR || report.kind == CrashReportKind.STARTUP_HANG ||
+            report.kind == CrashReportKind.FREEZE -> R.string.lumen_crash_report_title_anr
+        report.kind == CrashReportKind.PRIOR_EXIT -> R.string.lumen_crash_report_title_prior_exit
+        else -> R.string.lumen_crash_report_title
+    }
+    val messageRes = when {
+        rendererDeath -> R.string.lumen_crash_report_message_renderer
+        report.kind == CrashReportKind.EXTERNAL -> R.string.lumen_crash_report_message_external
+        report.component == CrashComponent.RUST_NATIVE -> R.string.lumen_crash_report_message_rust
+        report.kind == CrashReportKind.ANR || report.kind == CrashReportKind.STARTUP_HANG ||
+            report.kind == CrashReportKind.FREEZE -> R.string.lumen_crash_report_message_anr
+        report.kind == CrashReportKind.PRIOR_EXIT -> R.string.lumen_crash_report_message_prior_exit
+        else -> R.string.lumen_crash_report_message
+    }
+    return stringResource(titleRes) to stringResource(messageRes)
+}
+
+private fun componentLabelRes(component: CrashComponent): Int = when (component) {
+    CrashComponent.RUST_NATIVE -> R.string.lumen_crash_report_component_rust_native
+    CrashComponent.NATIVE -> R.string.lumen_crash_report_component_native
+    CrashComponent.WEBVIEW_RENDERER -> R.string.lumen_crash_report_component_webview_renderer
+    CrashComponent.WEBVIEW -> R.string.lumen_crash_report_component_webview
+    CrashComponent.JAVA -> R.string.lumen_crash_report_component_java
+    CrashComponent.ANR -> R.string.lumen_crash_report_component_anr
+    CrashComponent.HOST_EXTERNAL -> R.string.lumen_crash_report_component_host_external
+    CrashComponent.UNKNOWN -> R.string.lumen_crash_report_component_unknown
 }
 
 private fun copyTextToClipboard(context: Context, label: String, text: String) {

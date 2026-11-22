@@ -73,6 +73,16 @@ data class LumenCrashConfig(
      */
     val priorExitCaptureEnabled: Boolean = true,
 
+    /**
+     * Directory scanned for host-observed failures (Rust panic hook files, JS error dumps,
+     * native log snippets) right after [LumenCrash.install].
+     *
+     * Files are converted into [CrashReportKind.EXTERNAL] reports and deleted once accepted. Null
+     * (the default) disables the scan; hosts can also call [CrashExternalInbox.ingest] directly.
+     * Point it at app-private storage — the SDK redacts tokens, not file permissions.
+     */
+    val externalInboxDirectory: java.io.File? = null,
+
     // ── Backend crash-report upload ──────────────────────────────────────────
 
     /**

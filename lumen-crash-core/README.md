@@ -150,3 +150,40 @@ LumenCrash.markStartupComplete()
 Startup reports use `CrashReportKind.STARTUP_HANG`; main-looper reports use
 `CrashReportKind.FREEZE`. Existing JSON without `kind` or `durationMillis` continues to load as
 an ordinary crash report.
+
+## WebView-shell hosts (Tauri / Capacitor / plain WebView)
+
+A WebView shell fails in runtimes the uncaught-exception handler never sees: a Rust panic that
+aborts the process, a WebView renderer process death (`:sandboxed_process0`), an ANR while the
+main thread is inside JNI, or an uncaught JS error. Reports therefore carry
+`CrashReport.component` (`rust_native`, `native`, `webview_renderer`, `webview`, `java`, `anr`,
+`host_external`, `unknown`), plus `exitStatus` and `nativeLibraries` when the platform supplied
+them.
+
+Prior-exit capture reads **every** process the package owned and reports up to 5 unreported
+deaths. Only a death of the app's own process claims the single pending-report slot; a renderer
+or secondary process death is uploaded and delivered to `onReportSaved` instead, so the next
+launch is not blocked by a crash report for a crash the shell survived.
+
+Hosts that observe failures themselves push them in:
+
+```kotlin
+// Direct call, e.g. from a JS bridge. Never throws; returns null when not installed.
+LumenCrash.recordExternalFailure(
+    source = "webview.js",
+    message = "TypeError: x is undefined",
+    stackTrace = jsStack,          // optional
+    claimPendingSlot = false,      // true only for post-mortem evidence
+)
+
+// Or drop files in a directory (Rust panic hook, native log lines):
+LumenCrash.install(this) {
+    externalInboxDirectory = File(filesDir, "crash-inbox")
+}
+```
+
+Inbox files are `*.json` (`message`, `stackTrace`, `source`, `timestampMillis`, `thread`) or
+`*.txt`/`*.log` (first line is the message). They are deleted only after a report was built.
+
+See [docs/tauri-android-crash-analysis.md](../docs/tauri-android-crash-analysis.md) for the Tauri
+architecture, a Rust panic-hook recipe, a JS handler recipe, and the diagnosis playbook.

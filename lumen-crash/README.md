@@ -1086,6 +1086,8 @@ LumenCrash.record(throwable) // also persists + invokes onCrashSaved
 | `LumenCrash.recordBreadcrumb(event)` | Append sanitized breadcrumb | Yes |
 | `LumenCrash.record(throwable)` | Build + persist report, invoke `onCrashSaved` | Yes |
 | `LumenCrash.recordNonFatal(throwable)` | Build + upload a `NON_FATAL` report **without** persisting it | Current source / recent AARs only |
+| `LumenCrash.recordExternalFailure(source, message, stackTrace, occurredAtMillis, threadName, claimPendingSlot)` | Report a failure another runtime saw (JS `window.onerror`, Rust panic hook, Flutter); never throws | Current source only |
+| `CrashExternalInbox.ingest(directory)` | Convert `*.json` / `*.txt` / `*.log` failure dumps into reports | Current source only |
 | `LumenCrash.loadPendingReport()` | In-memory startup report, else disk load (integrity fail-closed) | Yes |
 | `LumenCrash.loadPendingReportSafely()` | Host-safe pending load (`null` on failure) | Current source / recent AARs only — if missing, wrap `loadPendingReport` in `runCatching` |
 | `LumenCrash.clearPendingReport()` | Clear store + startup report | Yes |
@@ -1109,8 +1111,9 @@ LumenCrash.record(throwable) // also persists + invokes onCrashSaved
 | `commitHash` | no | Default `"unknown"` |
 | `fileProviderAuthority` | no | Enables share-as-file; `null` => text-only share |
 | `shareSubject` | no | Share intent subject; falls back to library string |
-| `reportTitle` | no | UI title override; `null` => EN/ZH library string |
-| `reportMessage` | no | UI message override; `null` => EN/ZH library string |
+| `reportTitle` | no | UI title override; `null` => EN/ZH library string chosen per failure layer |
+| `reportMessage` | no | UI message override; `null` => EN/ZH library string chosen per failure layer |
+| `externalInboxDirectory` | no | Directory scanned after install for host-supplied failure files; `null` disables |
 | `onCrashSaved` | no | Host upload/telemetry hook after successful save |
 | `killProcessWhenNoPreviousHandler` | no | Default `true`; kill process if no previous handler |
 
@@ -1142,11 +1145,40 @@ fun LumenCrashReportScreen(
 ```
 
 - Opens only after author integrity verification; failure shows a blocked screen.
-- Title/message come from `LumenCrashConfig` overrides when non-blank, else library resources.
+- Title/message come from `LumenCrashConfig` overrides when non-blank, else library resources chosen per failure layer (crash / ANR / renderer process / Rust native / host-reported / prior exit).
 - Primary actions: copy report ID, copy full report, share, clear & continue.
 - `onClearStoredReport` lets the host inject extra work (for example schedule upload then clear). When null, the screen calls `LumenCrash.clearPendingReport()`.
 
 ## Crash capture behavior
+
+### Failure-layer attribution (WebView shells)
+
+`CrashReport.component` names the runtime that failed, so one crash screen can describe four
+very different situations, and the UI headings follow it ("Native layer aborted", "Web page
+process restarted", "App stopped responding" …):
+
+| `CrashComponent` | Meaning | How it is decided |
+|---|---|---|
+| `rust_native` | Rust code (Tauri/Wry) | Rust panic symbols or `lib*_lib.so` / `libtauri` / `libwry` / `libtao` in the trace |
+| `native` | Other native code | `.so` frames with offsets/BuildId, or `REASON_CRASH_NATIVE` / `REASON_SIGNALED` |
+| `webview_renderer` | WebView renderer process died | Process name contains `:sandboxed_process` / `:privileged_process` / `:webview` |
+| `webview` | WebView glue Java frames | `android.webkit.*` / `org.chromium.*` frames |
+| `java` | Plain JVM crash | None of the above |
+| `anr` | Main thread unresponsive | `ANR` / `STARTUP_HANG` / `FREEZE` reports |
+| `host_external` | Host runtime reported it | `CrashReportKind.EXTERNAL` |
+| `unknown` | Legacy report | Missing `component` field |
+
+Prior-exit capture reads every process the package owned (`getHistoricalProcessExitReasons(package,
+0, 32)`) and reports up to 5 unreported deaths, with `exitStatus` (e.g. `SIGABRT (6)`),
+`importance` and `rss` folded into the report. Only a **main-process** death claims the single
+pending-report slot: a renderer or secondary process death is uploaded and delivered through
+`onReportSaved`, so a renderer restart never blocks the next launch with a full-screen crash
+report.
+
+See [docs/tauri-android-crash-analysis.md](../docs/tauri-android-crash-analysis.md) for the Tauri
+runtime internals, the Rust panic-hook recipe, the JS handler recipe, and the diagnosis playbook.
+
+### Capture path
 
 1. `install()` stores config, creates `CrashReportStore`, installs a default uncaught exception handler, and records an install breadcrumb.
 2. On uncaught exception:

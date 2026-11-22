@@ -9,6 +9,10 @@
     <string name="lumen_crash_report_time">时间</string>
     <string name="lumen_crash_report_root_cause">根因</string>
     <string name="lumen_crash_report_exception_type">异常类型</string>
+    <string name="lumen_crash_report_component">失败层</string>
+    <string name="lumen_crash_report_exit_reason">退出原因</string>
+    <string name="lumen_crash_report_captured_by">上报来源</string>
+    <string name="lumen_crash_report_native_libraries">原生库</string>
     <string name="lumen_crash_report_system_info">系统信息</string>
     <string name="lumen_crash_report_recent_events">最近应用事件</string>
     <string name="lumen_crash_report_stack_trace">堆栈信息</string>
@@ -44,4 +48,25 @@
     <string name="lumen_crash_report_file_share_unavailable">未配置 FileProvider，无法以文件形式分享。</string>
     <string name="lumen_crash_report_author_label">SDK 作者</string>
     <string name="lumen_crash_report_integrity_failed">崩溃报告界面已阻止：作者完整性校验失败。</string>
+
+    <!-- 按失败层区分的标题：WebView 套壳应用可能在不同运行时里挂掉。 -->
+    <string name="lumen_crash_report_title_anr">应用无响应</string>
+    <string name="lumen_crash_report_message_anr">主线程被阻塞过久，系统已判定为无响应。下面的线程转储展示了它当时在做什么。</string>
+    <string name="lumen_crash_report_title_renderer">网页渲染进程已重启</string>
+    <string name="lumen_crash_report_message_renderer">WebView 渲染进程已结束，而应用主壳仍在运行。通常问题在网页侧，因此下面的记录来自系统退出日志，而非 JVM 异常。</string>
+    <string name="lumen_crash_report_title_rust">原生层已中止</string>
+    <string name="lumen_crash_report_message_rust">原生代码中止了进程，Rust panic 逸出应用入口时正是这种行为。下面是系统侧记录；符号化需要对应的 ABI 与调试符号。</string>
+    <string name="lumen_crash_report_title_external">应用运行时上报的失败</string>
+    <string name="lumen_crash_report_message_external">该失败由应用自身的运行时（脚本或原生层）上报，而不是 JVM 崩溃处理器捕获的。下面是它提供的原始信息。</string>
+    <string name="lumen_crash_report_title_prior_exit">上次运行异常结束</string>
+    <string name="lumen_crash_report_message_prior_exit">应用上一次运行时异常退出，下面是系统记录的退出信息。</string>
+
+    <string name="lumen_crash_report_component_rust_native">Rust / 原生</string>
+    <string name="lumen_crash_report_component_native">原生</string>
+    <string name="lumen_crash_report_component_webview_renderer">WebView 渲染进程</string>
+    <string name="lumen_crash_report_component_webview">WebView</string>
+    <string name="lumen_crash_report_component_java">Java / Kotlin</string>
+    <string name="lumen_crash_report_component_anr">主线程（无响应）</string>
+    <string name="lumen_crash_report_component_host_external">由宿主运行时上报</string>
+    <string name="lumen_crash_report_component_unknown">未知</string>
 </resources>
