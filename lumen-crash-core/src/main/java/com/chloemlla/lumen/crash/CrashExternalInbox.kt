@@ -15,9 +15,14 @@ import java.io.File
  * - A JS `window.onerror` handler has no JVM stack, but it has a message and a JS stack — both
  *   survive as-is.
  *
- * Accepted files: `*.json` (`message`/`stackTrace`/`source`/`timestampMillis`/`thread`),
- * plus `*.txt` and `*.log` (first line is the message, the rest is the stack trace). Files are
- * deleted only after the SDK accepted the report, so a failed ingest is retried on the next scan.
+ * Accepted files: `*.json`
+ * (`message`/`stackTrace`/`source`/`timestampMillis`/`thread`/`fatal`), plus `*.txt` and `*.log`
+ * (first line is the message, the rest is the stack trace). Files are deleted only after the SDK
+ * accepted the report, so a failed ingest is retried on the next scan.
+ *
+ * `fatal` defaults to true because a file in the inbox usually means the process died. A host
+ * that funnels recoverable failures through the same directory — a JS `window.onerror` storm, for
+ * example — writes `"fatal": false`, and those reports never claim the crash-screen slot.
  *
  * Everything here fails soft: a malformed or oversized file is skipped, never thrown.
  */
@@ -33,9 +38,10 @@ object CrashExternalInbox {
     /**
      * Converts up to [DEFAULT_MAX_FILES_PER_SCAN] pending files in [directory] into reports.
      *
-     * Returns the number of files consumed. Ingestion claims the pending-report slot: a file in
-     * the inbox means the previous process died before the host could tell anyone, which is
-     * exactly the case the crash screen exists for.
+     * Returns the number of files consumed. A fatal file claims the pending-report slot: a file in
+     * the inbox usually means the previous process died before the host could tell anyone, which
+     * is exactly the case the crash screen exists for. Files marked `"fatal": false` are recorded
+     * as non-fatal evidence and leave the slot alone.
      */
     fun ingest(directory: File): Int {
         if (!LumenCrash.isInstalled()) return 0
@@ -59,7 +65,7 @@ object CrashExternalInbox {
                     stackTrace = record.stackTrace,
                     occurredAtMillis = record.occurredAtMillis,
                     threadName = record.threadName,
-                    claimPendingSlot = true,
+                    claimPendingSlot = record.fatal,
                 )
             }.getOrNull() ?: continue
             if (report.kind != CrashReportKind.EXTERNAL) continue
@@ -91,6 +97,8 @@ internal data class CrashExternalRecord(
     val stackTrace: String?,
     val occurredAtMillis: Long,
     val threadName: String?,
+    /** False for failures the host recovered from; such entries never claim the pending slot. */
+    val fatal: Boolean = true,
 )
 
 /**
@@ -128,6 +136,7 @@ internal object CrashExternalRecordParser {
                 stackTrace = stackTrace,
                 occurredAtMillis = occurredAtMillis,
                 threadName = json.optString("thread").trim().takeIf { it.isNotBlank() },
+                fatal = json.optBoolean("fatal", json.optBoolean("isFatal", true)),
             )
         }.getOrNull()
     }
@@ -142,6 +151,8 @@ internal object CrashExternalRecordParser {
             stackTrace = lines.drop(1).joinToString("\n").trim().takeIf { it.isNotBlank() },
             occurredAtMillis = 0L,
             threadName = null,
+            // A plain-text dump has no header, so it is treated as post-mortem evidence.
+            fatal = true,
         )
     }
 }

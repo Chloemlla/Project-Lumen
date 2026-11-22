@@ -107,9 +107,13 @@ CrashExternalInbox.ingest(File(filesDir, "crash-inbox"))
 
 支持格式：
 
-- `*.json`：`{"source": "...", "message": "...", "stackTrace": "...", "timestampMillis": 0, "thread": "..."}`
-  （`msg`/`error`、`stack`/`backtrace`、`timestamp`/`occurredAtMillis` 作为别名）
+- `*.json`：`{"source": "...", "message": "...", "stackTrace": "...", "timestampMillis": 0, "thread": "...", "fatal": true}`
+  （`msg`/`error`、`stack`/`backtrace`、`timestamp`/`occurredAtMillis`、`isFatal` 作为别名）
 - `*.txt` / `*.log`：首行是消息，其余行是栈。
+
+`fatal` 缺省为 `true`：目录里出现文件通常意味着进程已经死了，这类报告会占用"下启动展示崩溃页"的那个槽位。
+宿主如果把**可恢复**的失败（典型是 JS `window.onerror`）也丢进同一个目录，就必须写 `"fatal": false`，
+否则一条 JS 报错就会把下次启动变成崩溃页——这类条目只作为证据记入面包屑与非致命上报，不抢槽位。
 
 单文件读取上限 64 KiB，每次最多处理 8 个；**只有成功生成报告才删除文件**，失败留待下次。
 
@@ -220,7 +224,8 @@ window.addEventListener("unhandledrejection", (event) => {
 });
 ```
 
-Rust 命令侧把这两个字段写成 `*.json` 丢进 `crash-inbox` 即可（与 4.2 同一格式，`source` 换成 `webview.js`）。
+Rust 命令侧把这两个字段写成 `*.json` 丢进 `crash-inbox` 即可（与 4.2 同一格式，`source` 换成 `webview.js`），
+**必须带上 `"fatal": false`**：JS 报错多数可恢复，若占用了槽位，用户下次启动只会看到一条 TypeError 的崩溃页。
 
 ---
 

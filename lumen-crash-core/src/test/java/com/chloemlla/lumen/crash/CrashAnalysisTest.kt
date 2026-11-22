@@ -43,9 +43,9 @@ class CrashAnalysisTest {
         listOf(CrashReportKind.ANR, CrashReportKind.STARTUP_HANG, CrashReportKind.FREEZE)
             .forEach { kind ->
                 assertEquals(
+                    "kind=${kind.wireValue}",
                     CrashComponent.ANR,
                     CrashComponentClassifier.classify(kind, "com.example.app", "ANR", ""),
-                    "kind=${kind.wireValue}",
                 )
             }
     }
