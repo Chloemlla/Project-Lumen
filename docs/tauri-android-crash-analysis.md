@@ -12,12 +12,12 @@
 
 | 失败形态 | 真实运行时 | 系统留下的证据 | 旧版 SDK 的表现 |
 | --- | --- | --- | --- |
-| Rust panic 逸出应用入口 | Rust（`lib<app>_lib.so`） | `ApplicationExitInfo`：`REASON_CRASH_NATIVE` + `SIGABRT (6)`，tombstone 里**没有 abort message** | 只显示"进程异常退出"，无栈、无归属 |
+| Rust panic 逸出应用入口 | Rust（`lib[app]_lib.so`） | `ApplicationExitInfo`：`REASON_CRASH_NATIVE` + `SIGABRT (6)`，tombstone 里**没有 abort message** | 只显示"进程异常退出"，无栈、无归属 |
 | Rust worker 线程 panic | Rust | 通常**什么都不留**（进程没死） | 完全看不到 |
 | WebView 渲染进程死亡 | Chromium `:sandboxed_process0` | `REASON_CRASH` + 渲染进程名；主进程仍活着 | 主进程没崩 → 看不到；一旦被采集又会误报成主进程崩溃 |
 | 主线程卡在 JNI/Rust | 主线程 | `REASON_ANR` + `getAnrInfo()` | 采到 ANR，但不区分"卡在原生层" |
 | JS 未捕获异常 | WebView JS 引擎 | 只有 `window.onerror` 能拿到 | 完全看不到 |
-| 原生库加载失败 | Linker | `java.lang.UnsatisfiedLinkError`（有时带 `lib<app>_lib.so`） | 归为普通 Java 崩溃，看不出是 Rust 库 |
+| 原生库加载失败 | Linker | `java.lang.UnsatisfiedLinkError`（有时带 `lib[app]_lib.so`） | 归为普通 Java 崩溃，看不出是 Rust 库 |
 
 所以"支持套壳应用"不是加一个标题常量，而是要把**归属（哪个运行时）**、**系统退出证据（信号/重要性/RSS）**、**外部运行时上报通道**补齐。
 
@@ -31,11 +31,11 @@
   `abstract class TauriActivity : WryActivity()`，把 `onCreate` / `onResume` / `onNewIntent` 等生命周期转发给 `PluginManager`。宿主写 `class MainActivity : TauriActivity()`。
 - `crates/tauri-macros/src/mobile.rs`
   `#[tauri::mobile_entry_point]` 生成的 `start_app` 被包在 `std::panic::catch_unwind` 里；捕获到展开失败时只做 `eprintln!("attempt to unwind out of \`rust\` with err: {:?}")`，然后**直接 `std::process::abort()`**。
-  ⇒ Release 包 stderr 被丢弃，tombstone 里只有 `signal 6 (SIGABRT)` 与 `lib<app>_lib.so` 的原始 PC，**没有 abort message**。
+  ⇒ Release 包 stderr 被丢弃，tombstone 里只有 `signal 6 (SIGABRT)` 与 `lib[app]_lib.so` 的原始 PC，**没有 abort message**。
 - `crates/tauri/mobile/android/src/main/java/app/tauri/Logger.kt`
   tag `"Tauri"`，只在 `shouldLog()`（debug 构建）时输出 ⇒ 不能把 release 端的诊断建立在 logcat 上。
 - `crates/tauri-cli/templates/mobile/android/buildSrc/src/main/kotlin/RustPlugin.kt`
-  每个 ABI 一个 product flavor，Rust 产物固定为 `lib<app>_lib.so`（Cargo `[lib] name = "<app>_lib"`）。这个名字同时是符号化提示。
+  每个 ABI 一个 product flavor，Rust 产物固定为 `lib[app]_lib.so`（Cargo `[lib] name = "[app]_lib"`）。这个名字同时是符号化提示。
 - Rust 端没有默认的 `panic::set_hook` → panic 信息既不入文件也不入 JVM，只有 abort。
 
 **结论**：Tauri 宿主必须自己接一个"外部上报通道"，SDK 负责把通道里的内容变成可读报告。
@@ -230,13 +230,13 @@ Rust 命令侧把这两个字段写成 `*.json` 丢进 `crash-inbox` 即可（�
 
 1. **`component = rust_native` + `退出原因 REASON_CRASH_NATIVE / SIGABRT (6)`**
    → 典型"panic 逸出 `start_app` 后被 `abort()`"。看 `根因`：inbox 里的 panic 消息（若有）就是真相；没有 inbox 时只能靠 tombstone 的 PC 做符号化。
-   符号化：用 `nativeLibraries` 里的库名（`lib<app>_lib.so`）+ tombstone 的 `BuildId` 找对应 ABI 的未剥离 `.so`，`llvm-symbolizer` / `ndk-stack`。
+   符号化：用 `nativeLibraries` 里的库名（`lib[app]_lib.so`）+ tombstone 的 `BuildId` 找对应 ABI 的未剥离 `.so`，`llvm-symbolizer` / `ndk-stack`。
 2. **`component = rust_native`，但退出原因是 `REASON_CRASH`/Java 栈**
    → 多半是 `UnsatisfiedLinkError` 或 FFI 参数穿越（Rust 里 `unwrap()` 一个 Kotlin 传进来的 `null`）。
 3. **`component = webview_renderer`**
    → 页面侧问题（OOM/无限递归/渲染崩溃）。主进程没死，报告的 `processName` 带 `:sandboxed_process0`；此时报告不会弹崩溃界面，只上传。
 4. **`component = anr`**
-   → 主线程被 Rust 调用占住。看 `线程转储` 里是否停在 `Native method` / `lib<app>_lib.so`；`importance` 高说明用户正在前台。
+   → 主线程被 Rust 调用占住。看 `线程转储` 里是否停在 `Native method` / `lib[app]_lib.so`；`importance` 高说明用户正在前台。
 5. **`component = host_external` + `Captured by: webview.js`**
    → JS 未捕获异常，看 `根因` 与 JS 栈（`at app.js:12:5` 这类）。
 6. **`nativeLibraries` 为空但 `component = native`**
@@ -246,7 +246,7 @@ Rust 命令侧把这两个字段写成 `*.json` 丢进 `crash-inbox` 即可（�
 
 ## 6. 已知限制
 
-- **符号化需要调试符号**：SDK 只能给出库名、BuildId、原始 PC。`lib<app>_lib.so` 需用构建该版本时的 `buildId` 匹配，否则地址无意义。
+- **符号化需要调试符号**：SDK 只能给出库名、BuildId、原始 PC。`lib[app]_lib.so` 需用构建该版本时的 `buildId` 匹配，否则地址无意义。
 - **`abort()` 前的最后一份 panic 文件可能丢失**：hook 写文件与进程被杀竞争，极端情况下文件为空；此时退化为只有 tombstone。
 - **`REASON_CRASH_NATIVE` 的 tombstone 只在 API 31+ 可解析**（protobuf 格式）；API 30 走 `REASON_CRASH_NATIVE` 但没有可读栈。
 - **渲染进程报告不占槽位**：如果宿主只依赖"崩溃界面"来做提示，这类事件只能通过 `onReportSaved` / 后端看到。
