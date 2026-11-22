@@ -55,8 +55,7 @@ class MainActivity : ComponentActivity() {
                                     LumenCrash.recordExternalFailure(
                                         source = "sample.js",
                                         message = "TypeError: sample handler failed",
-                                        stackTrace = "at app.js:12:5
-at run.js:3:1",
+                                        stackTrace = "at app.js:12:5\nat run.js:3:1",
                                         claimPendingSlot = true,
                                     )
                                 },
